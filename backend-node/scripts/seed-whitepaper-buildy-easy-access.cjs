@@ -1,22 +1,20 @@
 #!/usr/bin/env node
 /**
- * Crée le livre blanc marketing « Buildy Easy Access » (3 pages : cover +
- * chapitre corps + chapitre CTA). Mode chapitres (Tiptap + template
- * `whitepaper-book.hbs`). Idempotent : si slug='buildy-easy-access'
- * existe déjà, le script affiche l'URL et sort sans dupliquer.
+ * Brochure marketing « Buildy Easy Access » (4 pages : cover + 2 pages
+ * contenu + back-cover CTA). Mode chapitres (Tiptap + template
+ * whitepaper-book.hbs). Idempotent : si slug existe, le script affiche
+ * l'URL et sort. Mode --update : aligne en place le whitepaper existant.
  *
  * Lancer DEPUIS LA RACINE du repo buildy-docs :
  *   node backend-node/scripts/seed-whitepaper-buildy-easy-access.cjs
+ *   node backend-node/scripts/seed-whitepaper-buildy-easy-access.cjs --update
  *
- * Effet :
- *  - crée un document afs (kind='whitepaper', wp_layout='book',
- *    wp_audience='asset_manager', wp_meta_json.subtitle=...)
- *  - insère 2 chapitres dans `sections` (kind='standard', parent_id=null,
- *    position 1 et 2)
- *  - grant 'write' aux autres utilisateurs pour partage équipe
- *
- * Ton : « punchy LinkedIn » — reprend l'angle du post Kevin Brocard de
- * mars 2026 qui a fait réagir (« GTB la plus utilisée en France = Excel »).
+ * Charte voix Buildy (stricte) :
+ *  - Voix directe, sobre, humaine. Phrases courtes.
+ *  - AUCUN tiret long. Aucun emoji. Aucun jargon (credentials, proxy,
+ *    révocation, etc.).
+ *  - Le lecteur est déjà chaud : on confirme, on rend tangible, on
+ *    enlève le risque, on facilite le passage à l'action.
  */
 'use strict';
 
@@ -25,108 +23,127 @@ const path = require('path');
 const ROOT = process.cwd();
 const SLUG = 'buildy-easy-access';
 const TITLE = 'Buildy Easy Access';
-const SUBTITLE = 'Un seul portail sécurisé pour superviser toutes vos GTB tierces, quelle que soit la marque déployée sur chaque site.';
+const SUBTITLE = 'Tous vos bâtiments sur une carte. Un clic, vous êtes dans la GTB du site. Quelle que soit la marque.';
 
-const CHAPTER_1_TITLE = 'Il est temps d\'oublier Excel pour la gestion technique de vos bâtiments';
+const db = require(path.join(ROOT, 'backend-node/src/database'));
+const { renderFaIconSvg } = require(path.join(ROOT, 'backend-node/src/lib/pdf'));
+db.init();
+
+// Icônes FA Solid embed SVG (vert menthe pour pain cards, navy pour
+// les autres). Taille interne ajustée via le CSS .pain-card .pain-icon
+// qui set width/height directement sur le <svg>.
+const ICON_USER_SHIELD = renderFaIconSvg('user-shield', '#00cd92', '32');
+const ICON_LOCK_OPEN   = renderFaIconSvg('lock-open',   '#00cd92', '32');
+const ICON_BOLT        = renderFaIconSvg('bolt',        '#00cd92', '32');
+
+// ─── Page 2 ─ confirmation + comment ça marche + 3 bénéfices ─────────
+const CHAPTER_1_TITLE = 'Vous nous l\'avez dit. On a la réponse.';
 const CHAPTER_1_HTML = `
-<p class="lead">Sur un parc de plusieurs dizaines de bâtiments tertiaires, l'outil de supervision le plus utilisé n'est pas une plateforme GTB — c'est un fichier Excel partagé sur Teams.</p>
+<p class="lead">Vous nous avez dit que c'était votre quotidien. Comme beaucoup de nos clients. Pas besoin de vous refaire le tableau, vous le vivez déjà. Voici comment on le règle.</p>
+
+<div class="solution-card">
+  <div class="solution-eyebrow">Comment ça marche</div>
+  <h2>Une carte, un clic, vous êtes dans la GTB</h2>
+  <p>Tous vos sites apparaissent sur une carte dans Hyperveez. Vous cliquez sur un bâtiment, sa supervision s'ouvre directement. Pas de VPN à lancer. Pas de login à retrouver. Pas de logiciel à changer.</p>
+  <p>Peu importe la marque installée sur le site (Schneider EcoStruxure, Distech, Niagara, PCVue et les autres), tout passe par le même portail.</p>
+  <p>Un seul accès, géré par vous. Quand un collaborateur part, vous coupez son accès d'un coup, sans toucher aux mots de passe des GTB.</p>
+</div>
 
 <div class="pain-grid">
   <div class="pain-card">
-    <div class="pain-icon">🔑</div>
-    <div class="pain-title">Connaissance silotée</div>
-    <p>Les accès sont dans la tête d'une seule personne. Quand elle quitte l'entreprise, la moitié du parc devient inaccessible le temps de tout reconstituer.</p>
+    <div class="pain-icon">${ICON_USER_SHIELD}</div>
+    <div class="pain-title">Plus de dépendance à une seule personne</div>
+    <p>Les accès sont dans le portail, pas dans une tête.</p>
   </div>
   <div class="pain-card">
-    <div class="pain-icon">📧</div>
-    <div class="pain-title">Credentials sur Teams</div>
-    <p>URLs, VPN, logins, mots de passe&nbsp;: tout circule par email et Teams. Pas de révocation centralisée quand un collaborateur change de poste.</p>
+    <div class="pain-icon">${ICON_LOCK_OPEN}</div>
+    <div class="pain-title">Plus de mots de passe qui traînent sur Teams</div>
+    <p>Un seul accès, que vous coupez quand vous voulez.</p>
   </div>
   <div class="pain-card">
-    <div class="pain-icon">⏱️</div>
-    <div class="pain-title">Temps d'investigation</div>
-    <p>Ouvrir le bon VPN, retrouver le bon login, attendre la connexion, comprendre l'interface native du fabricant. Multiplié par chaque alerte.</p>
-  </div>
-</div>
-
-<div class="solution-card">
-  <div class="solution-eyebrow">La solution Buildy</div>
-  <h2>Un seul portail, toutes vos GTB tierces</h2>
-  <p>Buildy Easy Access centralise l'accès à toutes vos supervisions GTB tierces depuis Hyperveez. Chaque interface native — <strong>Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk</strong>, peu importe la marque — est exposée via un lien proxy chiffré HTTPS de la forme&nbsp;:</p>
-  <div class="solution-url">https://<span class="url-var">votre_gtb</span>.proxy.buildy.fr</div>
-  <p>Sur la vue cartographique d'Hyperveez, vous cliquez sur un site et la console native du fabricant s'ouvre dans un nouvel onglet — sans client VPN, sans saisie d'identifiants, sans changement de logiciel. <strong>Authentification unique</strong> côté Buildy, <strong>révocation immédiate</strong> lors du départ d'un collaborateur, sans avoir à toucher aux credentials natifs des GTB.</p>
-</div>
-
-<div class="guarantee-card">
-  <div class="guarantee-check">✓</div>
-  <div>
-    <div class="guarantee-title">Pas de remplacement matériel — aucun risque de régression</div>
-    <p>Vos automates, vos régulateurs, vos sondes terrain et votre supervision historique restent en place. Buildy n'intervient que sur la couche <strong>accès</strong> et <strong>vue d'ensemble multi-sites</strong>. Aucun serveur hyperviseur à 100&nbsp;k€, aucune migration de données, aucun PV de réception à attendre.</p>
+    <div class="pain-icon">${ICON_BOLT}</div>
+    <div class="pain-title">Plus de temps perdu à chaque alerte</div>
+    <p>Vous cliquez, vous êtes dedans.</p>
   </div>
 </div>
 `.trim();
 
-const CHAPTER_2_TITLE = 'Voir Buildy Easy Access lors d\'une démo live';
+// ─── Page 3 ─ rien à remplacer + preuve sociale ──────────────────────
+const CHAPTER_2_TITLE = 'Rien à remplacer. Rien à risquer.';
 const CHAPTER_2_HTML = `
-<p>Une démonstration guidée de 30 minutes sur Hyperveez avec vos sites réels. Nous configurons une ou deux supervisions tierces de votre patrimoine en direct, vous testez l'accès, vous mesurez le gain de temps obtenu.</p>
+<p class="lead">Vos automates, vos régulateurs, vos sondes, votre supervision actuelle : tout reste en place. Buildy n'ajoute qu'une couche d'accès et une vue d'ensemble.</p>
+
+<div class="guarantee-card">
+  <div class="guarantee-check">✓</div>
+  <div>
+    <div class="guarantee-title">Pas de serveur à 100 000 €. Pas de migration. Rien à réceptionner.</div>
+    <p>Le matériel reste en place, vos automaticiens continuent leur travail comme avant. La supervision historique du site fonctionne sans changement. C'est uniquement la manière d'y accéder et de voir l'ensemble qui change.</p>
+  </div>
+</div>
+
+<div class="proof-card">
+  <div class="proof-eyebrow">Ce que font nos clients</div>
+  <p class="proof-text">Comme beaucoup de nos clients, vous pouvez commencer par un site, voir ce que ça donne, puis en connecter d'autres à votre rythme. C'est exactement ce qu'ils font.</p>
+</div>
+`.trim();
+
+// ─── Page 4 ─ back-cover CTA ─────────────────────────────────────────
+const CHAPTER_3_TITLE = 'Voyez-le en live, sur de vrais bâtiments.';
+const CHAPTER_3_HTML = `
+<p>30 minutes en visio. On vous montre Easy Access sur des bâtiments en exploitation, avec plusieurs marques de GTB. Vous voyez l'accès en un clic, en direct, pas sur une maquette.</p>
 
 <div class="pricing-tile">
   <div class="pricing-eyebrow">À partir de</div>
   <div class="pricing-amount">20 € <span class="pricing-unit">HT / mois / bâtiment</span></div>
   <div class="pricing-note">même avec plusieurs interfaces de GTB sur le site</div>
-  <div class="pricing-bundle">— ou incluse de série dans les abonnements <strong>Smart</strong> et <strong>Premium</strong></div>
+  <div class="pricing-bundle">ou incluse de série dans les abonnements <strong>Smart</strong> et <strong>Premium</strong></div>
 </div>
 
 <p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
-<p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a> — Tél. 04 28 39 03 34</p>
+<p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>&nbsp;&nbsp;Tél. 04 28 39 03 34</p>
 <p><em>Aucun engagement n'est requis pour la démonstration.</em></p>
 `.trim();
 
-const db = require(path.join(ROOT, 'backend-node/src/database'));
-db.init();
-
+// ─── Idempotence + écriture DB ───────────────────────────────────────
 const UPDATE_MODE = process.argv.includes('--update');
 const existing = db.afs.getBySlug(SLUG);
+
+const META = {
+  subtitle: SUBTITLE,
+  has_back_cover: true,
+  cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
+  cover_image_caption: 'Visualisez l\'ensemble de vos bâtiments sur une carte et accédez à votre GTB en un clic !',
+  hide_cover_eyebrow: true,
+  footer_doc_label: 'Brochure Buildy',
+  edition_label: 'À L\'ATTENTION DES ASSET MANAGERS',
+};
+
+const WANTED_CHAPTERS = [
+  { position: 1, title: CHAPTER_1_TITLE, bodyHtml: CHAPTER_1_HTML },
+  { position: 2, title: CHAPTER_2_TITLE, bodyHtml: CHAPTER_2_HTML },
+  { position: 3, title: CHAPTER_3_TITLE, bodyHtml: CHAPTER_3_HTML },
+];
+
 if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
   if (!UPDATE_MODE) {
-    console.log(`✓ Livre blanc déjà présent : afs #${existing.id} (slug='${SLUG}').`);
+    console.log(`✓ Whitepaper déjà présent : afs #${existing.id}.`);
     console.log(`  Édition  : https://docs.buildy.fr:3443/whitepapers/${existing.id}`);
     console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/preview`);
     console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/export/pdf`);
-    console.log('  Pour re-synchroniser meta + body chapitres avec ce script (idempotent, sans toucher à la DB ad hoc) :');
-    console.log('    node backend-node/scripts/seed-whitepaper-buildy-easy-access.cjs --update');
+    console.log('  Pour aligner sur le script : --update');
     process.exit(0);
   }
-
-  // Mode --update : aligne le whitepaper existant sur le contenu du
-  // script (meta + titres + body_html des 2 chapitres). Pas de DELETE :
-  // on UPDATE en place via les helpers DB officiels. Tout edit manuel
-  // utilisateur sur le titre/body sera écrasé — c'est le but du mode.
   console.log(`→ Mode --update : alignement du whitepaper afs #${existing.id} sur le script.`);
-
   db.afs.update(existing.id, {
     title: TITLE,
     wp_layout: 'book',
     wp_audience: 'asset_manager',
     wp_version: '1.0',
-    wp_meta_json: JSON.stringify({
-      subtitle: SUBTITLE,
-      has_back_cover: true,
-      cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
-      cover_image_caption: 'Visualisez l\'ensemble de vos bâtiments sur une carte et accédez à votre GTB en un clic !',
-      hide_cover_eyebrow: true,
-      footer_doc_label: 'Brochure Buildy',
-    }),
+    wp_meta_json: JSON.stringify(META),
   });
-
   const currentChapters = db.sections.listByAf(existing.id)
     .slice().sort((a, b) => (a.position || 0) - (b.position || 0));
-  const wanted = [
-    { position: 1, title: CHAPTER_1_TITLE, bodyHtml: CHAPTER_1_HTML },
-    { position: 2, title: CHAPTER_2_TITLE, bodyHtml: CHAPTER_2_HTML },
-  ];
-  // Aligne 1-1 sur position : update si existe, create si manque, delete les excédents.
-  for (const w of wanted) {
+  for (const w of WANTED_CHAPTERS) {
     const c = currentChapters.find(x => x.position === w.position);
     if (c) {
       db.sections.update(c.id, { title: w.title, body_html: w.bodyHtml });
@@ -136,9 +153,8 @@ if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
     }
   }
   for (const c of currentChapters) {
-    if (!wanted.find(w => w.position === c.position)) db.sections.delete(c.id);
+    if (!WANTED_CHAPTERS.find(w => w.position === c.position)) db.sections.delete(c.id);
   }
-
   console.log(`✓ Whitepaper mis à jour : afs #${existing.id}.`);
   console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/preview`);
   console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/export/pdf`);
@@ -147,14 +163,13 @@ if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
 
 const owner = db.db.prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
 if (!owner) {
-  console.error('✗ Aucun utilisateur en base — impossible d\'assigner un propriétaire.');
+  console.error('✗ Aucun utilisateur en base.');
   process.exit(1);
 }
 
-// 1. Création du document whitepaper
 const wp = db.afs.create({
   slug: SLUG,
-  clientName: 'Buildy',         // colonnes legacy NOT NULL
+  clientName: 'Buildy',
   projectName: TITLE,
   kind: 'whitepaper',
   title: TITLE,
@@ -165,43 +180,18 @@ db.afs.update(wp.id, {
   wp_layout: 'book',
   wp_audience: 'asset_manager',
   wp_version: '1.0',
-  wp_meta_json: JSON.stringify({
-    subtitle: SUBTITLE,
-    has_back_cover: true,
-    // Capture Hyperveez en page de garde — wp-asset: résolu en data URL
-    // au rendu via loadAssetDataUrl(filename). Fichier dans
-    // backend-node/templates/pdf/assets/wp-buildy-easy-access-cover.webp.
-    cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
-    cover_image_caption: 'Visualisez l\'ensemble de vos bâtiments sur une carte et accédez à votre GTB en un clic !',
-  }),
+  wp_meta_json: JSON.stringify(META),
   updatedBy: owner.id,
 });
-
-// 2. Insertion des 2 chapitres (kind='standard', parent_id=null, position 1 et 2)
-db.sections.create({
-  afId: wp.id,
-  parentId: null,
-  position: 1,
-  title: CHAPTER_1_TITLE,
-  bodyHtml: CHAPTER_1_HTML,
-  kind: 'standard',
-});
-db.sections.create({
-  afId: wp.id,
-  parentId: null,
-  position: 2,
-  title: CHAPTER_2_TITLE,
-  bodyHtml: CHAPTER_2_HTML,
-  kind: 'standard',
-});
-
-// 3. Accès équipe (grant 'write' aux autres utilisateurs)
+for (const w of WANTED_CHAPTERS) {
+  db.sections.create({ afId: wp.id, parentId: null, position: w.position,
+                       title: w.title, bodyHtml: w.bodyHtml, kind: 'standard' });
+}
 const others = db.db.prepare('SELECT id FROM users WHERE id != ?').all(owner.id);
 for (const u of others) db.afPermissions.grant(wp.id, u.id, 'write', owner.id);
 
-console.log(`✓ Livre blanc créé : afs #${wp.id} (slug='${SLUG}').`);
+console.log(`✓ Whitepaper créé : afs #${wp.id} (slug='${SLUG}').`);
 console.log(`  Édition  : https://docs.buildy.fr:3443/whitepapers/${wp.id}`);
 console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${wp.id}/preview`);
 console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${wp.id}/export/pdf`);
-console.log(`  Propriétaire : user #${owner.id} · accès équipe : ${others.length} collègue(s).`);
 process.exit(0);

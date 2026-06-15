@@ -165,6 +165,7 @@ async function generateWhitepaperPdf(row) {
     logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
     hideCoverEyebrow: meta.hide_cover_eyebrow === true,
     coverEyebrowLabel: meta.cover_eyebrow_label || 'Livre blanc',
+    editionLabel: meta.edition_label || null,
   };
   const isSinglePage = row.wp_layout === 'single-page';
   const result = await renderPdf({
@@ -456,6 +457,7 @@ async function routes(fastify) {
       logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
       hideCoverEyebrow: meta.hide_cover_eyebrow === true,
       coverEyebrowLabel: meta.cover_eyebrow_label || 'Livre blanc',
+      editionLabel: meta.edition_label || null,
     };
     const isSinglePage = row.wp_layout === 'single-page';
     const html = renderHtml({
