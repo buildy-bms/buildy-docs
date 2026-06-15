@@ -9,6 +9,9 @@
 
 {{!-- Couverture pleine page --}}
 <section class="cover">
+  {{#if logoWhiteDataUrl}}
+  <img class="cover-logo" src="{{logoWhiteDataUrl}}" alt="Buildy" />
+  {{/if}}
   <div class="cover-eyebrow">
     Livre blanc <span class="accent">·</span> Buildy{{#if audienceLabel}} <span class="accent">·</span> {{audienceLabel}}{{/if}}
   </div>
@@ -33,6 +36,9 @@
 {{#each chapters}}
 {{#if is_back_cover}}
 <section class="closing">
+  {{#if ../logoWhiteDataUrl}}
+  <img class="closing-logo" src="{{../logoWhiteDataUrl}}" alt="Buildy" />
+  {{/if}}
   <div class="closing-eyebrow">Aller plus loin</div>
   <h1 class="closing-title">{{title}}</h1>
   <div class="closing-body">

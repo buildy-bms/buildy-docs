@@ -760,16 +760,26 @@ async function replaceLastPage(mainPath, lastPath) {
   const lastBytes = fs.readFileSync(lastPath);
   const mainDoc = await PDFDocument.load(mainBytes);
   const lastDoc = await PDFDocument.load(lastBytes);
-  // Prend la DERNIÈRE page de lastDoc (pas la première) : quand on
-  // re-rend tout le DOM sans margin pour atteindre plein-bord, le
-  // tmp PDF contient autant de pages que le rendu — la closing est la
-  // dernière. Cf. bug 0.1.166 où pageRanges=N plantait car le re-flow
-  // sans margin produit un pageCount différent du PDF principal.
+  const mainPageCount = mainDoc.getPageCount();
+  const tmpPageCount = lastDoc.getPageCount();
+  // Combien de pages la closing occupe-t-elle dans le PDF principal ?
+  // Hypothèse : cover + chapters prennent le même nombre de pages dans
+  // les 2 rendus (margins identiques pour eux). Donc :
+  //   closingPagesInMain = mainPageCount - (tmpPageCount - 1)
+  // où (tmpPageCount - 1) = pages cover+chapters du re-render plein-bord
+  // (et 1 page de closing tmp qu'on va injecter). Incident 0.1.167 :
+  // si la closing débordait sur 2 pages dans le main, on ne remplaçait
+  // que la dernière → l'ancienne 1ère moitié de la closing restait
+  // visible en avant-dernière page (bandes blanches autour, mocheté).
+  const closingPagesInMain = Math.max(1, mainPageCount - (tmpPageCount - 1));
+  // Retire toutes les pages "closing" du main, puis ajoute la closing
+  // plein-bord re-rendue (= dernière page du tmp).
+  for (let i = 0; i < closingPagesInMain; i++) {
+    mainDoc.removePage(mainDoc.getPageCount() - 1);
+  }
   const lastTmpIdx = lastDoc.getPageCount() - 1;
   const [lastPage] = await mainDoc.copyPages(lastDoc, [lastTmpIdx]);
-  const lastIdx = mainDoc.getPageCount() - 1;
-  mainDoc.removePage(lastIdx);
-  mainDoc.insertPage(lastIdx, lastPage);
+  mainDoc.addPage(lastPage);
   fs.writeFileSync(mainPath, await mainDoc.save());
 }
 

@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.168",
+      "date": "2026-06-08",
+      "title": "Livre blanc — fix doublon back-cover + logo cover/back-cover + modale plus large",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de doublon de la page de fin (l'ancienne 1ère moitié restait visible)",
+          "what": "Quand le contenu de la back-cover débordait sur 2 pages dans le rendu principal (margins), mon replaceLastPage ne remplaçait que la dernière page → l'ancienne 1ère moitié restait visible en avant-dernière page avec marges blanches. Calcul corrigé : closingPagesInMain = mainPageCount - (tmpPageCount - 1). Toutes les pages closing du main sont retirées avant d'injecter la closing plein-bord re-rendue.",
+          "where": "PDF livre blanc — dernière page.",
+          "how_to_test": "Régénérer Buildy Easy Access : exactement 3 pages, pas de doublon."
+        },
+        {
+          "kind": "feature",
+          "title": "Logo Buildy blanc en haut de la cover et de la back-cover",
+          "what": "Le header/footer Puppeteer est masqué sur les pages plein-bord, donc le logo footer n'apparaissait pas. Désormais : logo Buildy blanc (logo-buildy-blanc.png embed data URL) injecté directement dans le template HTML, position absolue top:16mm left:26mm, height:14mm. Apparait sur la cover ET la back-cover.",
+          "where": "Page 1 et page 3 du PDF.",
+          "how_to_test": "Régénérer : logo Buildy en haut à gauche, navy plein-bord autour."
+        },
+        {
+          "kind": "ux",
+          "title": "Modale d'aperçu PDF forcée à 90vw × 90vh",
+          "what": "Le conteneur iframe a maintenant width:calc(90vw - 40px) et height:calc(90vh - 110px) inline. BaseModal en size=full étendu à 92vw max — la modale prend désormais quasi tout l'écran.",
+          "where": "Modale Aperçu PDF du whitepaper.",
+          "how_to_test": "Cliquer Aperçu PDF : la modale doit faire ~90 % de l'écran."
+        }
+      ]
+    },
+    {
       "version": "0.1.167",
       "date": "2026-06-08",
       "title": "Livre blanc — vrai fix back-cover plein-bord (re-render robuste au re-flow)",

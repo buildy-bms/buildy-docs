@@ -5,6 +5,21 @@
 @page :first { margin: 0; background: #1b2842; }
 @page :last  { margin: 0; background: #1b2842; }
 
+/* ─── Logo Buildy blanc en page de garde + back-cover ────────────────
+   Le header/footer Puppeteer est masqué sur ces 2 pages (re-render
+   plein-bord sans margin), donc on injecte le logo direct dans le
+   template HTML pour le rendre visible sur le fond navy. */
+.cover-logo,
+.closing-logo {
+  display: block;
+  height: 14mm;
+  width: auto;
+  position: absolute;
+  top: 16mm;
+  left: 26mm;
+}
+.cover, .closing { position: relative; }
+
 /* ─── Cover image (capture / mockup en page de garde) ────────────────
    Affichee sous le titre+sous-titre, encadree, ombre douce pour
    detacher de l'aplat navy. Largeur 70% pour laisser respirer. */
