@@ -131,26 +131,28 @@ const CHAPTER_3_HTML = `
 <div class="price-step price-step-recurring">
   <div class="price-step-num">2</div>
   <div class="price-step-body">
-    <div class="price-step-kicker">Chaque mois, par bâtiment</div>
+    <div class="price-step-kicker">Par bâtiment, facturé à l'année</div>
     <h2 class="price-step-title">L'abonnement plateforme</h2>
-    <p>Une fois le Pack en place, l'accès à Hyperveez se règle au mois, par site. Tarif identique quel que soit le nombre d'interfaces de GTB présentes sur le bâtiment.</p>
+    <p>Une fois le Pack en place, l'accès à Hyperveez est facturé annuellement, en début de contrat. Tarif identique quel que soit le nombre d'interfaces de GTB présentes sur le bâtiment.</p>
     <p class="tiers-intro">Deux formules, selon qui fournit la connexion internet du site :</p>
 
     <div class="price-tiers">
       <div class="price-tier">
         <div class="tier-value">20 € <span class="tier-unit">HT / mois</span></div>
+        <div class="tier-annual">Soit 240 € HT / an / bâtiment</div>
         <div class="tier-label">Vous fournissez la connexion internet du site.</div>
         <div class="tier-include">Inclus dans l'offre Smart.</div>
       </div>
       <div class="price-tier price-tier-highlight">
         <div class="tier-badge">Le plus populaire</div>
         <div class="tier-value">40 € <span class="tier-unit">HT / mois</span></div>
+        <div class="tier-annual">Soit 480 € HT / an / bâtiment</div>
         <div class="tier-label">Buildy fournit la connexion, en 4G M2M multi-opérateurs. 1 Go par mois inclus. Vous n'avez rien à gérer.</div>
         <div class="tier-include">Inclus dans l'offre Premium.</div>
       </div>
     </div>
 
-    <p class="price-step-note">Le routeur 4G est inclus dans le Pack.<br>L'abonnement couvre l'accès à la plateforme, et la connexion 4G mensuelle quand c'est Buildy qui la fournit.</p>
+    <p class="price-step-note">Le routeur 4G est inclus dans le Pack.<br>L'abonnement couvre l'accès à la plateforme, et la connexion 4G mensuelle quand c'est Buildy qui la fournit.<br>Facturé annuellement en début de contrat, sans reconduction tacite.</p>
 
     <p class="price-step-secondary-cta"><a href="https://www.buildy.fr/dl/tableau-des-offres-buildy">Découvrir les offres Smart et Premium</a></p>
   </div>

@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.196",
+      "date": "2026-06-15",
+      "title": "Whitepaper Easy Access : conditions de facturation (annuelle, sans tacite reconduction)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Tarifs annuels affichés + mention facturation annuelle",
+          "what": "Page « Combien ça coûte » du whitepaper Buildy Easy Access : chaque carte affiche désormais sous le prix mensuel un sous-tarif annuel (« Soit 240 € HT / an / bâtiment » pour Smart, « Soit 480 € HT / an / bâtiment » pour Premium) en petit gris. Kicker « Chaque mois » remplacé par « Par bâtiment, facturé à l'année ». Phrase d'intro et note ajoutent la mention explicite « Facturé annuellement en début de contrat, sans reconduction tacite ».",
+          "where": "Whitepaper Buildy Easy Access (#55), page 4.",
+          "how_to_test": "Régénérer le PDF #55 : sous chaque tarif mensuel apparaît le tarif annuel en petit, et la note finale mentionne la facturation annuelle sans tacite reconduction."
+        }
+      ]
+    },
+    {
       "version": "0.1.195",
       "date": "2026-06-15",
       "title": "Fix réel : CTA whitepaper enfin aéré (spécificité CSS)",
