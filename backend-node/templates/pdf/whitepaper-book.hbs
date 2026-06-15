@@ -15,20 +15,38 @@
   <div class="cover-center">
     <h1 class="cover-title">{{title}}</h1>
     {{#if subtitle}}<p class="cover-sub">{{subtitle}}</p>{{/if}}
+    {{#if coverImageUrl}}
+    <figure class="cover-image-frame">
+      <img class="cover-image" src="{{coverImageUrl}}" alt="" />
+      {{#if coverImageCaption}}<figcaption class="cover-image-caption">{{coverImageCaption}}</figcaption>{{/if}}
+    </figure>
+    {{/if}}
   </div>
   <div class="cover-foot">
     {{#if version}}<strong>Version {{version}}</strong> · {{/if}}{{dateLabel}}
   </div>
 </section>
 
-{{!-- Chapitres : flux naturel, chaque .chapter-title force une page --}}
+{{!-- Chapitres : flux naturel, chaque .chapter-title force une page.
+     Si le dernier chapitre est marqué `is_back_cover`, il est rendu en
+     section.closing (fond navy plein-bord, CTA vert menthe).            --}}
 {{#each chapters}}
+{{#if is_back_cover}}
+<section class="closing">
+  <div class="closing-eyebrow">Aller plus loin</div>
+  <h1 class="closing-title">{{title}}</h1>
+  <div class="closing-body">
+    {{{body_html}}}
+  </div>
+</section>
+{{else}}
 <section class="chapter">
   <h1 class="chapter-title">{{title}}</h1>
   <div class="chapter-body">
     {{{body_html}}}
   </div>
 </section>
+{{/if}}
 {{/each}}
 
 </body>

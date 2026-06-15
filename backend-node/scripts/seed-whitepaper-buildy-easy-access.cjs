@@ -41,12 +41,16 @@ const CHAPTER_1_HTML = `
 `.trim();
 
 const CHAPTER_2_TITLE = 'Voir Buildy Easy Access sur votre patrimoine';
+// Note : ce chapitre est rendu en BACK-COVER (fond navy plein-bord) grâce
+// à meta.has_back_cover=true ci-dessous. On utilise <p class="cta-button">
+// pour produire un bouton CTA vert menthe arrondi.
 const CHAPTER_2_HTML = `
 <h2>30 minutes pour voir si ça change vraiment quelque chose</h2>
 <p>Une démo guidée d'Hyperveez avec vos sites réels. On configure 1 ou 2 supervisions tierces sur votre patrimoine en live, vous testez l'accès, vous mesurez le gain de temps.</p>
 <p>Si ça vous parle, vous déployez sur l'ensemble du parc. Si ça ne vous parle pas, vous gardez votre Excel.</p>
-<h2>Réserver un créneau</h2>
-<p>Email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a><br>Calendrier&nbsp;: <a href="https://buildy.fr/demo">buildy.fr/demo</a></p>
+<p class="cta-button"><a href="https://buildy.fr/demo">Réserver une démo</a></p>
+<h2>Ou par email</h2>
+<p><a href="mailto:contact@buildy.fr">contact@buildy.fr</a></p>
 <p><em>Buildy Easy Access est inclus de série dans les niveaux Smart et Premium. Aucun engagement requis pour la démo.</em></p>
 `.trim();
 
@@ -56,7 +60,8 @@ db.init();
 const existing = db.afs.getBySlug(SLUG);
 if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
   console.log(`✓ Livre blanc déjà présent : afs #${existing.id} (slug='${SLUG}').`);
-  console.log(`  Édition : https://docs.buildy.fr:3443/whitepapers/${existing.id}`);
+  console.log(`  Édition  : https://docs.buildy.fr:3443/whitepapers/${existing.id}`);
+  console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/preview`);
   console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/export/pdf`);
   console.log('  Pour reseed après édition du script : DELETE FROM afs WHERE slug = \'' + SLUG + '\' puis relancer.');
   process.exit(0);
@@ -82,7 +87,17 @@ db.afs.update(wp.id, {
   wp_layout: 'book',
   wp_audience: 'asset_manager',
   wp_version: '1.0',
-  wp_meta_json: JSON.stringify({ subtitle: SUBTITLE }),
+  wp_meta_json: JSON.stringify({
+    subtitle: SUBTITLE,
+    // Dernier chapitre rendu en BACK-COVER navy plein-bord (CTA marketing).
+    has_back_cover: true,
+    // URL d'une capture d'écran Hyperveez en page de garde. Vide pour
+    // l'instant — à renseigner via PATCH /api/whitepapers/:id { meta: {...} }
+    // ou édition wp_meta_json directe. Format : URL HTTPS publique (FTP OVH
+    // crisp-faq/, ou data URI base64). Recommandé : 1600x900px max.
+    cover_image_url: null,
+    cover_image_caption: null,
+  }),
   updatedBy: owner.id,
 });
 
@@ -109,7 +124,8 @@ const others = db.db.prepare('SELECT id FROM users WHERE id != ?').all(owner.id)
 for (const u of others) db.afPermissions.grant(wp.id, u.id, 'write', owner.id);
 
 console.log(`✓ Livre blanc créé : afs #${wp.id} (slug='${SLUG}').`);
-console.log(`  Édition : https://docs.buildy.fr:3443/whitepapers/${wp.id}`);
+console.log(`  Édition  : https://docs.buildy.fr:3443/whitepapers/${wp.id}`);
+console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${wp.id}/preview`);
 console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${wp.id}/export/pdf`);
 console.log(`  Propriétaire : user #${owner.id} · accès équipe : ${others.length} collègue(s).`);
 process.exit(0);

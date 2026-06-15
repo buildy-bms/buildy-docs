@@ -17,7 +17,7 @@ const { z } = require('zod');
 const db = require('../database');
 const config = require('../config');
 const { uniqueSlug } = require('../lib/slug');
-const { renderPdf, renderRawHtmlPdf } = require('../lib/pdf');
+const { renderPdf, renderRawHtmlPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl } = require('../lib/pdf');
 const { uploadWhitepaperPdf } = require('../lib/whitepaper-ftp');
 const { ensureTracker, ingestClicks } = require('../lib/whitepaper-tracker');
 const { assertRead, assertWrite } = require('../lib/af-permissions');
@@ -116,15 +116,23 @@ async function generateWhitepaperPdf(row) {
   }
 
   // ── Mode « chapitres » (Tiptap + template flux naturel) ───────────
-  const chapters = db.sections.listByAf(id)
+  const rawChapters = db.sections.listByAf(id)
     .slice()
-    .sort((a, b) => (a.position || 0) - (b.position || 0))
-    .map(c => ({ title: c.title, body_html: c.body_html || '<p></p>' }));
-  if (!chapters.length) {
+    .sort((a, b) => (a.position || 0) - (b.position || 0));
+  if (!rawChapters.length) {
     const e = new Error("Ajoutez au moins un chapitre avant d'exporter");
     e.clientStatus = 400;
     throw e;
   }
+  // Convention : si meta.has_back_cover === true, le DERNIER chapitre est
+  // rendu comme back-cover navy plein-bord (CTA marketing). Sinon tous les
+  // chapitres sont des pages claires standard.
+  const hasBackCover = meta.has_back_cover === true;
+  const chapters = rawChapters.map((c, idx) => ({
+    title: c.title,
+    body_html: c.body_html || '<p></p>',
+    is_back_cover: hasBackCover && idx === rawChapters.length - 1,
+  }));
 
   const data = {
     title: row.title,
@@ -133,6 +141,11 @@ async function generateWhitepaperPdf(row) {
     audienceLabel: AUDIENCE_LABELS[row.wp_audience] || null,
     dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
     chapters,
+    // Image cover optionnelle (URL data URI ou http(s)) — capture
+    // Hyperveez, mockup produit, etc. Renseignée via meta.cover_image_url.
+    coverImageUrl: meta.cover_image_url || null,
+    coverImageCaption: meta.cover_image_caption || null,
+    hasBackCover,
   };
   const isSinglePage = row.wp_layout === 'single-page';
   const result = await renderPdf({
@@ -142,6 +155,18 @@ async function generateWhitepaperPdf(row) {
     outputPath,
     pageFormat: 'A4',
     coverFullBleed: !isSinglePage,
+    // Back cover navy plein-bord → masquer header/footer sur cette page
+    // aussi (sinon le footer logo apparaît sur le fond navy).
+    closingFullBleed: !isSinglePage && hasBackCover,
+    // Header/footer Buildy unifié (logo en footer + pagination).
+    pdfOptions: isSinglePage ? undefined : buildHeaderFooter({
+      clientName: 'Buildy',
+      projectName: row.title,
+      docType: 'Livre blanc',
+      version: row.wp_version || '1.0',
+      logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+      footerNote: `Livre blanc Buildy · ${row.title}`,
+    }),
   });
   return { path: result.path, sizeBytes: result.sizeBytes, mode: 'chapters', meta };
 }
@@ -353,6 +378,64 @@ async function routes(fastify) {
     }
     db.sections.moveWithinSiblings(chapterId, direction);
     return db.sections.listByAfLight(id);
+  });
+
+  // ─── Preview HTML (hot-reloadable, itération design) ─────────────
+  // Rend le même HTML que celui passé à Puppeteer, mais directement dans
+  // le navigateur (pas de PDF). Cmd+R pour voir les changements de
+  // template/CSS sans regénérer Puppeteer (cycle ~30s). Pour la preview
+  // PDF avec header/footer Buildy, garder l'export PDF classique.
+  fastify.get('/whitepapers/:id/preview', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertRead(request, reply, id)) return;
+
+    let meta = {};
+    try { meta = row.wp_meta_json ? JSON.parse(row.wp_meta_json) : {}; } catch { meta = {}; }
+
+    // Mode HTML brut : redirige vers le source.html servi tel quel.
+    if (meta.mode === 'html') {
+      return reply.code(400).send({
+        detail: 'Preview indisponible pour le mode HTML brut — utilisez /api/whitepapers/' + id + '/export/pdf',
+      });
+    }
+
+    const rawChapters = db.sections.listByAf(id)
+      .slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+    if (!rawChapters.length) {
+      return reply.code(400).send({ detail: 'Aucun chapitre à prévisualiser' });
+    }
+    const hasBackCover = meta.has_back_cover === true;
+    const chapters = rawChapters.map((c, idx) => ({
+      title: c.title,
+      body_html: c.body_html || '<p></p>',
+      is_back_cover: hasBackCover && idx === rawChapters.length - 1,
+    }));
+
+    const data = {
+      title: row.title,
+      subtitle: meta.subtitle || null,
+      version: row.wp_version || null,
+      audienceLabel: AUDIENCE_LABELS[row.wp_audience] || null,
+      dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      chapters,
+      coverImageUrl: meta.cover_image_url || null,
+      coverImageCaption: meta.cover_image_caption || null,
+      hasBackCover,
+    };
+    const isSinglePage = row.wp_layout === 'single-page';
+    const html = renderHtml({
+      template: isSinglePage ? 'whitepaper-singlepage' : 'whitepaper-book',
+      styles: isSinglePage ? 'styles-whitepaper' : ['styles-whitepaper', 'styles-whitepaper-book'],
+      data,
+      pageFormat: 'A4',
+      fresh: true,
+    });
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return reply.send(html);
   });
 
   // ─── Export PDF ────────────────────────────────────────────────────

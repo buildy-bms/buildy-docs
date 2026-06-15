@@ -1,4 +1,132 @@
 /* Override charge UNIQUEMENT pour le layout 'book' (livre blanc complet).
    Cover full-bleed : 1re page sans marge + fond navy (double defense
-   sub-pixel Chromium, cf. CLAUDE.md). Ne pas charger pour 'single-page'. */
-@page :first{ margin:0; background:#1b2842; }
+   sub-pixel Chromium, cf. CLAUDE.md). Idem dernière page back-cover.
+   Ne pas charger pour 'single-page'. */
+@page :first { margin: 0; background: #1b2842; }
+@page :last  { margin: 0; background: #1b2842; }
+
+/* ─── Cover image (capture / mockup en page de garde) ────────────────
+   Affichee sous le titre+sous-titre, encadree, ombre douce pour
+   detacher de l'aplat navy. Largeur 70% pour laisser respirer. */
+.cover-image-frame {
+  margin: 18mm auto 0;
+  max-width: 70%;
+  text-align: center;
+}
+.cover-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100mm;
+  object-fit: contain;
+  border-radius: 4mm;
+  box-shadow: 0 4mm 12mm rgba(0, 0, 0, 0.35);
+  background: #ffffff;
+}
+.cover-image-caption {
+  margin-top: 4mm;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Inter', sans-serif;
+  font-size: 9pt;
+  font-style: italic;
+}
+
+/* ─── Back-cover (dernière page CTA marketing) ───────────────────────
+   Fond navy plein-bord, titre Poppins blanc, gros bouton CTA vert
+   menthe (#00cd92). On utilise les memes mecanismes que .cover pour
+   forcer le plein-bord (margin negatif + width calc + @page :last). */
+.closing {
+  break-before: page;
+  background: #1b2842;
+  color: #ffffff;
+  margin: 0;
+  padding: 28mm 22mm;
+  min-height: 297mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.closing-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-family: 'Inter', sans-serif;
+  font-size: 9pt;
+  color: #00cd92;
+  font-weight: 600;
+  margin-bottom: 6mm;
+}
+.closing-title {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 30pt;
+  line-height: 1.15;
+  color: #ffffff;
+  margin: 0 0 12mm;
+  padding-bottom: 6mm;
+  border-bottom: 0.8mm solid #00cd92;
+  max-width: 145mm;
+}
+.closing-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5pt;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 145mm;
+}
+.closing-body h2 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 15pt;
+  color: #ffffff;
+  margin: 10mm 0 4mm;
+}
+.closing-body h2:first-child { margin-top: 0; }
+.closing-body p {
+  margin: 0 0 4mm;
+  color: rgba(255, 255, 255, 0.88);
+}
+.closing-body p em { color: rgba(255, 255, 255, 0.65); font-style: italic; }
+.closing-body strong { color: #ffffff; font-weight: 600; }
+.closing-body code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #00cd92;
+  padding: 0.5mm 2mm;
+  border-radius: 1mm;
+  font-family: 'SFMono-Regular', Menlo, monospace;
+  font-size: 10pt;
+}
+/* Liens dans la back-cover : tournés en boutons CTA pleins vert menthe.
+   Le premier lien (mailto ou demo) ressort comme bouton plein ; les
+   suivants restent en lien souligné blanc. Conventionnellement on met
+   les CTA en début de bloc « Réserver un créneau ». */
+.closing-body a {
+  color: #00cd92;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 205, 146, 0.5);
+  text-underline-offset: 2px;
+}
+.closing-body a:hover { text-decoration-color: #00cd92; }
+.closing-body p > a:first-child {
+  /* Premier lien d'un paragraphe = pas un bouton, juste un highlight. */
+}
+/* Pour produire un VRAI bouton CTA, l'auteur du contenu peut wrapper le
+   lien dans un <p class="cta-button"> côté body_html — pris en charge
+   ici. */
+.closing-body .cta-button {
+  display: block;
+  text-align: center;
+  margin: 8mm auto;
+}
+.closing-body .cta-button a {
+  display: inline-block;
+  background: #00cd92;
+  color: #1b2842;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 13pt;
+  text-decoration: none;
+  padding: 4mm 12mm;
+  border-radius: 100mm;
+  box-shadow: 0 2mm 6mm rgba(0, 205, 146, 0.35);
+}
