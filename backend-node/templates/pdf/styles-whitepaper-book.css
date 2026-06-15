@@ -183,8 +183,8 @@
    se détacher du navy sans alourdir. */
 .back-body .pricing-tile {
   margin: 9mm auto 7mm;
-  max-width: 105mm;
-  padding: 7mm 8mm 6mm;
+  max-width: 135mm;
+  padding: 7mm 10mm 6mm;
   background: rgba(0, 205, 146, 0.07);
   border: 0.6mm solid rgba(0, 205, 146, 0.45);
   border-radius: 3mm;
