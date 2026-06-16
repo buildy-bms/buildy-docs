@@ -2,6 +2,28 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.208",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : marges page réduites + tagline #72eebf + image moins tronquée",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Marges verticales 22mm → 16mm sur les pages chapitres",
+          "what": "Gagne 12 mm d'espace vertical utile par page. Permet d'afficher l'image cartographique page 2 plus généreusement (92 mm au lieu de 78 mm, moins de crop) tout en gardant les 3 pain-cards sur la même page."
+        },
+        {
+          "kind": "fix",
+          "title": "Tagline cover : couleur mint clair #72eebf",
+          "what": "Le mint sombre #00cd92 manquait de contraste sur le bleu nuit. Passe à #72eebf (mint clair de la charte) pour une lisibilité immédiate et un rendu plus aérien."
+        },
+        {
+          "kind": "fix",
+          "title": "Tagline cover : 3 lignes propres, plus de wrap mid-phrase",
+          "what": "Le précédent layout coupait « QUELLE QUE SOIT LA / MARQUE. » au milieu. Ajout d'un `<br>` avant « Quelle que soit la marque. » : 3 lignes éditorialement choisies (« Tous vos bâtiments sur une carte. » / « Un clic, vous êtes dans la GTB du site. » / « Quelle que soit la marque. »), aucun wrap arbitraire."
+        }
+      ]
+    },
+    {
       "version": "0.1.207",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : tagline uppercase mint sur cover + image page 2 contenue",

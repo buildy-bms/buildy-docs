@@ -20,7 +20,7 @@
   --tip:#047857;
 }
 
-@page{ size:A4; margin:22mm 18mm; }
+@page{ size:A4; margin:16mm 18mm; }
 /* La regle cover full-bleed @page :first vit dans styles-whitepaper-book.css
    (chargee uniquement pour le layout 'book') — sinon elle casserait le
    layout 'single-page' des documents compagnons. */
