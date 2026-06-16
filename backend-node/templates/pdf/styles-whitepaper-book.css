@@ -73,7 +73,7 @@
   font-size: 14pt;
   line-height: 1.5;
   font-weight: 600;
-  color: #00cd92;
+  color: #72eebf;
   max-width: 175mm;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -213,7 +213,7 @@
 }
 .chapter-body .chapter-figure-band img {
   width: 100%;
-  height: 78mm;
+  height: 92mm;
   object-fit: cover;
   object-position: center top;
 }
