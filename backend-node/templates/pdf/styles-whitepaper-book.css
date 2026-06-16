@@ -63,13 +63,14 @@
   white-space: nowrap;
 }
 .cover-sub {
-  margin-top: 16px;
-  font-size: 15pt;
-  line-height: 1.4;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.85);
+  margin-top: 6mm;
+  font-family: 'Poppins', sans-serif;
+  font-size: 19pt;
+  line-height: 1.35;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
   max-width: 175mm;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
 }
 /* Illustration de couverture (SVG inline OU image PNG transparente).
    Composition resserrée : marge sup réduite pour former un bloc cohérent
@@ -196,18 +197,17 @@
   box-shadow: 0 4mm 18mm rgba(27, 40, 66, 0.18);
 }
 /* Variante « bande horizontale » : pleine largeur réelle (width 100% au
-   lieu de max-width 100% pour forcer l'extension au-delà de la taille
-   naturelle de l'image) + hauteur fixe pour intégration en page dense.
-   object-fit cover + object-position center top crop le bas pour garder
-   le ratio paysage et la lisibilité du haut de la carte. */
+   lieu de max-width 100%, qui ne forçait pas l'extension au-delà de la
+   taille naturelle). Hauteur libre (height auto) pour respecter le ratio
+   du screenshot et éviter de cropper le bas — il y a la place sur la
+   page 2 dense, autant montrer la carte en entier. */
 .chapter-body .chapter-figure-band {
   width: 100%;
 }
 .chapter-body .chapter-figure-band img {
   width: 100%;
-  height: 65mm;
-  object-fit: cover;
-  object-position: center top;
+  height: auto;
+  max-height: 110mm;
 }
 
 /* Variantes compactes de la solution-card et de la pain-grid pour les
