@@ -2,6 +2,28 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.212",
+      "date": "2026-06-16",
+      "title": "PDF : fix rendu Safari (Inter pas embarqué + italiques) + ? sur Combien ça coûte",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Inter enfin embarqué dans les PDF (fix Safari/macOS Preview)",
+          "what": "Le package `@fontsource/inter` était installé en frontend uniquement, mais `backend-node/src/lib/pdf.js` tentait de l'embarquer via `require.resolve` — qui échouait silencieusement (warn dans les logs). Conséquence : Inter n'a jamais été embarqué dans aucun PDF Buildy. Chromium utilisait sa fallback à la génération ; Safari/macOS Preview utilisait une autre fallback à la lecture, d'où le rendu cassé (lettres écartées, espaces manquants, textes qui se chevauchent). Installation côté backend (`npm install @fontsource/inter`) + 4 poids 400/500/600/700 normaux et 400 italique embarqués."
+        },
+        {
+          "kind": "fix",
+          "title": "Poppins italique embarquée (4 poids)",
+          "what": "Le `.chapter-big .punch` (« Excel. » italique mint sur whitepaper Easy Access) référence `font-style: italic` mais aucune Poppins italique n'était dans le registre. Ajout de Poppins italic 400/500/600/700. Helper `getEmbeddedFontsCss` étendu pour générer `font-style: italic` quand `f.style === 'italic'`. Tous les PDFs Buildy bénéficient désormais d'un italique de qualité."
+        },
+        {
+          "kind": "fix",
+          "title": "Whitepaper Easy Access : ? ajouté au titre « Combien ça coûte »",
+          "what": "Titre page 4 passe de « Combien ça coûte » à « Combien ça coûte ? » (forme interrogative cohérente avec le ton éditorial du whitepaper)."
+        }
+      ]
+    },
+    {
       "version": "0.1.211",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : charnière rétablie + capture en entier + formulation affirmative",
