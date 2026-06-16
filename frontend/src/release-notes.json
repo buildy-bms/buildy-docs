@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.200",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : back-cover « Contacter Julien »",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Page de fin refondue autour de Julien",
+          "what": "Nouveau titre « Toutes vos GTB, au même endroit. », pitch sur la diversité des marques, bouton vert principal « Contacter Julien » → mailto:julien@buildy.fr, ligne contact (Julien, 06 11 30 86 12, julien@buildy.fr) et mention discrète « Devis gratuit, sans engagement. ». Logo wordmark, signature Buildy et footer édition + pagination conservés.",
+          "where": "Whitepaper Buildy Easy Access (#55), dernière page.",
+          "how_to_test": "Régénérer le PDF #55 et vérifier la page de fin : titre Julien, bouton vert, contact, mention. Le mailto déclenche bien l'envoi à julien@buildy.fr."
+        }
+      ]
+    },
+    {
       "version": "0.1.199",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : refonte page 2 — accroche Excel",
