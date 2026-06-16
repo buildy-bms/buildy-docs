@@ -150,6 +150,7 @@ async function generateWhitepaperPdf(row) {
     title: c.title,
     body_html: c.body_html || '<p></p>',
     is_back_cover: hasBackCover && idx === rawChapters.length - 1,
+    hide_title: !c.title || !String(c.title).trim(),
   }));
 
   const data = {
@@ -161,6 +162,8 @@ async function generateWhitepaperPdf(row) {
     chapters,
     coverImageUrl: resolveWpAssetUrl(meta.cover_image_url),
     coverImageCaption: meta.cover_image_caption || null,
+    coverIconSvg: meta.cover_icon_svg || null,
+    hideCoverFoot: meta.hide_cover_foot === true,
     hasBackCover,
     logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
     hideCoverEyebrow: meta.hide_cover_eyebrow === true,
@@ -442,6 +445,7 @@ async function routes(fastify) {
       title: c.title,
       body_html: c.body_html || '<p></p>',
       is_back_cover: hasBackCover && idx === rawChapters.length - 1,
+      hide_title: !c.title || !String(c.title).trim(),
     }));
 
     const data = {

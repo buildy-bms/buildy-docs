@@ -2,6 +2,35 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.201",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : refonte cover épurée + split page 2/3 (6 pages au total)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Cover épurée avec icône Lucide map-pinned",
+          "what": "Couverture débarrassée du screenshot, de la légende et du bandeau « À L'attention des Asset Managers ». À la place : icône Lucide map-pinned grande en vert menthe Buildy (70 mm), centrée et aérée. Template `whitepaper-book.hbs` étendu pour accepter `meta.cover_icon_svg` et `meta.hide_cover_foot`."
+        },
+        {
+          "kind": "feature",
+          "title": "Page 2 dédiée à la douleur Excel + révélation visuelle",
+          "what": "Nouvelle page 2 : accroche + « Un fichier Excel. » + énumération + verdict, puis charnière éditoriale « Voilà à quoi ça devrait ressembler. » (Poppins 22pt vert menthe, plus du tout italique discrète), puis la capture cartographique en grand. La page se termine sur cette image (la révélation visuelle).",
+          "where": "Whitepaper Buildy Easy Access (#55), page 2."
+        },
+        {
+          "kind": "feature",
+          "title": "Page 3 dédiée à l'explication (« Comment ça marche » + bénéfices)",
+          "what": "Nouvelle page 3 (sans titre de chapitre — `hide_title` automatique sur titre vide) : bloc « Comment ça marche / Une carte, un clic » conservé tel quel, suivi des 3 cartes de bénéfices. Le saut de page est désormais porté par `.chapter { break-before:page }` (avant : `.chapter-title`) pour autoriser les chapitres sans titre.",
+          "where": "Whitepaper Buildy Easy Access (#55), page 3."
+        },
+        {
+          "kind": "fix",
+          "title": "Pagination 6 pages",
+          "what": "Décalage automatique des pages 4 (Rien à remplacer), 5 (Combien ça coûte) et 6 (Contacter Julien) — total brochure passe à 6 pages, footer Puppeteer met à jour automatiquement la pagination (2/6, 3/6, etc.)."
+        }
+      ]
+    },
+    {
       "version": "0.1.200",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : back-cover « Contacter Julien »",
