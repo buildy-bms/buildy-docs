@@ -54,16 +54,39 @@ const ICON_USER_SHIELD = renderFaIconSvg('user-shield', '#00cd92', '32');
 const ICON_LOCK_OPEN   = renderFaIconSvg('lock-open',   '#00cd92', '32');
 const ICON_BOLT        = renderFaIconSvg('bolt',        '#00cd92', '32');
 
-// Icône Lucide « map-pinned » (carte + pin), trait courant (currentColor)
-// pour la cover. Couleur menthe Buildy appliquée via CSS .cover-icon.
-// Source : lucide.dev (MIT) — paths verbatim de l'icon officielle.
-const LUCIDE_MAP_PINNED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0"/><circle cx="12" cy="8" r="2"/><path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712"/></svg>`;
+// Illustration de couverture : carte stylisée portant plusieurs pastilles
+// d'état (vert menthe / orange / rouge) — esprit Hyperveez. Vert menthe
+// dominant. SVG ratio 16:10 pour s'intégrer sous le titre + sous-titre.
+// Régions abstraites (mint translucide), routes en pointillés blancs,
+// 4 pastilles vertes, 1 orange, 1 rouge — chacune avec un halo de couleur.
+const COVER_MAP_ILLUSTRATION = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none" aria-label="Carte des bâtiments avec pastilles d'état">
+  <defs>
+    <linearGradient id="cover-map-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#00cd92" stop-opacity="0.10"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="314" height="194" rx="14" fill="url(#cover-map-bg)" stroke="#00cd92" stroke-width="1.4"/>
+  <path d="M20 50 Q 80 32 145 50 T 290 38 L 298 110 Q 220 130 160 112 T 28 122 Z" fill="#00cd92" fill-opacity="0.08" stroke="#00cd92" stroke-width="0.9" stroke-opacity="0.30"/>
+  <path d="M28 130 Q 100 120 180 138 L 202 178 Q 110 188 22 168 Z" fill="#00cd92" fill-opacity="0.08" stroke="#00cd92" stroke-width="0.9" stroke-opacity="0.30"/>
+  <path d="M0 78 Q 80 56 160 80 T 320 92" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.35" stroke-dasharray="4 5" fill="none"/>
+  <path d="M118 0 Q 130 100 96 200" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.35" stroke-dasharray="4 5" fill="none"/>
+  <g><circle cx="58" cy="70" r="13" fill="#00cd92" fill-opacity="0.20"/><circle cx="58" cy="70" r="6.5" fill="#00cd92"/><circle cx="58" cy="70" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
+  <g><circle cx="155" cy="55" r="13" fill="#00cd92" fill-opacity="0.20"/><circle cx="155" cy="55" r="6.5" fill="#00cd92"/><circle cx="155" cy="55" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
+  <g><circle cx="248" cy="82" r="13" fill="#00cd92" fill-opacity="0.20"/><circle cx="248" cy="82" r="6.5" fill="#00cd92"/><circle cx="248" cy="82" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
+  <g><circle cx="108" cy="142" r="13" fill="#f5c259" fill-opacity="0.28"/><circle cx="108" cy="142" r="6.5" fill="#f5c259"/><circle cx="108" cy="142" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
+  <g><circle cx="212" cy="152" r="13" fill="#e95369" fill-opacity="0.28"/><circle cx="212" cy="152" r="6.5" fill="#e95369"/><circle cx="212" cy="152" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
+  <g><circle cx="48" cy="158" r="11" fill="#00cd92" fill-opacity="0.20"/><circle cx="48" cy="158" r="5.5" fill="#00cd92"/><circle cx="48" cy="158" r="5.5" fill="none" stroke="#ffffff" stroke-width="1.4"/></g>
+</svg>`;
 
 // Capture cartographique embarquée — déplacée de la cover à la page 2
 // (sous la phrase de bascule). Chargée en data URL via loadAssetDataUrl.
 const MAP_SCREENSHOT_DATA_URL = loadAssetDataUrl('wp-buildy-easy-access-cover.webp');
 
-// ─── Page 2 ─ douleur Excel + révélation visuelle (capture carte) ────
+// ─── Page 2 ─ accroche Excel + capture (bande horizontale) + solution ─
+// Fusion en une seule page dense : douleur → charnière → révélation
+// visuelle (capture cartographique en taille moyenne) → explication
+// (bloc « Comment ça marche ») → 3 bénéfices.
 const CHAPTER_1_TITLE = '<span class="chapter-overhead">Le logiciel d\'hypervision et de GTB le plus utilisé en France ?</span><span class="chapter-big">Un fichier Excel.</span>';
 const CHAPTER_1_HTML = `
 <p class="lead-narrative">Une colonne par site : l'URL de la GTB, le login, le mot de passe en clair. Et les accès VPN, partagés avec toute l'équipe.</p>
@@ -72,26 +95,18 @@ const CHAPTER_1_HTML = `
 
 <p class="chapter-bridge">Voilà à quoi ça devrait ressembler.</p>
 
-<figure class="chapter-figure">
+<figure class="chapter-figure chapter-figure-band">
   <img src="${MAP_SCREENSHOT_DATA_URL}" alt="Tous vos bâtiments sur une carte dans Hyperveez" />
 </figure>
-`.trim();
 
-// ─── Page 3 ─ explication : Comment ça marche + 3 bénéfices ──────────
-// Chapitre sans titre (hide_title déclenché par title vide côté route).
-// Le bloc « Comment ça marche / Une carte, un clic… » sert visuellement
-// d'en-tête de page via son eyebrow + h2 dédiés.
-const CHAPTER_2_TITLE = '';
-const CHAPTER_2_HTML = `
-<div class="solution-card">
+<div class="solution-card solution-card-compact">
   <div class="solution-eyebrow">Comment ça marche</div>
   <h2>Une carte, un clic, vous êtes dans la GTB</h2>
   <p>Tous vos sites apparaissent sur une carte dans Hyperveez. Vous cliquez sur un bâtiment, sa supervision s'ouvre directement. Pas de VPN à lancer. Pas de login à retrouver. Pas de logiciel à changer.</p>
-  <p>Peu importe la marque installée sur le site (Schneider EcoStruxure, Distech, Niagara, PCVue et les autres), tout passe par le même portail.</p>
   <p>Un seul accès, géré par vous. Quand un collaborateur part, vous coupez son accès d'un coup, sans toucher aux mots de passe des GTB.</p>
 </div>
 
-<div class="pain-grid">
+<div class="pain-grid pain-grid-compact">
   <div class="pain-card">
     <div class="pain-icon">${ICON_USER_SHIELD}</div>
     <div class="pain-title">Plus de dépendance à une seule personne</div>
@@ -110,9 +125,9 @@ const CHAPTER_2_HTML = `
 </div>
 `.trim();
 
-// ─── Page 4 ─ rien à remplacer + preuve sociale + logos ──────────────
-const CHAPTER_3_TITLE = 'Rien à remplacer. Rien à risquer.';
-const CHAPTER_3_HTML = `
+// ─── Page 3 ─ rien à remplacer + preuve sociale + logos ──────────────
+const CHAPTER_2_TITLE = 'Rien à remplacer. Rien à risquer.';
+const CHAPTER_2_HTML = `
 <p class="lead">Vos automates, vos régulateurs, vos sondes, votre supervision actuelle : tout reste en place. Buildy n'ajoute qu'une couche d'accès et une vue d'ensemble.</p>
 
 <div class="guarantee-card">
@@ -131,9 +146,9 @@ const CHAPTER_3_HTML = `
 ${CLIENT_LOGOS_HTML}
 `.trim();
 
-// ─── Page 5 ─ Tarification : Pack + Abonnement ───────────────────────
-const CHAPTER_4_TITLE = 'Combien ça coûte';
-const CHAPTER_4_HTML = `
+// ─── Page 4 ─ Tarification : Pack + Abonnement ───────────────────────
+const CHAPTER_3_TITLE = 'Combien ça coûte';
+const CHAPTER_3_HTML = `
 <p class="lead">Deux lignes claires sur le devis. Une fois pour l'installation, puis un abonnement annuel pour la plateforme. Pas d'autres frais cachés.</p>
 
 <div class="price-step">
@@ -183,9 +198,9 @@ const CHAPTER_4_HTML = `
 </div>
 `.trim();
 
-// ─── Page 6 ─ back-cover CTA ─────────────────────────────────────────
-const CHAPTER_5_TITLE = 'Toutes vos GTB, au même endroit.';
-const CHAPTER_5_HTML = `
+// ─── Page 5 ─ back-cover CTA ─────────────────────────────────────────
+const CHAPTER_4_TITLE = 'Toutes vos GTB, au même endroit.';
+const CHAPTER_4_HTML = `
 <p>Vous avez des bâtiments équipés de GTB de différentes marques, accessibles site par site, chacun dans son coin&nbsp;? Parlez-en à Julien. On regarde vos sites ensemble, on chiffre le déploiement, et on s'occupe de tout.</p>
 
 <p class="cta-button"><a href="mailto:julien@buildy.fr">Contacter Julien</a></p>
@@ -202,7 +217,7 @@ const existing = db.afs.getBySlug(SLUG);
 const META = {
   subtitle: SUBTITLE,
   has_back_cover: true,
-  cover_icon_svg: LUCIDE_MAP_PINNED,
+  cover_icon_svg: COVER_MAP_ILLUSTRATION,
   hide_cover_eyebrow: true,
   hide_cover_foot: true,
   footer_doc_label: 'Brochure Buildy',
@@ -213,7 +228,6 @@ const WANTED_CHAPTERS = [
   { position: 2, title: CHAPTER_2_TITLE, bodyHtml: CHAPTER_2_HTML },
   { position: 3, title: CHAPTER_3_TITLE, bodyHtml: CHAPTER_3_HTML },
   { position: 4, title: CHAPTER_4_TITLE, bodyHtml: CHAPTER_4_HTML },
-  { position: 5, title: CHAPTER_5_TITLE, bodyHtml: CHAPTER_5_HTML },
 ];
 
 if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
