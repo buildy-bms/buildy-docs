@@ -69,7 +69,7 @@ const MAP_SCREENSHOT_DATA_URL = loadAssetDataUrl('wp-buildy-easy-access-cover.we
 // Fusion en une seule page dense : douleur → charnière → révélation
 // visuelle (capture cartographique en taille moyenne) → explication
 // (bloc « Comment ça marche ») → 3 bénéfices.
-const CHAPTER_1_TITLE = '<span class="chapter-overhead">Le logiciel d\'hypervision et de GTB le plus utilisé en France ?</span><span class="chapter-big">Un fichier Excel.</span>';
+const CHAPTER_1_TITLE = '<span class="chapter-overhead">Le logiciel d\'hypervision et de GTB le plus utilisé en France ?</span><span class="chapter-big">Un fichier <em class="punch">Excel.</em></span>';
 const CHAPTER_1_HTML = `
 <p class="lead-narrative">Une colonne par site : l'URL de la GTB, le login, le mot de passe en clair. Et les accès VPN, partagés avec toute l'équipe.</p>
 
