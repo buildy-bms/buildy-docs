@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.213",
+      "date": "2026-06-16",
+      "title": "PDF : suppression des box-shadows mint (fix rendu Safari rectangles opaques)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Box-shadows mint retirées sur whitepaper + back-cover offerings",
+          "what": "Safari (PDF viewer macOS / iOS) rend les `box-shadow` floues de Chromium comme des rectangles verts opaques sans flou — visible sur les cards prix du whitepaper Easy Access (carte highlight, badge « Le plus populaire », CTA secondaire vert) et sur le bouton « Réserver une démonstration » de la back-cover partagée offerings. Les 5 box-shadows mint sont supprimées. Le rendu reste premium grâce aux bordures mint pleines et au radius pill ; aucune ombre fake en plus."
+        }
+      ]
+    },
+    {
       "version": "0.1.212",
       "date": "2026-06-16",
       "title": "PDF : fix rendu Safari (Inter pas embarqué + italiques) + ? sur Combien ça coûte",
