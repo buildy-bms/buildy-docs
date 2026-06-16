@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.215",
+      "date": "2026-06-16",
+      "title": "Tableau des offres : pied de page sans numérotation",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Pas de pagination X/Y sur le PDF Tableau des offres",
+          "what": "Le catalogue tient sur 2 pages (cover + table), la pagination alourdissait le pied. Ajout d'une option `hidePagination` sur `buildHeaderFooter()` (lib/pdf.js), activée uniquement dans `_renderCatalogPdf()` (routes/offerings.js). Brochure détaillée et tous les autres PDF Buildy conservent leur numérotation."
+        }
+      ]
+    },
+    {
       "version": "0.1.214",
       "date": "2026-06-16",
       "title": "Doc PDF cross-viewer : checklist fonts backend + interdit box-shadow Safari",

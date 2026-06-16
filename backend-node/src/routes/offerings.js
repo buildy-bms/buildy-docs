@@ -433,6 +433,9 @@ async function routes(fastify) {
         version: String(data.year),
         logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
         footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+        // Catalogue tient sur 2 pages (cover + table) — la numérotation
+        // X/Y est superflue et alourdit visuellement le pied de page.
+        hidePagination: true,
       }),
     });
   }
