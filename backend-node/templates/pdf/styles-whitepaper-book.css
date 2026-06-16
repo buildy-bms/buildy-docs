@@ -242,6 +242,13 @@
   line-height: 1.4;
   margin-bottom: 1.8mm;
 }
+/* Phrase « Peu importe la marque… » : mise en avant subtile (mint clair
+   + un cran de poids), pour signaler le bénéfice multi-marques sans
+   alourdir la card. */
+.chapter-body .solution-card-compact p.brands-line {
+  color: #72eebf;
+  font-weight: 500;
+}
 .chapter-body .solution-card-compact .solution-eyebrow {
   font-size: 7.5pt;
   margin-bottom: 1.8mm;

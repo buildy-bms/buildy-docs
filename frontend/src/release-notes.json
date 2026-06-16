@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.217",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : phrase marques en mint clair + poids 500",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Mise en avant subtile du multi-marques",
+          "what": "Le paragraphe « Peu importe la marque installée sur le site… » du bloc Comment ça marche (page 2) passe en mint clair #72eebf + font-weight 500 via `<p class=\"brands-line\">`. Signale le bénéfice clé multi-marques sans alourdir la card."
+        }
+      ]
+    },
+    {
       "version": "0.1.216",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : phrase « Peu importe la marque » réintégrée page 2",
