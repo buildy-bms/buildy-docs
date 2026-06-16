@@ -54,10 +54,14 @@ const ICON_USER_SHIELD = renderFaIconSvg('user-shield', '#00cd92', '32');
 const ICON_LOCK_OPEN   = renderFaIconSvg('lock-open',   '#00cd92', '32');
 const ICON_BOLT        = renderFaIconSvg('bolt',        '#00cd92', '32');
 
-// ─── Page 2 ─ confirmation + comment ça marche + 3 bénéfices ─────────
-const CHAPTER_1_TITLE = 'Vous nous l\'avez dit. On a la réponse.';
+// ─── Page 2 ─ accroche Excel + comment ça marche + 3 bénéfices ───────
+const CHAPTER_1_TITLE = '<span class="chapter-overhead">Le logiciel d\'hypervision et de GTB le plus utilisé en France ?</span><span class="chapter-big">Un fichier Excel.</span>';
 const CHAPTER_1_HTML = `
-<p class="lead">Vous nous avez dit que c'était votre quotidien.<br>Comme beaucoup de nos clients.<br>Pas besoin de vous refaire le tableau, vous le vivez déjà.<br>Voici comment on le règle.</p>
+<p class="lead-narrative">Une colonne par site : l'URL de la GTB, le login, le mot de passe en clair. Et les accès VPN, partagés avec toute l'équipe.</p>
+
+<p class="lead-narrative">Résultat : avant même de pouvoir s'en servir, il faut réussir à s'y connecter. Un parcours du combattant, parfois impossible.</p>
+
+<p class="chapter-bridge">Voilà à quoi ça devrait ressembler.</p>
 
 <div class="solution-card">
   <div class="solution-eyebrow">Comment ça marche</div>

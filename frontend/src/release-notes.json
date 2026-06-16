@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.199",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : refonte page 2 — accroche Excel",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Page 2 du whitepaper réécrite autour de l'accroche Excel",
+          "what": "Nouveau titre 2 niveaux (accroche question en petit + « Un fichier Excel. » en gros). Intro raccourcie : une colonne par site, mots de passe en clair, VPN partagé → constat « parcours du combattant ». Phrase de bascule italique verte « Voilà à quoi ça devrait ressembler. » avant le bloc « Comment ça marche » (conservé). Template whitepaper-book.hbs : `{{title}}` → `{{{title}}}` pour autoriser HTML dans les titres de chapitre (safe : les autres whitepapers stockent du texte plain).",
+          "where": "Whitepaper Buildy Easy Access (#55), page 2.",
+          "how_to_test": "Régénérer le PDF #55 et vérifier la page 2 : accroche + réponse en gros, 2 paragraphes courts de constat, phrase de bascule centrée, puis bloc Comment ça marche inchangé."
+        }
+      ]
+    },
+    {
       "version": "0.1.198",
       "date": "2026-06-15",
       "title": "Whitepaper Easy Access : retours à la ligne dans l'accroche du chapitre 2",
