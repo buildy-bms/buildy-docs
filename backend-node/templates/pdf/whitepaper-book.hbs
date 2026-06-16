@@ -22,7 +22,9 @@
   <div class="cover-center">
     <h1 class="cover-title">{{title}}</h1>
     {{#if subtitle}}<p class="cover-sub">{{subtitle}}</p>{{/if}}
-    {{#if coverImageUrl}}
+    {{#if coverIconSvg}}
+    <div class="cover-icon">{{{coverIconSvg}}}</div>
+    {{else if coverImageUrl}}
     <figure class="cover-image-frame">
       <img class="cover-image" src="{{coverImageUrl}}" alt="" />
       {{#if coverImageCaption}}<figcaption class="cover-image-caption">{{coverImageCaption}}</figcaption>{{/if}}
@@ -30,9 +32,11 @@
     {{/if}}
   </div>
 
+  {{#unless hideCoverFoot}}
   <div class="cover-foot">
     <div class="edition">{{#if editionLabel}}{{editionLabel}}{{else}}{{#if audienceLabel}}À l'attention des {{audienceLabel}}{{else}}Livre blanc Buildy{{/if}}{{/if}}</div>
   </div>
+  {{/unless}}
 </section>
 
 {{!-- ═══════════ Chapitres (style flux naturel) ═══════════ --}}
@@ -62,8 +66,8 @@
   </div>
 </section>
 {{else}}
-<section class="chapter">
-  <h1 class="chapter-title">{{{title}}}</h1>
+<section class="chapter{{#if hide_title}} chapter-untitled{{/if}}">
+  {{#unless hide_title}}<h1 class="chapter-title">{{{title}}}</h1>{{/unless}}
   <div class="chapter-body">
     {{{body_html}}}
   </div>

@@ -79,7 +79,10 @@ html,body{
 .cover-foot strong{ color:rgba(255,255,255,0.8); font-weight:600; }
 
 /* ── Chapitres (flux naturel) ─────────────────────────────────────── */
-.chapter{ }
+.chapter{ break-before:page; }
+/* Le tout premier chapitre ne force pas de page vide apres la cover :
+   la cover a deja break-after:page. */
+.chapter:first-of-type{ break-before:auto; }
 .chapter-title{
   font-family:'Poppins',sans-serif;
   font-size:24pt;
@@ -88,13 +91,9 @@ html,body{
   letter-spacing:-0.02em;
   color:var(--navy);
   margin:0 0 4mm 0;
-  break-before:page;          /* chaque chapitre demarre une page */
   padding-bottom:4mm;
   border-bottom:2px solid var(--mint);
 }
-/* Le tout premier chapitre ne force pas de page vide apres la cover :
-   la cover a deja break-after:page. */
-.chapter:first-of-type .chapter-title{ break-before:auto; }
 
 /* ── Contenu Tiptap ───────────────────────────────────────────────── */
 .chapter-body h2{

@@ -54,7 +54,16 @@ const ICON_USER_SHIELD = renderFaIconSvg('user-shield', '#00cd92', '32');
 const ICON_LOCK_OPEN   = renderFaIconSvg('lock-open',   '#00cd92', '32');
 const ICON_BOLT        = renderFaIconSvg('bolt',        '#00cd92', '32');
 
-// ─── Page 2 ─ accroche Excel + comment ça marche + 3 bénéfices ───────
+// Icône Lucide « map-pinned » (carte + pin), trait courant (currentColor)
+// pour la cover. Couleur menthe Buildy appliquée via CSS .cover-icon.
+// Source : lucide.dev (MIT) — paths verbatim de l'icon officielle.
+const LUCIDE_MAP_PINNED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0"/><circle cx="12" cy="8" r="2"/><path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712"/></svg>`;
+
+// Capture cartographique embarquée — déplacée de la cover à la page 2
+// (sous la phrase de bascule). Chargée en data URL via loadAssetDataUrl.
+const MAP_SCREENSHOT_DATA_URL = loadAssetDataUrl('wp-buildy-easy-access-cover.webp');
+
+// ─── Page 2 ─ douleur Excel + révélation visuelle (capture carte) ────
 const CHAPTER_1_TITLE = '<span class="chapter-overhead">Le logiciel d\'hypervision et de GTB le plus utilisé en France ?</span><span class="chapter-big">Un fichier Excel.</span>';
 const CHAPTER_1_HTML = `
 <p class="lead-narrative">Une colonne par site : l'URL de la GTB, le login, le mot de passe en clair. Et les accès VPN, partagés avec toute l'équipe.</p>
@@ -63,6 +72,17 @@ const CHAPTER_1_HTML = `
 
 <p class="chapter-bridge">Voilà à quoi ça devrait ressembler.</p>
 
+<figure class="chapter-figure">
+  <img src="${MAP_SCREENSHOT_DATA_URL}" alt="Tous vos bâtiments sur une carte dans Hyperveez" />
+</figure>
+`.trim();
+
+// ─── Page 3 ─ explication : Comment ça marche + 3 bénéfices ──────────
+// Chapitre sans titre (hide_title déclenché par title vide côté route).
+// Le bloc « Comment ça marche / Une carte, un clic… » sert visuellement
+// d'en-tête de page via son eyebrow + h2 dédiés.
+const CHAPTER_2_TITLE = '';
+const CHAPTER_2_HTML = `
 <div class="solution-card">
   <div class="solution-eyebrow">Comment ça marche</div>
   <h2>Une carte, un clic, vous êtes dans la GTB</h2>
@@ -90,9 +110,9 @@ const CHAPTER_1_HTML = `
 </div>
 `.trim();
 
-// ─── Page 3 ─ rien à remplacer + preuve sociale + logos ──────────────
-const CHAPTER_2_TITLE = 'Rien à remplacer. Rien à risquer.';
-const CHAPTER_2_HTML = `
+// ─── Page 4 ─ rien à remplacer + preuve sociale + logos ──────────────
+const CHAPTER_3_TITLE = 'Rien à remplacer. Rien à risquer.';
+const CHAPTER_3_HTML = `
 <p class="lead">Vos automates, vos régulateurs, vos sondes, votre supervision actuelle : tout reste en place. Buildy n'ajoute qu'une couche d'accès et une vue d'ensemble.</p>
 
 <div class="guarantee-card">
@@ -111,9 +131,9 @@ const CHAPTER_2_HTML = `
 ${CLIENT_LOGOS_HTML}
 `.trim();
 
-// ─── Page 4 ─ Tarification : Pack + Abonnement ───────────────────────
-const CHAPTER_3_TITLE = 'Combien ça coûte';
-const CHAPTER_3_HTML = `
+// ─── Page 5 ─ Tarification : Pack + Abonnement ───────────────────────
+const CHAPTER_4_TITLE = 'Combien ça coûte';
+const CHAPTER_4_HTML = `
 <p class="lead">Deux lignes claires sur le devis. Une fois pour l'installation, puis un abonnement annuel pour la plateforme. Pas d'autres frais cachés.</p>
 
 <div class="price-step">
@@ -163,9 +183,9 @@ const CHAPTER_3_HTML = `
 </div>
 `.trim();
 
-// ─── Page 5 ─ back-cover CTA ─────────────────────────────────────────
-const CHAPTER_4_TITLE = 'Toutes vos GTB, au même endroit.';
-const CHAPTER_4_HTML = `
+// ─── Page 6 ─ back-cover CTA ─────────────────────────────────────────
+const CHAPTER_5_TITLE = 'Toutes vos GTB, au même endroit.';
+const CHAPTER_5_HTML = `
 <p>Vous avez des bâtiments équipés de GTB de différentes marques, accessibles site par site, chacun dans son coin&nbsp;? Parlez-en à Julien. On regarde vos sites ensemble, on chiffre le déploiement, et on s'occupe de tout.</p>
 
 <p class="cta-button"><a href="mailto:julien@buildy.fr">Contacter Julien</a></p>
@@ -182,11 +202,10 @@ const existing = db.afs.getBySlug(SLUG);
 const META = {
   subtitle: SUBTITLE,
   has_back_cover: true,
-  cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
-  cover_image_caption: 'Visualisez l\'ensemble de vos bâtiments sur une carte et accédez à votre GTB en un clic !',
+  cover_icon_svg: LUCIDE_MAP_PINNED,
   hide_cover_eyebrow: true,
+  hide_cover_foot: true,
   footer_doc_label: 'Brochure Buildy',
-  edition_label: 'À L\'ATTENTION DES ASSET MANAGERS',
 };
 
 const WANTED_CHAPTERS = [
@@ -194,6 +213,7 @@ const WANTED_CHAPTERS = [
   { position: 2, title: CHAPTER_2_TITLE, bodyHtml: CHAPTER_2_HTML },
   { position: 3, title: CHAPTER_3_TITLE, bodyHtml: CHAPTER_3_HTML },
   { position: 4, title: CHAPTER_4_TITLE, bodyHtml: CHAPTER_4_HTML },
+  { position: 5, title: CHAPTER_5_TITLE, bodyHtml: CHAPTER_5_HTML },
 ];
 
 if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {

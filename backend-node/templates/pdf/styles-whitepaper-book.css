@@ -71,6 +71,19 @@
   max-width: 175mm;
   letter-spacing: -0.005em;
 }
+/* Icône de couverture (Lucide ou inline SVG en vert menthe).
+   Remplace l'image quand on veut une cover épurée (sans capture). */
+.cover-icon {
+  margin: 20mm auto 0;
+  text-align: center;
+  color: #00cd92;
+}
+.cover-icon svg {
+  width: 70mm;
+  height: 70mm;
+  stroke: currentColor;
+}
+
 .cover-image-frame {
   margin: 14mm auto 0;
   text-align: center;
@@ -150,16 +163,31 @@
   letter-spacing: -0.025em;
 }
 
-/* Phrase de bascule (entre le constat et le bloc solution). */
+/* Phrase de bascule (entre le constat et la révélation visuelle).
+   Charnière éditoriale : grande, droite (pas italique), centrée, aérée. */
 .chapter-body .chapter-bridge {
   font-family: 'Poppins', sans-serif;
-  font-size: 14pt;
-  font-weight: 600;
-  font-style: italic;
+  font-size: 22pt;
+  font-weight: 700;
   color: #00cd92;
   text-align: center;
-  margin: 14mm 0 10mm;
-  letter-spacing: -0.01em;
+  margin: 18mm 0 14mm;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* Figure plein cadre dans un chapitre (révélation visuelle après bascule). */
+.chapter-body .chapter-figure {
+  margin: 0;
+  text-align: center;
+}
+.chapter-body .chapter-figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 3mm;
+  box-shadow: 0 4mm 18mm rgba(27, 40, 66, 0.18);
 }
 
 /* Lead intro (pull-quote en haut de chapitre, gros texte navy) */
