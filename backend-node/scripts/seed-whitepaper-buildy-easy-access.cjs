@@ -129,7 +129,7 @@ ${CLIENT_LOGOS_HTML}
 `.trim();
 
 // ─── Page 4 ─ Tarification : Pack + Abonnement ───────────────────────
-const CHAPTER_3_TITLE = 'Combien ça coûte';
+const CHAPTER_3_TITLE = 'Combien ça coûte ?';
 const CHAPTER_3_HTML = `
 <p class="lead">Deux lignes claires sur le devis. Une fois pour l'installation, puis un abonnement annuel pour la plateforme. Pas d'autres frais cachés.</p>
 

@@ -318,17 +318,25 @@ function loadStyles(name) {
 // On embed Poppins + Manrope WOFF2 directement dans le CSS pour eviter
 // tout fetch reseau (Google Fonts est bloque par le firewall Jelastic).
 const FONT_FILES = [
-  // Titres : Poppins (geometric sans, modern)
+  // Titres : Poppins (geometric sans, modern). Normal + italic (italic
+  // utilise par les punchlines editoriales, ex .chapter-big .punch).
+  { family: 'Poppins', weight: 400, file: '@fontsource/poppins/files/poppins-latin-400-normal.woff2' },
   { family: 'Poppins', weight: 500, file: '@fontsource/poppins/files/poppins-latin-500-normal.woff2' },
   { family: 'Poppins', weight: 600, file: '@fontsource/poppins/files/poppins-latin-600-normal.woff2' },
   { family: 'Poppins', weight: 700, file: '@fontsource/poppins/files/poppins-latin-700-normal.woff2' },
+  { family: 'Poppins', weight: 400, style: 'italic', file: '@fontsource/poppins/files/poppins-latin-400-italic.woff2' },
+  { family: 'Poppins', weight: 500, style: 'italic', file: '@fontsource/poppins/files/poppins-latin-500-italic.woff2' },
+  { family: 'Poppins', weight: 600, style: 'italic', file: '@fontsource/poppins/files/poppins-latin-600-italic.woff2' },
+  { family: 'Poppins', weight: 700, style: 'italic', file: '@fontsource/poppins/files/poppins-latin-700-italic.woff2' },
   // Corps : Inter (reference editoriale Stripe / Linear / Vercel / GitHub).
   // Source de verite cross-app : `frontend/src/main.js` charge les memes
   // poids cote UI Vue. Voir `docs/pdf-design-system.md` section Typographie.
+  // Italic embed aussi (utilisé sur back-cover, action notes, etc.).
   { family: 'Inter', weight: 400, file: '@fontsource/inter/files/inter-latin-400-normal.woff2' },
   { family: 'Inter', weight: 500, file: '@fontsource/inter/files/inter-latin-500-normal.woff2' },
   { family: 'Inter', weight: 600, file: '@fontsource/inter/files/inter-latin-600-normal.woff2' },
   { family: 'Inter', weight: 700, file: '@fontsource/inter/files/inter-latin-700-normal.woff2' },
+  { family: 'Inter', weight: 400, style: 'italic', file: '@fontsource/inter/files/inter-latin-400-italic.woff2' },
   // Manrope embed pour COMPATIBILITE DESCENDANTE uniquement — plus utilisee
   // dans aucun template PDF actuel (migration mai 2026 vers Inter). Conservee
   // 30 jours au cas ou un export historique serait ouvert ; a retirer apres
@@ -349,7 +357,7 @@ function getEmbeddedFontsCss() {
       const base64 = fs.readFileSync(fontPath).toString('base64');
       parts.push(`@font-face {
   font-family: '${f.family}';
-  font-style: normal;
+  font-style: ${f.style || 'normal'};
   font-weight: ${f.weight};
   font-display: swap;
   src: url(data:font/woff2;base64,${base64}) format('woff2');
