@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.214",
+      "date": "2026-06-16",
+      "title": "Doc PDF cross-viewer : checklist fonts backend + interdit box-shadow Safari",
+      "highlights": [
+        {
+          "kind": "doc",
+          "title": "CLAUDE.md PDF : 2 nouveaux pièges cross-viewer documentés",
+          "what": "Section « PDF — point d'entrée unique et conventions » étendue avec : (1) Fonts embed cross-viewer — `@fontsource/<famille>` doit être installé en backend (pas frontend uniquement), italics nécessitent fichier WOFF2 séparé avec `style: 'italic'`, audit logs `Font X Y absente` au boot. (2) Pas de `box-shadow` floues — Safari/macOS Preview les rend en rectangles opaques, utiliser bordure pleine + radius + fond teinté pour la profondeur, toujours ouvrir un PDF dans Safari avant validation."
+        }
+      ]
+    },
+    {
       "version": "0.1.213",
       "date": "2026-06-16",
       "title": "PDF : suppression des box-shadows mint (fix rendu Safari rectangles opaques)",

@@ -129,6 +129,11 @@ Tous les PDF passent par `backend-node/src/lib/pdf.js::renderPdf()`. Options en 
 - **Constantes mm/pt/px** : 1mm = 3.7795px (viewport), 1mm = 2.83465pt (post-process), PT_PER_PX = 0.75 (96 DPI Puppeteer). Disseminees, ne pas les redefinir ailleurs.
 - **Cover-level-band partial** : `templates/pdf/_cover-level-band.hbs` est l'unique source pour le bandeau "Required vs Vise + justif + verdict" (AF, Synthese, Liste de points).
 - **populateToc 2-passes** : `setContent` -> `page.evaluate` calcule pages via scrollY + mute le DOM `.toc-page` -> `pdf()`. Une seule passe DOM. La TOC est cliquable car les ancres recoivent leur `id` injecte.
+- **Fonts embed cross-viewer** (Chrome OK ne suffit pas) :
+  - `@fontsource/<famille>` doit être installé EN BACKEND, pas seulement frontend. Si absent, `require.resolve` dans `getEmbeddedFontsCss()` echoue silencieusement (warn dans logs) → font non embarquee → Safari/macOS Preview tombe en fallback → texte casse (espaces absorbes, lettres ecartees). Incident juin 2026 sur Inter (etait en frontend uniquement depuis migration Manrope→Inter).
+  - Les variantes `font-style: italic` necessitent un fichier WOFF2 italique separe dans `FONT_FILES` avec `style: 'italic'`. Sans ca, Chrome synthese une oblique fake, Safari ne sait pas reproduire en PDF.
+  - Audit `pm2 logs buildy-docs` au boot : tout warn `Font X Y absente` = symptome a corriger immediatement.
+- **Pas de `box-shadow` floues** : Safari/macOS Preview rend les `box-shadow: 0 Xmm Ymm rgba(...)` comme un rectangle opaque cale a l'offset, sans blur. Visuellement catastrophique (CTA vert flanque d'un bloc vert, card avec halo plat qui deborde). Utiliser bordure pleine + radius + fond teinte pour la profondeur. Audit : `grep -rn "box-shadow" backend-node/templates/pdf/` ne doit pas retourner de blur > 0.5mm. Toujours ouvrir un PDF dans Safari avant validation.
 
 ### Design system PDF (référence centrale)
 
