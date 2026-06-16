@@ -164,14 +164,15 @@ const CHAPTER_3_HTML = `
 `.trim();
 
 // ─── Page 5 ─ back-cover CTA ─────────────────────────────────────────
-const CHAPTER_4_TITLE = 'Voyez-le en live, sur de vrais bâtiments.';
+const CHAPTER_4_TITLE = 'Toutes vos GTB, au même endroit.';
 const CHAPTER_4_HTML = `
-<p>30 minutes en visio. On vous montre Easy Access sur des bâtiments en exploitation, avec plusieurs marques de GTB. Vous voyez l'accès en un clic, en direct, pas sur une maquette.</p>
+<p>Vous avez des bâtiments équipés de GTB de différentes marques, accessibles site par site, chacun dans son coin&nbsp;? Parlez-en à Julien. On regarde vos sites ensemble, on chiffre le déploiement, et on s'occupe de tout.</p>
 
-<p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
+<p class="cta-button"><a href="mailto:julien@buildy.fr">Contacter Julien</a></p>
 
-<p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>&nbsp;&nbsp;Tél. 04 28 39 03 34</p>
-<p><em>Aucun engagement n'est requis pour la démonstration.</em></p>
+<p class="contact-line">Julien, 06&nbsp;11&nbsp;30&nbsp;86&nbsp;12, <a href="mailto:julien@buildy.fr">julien@buildy.fr</a></p>
+
+<p class="cta-note"><em>Devis gratuit, sans engagement.</em></p>
 `.trim();
 
 // ─── Idempotence + écriture DB ───────────────────────────────────────

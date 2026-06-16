@@ -849,6 +849,27 @@
   font-weight: 600;
 }
 
+/* Ligne contact (Julien, telephone, email) sous le bouton CTA principal. */
+.back-body .contact-line {
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 11pt;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0 auto 4mm;
+  letter-spacing: 0.005em;
+}
+
+/* Mention discrete sous la ligne contact (« Devis gratuit... »). */
+.back-body .cta-note {
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5pt;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+.back-body .cta-note em { font-style: italic; }
+
 /* Bouton CTA arrondi vert menthe (wrapper <p class="cta-button">). */
 .back-body .cta-button {
   display: block;
