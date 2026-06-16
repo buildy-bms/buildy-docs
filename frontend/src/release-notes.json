@@ -2,6 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.204",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : page 2 dense tient en 1 page (5 pages total) + capture pleine largeur",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Page 2 dense : tout tient maintenant en une seule page",
+          "what": "Le précédent layout débordait : les 3 cartes de bénéfices avaient leur bas poussé sur une page 3 fantôme, ce qui maintenait le total à 6 pages. Resserrage : titre 2 niveaux (32pt → 26pt), charnière 22pt → 17pt, lead-narrative 14pt → 12pt, solution-card-compact paddings/typo réduits, pain-grid-compact paddings/typo réduits, icônes 32px → 28px, et page-break-inside: avoid sur figure / solution-card / pain-grid. Brochure repasse réellement à 5 pages."
+        },
+        {
+          "kind": "feature",
+          "title": "Capture cartographique pleine largeur (page 2)",
+          "what": "La bande horizontale `.chapter-figure-band` passe en max-width 100% (largeur utile A4) au lieu de 140 mm, max-height 70 mm. La capture est désormais nettement plus visible, sans casser la densité de la page."
+        }
+      ]
+    },
+    {
       "version": "0.1.203",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : cover illustrée avec le visuel de marque Hyperveez",
