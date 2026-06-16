@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.203",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : cover illustrée avec le visuel de marque Hyperveez",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Cover : illustration de marque Hyperveez (écran + marqueurs colorés)",
+          "what": "Remplacement de l'illustration SVG carte stylisée par le visuel de marque Buildy `cover-illustration-easy-access.png` (écran isométrique avec marqueurs rouge / orange / vert + tâche mint). PNG transparent ajouté aux assets du template PDF, embed en data URL via loadAssetDataUrl pour s'intégrer directement sur le bleu nuit. Marge supérieure 12 mm → 8 mm, largeur portée à 140 mm (max-height 110 mm) pour une présence plus généreuse. CSS `.cover-icon img` couvre désormais le cas PNG en plus du SVG inline.",
+          "where": "Whitepaper Buildy Easy Access (#55), page 1.",
+          "how_to_test": "Régénérer le PDF #55 : la cover présente l'illustration de marque (écran isométrique + marqueurs colorés), bien intégrée sous le titre et le sous-titre."
+        }
+      ]
+    },
+    {
       "version": "0.1.202",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : cover illustrée (multi-pastilles) + fusion p2/p3 (5 pages)",
