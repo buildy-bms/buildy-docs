@@ -75,8 +75,6 @@ const CHAPTER_1_HTML = `
 
 <p class="lead-narrative">Résultat : avant même de pouvoir s'en servir, il faut réussir à s'y connecter. Un parcours du combattant, parfois impossible.</p>
 
-<p class="chapter-bridge">Voilà à quoi ça devrait ressembler.</p>
-
 <figure class="chapter-figure chapter-figure-band">
   <img src="${MAP_SCREENSHOT_DATA_URL}" alt="Tous vos bâtiments sur une carte dans Hyperveez" />
 </figure>
