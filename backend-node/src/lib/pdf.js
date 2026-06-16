@@ -987,6 +987,7 @@ function buildHeaderFooter({
   footerNote,     // optionnel, defaut = "<docType> · document confidentiel"
   decreeVersionLabel, // optionnel — Lot 2 : ajoute la version R175 de référence dans le footer
   margin,         // optionnel, defaut adapte au portrait A4
+  hidePagination, // optionnel — supprime le bloc « X / Y » a droite (cas catalogue offres)
 }) {
   const esc = (s) => String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -1009,9 +1010,9 @@ function buildHeaderFooter({
     footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:4mm; border-top:0.4pt solid #e5e7eb; padding-top:2mm;">
       <img src="${logoDataUrl}" style="height:4mm; opacity:0.55;" />
       <span style="flex:1; color:#9ca3af; font-size:7pt;">${esc(note)}</span>
-      <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#4b5563; font-weight:600;">
+      ${hidePagination ? '' : `<span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#4b5563; font-weight:600;">
         <span class="pageNumber"></span> <span style="color:#9ca3af; font-weight:400;">/</span> <span class="totalPages"></span>
-      </span>
+      </span>`}
     </div>`,
   };
 }
