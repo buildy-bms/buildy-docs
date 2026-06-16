@@ -85,6 +85,7 @@ const CHAPTER_1_HTML = `
   <div class="solution-eyebrow">Comment ça marche</div>
   <h2>Une carte, un clic, vous êtes dans la GTB</h2>
   <p>Tous vos sites apparaissent sur une carte dans Hyperveez. Vous cliquez sur un bâtiment, sa supervision s'ouvre directement. Pas de VPN à lancer. Pas de login à retrouver. Pas de logiciel à changer.</p>
+  <p>Peu importe la marque installée sur le site (Schneider EcoStruxure, Distech, Niagara, PCVue et les autres), tout passe par le même portail.</p>
   <p>Un seul accès, géré par vous. Quand un collaborateur part, vous coupez son accès d'un coup, sans toucher aux mots de passe des GTB.</p>
 </div>
 
