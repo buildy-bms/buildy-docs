@@ -23,7 +23,7 @@ const path = require('path');
 const ROOT = process.cwd();
 const SLUG = 'buildy-easy-access';
 const TITLE = 'Buildy Easy Access';
-const SUBTITLE = 'Tous vos bâtiments sur une carte. Un clic, vous êtes dans la GTB du site. Quelle que soit la marque.';
+const SUBTITLE = 'Tous vos bâtiments sur une carte.<br>Un clic, vous êtes dans la GTB du site. Quelle que soit la marque.';
 
 const db = require(path.join(ROOT, 'backend-node/src/database'));
 const { renderFaIconSvg, loadAssetDataUrl } = require(path.join(ROOT, 'backend-node/src/lib/pdf'));
