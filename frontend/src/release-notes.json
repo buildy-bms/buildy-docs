@@ -2,6 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.211",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : charnière rétablie + capture en entier + formulation affirmative",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "« Voilà à quoi ça doit ressembler. » rétabli (avec formulation affirmative)",
+          "what": "La charnière éditoriale entre le constat Excel et la capture cartographique avait été supprimée par erreur — elle est rétablie. Formulation passée de « devrait » à « doit » (présent indicatif, plus affirmatif)."
+        },
+        {
+          "kind": "fix",
+          "title": "Capture cartographique visible en entier (pas de crop)",
+          "what": "`.chapter-figure-band img` passe de `height: 92mm + object-fit cover` à `max-width: 100% + max-height: 100mm + height: auto` : ratio naturel préservé, image en entier visible (la moitié sud de la France et le pourtour méditerranéen ne sont plus cropés)."
+        }
+      ]
+    },
+    {
       "version": "0.1.210",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : nettoyage page 2 (ombre capture + charnière retirées)",

@@ -219,10 +219,11 @@
   width: 100%;
 }
 .chapter-body .chapter-figure-band img {
-  width: 100%;
-  height: 92mm;
-  object-fit: cover;
-  object-position: center top;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100mm;
+  margin: 0 auto;
 }
 
 /* Variantes compactes de la solution-card et de la pain-grid pour les
