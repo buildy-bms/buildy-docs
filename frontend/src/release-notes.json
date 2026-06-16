@@ -2,6 +2,25 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.205",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : capture vraiment pleine largeur + retours à la ligne nettoyés",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Capture cartographique réellement en pleine largeur",
+          "what": "`.chapter-figure-band img` passe de `max-width: 100%` à `width: 100%` (la version `max-` ne forçait pas l'image au-delà de sa taille naturelle, donc l'image restait à ~70% de la largeur). Hauteur fixe 65 mm + object-fit cover + object-position center top pour conserver le ratio paysage et la lisibilité du haut de la carte.",
+          "where": "Whitepaper Buildy Easy Access (#55), page 2."
+        },
+        {
+          "kind": "fix",
+          "title": "Plus de retours à la ligne précoces dans les paragraphes",
+          "what": "Suppression du `max-width: 165mm` sur `.lead` et `.lead-narrative` : les paragraphes courts utilisent désormais toute la largeur utile (174 mm) au lieu de wrapper « Et les / accès VPN » ou « Vos automates… votre / supervision actuelle ». Sous-titre de cover passe en triple-stache pour autoriser un `<br>` après « carte. » : la coupure se fait maintenant où elle a du sens éditorial.",
+          "where": "Whitepaper Buildy Easy Access (#55), cover + page 2 + page 3."
+        }
+      ]
+    },
+    {
       "version": "0.1.204",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : page 2 dense tient en 1 page (5 pages total) + capture pleine largeur",
