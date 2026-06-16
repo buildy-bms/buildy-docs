@@ -71,18 +71,19 @@
   max-width: 175mm;
   letter-spacing: -0.005em;
 }
-/* Illustration de couverture (carte stylisée avec pastilles d'état).
+/* Illustration de couverture (SVG inline OU image PNG transparente).
    Composition resserrée : marge sup réduite pour former un bloc cohérent
    avec le titre + sous-titre, plutôt qu'un grand vide. */
 .cover-icon {
-  margin: 12mm auto 0;
+  margin: 8mm auto 0;
   text-align: center;
   color: #00cd92;
 }
-.cover-icon svg {
-  width: 130mm;
+.cover-icon svg,
+.cover-icon img {
+  width: 140mm;
   height: auto;
-  max-height: 95mm;
+  max-height: 110mm;
   display: block;
   margin: 0 auto;
 }

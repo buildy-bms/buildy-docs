@@ -54,30 +54,12 @@ const ICON_USER_SHIELD = renderFaIconSvg('user-shield', '#00cd92', '32');
 const ICON_LOCK_OPEN   = renderFaIconSvg('lock-open',   '#00cd92', '32');
 const ICON_BOLT        = renderFaIconSvg('bolt',        '#00cd92', '32');
 
-// Illustration de couverture : carte stylisée portant plusieurs pastilles
-// d'état (vert menthe / orange / rouge) — esprit Hyperveez. Vert menthe
-// dominant. SVG ratio 16:10 pour s'intégrer sous le titre + sous-titre.
-// Régions abstraites (mint translucide), routes en pointillés blancs,
-// 4 pastilles vertes, 1 orange, 1 rouge — chacune avec un halo de couleur.
-const COVER_MAP_ILLUSTRATION = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none" aria-label="Carte des bâtiments avec pastilles d'état">
-  <defs>
-    <linearGradient id="cover-map-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
-      <stop offset="1" stop-color="#00cd92" stop-opacity="0.10"/>
-    </linearGradient>
-  </defs>
-  <rect x="3" y="3" width="314" height="194" rx="14" fill="url(#cover-map-bg)" stroke="#00cd92" stroke-width="1.4"/>
-  <path d="M20 50 Q 80 32 145 50 T 290 38 L 298 110 Q 220 130 160 112 T 28 122 Z" fill="#00cd92" fill-opacity="0.08" stroke="#00cd92" stroke-width="0.9" stroke-opacity="0.30"/>
-  <path d="M28 130 Q 100 120 180 138 L 202 178 Q 110 188 22 168 Z" fill="#00cd92" fill-opacity="0.08" stroke="#00cd92" stroke-width="0.9" stroke-opacity="0.30"/>
-  <path d="M0 78 Q 80 56 160 80 T 320 92" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.35" stroke-dasharray="4 5" fill="none"/>
-  <path d="M118 0 Q 130 100 96 200" stroke="#ffffff" stroke-width="0.8" stroke-opacity="0.35" stroke-dasharray="4 5" fill="none"/>
-  <g><circle cx="58" cy="70" r="13" fill="#00cd92" fill-opacity="0.20"/><circle cx="58" cy="70" r="6.5" fill="#00cd92"/><circle cx="58" cy="70" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
-  <g><circle cx="155" cy="55" r="13" fill="#00cd92" fill-opacity="0.20"/><circle cx="155" cy="55" r="6.5" fill="#00cd92"/><circle cx="155" cy="55" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
-  <g><circle cx="248" cy="82" r="13" fill="#00cd92" fill-opacity="0.20"/><circle cx="248" cy="82" r="6.5" fill="#00cd92"/><circle cx="248" cy="82" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
-  <g><circle cx="108" cy="142" r="13" fill="#f5c259" fill-opacity="0.28"/><circle cx="108" cy="142" r="6.5" fill="#f5c259"/><circle cx="108" cy="142" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
-  <g><circle cx="212" cy="152" r="13" fill="#e95369" fill-opacity="0.28"/><circle cx="212" cy="152" r="6.5" fill="#e95369"/><circle cx="212" cy="152" r="6.5" fill="none" stroke="#ffffff" stroke-width="1.6"/></g>
-  <g><circle cx="48" cy="158" r="11" fill="#00cd92" fill-opacity="0.20"/><circle cx="48" cy="158" r="5.5" fill="#00cd92"/><circle cx="48" cy="158" r="5.5" fill="none" stroke="#ffffff" stroke-width="1.4"/></g>
-</svg>`;
+// Illustration de couverture : visuel de marque Buildy (écran isométrique
+// avec 3 marqueurs de couleur). PNG transparent embarqué en data URL pour
+// s'intégrer directement sur le bleu nuit de la cover. Le champ DB s'appelle
+// `cover_icon_svg` historiquement mais accepte n'importe quel HTML — un
+// <img> data URL fonctionne aussi.
+const COVER_ILLUSTRATION = `<img src="${loadAssetDataUrl('cover-illustration-easy-access.png')}" alt="Cartes interactives Hyperveez avec marqueurs colorés" />`;
 
 // Capture cartographique embarquée — déplacée de la cover à la page 2
 // (sous la phrase de bascule). Chargée en data URL via loadAssetDataUrl.
@@ -217,7 +199,7 @@ const existing = db.afs.getBySlug(SLUG);
 const META = {
   subtitle: SUBTITLE,
   has_back_cover: true,
-  cover_icon_svg: COVER_MAP_ILLUSTRATION,
+  cover_icon_svg: COVER_ILLUSTRATION,
   hide_cover_eyebrow: true,
   hide_cover_foot: true,
   footer_doc_label: 'Brochure Buildy',
