@@ -208,7 +208,6 @@
   height: auto;
   margin: 0 auto;
   border-radius: 3mm;
-  box-shadow: 0 4mm 18mm rgba(27, 40, 66, 0.18);
 }
 /* Variante « bande horizontale » : pleine largeur réelle + hauteur fixe
    contenue pour ne pas faire déborder la page dense (l'image en ratio
