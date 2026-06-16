@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.209",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : titre Excel rééquilibré + chute typographique sur « Excel. »",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Setup/punchline rééquilibré sur page 2",
+          "what": "La question éditoriale (« Le logiciel d'hypervision et de GTB le plus utilisé en France ? ») était trop discrète (gris faible, 11.5pt, regular) face au punch « Un fichier Excel. » 26pt. Elle passe à 14pt Poppins 400 navy-gris #4b5563 et gagne 5 mm de respiration avant la chute. Le punch « Un fichier Excel. » grossit à 32pt. Le mot « Excel. » est mis en italique vert menthe (#00cd92) via `<em class=\"punch\">` pour signaler éditorialement que c'est LE mot — comme une citation moqueuse. Rapport setup/chute beaucoup plus juste.",
+          "where": "Whitepaper Buildy Easy Access (#55), titre page 2.",
+          "how_to_test": "Régénérer le PDF #55. Sur la page 2, la question se lit nettement, puis silence, puis l'« Excel. » mint italique fait punch."
+        }
+      ]
+    },
+    {
       "version": "0.1.208",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : marges page réduites + tagline #72eebf + image moins tronquée",
