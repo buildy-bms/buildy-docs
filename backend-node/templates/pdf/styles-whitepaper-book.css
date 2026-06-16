@@ -62,15 +62,21 @@
   max-width: 175mm;
   white-space: nowrap;
 }
+/* Sous-titre de cover = tagline produit.
+   Traitement uppercase + mint pour affirmer une promesse de marque,
+   sans concurrencer le titre blanc (sub-hiérarchie nette). Letter-spacing
+   ouvert pour la lisibilité des majuscules, line-height généreuse pour
+   l'air des 2 lignes. */
 .cover-sub {
-  margin-top: 6mm;
+  margin-top: 7mm;
   font-family: 'Poppins', sans-serif;
-  font-size: 19pt;
-  line-height: 1.35;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
+  font-size: 14pt;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #00cd92;
   max-width: 175mm;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 /* Illustration de couverture (SVG inline OU image PNG transparente).
    Composition resserrée : marge sup réduite pour former un bloc cohérent
@@ -196,18 +202,20 @@
   border-radius: 3mm;
   box-shadow: 0 4mm 18mm rgba(27, 40, 66, 0.18);
 }
-/* Variante « bande horizontale » : pleine largeur réelle (width 100% au
-   lieu de max-width 100%, qui ne forçait pas l'extension au-delà de la
-   taille naturelle). Hauteur libre (height auto) pour respecter le ratio
-   du screenshot et éviter de cropper le bas — il y a la place sur la
-   page 2 dense, autant montrer la carte en entier. */
+/* Variante « bande horizontale » : pleine largeur réelle + hauteur fixe
+   contenue pour ne pas faire déborder la page dense (l'image en ratio
+   naturel à pleine largeur faisait 95+ mm et expulsait les pain-cards
+   sur une page 3 fantôme). object-fit cover + center top : on garde la
+   moitié haute de la carte (France entière) et on crop le bas (mer
+   Méditerranée + Espagne) qui n'apporte rien. */
 .chapter-body .chapter-figure-band {
   width: 100%;
 }
 .chapter-body .chapter-figure-band img {
   width: 100%;
-  height: auto;
-  max-height: 110mm;
+  height: 78mm;
+  object-fit: cover;
+  object-position: center top;
 }
 
 /* Variantes compactes de la solution-card et de la pain-grid pour les

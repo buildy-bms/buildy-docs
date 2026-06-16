@@ -2,6 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.207",
+      "date": "2026-06-16",
+      "title": "Whitepaper Easy Access : tagline uppercase mint sur cover + image page 2 contenue",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Cover : sous-titre traité comme tagline (uppercase + mint Buildy)",
+          "what": "Le sous-titre « Tous vos bâtiments sur une carte… » devient une tagline produit : Poppins 14pt, font-weight 600, text-transform uppercase, color #00cd92 (mint Buildy, différent du blanc du titre), letter-spacing 0.04em. Sub-hiérarchie nette par rapport au titre blanc 52pt, identité de marque affirmée."
+        },
+        {
+          "kind": "fix",
+          "title": "Page 2 dense : image contenue (5 pages réelles)",
+          "what": "L'image à ratio naturel mesurait 95+ mm en pleine largeur et expulsait les 3 pain-cards sur une page 3 fantôme. Hauteur fixée à 78 mm + object-fit cover + object-position center top : on garde la France entière en haut de la carte, on crop le bas (mer + Espagne) qui n'apporte rien. Brochure repasse à 5 pages réelles."
+        }
+      ]
+    },
+    {
       "version": "0.1.206",
       "date": "2026-06-16",
       "title": "Whitepaper Easy Access : capture en entier + sous-titre cover plus présent",
