@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.219",
+      "date": "2026-06-17",
+      "title": "Connexion Buildy ID fiabilisée (cookie d'état OIDC)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus d'erreur « état OIDC invalide » à la connexion",
+          "what": "Le cookie d'état du login Buildy ID passe en SameSite=None+Secure. Comme la connexion rebondit vers PocketID (sur un autre domaine que docs.buildy.fr), Safari supprimait l'ancien cookie SameSite=lax pendant ce rebond cross-site → le login échouait avec « état OIDC invalide ». Le cookie survit désormais au trajet.",
+          "where": "Page de connexion Buildy Docs (Se connecter avec Buildy ID).",
+          "how_to_test": "Se connecter via Buildy ID en navigation privée : la connexion aboutit sans erreur."
+        }
+      ]
+    },
+    {
       "version": "0.1.218",
       "date": "2026-06-16",
       "title": "Whitepapers : page détail allégée — PDF embarqué au lieu de l'éditeur",

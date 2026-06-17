@@ -22,11 +22,16 @@ async function routes(fastify) {
       const params = oidc.generateOidcParams();
       // Cookie signe (HMAC via @fastify/cookie secret). Permet de detecter
       // toute manipulation par un client malveillant.
+      // SameSite=None+Secure : le retour depuis PocketID (fleet-manager.buildy.wan)
+      // vers docs.buildy.fr est cross-site → Safari/ITP supprime un cookie lax →
+      // « state mismatch » au callback. None+Secure est robuste (repli lax en dev).
+      const stateOpts = { ...cookieOpts(300), signed: true };
+      if (stateOpts.secure) stateOpts.sameSite = 'none';
       reply.setCookie('docs_oidc_state', JSON.stringify({
         state: params.state,
         nonce: params.nonce,
         codeVerifier: params.codeVerifier,
-      }), { ...cookieOpts(300), signed: true });
+      }), stateOpts);
 
       const authUrl = await oidc.getAuthorizationUrl(config, params);
       return reply.redirect(authUrl);
