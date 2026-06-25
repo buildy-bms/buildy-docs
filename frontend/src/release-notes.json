@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.220",
+      "date": "2026-06-25",
+      "title": "Exports PDF : on ne garde que le dernier par document (stockage allégé)",
+      "highlights": [
+        {
+          "kind": "perf",
+          "title": "Purge automatique des anciens exports",
+          "what": "À chaque génération de Rapport, Synthèse, Liste de points ou export d'audit BACS, les générations précédentes du même type sont supprimées (fichier + historique). On ne conserve plus que la dernière version de chaque type par document, au lieu d'empiler toutes les générations indéfiniment sur le serveur.",
+          "where": "Boutons Rapport / Synthèse / Liste de points (AF) et exports d'audit BACS ; historique des exports dans le détail du document.",
+          "how_to_test": "Générer deux fois le Rapport d'un même AF : l'historique n'affiche plus qu'une entrée Rapport (la dernière). Le dernier export reste re-téléchargeable."
+        }
+      ]
+    },
+    {
       "version": "0.1.219",
       "date": "2026-06-17",
       "title": "Connexion Buildy ID fiabilisée (cookie d'état OIDC)",

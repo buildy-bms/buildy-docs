@@ -13,6 +13,7 @@ const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl } = require('
 const { buildChecklistData } = require('../../lib/bacs-checklist-builder');
 const { assertBacsAuditExists } = require('./_shared');
 const { buildBacsAuditExportData } = require('./_export-data');
+const { pruneOldExports } = require('../../lib/export-retention');
 const { buildFixturePreviewData } = require('./_preview-fixture');
 
 // Atelier de design PDF audit BACS — n'est servi qu'en dev (NODE_ENV != 'production'
@@ -381,6 +382,7 @@ async function routes(fastify) {
       payload: { version, file_size_bytes: result.sizeBytes, actions_total: actionItemsRaw.length },
     });
     log.info(`PDF audit BACS exported: doc #${documentId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
+    pruneOldExports(documentId, insertedRow.lastInsertRowid);
 
     return {
       id: insertedRow.lastInsertRowid,
@@ -460,6 +462,7 @@ async function routes(fastify) {
       payload: { version, file_size_bytes: result.sizeBytes },
     });
     log.info(`PDF tables exported: doc #${documentId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
+    pruneOldExports(documentId, insertedRow.lastInsertRowid);
 
     return {
       id: insertedRow.lastInsertRowid,

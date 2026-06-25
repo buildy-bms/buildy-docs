@@ -18,6 +18,7 @@ const {
   buildContractualSummaryForAf,
   buildLevelVerdict,
 } = require('./_export-builders');
+const { pruneOldExports } = require('../lib/export-retention');
 
 // Filigrane Buildy (favicon) applique sur tous les exports PDF
 const WATERMARK_PATH = path.resolve(__dirname, '../../templates/pdf/assets/watermark-buildy.png');
@@ -223,6 +224,7 @@ async function routes(fastify) {
     });
     log.info(`PDF points-list exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
     await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
+    pruneOldExports(afId, insertedRow.lastInsertRowid);
 
     return {
       id: insertedRow.lastInsertRowid,
@@ -1055,6 +1057,7 @@ async function routes(fastify) {
     });
     log.info(`PDF synthesis exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB)`);
     await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
+    pruneOldExports(afId, insertedRow.lastInsertRowid);
 
     return {
       id: insertedRow.lastInsertRowid,
@@ -1159,6 +1162,7 @@ async function routes(fastify) {
     });
     log.info(`PDF AF exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
     await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
+    pruneOldExports(afId, insertedRow.lastInsertRowid);
 
     return {
       id: insertedRow.lastInsertRowid,
