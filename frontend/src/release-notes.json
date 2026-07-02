@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.236",
+      "date": "2026-06-25",
+      "title": "Card GTB : libellé d'énergie retiré à côté de la pilule (redondant)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "En-tête énergie compteurs — pilule seule",
+          "what": "L'en-tête indigo par type d'énergie affichait « [Pilule Électrique] Électrique » — texte redondant avec la pilule. Le label texte est retiré, seule la pilule reste."
+        }
+      ]
+    },
+    {
       "version": "0.1.235",
       "date": "2026-06-25",
       "title": "Card GTB : équipements et compteurs regroupés + triés",

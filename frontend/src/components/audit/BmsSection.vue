@@ -574,9 +574,8 @@ function hasNotes(html) {
                 <template v-for="typeGroup in metersByEnergyThenZone" :key="typeGroup.type">
                   <tbody class="divide-y divide-gray-100">
                     <tr class="bg-indigo-50/50">
-                      <td colspan="3" class="px-2 py-1 text-[11px] tracking-wider font-semibold text-indigo-800 flex items-center gap-2">
+                      <td colspan="3" class="px-2 py-1">
                         <MeterTypePill :type="typeGroup.type" />
-                        {{ typeGroup.typeLabel }}
                       </td>
                     </tr>
                   </tbody>
