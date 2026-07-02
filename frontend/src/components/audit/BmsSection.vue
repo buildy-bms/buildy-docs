@@ -641,7 +641,7 @@ function hasNotes(html) {
               <SegmentedToggle :model-value="triState(bms.meets_r175_3_p2)"
                                @update:model-value="v => setBmsFlag('meets_r175_3_p2', v)" />
             </div>
-            <div v-if="bms.meets_r175_3_p1" class="ml-4 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div v-if="bms.meets_r175_3_p1" class="ml-4 mt-2 space-y-3">
               <div>
                 <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
                 <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
@@ -685,7 +685,7 @@ function hasNotes(html) {
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
                         placeholder="Décris le mécanisme : extraction CSV, accès portail web, API, planning d'envoi…"
                         class="mt-2 input-base text-xs py-1.5" rows="2"></textarea>
-              <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="mt-3 space-y-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Fréquence de mise à dispo</label>
                   <input v-model="bms.data_provision_frequency" type="text"
@@ -790,7 +790,7 @@ function hasNotes(html) {
                 <SegmentedToggle :model-value="triState(bms.has_maintenance_procedures)"
                                  @update:model-value="v => setBmsFlag('has_maintenance_procedures', v)" />
               </div>
-              <div v-if="bms.has_maintenance_procedures" class="ml-6 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div v-if="bms.has_maintenance_procedures" class="ml-6 mt-2 space-y-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Périodicité</label>
                   <input v-model="bms.maintenance_periodicity" type="text"
@@ -818,7 +818,7 @@ function hasNotes(html) {
                 <SegmentedToggle :model-value="triState(bms.operator_trained)"
                                  @update:model-value="v => setBmsFlag('operator_trained', v)" />
               </div>
-              <div v-if="bms.operator_trained" class="ml-6 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div v-if="bms.operator_trained" class="ml-6 mt-2 space-y-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Date de formation</label>
                   <input v-model="bms.operator_training_date" type="date"
