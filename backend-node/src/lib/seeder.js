@@ -910,6 +910,58 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     if (thermalBackfilled) log.info(`Resync audit ${documentId} — thermal system_id backfill : ${thermalBackfilled} row(s) reliée(s)`);
   }
 
+  // Fix — Dédup thermal_regulation : un système = une régulation. La
+  // contrainte UNIQUE(document, zone, category) a été retirée en mig 170
+  // (plusieurs systèmes hétérogènes possibles dans une même zone), mais
+  // deux rows avec le MÊME system_id sont bien un doublon accidentel.
+  // On garde la row la plus riche (compte des champs non-null) et on
+  // fusionne toutes les valeurs non-null des autres dedans, avant de
+  // supprimer les doublons.
+  const NULLABLE_COLS = [
+    'generator_device_id', 'distribution_device_id', 'emission_device_id',
+    'production_regulation_device_id', 'distribution_regulation_device_id',
+    'emission_regulation_device_id',
+    'production_extra_device_ids', 'distribution_extra_device_ids',
+    'emission_extra_device_ids',
+    'production_notes_html', 'distribution_notes_html', 'emission_notes_html',
+    'notes', 'notes_html', 'label', 'regulation_type',
+  ];
+  const dupGroups = db.db.prepare(`
+    SELECT system_id, COUNT(*) AS n FROM bacs_audit_thermal_regulation
+    WHERE document_id = ? AND system_id IS NOT NULL
+    GROUP BY system_id HAVING COUNT(*) > 1
+  `).all(documentId);
+  let thermalDeduped = 0;
+  for (const g of dupGroups) {
+    const rows = db.db.prepare(`
+      SELECT * FROM bacs_audit_thermal_regulation
+      WHERE document_id = ? AND system_id = ? ORDER BY id ASC
+    `).all(documentId, g.system_id);
+    // Score = nombre de champs non-null / non-vide dans NULLABLE_COLS
+    const score = (r) => NULLABLE_COLS.reduce((n, c) => n + ((r[c] != null && r[c] !== '') ? 1 : 0), 0);
+    rows.sort((a, b) => score(b) - score(a) || a.id - b.id);
+    const keep = rows[0];
+    // Merge : pour chaque champ nullable, si keep est vide et un autre a une valeur, on récupère.
+    const patch = {};
+    for (const c of NULLABLE_COLS) {
+      if (keep[c] != null && keep[c] !== '') continue;
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][c] != null && rows[i][c] !== '') { patch[c] = rows[i][c]; break; }
+      }
+    }
+    if (Object.keys(patch).length) {
+      const sets = Object.keys(patch).map(k => `${k} = ?`).join(', ');
+      db.db.prepare(`UPDATE bacs_audit_thermal_regulation SET ${sets} WHERE id = ?`)
+        .run(...Object.values(patch), keep.id);
+    }
+    // Supprimer les doublons (toutes les rows sauf keep)
+    for (let i = 1; i < rows.length; i++) {
+      db.db.prepare('DELETE FROM bacs_audit_thermal_regulation WHERE id = ?').run(rows[i].id);
+      thermalDeduped++;
+    }
+  }
+  if (thermalDeduped) log.info(`Resync audit ${documentId} — dédup thermal_regulation : ${thermalDeduped} doublon(s) supprimé(s)`);
+
   // Ligne 1-1 vide dans bacs_audit_bms (sera editee dans le formulaire GTB)
   db.db.prepare(`
     INSERT OR IGNORE INTO bacs_audit_bms (document_id) VALUES (?)
