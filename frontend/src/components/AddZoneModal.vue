@@ -79,44 +79,9 @@ async function submit() {
           class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
         />
       </div>
-      <div v-if="!isTechnical" class="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-2 flex items-center gap-2">
-        <QuestionMarkCircleIcon class="w-5 h-5 text-indigo-600 shrink-0" />
-        <span class="text-xs text-gray-700 flex-1">Une zone fonctionnelle n'est pas une pièce — c'est une unité de suivi énergétique.</span>
-        <button type="button" @click="showHelp = true"
-                class="text-xs font-medium text-indigo-700 hover:text-indigo-900 underline whitespace-nowrap shrink-0">
-          En savoir plus
-        </button>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Nature de la zone</label>
-        <SearchableSelect
-          v-model="form.nature"
-          :options="zoneNatures"
-          placeholder="Sélectionner une nature"
-        />
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Régime d'activité</label>
-        <SearchableSelect
-          v-model="form.occupancy_profile"
-          :options="ZONE_OCCUPANCY_PROFILES"
-          placeholder="Sélectionner un régime d'activité"
-        />
-        <p class="mt-1 text-xs text-gray-500">
-          Caractérise l'usage temporel de la zone (24/7, heures de bureau, scolaire…).
-        </p>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">
-          Contrainte de confort <span class="text-gray-400 font-normal">(optionnel)</span>
-        </label>
-        <input
-          v-model="form.comfort_constraint"
-          type="text"
-          placeholder="ex : température minimale imposée 22 °C, qualité d'air…"
-          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
-        />
-      </div>
+      <!-- Type de zone : déplacé juste après le nom pour piloter la
+           visibilité des champs suivants (les zones techniques masquent
+           régime d'activité + occupants qui n'ont pas de sens hors BACS). -->
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Type de zone</label>
         <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
@@ -133,6 +98,44 @@ async function submit() {
             : 'Zone assujettie au décret BACS : alimente les cards Systèmes et Compteurs.' }}
         </p>
       </div>
+      <div v-if="!isTechnical" class="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-2 flex items-center gap-2">
+        <QuestionMarkCircleIcon class="w-5 h-5 text-indigo-600 shrink-0" />
+        <span class="text-xs text-gray-700 flex-1">Une zone fonctionnelle n'est pas une pièce — c'est une unité de suivi énergétique.</span>
+        <button type="button" @click="showHelp = true"
+                class="text-xs font-medium text-indigo-700 hover:text-indigo-900 underline whitespace-nowrap shrink-0">
+          En savoir plus
+        </button>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Nature de la zone</label>
+        <SearchableSelect
+          v-model="form.nature"
+          :options="zoneNatures"
+          placeholder="Sélectionner une nature"
+        />
+      </div>
+      <div v-if="!isTechnical">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Régime d'activité</label>
+        <SearchableSelect
+          v-model="form.occupancy_profile"
+          :options="ZONE_OCCUPANCY_PROFILES"
+          placeholder="Sélectionner un régime d'activité"
+        />
+        <p class="mt-1 text-xs text-gray-500">
+          Caractérise l'usage temporel de la zone (24/7, heures de bureau, scolaire…).
+        </p>
+      </div>
+      <div v-if="!isTechnical">
+        <label class="block text-xs font-medium text-gray-700 mb-1">
+          Contrainte de confort <span class="text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        <input
+          v-model="form.comfort_constraint"
+          type="text"
+          placeholder="ex : température minimale imposée 22 °C, qualité d'air…"
+          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+        />
+      </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Surface (m²)</label>
         <input
@@ -142,7 +145,7 @@ async function submit() {
           class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
         />
       </div>
-      <div v-if="parties.length">
+      <div v-if="!isTechnical && parties.length">
         <label class="block text-xs font-medium text-gray-700 mb-1">
           Occupants de la zone <span class="text-gray-400 font-normal">(optionnel)</span>
         </label>

@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.221",
+      "date": "2026-06-25",
+      "title": "Audit BACS : zone technique allégée + production PV nettoyée",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "AddZoneModal : type de zone remonté + occupants/régime masqués pour les zones techniques",
+          "what": "Le sélecteur « Type de zone (Fonctionnelle / Technique) » est déplacé juste après le champ Nom, avant la nature — il pilote maintenant explicitement la suite du formulaire. Sur une zone technique : le régime d'activité, la contrainte de confort, les occupants et le bandeau « Une zone fonctionnelle n'est pas une pièce » sont masqués (n'ont pas de sens hors décret BACS). Le formulaire reste concentré sur les champs pertinents (nom, nature, surface, position sur la carte).",
+          "where": "Modale « Ajouter une zone » (BacsAuditDetailView → Sites & Zones).",
+          "how_to_test": "Ouvrir la modale, basculer Technique : seuls Nom + Nature + Surface + Position restent visibles."
+        },
+        {
+          "kind": "fix",
+          "title": "DeviceEditModal : production PV nettoyée (fonctions, énergie, comptage masqués)",
+          "what": "Sur un équipement rattaché à un système `electricity_production` : la section « Fonction(s) de l'équipement » (device_role production/distribution/émission/régulation) est masquée — la chaîne CVC amont/aval ne s'applique pas au PV, l'équipement EST la production. L'énergie primaire consommée est masquée (le PV produit, ne consomme pas). Le label de puissance devient « Puissance crête installée (kWc, valeur positive) » pour éviter toute confusion sur le signe. La question « Comptage séparable par zone » (et sa note) est masquée : le décret impose un comptage global unique de la production PV (R175-3 §1), pas de fractionnement zonal. `showEnergyField` est forcé à true en PV pour que le champ Puissance reste saisissable malgré l'absence de rôle Production explicite.",
+          "where": "Modale de modification d'un équipement dans un système de production PV.",
+          "how_to_test": "Ouvrir un équipement d'un système « Production photovoltaïque » : plus de section Fonctions, plus d'énergie primaire, label puissance = « kWc, valeur positive », plus de question comptage séparable."
+        }
+      ]
+    },
+    {
       "version": "0.1.220",
       "date": "2026-06-25",
       "title": "Exports PDF : on ne garde que le dernier par document (stockage allégé)",

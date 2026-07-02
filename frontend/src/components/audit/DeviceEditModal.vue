@@ -61,6 +61,11 @@ const METERING_OPTS = [
 const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 
 const showPower = computed(() => POWER_RELEVANT.has(props.system?.system_category))
+// PV production = chaîne CVC inapplicable (l'équipement EST la production,
+// pas de distribution/émission/régulation en aval BACS) + énergie non
+// consommée + comptage par nature global (un seul compteur PV). On masque
+// tous les champs qui ne s'appliquent pas pour éviter de piéger l'auditeur.
+const isPvProduction = computed(() => props.system?.system_category === 'electricity_production')
 // Catégories effectivement cumulées dans R175-2 (chauffage + climatisation +
 // éventuellement ventilation/ECS via batterie). Le reste reste informatif.
 const THERMAL_R175_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
@@ -90,7 +95,7 @@ const showCoolPower = computed(() => showPower.value && hasCooling.value)
 const heatPowerLabel = computed(() => {
   const cat = props.system?.system_category
   if (cat === 'lighting_indoor' || cat === 'lighting_outdoor') return 'Puissance installée (kW)'
-  if (cat === 'electricity_production') return 'Puissance crête (kW)'
+  if (cat === 'electricity_production') return 'Puissance crête installée (kWc, valeur positive)'
   if (hasHeating.value) return 'Puissance chaud (kW)'
   return 'Puissance (kW)'
 })
@@ -112,7 +117,13 @@ const hasEmissionRole     = computed(() => deviceRole.value.includes('emission')
 // Doctrine mig 194 — l'énergie primaire ne se renseigne que pour un
 // équipement de production. Pour un radiateur ou un ventilo-convecteur
 // (rôle émission seul), pas d'énergie : la chaleur vient d'ailleurs.
-const showEnergyField = computed(() => deviceRoleAllowsEnergySource(deviceRole.value))
+// showEnergyField pilote à la fois l'affichage du champ « Énergie primaire »
+// et l'activation du champ Puissance (via la card « non saisissable »).
+// Pour la production PV, la fonction Production est implicite (la section
+// Fonctions est masquée) : on force à true pour que la puissance crête
+// installée reste saisissable. Le champ Énergie primaire lui reste masqué
+// via la section Fonctions hidden.
+const showEnergyField = computed(() => isPvProduction.value || deviceRoleAllowsEnergySource(deviceRole.value))
 
 // Aide pédagogique sur le rôle : un exemple court par catégorie d'usage
 // pour ancrer la doctrine production/distribution/émission/régulation.
@@ -472,8 +483,12 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
            la cohérence métier. L'énergie n'apparaît QUE si la fonction
            contient Production (doctrine mig 194 : un radiateur à eau chaude
            n'a pas d'énergie primaire propre, c'est l'équipement amont qui la
-           porte). -->
-      <section class="rounded-xl border border-gray-200 overflow-hidden">
+           porte).
+           Masquée entièrement pour la production PV : la chaîne CVC amont/aval
+           ne s'applique pas (l'équipement EST la production, il n'y a pas de
+           distribution/émission BACS en aval) et l'énergie primaire consommée
+           n'a pas de sens (le PV produit, ne consomme pas). -->
+      <section v-if="!isPvProduction" class="rounded-xl border border-gray-200 overflow-hidden">
         <h4 :class="headCls">Fonction(s) de l'équipement</h4>
         <div class="p-3 space-y-3">
           <SearchableSelect :model-value="deviceRole" :options="ROLE_OPTIONS"
@@ -708,8 +723,11 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
         <h4 :class="headCls">Suivi énergétique BACS</h4>
         <div class="p-3 space-y-3">
           <!-- Comptage séparable : visible uniquement pour les équipements
-               partagés entre plusieurs systèmes/zones. -->
-          <div v-if="isShared" class="flex items-center justify-between gap-3">
+               partagés entre plusieurs systèmes/zones.
+               Masqué pour la production PV : le décret impose un comptage
+               global unique de la production sur site (R175-3 §1), pas de
+               fractionnement par zone. -->
+          <div v-if="isShared && !isPvProduction" class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">Le comptage de cet équipement est-il séparable par zone fonctionnelle ?</div>
               <div class="text-xs text-gray-500 mt-0.5">La consommation de chaque zone desservie par cet équipement partagé peut être relevée séparément.</div>
@@ -730,7 +748,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             <SegmentedToggle :model-value="triState(device.serves_multiple_buildings)" :options="YESNO"
                              @update:model-value="v => patch({ serves_multiple_buildings: v })" />
           </div>
-          <input v-if="isShared" type="text" :value="device.metering_separable_note || ''"
+          <input v-if="isShared && !isPvProduction" type="text" :value="device.metering_separable_note || ''"
                  placeholder="Justification courte sur la séparabilité du comptage…"
                  @blur="e => patchInput('metering_separable_note', e.target.value)"
                  :class="inputCls" class="w-full" />
