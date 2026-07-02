@@ -5,7 +5,7 @@ import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon
 import {
   REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
   derivedGranularity, resolveGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
-  GRANULARITY_OPTIONS, regulationTypesForCategory,
+  GRANULARITY_OPTIONS, GRANULARITY_R175_COMPLIANT, regulationTypesForCategory,
 } from '@/lib/audit-options'
 import { buildPrefillPatch, regulationTypeLabel } from '@/lib/thermal-prefill'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -296,32 +296,42 @@ function deviceOptionsForLevel(t, level) {
   // équipements du système courant + ses équipements partagés. Fallback
   // (zone × catégorie) si le system_id manque (rétro-compat).
   //
-  // Exception distribution : les circuits de distribution (bouclage ECS,
-  // circuits eau chaude/glacée…) sont souvent rattachés au système central
-  // de production (chaufferie, PAC air/eau) mais desservent plusieurs
-  // zones. Restreindre au system_id local rendait ces équipements
-  // introuvables depuis les thermal rows aval — bug audit #56 : les
-  // circuits « Eau Chaude Cellule 1 / Extension » sur la chaufferie z131
-  // ne pouvaient pas être sélectionnés pour la régulation de z126/z127.
-  // On élargit à tous les devices de même catégorie (heating/cooling) sur
-  // le document, avec le rôle recherché — le filtre par rôle du
-  // filterAndSortByRole écarte les faux positifs.
+  // Exception distribution CIBLÉE : les circuits de distribution (bouclage
+  // ECS, circuits eau chaude/glacée…) rattachés à un système central de
+  // production (chaufferie, PAC) desservent plusieurs zones. On élargit
+  // aux autres systèmes SEULEMENT si le système courant n'a pas de device
+  // production local — sinon c'est qu'il produit lui-même son énergie
+  // (ex. convecteur électrique en zone) et il n'y a rien à aller chercher
+  // ailleurs. Cette règle évite qu'un système autonome (Convecteur
+  // Vestiaires) reçoive des propositions de circuits chaufferie qui n'ont
+  // rien à voir avec la zone.
   let devices = t.system_id
     ? (props.generatorDevicesForZoneCategory(t.system_id) || [])
     : (props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || [])
   if (level === 'distribution') {
-    const cat = t.category || 'heating'
-    const sysIdsSameCat = new Set(
-      (audit.systems || [])
-        .filter(s => s.system_category === cat && s.present)
-        .map(s => s.id)
-    )
-    const seen = new Set(devices.map(d => d.id))
-    for (const d of (audit.devices || [])) {
-      if (seen.has(d.id)) continue
-      if (sysIdsSameCat.has(d.system_id)) {
-        devices = [...devices, d]
-        seen.add(d.id)
+    const hasLocalProduction = devices.some(d => {
+      const raw = d.device_role
+      const roles = Array.isArray(raw)
+        ? raw
+        : (typeof raw === 'string' && raw.startsWith('[')
+            ? (() => { try { return JSON.parse(raw) || [] } catch { return [] } })()
+            : (raw ? [raw] : []))
+      return roles.some(r => /production|generator/i.test(String(r || '')))
+    })
+    if (!hasLocalProduction) {
+      const cat = t.category || 'heating'
+      const sysIdsSameCat = new Set(
+        (audit.systems || [])
+          .filter(s => s.system_category === cat && s.present)
+          .map(s => s.id)
+      )
+      const seen = new Set(devices.map(d => d.id))
+      for (const d of (audit.devices || [])) {
+        if (seen.has(d.id)) continue
+        if (sysIdsSameCat.has(d.system_id)) {
+          devices = [...devices, d]
+          seen.add(d.id)
+        }
       }
     }
   }
@@ -590,7 +600,7 @@ onBeforeUnmount(teardownSortable)
                         :model-value="granularityForRow(t).key"
                         @update:modelValue="(v) => patchGranularity(t, v)"
                         :options="GRANULARITY_OPTIONS"
-                        :invalid="!deviceForLevel(t, 'emission')?.regulation_granularity"
+                        :invalid="!GRANULARITY_R175_COMPLIANT.has(granularityForRow(t).key)"
                         :clearable="true" :creatable="true" :auto-width="true"
                         size="sm" placeholder="Granularité…" />
                     </div>

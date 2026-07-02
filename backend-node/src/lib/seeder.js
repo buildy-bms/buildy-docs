@@ -978,6 +978,10 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
 
   // Recupere tous les devices avec leur zone parent. is_bacs = 1 : les
   // usages manuels hors decret ne generent PAS de compteur reglementaire.
+  // marked_negligible_under_5pct = 0 : R175-2 §5 (règle des 5%) exempte
+  // du comptage BACS les postes < 5% de la conso totale (FAQ ministère
+  // juin 2025). Aligné sur bacs-audit-action-generator qui ne génère plus
+  // d'actions R175-3 sur ces systèmes.
   // device_role est ajoute pour pouvoir filtrer les devices non producteurs
   // sur les usages thermiques (cf. plus bas).
   const devices = db.db.prepare(`
@@ -985,7 +989,10 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     LEFT JOIN zones z ON z.id = s.zone_id
-    WHERE s.document_id = ? AND s.is_bacs = 1 AND d.energy_source IS NOT NULL
+    WHERE s.document_id = ?
+      AND s.is_bacs = 1
+      AND (s.marked_negligible_under_5pct IS NULL OR s.marked_negligible_under_5pct = 0)
+      AND d.energy_source IS NOT NULL
   `).all(documentId);
 
   // Pour les usages thermiques (chauffage / refroidissement / ECS), seul
@@ -1086,6 +1093,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   const presentSystemsForFallback = db.db.prepare(`
     SELECT id, zone_id, system_category FROM bacs_audit_systems
     WHERE document_id = ? AND is_bacs = 1 AND present = 1
+      AND (marked_negligible_under_5pct IS NULL OR marked_negligible_under_5pct = 0)
       AND system_category IN ('ventilation', 'cooling', 'lighting_indoor', 'lighting_outdoor')
   `).all(documentId);
   for (const s of presentSystemsForFallback) {
@@ -1127,6 +1135,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     FROM bacs_audit_systems s
     LEFT JOIN bacs_audit_system_devices d ON d.system_id = s.id
     WHERE s.document_id = ? AND s.is_bacs = 1 AND s.present = 1
+      AND (s.marked_negligible_under_5pct IS NULL OR s.marked_negligible_under_5pct = 0)
       AND s.system_category IN ('heating', 'cooling', 'dhw')
       AND s.zone_id IS NOT NULL
     GROUP BY s.id
