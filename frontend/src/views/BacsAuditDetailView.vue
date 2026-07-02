@@ -444,15 +444,23 @@ const thermalFiltered = computed(() => {
   // 1 ligne par (zone, catégorie) : on ne garde que les rows dont la
   // catégorie correspond à un système présent dans la zone (sinon ça
   // n'a pas de sens — pas de chauffage = pas de régulation chauffage).
+  // On exclut aussi les zones techniques (locaux techniques, TGBT…) qui
+  // n'ont pas vocation à être régulées au sens R175-6 — défense en profondeur
+  // en plus de la purge backend au moment du resync.
+  const technicalZoneIds = new Set(
+    (zones.value || []).filter(z => (z.kind || 'functional') === 'technical').map(z => z.id)
+  )
   const presentCats = new Map()  // zone_id -> Set('heating'|'cooling')
   for (const s of systems.value) {
     if (!s.present) continue
+    if (technicalZoneIds.has(s.zone_id)) continue
     if (s.system_category === 'heating' || s.system_category === 'cooling') {
       if (!presentCats.has(s.zone_id)) presentCats.set(s.zone_id, new Set())
       presentCats.get(s.zone_id).add(s.system_category)
     }
   }
   return thermal.value.filter(t =>
+    !technicalZoneIds.has(t.zone_id) &&
     presentCats.get(t.zone_id)?.has(t.category || 'heating')
   )
 })

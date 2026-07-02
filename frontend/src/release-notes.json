@@ -2,6 +2,44 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.222",
+      "date": "2026-06-25",
+      "title": "Audit BACS : cohérence compteurs / zones techniques / régulation thermique",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Compteurs : fallback électrique pour ventilation / cooling / lighting sans device saisi (Fix A)",
+          "what": "La doctrine « no device, no meter » de `resyncBacsAuditMetersForZones` ratait l'obligation BACS quand l'auditeur oubliait de saisir un device. Pour les usages électriques par nature (ventilation, cooling, lighting_indoor, lighting_outdoor), on force désormais un compteur électrique zonal `required=1` dès que le système est présent (`present=1`), même sans device saisi. Le heating / dhw / electricity_production restent contraints par le device (l'énergie dépend du générateur).",
+          "where": "Backend `backend-node/src/lib/seeder.js` — `resyncBacsAuditMetersForZones`.",
+          "how_to_test": "Sur un audit BACS, marquer un système ventilation présent sans device : un compteur électrique `usage=other` `required=1` apparaît en card Compteurs avec la note « fallback système présent sans device saisi »."
+        },
+        {
+          "kind": "fix",
+          "title": "Compteurs : purge des orphelins jamais observés (Fix B)",
+          "what": "Les compteurs auto-générés qui deviennent orphelins (`required=0`) mais n'ont jamais été observés sur le terrain (pas de `present_actual`, pas de photo, pas d'équipement rattaché, notes non modifiées) sont désormais SUPPRIMÉS au lieu de rester en `required=0`. Réduit le bruit UI (audit #56 avait 3 compteurs fantômes gaz Cellule 1/Extension + PV Cellule 1 qui polluaient la card 04). Les saisies réelles (present_actual=1, photo, notes custom) sont préservées avec required=0.",
+          "where": "Backend `resyncBacsAuditMetersForZones` — étape 3 (synchronisation flag required)."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 05 Régulation thermique : zones techniques exclues (Fix D)",
+          "what": "Backend : `resyncBacsAuditDataForZones` purge maintenant les rows systems / thermal_regulation / meters restées orphelines quand une zone bascule fonctionnel → technique (rows non observées uniquement, saisies réelles préservées). Frontend : `thermalFiltered` filtre aussi côté client les zones techniques en défense.",
+          "where": "Backend `seeder.js` + frontend `BacsAuditDetailView.vue` `thermalFiltered`."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 05 : équipements de distribution enfin sélectionnables (Fix E)",
+          "what": "Bug audit #56 : impossible de sélectionner les circuits « Eau Chaude Cellule 1 / Extension » (rattachés à la chaufferie z131) depuis les thermal rows z126/z127 en aval. La cause : `deviceOptionsForLevel` filtrait strict sur `t.system_id` — les distributions rattachées au système central étaient inaccessibles aux zones desservies. Élargissement du scope pour le niveau `distribution` : on inclut désormais tous les devices `role=distribution` de tout système présent de la même catégorie (heating/cooling) sur le document. Le filtre par rôle écarte les faux positifs.",
+          "where": "`frontend/src/components/audit/ThermalSection.vue` `deviceOptionsForLevel`."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 05 : granularité « Par pièce » qui restait rouge — notification (Fix F)",
+          "what": "`patchGranularity` faisait un no-op silencieux si aucun équipement émetteur n'était sélectionné sur la thermal row (la granularité vit sur le device émission). L'auditeur cliquait « Par pièce », la pastille restait rouge « Centralisée », aucun feedback. Ajout d'une notification claire : « Sélectionne d'abord un équipement d'émission (colonne Émission) pour pouvoir régler la granularité. »",
+          "where": "`frontend/src/components/audit/ThermalSection.vue` `patchGranularity`."
+        }
+      ]
+    },
+    {
       "version": "0.1.221",
       "date": "2026-06-25",
       "title": "Audit BACS : zone technique allégée + production PV nettoyée",
