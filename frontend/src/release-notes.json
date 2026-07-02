@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.237",
+      "date": "2026-06-25",
+      "title": "Card GTB : questions R175-3 en colonne unique",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Format d'archivage / conservation vérifiée + Fréquence / Format de sortie sur 1 colonne",
+          "what": "Les 2 grilles 2 colonnes des blocs R175-3 (capacités + mise à disposition) passent en `space-y-3` — questions les unes en dessous des autres."
+        }
+      ]
+    },
+    {
       "version": "0.1.236",
       "date": "2026-06-25",
       "title": "Card GTB : libellé d'énergie retiré à côté de la pilule (redondant)",
