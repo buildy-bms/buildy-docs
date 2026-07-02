@@ -2,6 +2,29 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.226",
+      "date": "2026-06-25",
+      "title": "Audit BACS : distribution cross-system ciblée + granularité verte + règle 5%",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Distribution cross-system uniquement si pas de production locale",
+          "what": "Bug audit #56 : les circuits « Eau Chaude Cellule 1/Extension » de la chaufferie apparaissaient dans le dropdown Distribution des Vestiaires (Convecteur électrique local) — n'ont rien à voir avec cette zone. Fix : n'élargir aux devices distribution site-wide QUE si le système courant n'a pas de device rôle production local. Si production locale (convecteur électrique en zone), les options distribution restent scopées au système courant."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 05 : granularité verte quand dérivée correcte (per_room / per_zone)",
+          "what": "L'indicateur `:invalid` sur le SearchableSelect de granularité était `!regulation_granularity` — TRUE tant que la valeur n'était pas explicitement stockée. Or `patchGranularity` sauve `null` quand l'auditeur pick la valeur dérivée (per_room dérivée de thermostat_ambiant), pour signaler « pas de surcharge ». Résultat : la pilule restait rouge malgré une granularité résolue conforme R175-6. Fix : `:invalid` vrai seulement si la granularité résolue n'est PAS conforme R175-6 (`central_only` ou absente). Les valeurs dérivées per_room / per_zone rendent la pilule verte / bleue.",
+          "where": "`frontend/src/components/audit/ThermalSection.vue`."
+        },
+        {
+          "kind": "fix",
+          "title": "R175-2 §5 : compteurs non requis pour les systèmes marqués négligeables (< 5%)",
+          "what": "L'action generator exemptait déjà les systèmes `marked_negligible_under_5pct=1` des actions R175-3, mais `resyncBacsAuditMetersForZones` continuait à générer / maintenir `required=1` sur leurs compteurs. Incohérent. Les 3 sources de génération de compteur (devices + Fix A ventilation/cooling/lighting + Fix G thermique zonal) filtrent maintenant `AND (marked_negligible_under_5pct IS NULL OR marked_negligible_under_5pct = 0)`. Cohérent avec la FAQ ministère juin 2025 (règle des 5%)."
+        }
+      ]
+    },
+    {
       "version": "0.1.225",
       "date": "2026-06-25",
       "title": "Audit BACS : pill « Ventilation » + backend accepte distribution cross-system",
