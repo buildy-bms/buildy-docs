@@ -88,25 +88,55 @@ function toggleWorks(partyId, checked) {
 
 // Poste négligeable < 5 % : édité ici, mais mute toujours le système
 // parent (props.system) puis émet `patched` pour que la liste se recharge.
+// R175-2 §5 (FAQ ministère juin 2025) exige une justification textuelle
+// — le backend refuse le flag=1 sans texte. Quand on active le flag on
+// prompt inline l'auditeur ; sur annulation ou vide on ne persiste rien.
 async function setNegligible(v) {
   try {
-    const patch = { marked_negligible_under_5pct: v }
-    if (!v) patch.negligible_justification = null
-    await updateBacsSystem(props.system.id, patch)
-    props.system.marked_negligible_under_5pct = v ? 1 : (v === false ? 0 : null)
-    if (!v) props.system.negligible_justification = null
+    if (v === true) {
+      const existing = (props.system.negligible_justification || '').trim()
+      const text = window.prompt(
+        'Justifie l\'exemption R175-2 §5 (FAQ ministère juin 2025) — ex : « petits ballons ECS individuels », « groupe de secours ».\n\nLa justification est obligatoire pour un poste négligeable.',
+        existing,
+      )
+      if (text == null) return  // annulation
+      const trimmed = text.trim()
+      if (!trimmed) {
+        error('Justification obligatoire pour marquer un poste négligeable.')
+        return
+      }
+      await updateBacsSystem(props.system.id, {
+        marked_negligible_under_5pct: true,
+        negligible_justification: trimmed,
+      })
+      props.system.marked_negligible_under_5pct = 1
+      props.system.negligible_justification = trimmed
+    } else {
+      const patch = { marked_negligible_under_5pct: v }
+      if (!v) patch.negligible_justification = null
+      await updateBacsSystem(props.system.id, patch)
+      props.system.marked_negligible_under_5pct = v === false ? 0 : null
+      if (!v) props.system.negligible_justification = null
+    }
     emit('patched')
-  } catch {
-    error('Sauvegarde impossible')
+  } catch (e) {
+    error(e?.response?.data?.detail || 'Sauvegarde impossible')
   }
 }
 async function setJustification(text) {
+  const trimmed = (text || '').trim()
+  // Si le système est marqué négligeable, la justification ne peut pas
+  // être vidée (le backend renverra 400) — on revert la saisie locale.
+  if (props.system.marked_negligible_under_5pct === 1 && !trimmed) {
+    error('Justification obligatoire tant que le poste est marqué négligeable.')
+    return
+  }
   try {
-    await updateBacsSystem(props.system.id, { negligible_justification: text })
-    props.system.negligible_justification = text
+    await updateBacsSystem(props.system.id, { negligible_justification: trimmed || null })
+    props.system.negligible_justification = trimmed || null
     emit('patched')
-  } catch {
-    error('Sauvegarde impossible')
+  } catch (e) {
+    error(e?.response?.data?.detail || 'Sauvegarde impossible')
   }
 }
 </script>

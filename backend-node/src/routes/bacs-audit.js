@@ -229,6 +229,25 @@ async function routes(fastify) {
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
 
+    // Fix M — Validation R175-2 §5 : marquer un système négligeable exige
+    // une justification textuelle (FAQ ministère juin 2025 : « le poste
+    // devra être justifié par l'auditeur »). On refuse si l'auditeur
+    // active le flag sans texte, ou tente de vider un texte alors que le
+    // flag est encore actif. Cas nominal : flag et justification arrivent
+    // ensemble via le même PATCH (SystemSettingsModal.vue à mettre à
+    // jour pour envoyer les deux dans le même body).
+    const nextNegligible = 'marked_negligible_under_5pct' in body
+      ? body.marked_negligible_under_5pct
+      : (row.marked_negligible_under_5pct === 1);
+    const nextJustification = 'negligible_justification' in body
+      ? (body.negligible_justification || '').trim()
+      : (row.negligible_justification || '').trim();
+    if (nextNegligible === true && !nextJustification) {
+      return reply.code(400).send({
+        detail: 'Une justification est obligatoire pour marquer un poste négligeable < 5 % (R175-2 §5, FAQ ministère juin 2025).',
+      });
+    }
+
     const sets = [], args = [];
     const boolField = (k) => {
       if (k in body) {

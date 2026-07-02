@@ -145,6 +145,22 @@ async function toggleNegligible(s, checked) {
       })
       if (!ok) return
     }
+    // Fix M — R175-2 §5 : justification textuelle obligatoire (FAQ
+    // ministère juin 2025). Le backend refuse le flag=1 sans texte. On
+    // prompt inline pour ne pas faire capoter le PATCH en 400.
+    const existing = (s.negligible_justification || '').trim()
+    const text = window.prompt(
+      'Justifie l\'exemption R175-2 §5 (FAQ ministère juin 2025) — ex : « petits ballons ECS individuels », « groupe de secours ».\n\nLa justification est obligatoire.',
+      existing,
+    )
+    if (text == null) return  // annulation
+    const trimmed = text.trim()
+    if (!trimmed) return  // vide → skip
+    await patchSystem(s, {
+      marked_negligible_under_5pct: true,
+      negligible_justification: trimmed,
+    })
+    return
   }
   await patchSystem(s, {
     marked_negligible_under_5pct: checked,
