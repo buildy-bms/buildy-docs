@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.233",
+      "date": "2026-06-25",
+      "title": "Audit BACS : clic sur nom système en card 05 remonte à la card 03",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Nom système cliquable en card Régulation thermique",
+          "what": "Dans la card 05, cliquer sur le nom du système déplie la card 03 Systèmes (si repliée) puis scroll et highlight brièvement la ligne correspondante — repérage rapide entre les deux cards. Événement générique `bacs-collapse:open` ajouté à CollapsibleSection pour ouvrir une section précise à distance."
+        }
+      ]
+    },
+    {
       "version": "0.1.232",
       "date": "2026-06-25",
       "title": "Audit BACS : dédup automatique des régulations thermiques doublons",

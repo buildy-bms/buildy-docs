@@ -176,6 +176,22 @@ function levelRegulationTypeLabel(t, level) {
 // émetteur de la ligne. Mig 180 : on ne saisit plus la granularité côté
 // card 06 — elle découle automatiquement de ce qui est renseigné sur
 // l'équipement (modale équipement → section Régulation → type d'émission).
+// Remonte vers le système dans la card 03 (Systèmes) :
+// 1. Ouvre la section systems si elle est repliée
+// 2. Scroll vers le row `[data-system-id]` correspondant
+// 3. Highlight bref pour le repérage visuel
+function gotoSystemInCard03(systemId) {
+  if (!systemId) return
+  window.dispatchEvent(new CustomEvent('bacs-collapse:open', { detail: { storageKey: 'systems' } }))
+  nextTick(() => {
+    const el = document.querySelector(`[data-system-id="${systemId}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('ring-2', 'ring-indigo-400', 'ring-offset-2')
+    setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-400', 'ring-offset-2'), 1600)
+  })
+}
+
 function systemDisplayName(t) {
   if (t.system_label && t.system_label.trim()) return t.system_label.trim()
   const prod = deviceForLevel(t, 'production')
@@ -555,7 +571,12 @@ onBeforeUnmount(teardownSortable)
                     {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
                   </span>
                   <span class="text-gray-400">·</span>
-                  <span class="text-sm font-semibold text-gray-800">{{ systemDisplayName(t) }}</span>
+                  <button type="button"
+                          @click="gotoSystemInCard03(t.system_id)"
+                          v-tooltip="'Remonter vers ce système dans la card 03'"
+                          class="text-sm font-semibold text-gray-800 hover:text-indigo-600 hover:underline underline-offset-2 cursor-pointer">
+                    {{ systemDisplayName(t) }}
+                  </button>
                   <Tooltip v-if="exemptAutoFromWood(t)"
                            text="Exemption R175-6 II : l'équipement de Production est au bois.">
                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">

@@ -44,12 +44,20 @@ function toggle() {
 function onSetAll(e) {
   if (typeof e.detail === 'boolean') setOpen(e.detail)
 }
+// Événement ciblé : `bacs-collapse:open` avec detail={ storageKey }
+// permet d'ouvrir une section précise depuis n'importe où (ex. clic
+// sur un nom de système dans la card 05 pour remonter en card 03).
+function onOpenOne(e) {
+  if (e.detail?.storageKey === props.storageKey) setOpen(true)
+}
 
 onMounted(() => {
   window.addEventListener('bacs-collapse:set-all', onSetAll)
+  window.addEventListener('bacs-collapse:open', onOpenOne)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('bacs-collapse:set-all', onSetAll)
+  window.removeEventListener('bacs-collapse:open', onOpenOne)
 })
 </script>
 
