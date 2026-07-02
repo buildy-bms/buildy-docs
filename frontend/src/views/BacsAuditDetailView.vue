@@ -675,16 +675,6 @@ const STEP_DEFINITIONS = [
         ? '1 équipement incomplet — repérable à son bouton « Modifier » rouge'
         : `${ko.length} équipements incomplets — repérables à leur bouton « Modifier » rouge`]
     } },
-  { key: 'meters',
-    label: 'Compteurs',
-    description: 'Compteurs requis revus (presents/absents/HS coches).',
-    incomplete: () => {
-      if (!meters.value.length) return ["aucun compteur n'est listé"]
-      if (!meters.value.some(m => m.present_actual !== null)) {
-        return ["aucun compteur n'a été pointé présent ou absent"]
-      }
-      return []
-    } },
   { key: 'thermal',
     label: 'Régulation',
     description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
@@ -706,6 +696,16 @@ const STEP_DEFINITIONS = [
       })
       const head = `${incomplete.length} régulation${incomplete.length > 1 ? 's' : ''} sans équipement d'émission saisi`
       return [`${head} : ${labels.join(', ')}`]
+    } },
+  { key: 'meters',
+    label: 'Compteurs',
+    description: 'Compteurs requis revus (presents/absents/HS coches).',
+    incomplete: () => {
+      if (!meters.value.length) return ["aucun compteur n'est listé"]
+      if (!meters.value.some(m => m.present_actual !== null)) {
+        return ["aucun compteur n'a été pointé présent ou absent"]
+      }
+      return []
     } },
   // GTB : complète si « Pas de GTB » répondu, ou GTB présente + solution saisie.
   { key: 'bms',
@@ -1631,19 +1631,7 @@ onBeforeUnmount(() => {
         @add-device="sys => addDeviceSystem = sys"
       />
 
-      <!-- 5. Compteurs et mesurage (R175-3 1°) -->
-      <MetersSection
-        :active="activeStepKey === 'meters'"
-        :meter-usages="METER_USAGES"
-        :protocol-options="PROTOCOL_OPTIONS"
-        :step="stepFor('meters')"
-        @open-notes="openNotesModal"
-        @validate-step="validateStep"
-        @invalidate-step="invalidateStep"
-        @add-meter="openMeterAddModal"
-      />
-
-      <!-- 6. Régulation thermique automatique (R175-6) -->
+      <!-- 4. Régulation thermique automatique (R175-6) -->
       <ThermalSection
         v-if="isBacs"
         :active="activeStepKey === 'thermal'"
@@ -1655,6 +1643,18 @@ onBeforeUnmount(() => {
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
         @open-notes="openNotesModal"
+      />
+
+      <!-- 5. Compteurs et mesurage (R175-3 1°) -->
+      <MetersSection
+        :active="activeStepKey === 'meters'"
+        :meter-usages="METER_USAGES"
+        :protocol-options="PROTOCOL_OPTIONS"
+        :step="stepFor('meters')"
+        @open-notes="openNotesModal"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @add-meter="openMeterAddModal"
       />
 
       <!-- 7. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
