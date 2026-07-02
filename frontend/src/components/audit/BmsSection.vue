@@ -175,6 +175,14 @@ async function patchDeviceMb(d, patch) {
     fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(d, fullPatch)
+  // BUG FIX #10 — `d` provient de devicesWithMeta qui SPREAD chaque device
+  // (`...d`) et renvoie une copie plain non reactive par le proxy Vue.
+  // Muter la copie n'invalide donc pas le computed devicesWithMeta, et
+  // l'UI ne se rafraichit qu'apres le PATCH+debounce+refetch (~1.5s).
+  // Mutation directe du device dans le store → devicesWithMeta re-compute
+  // instantanement → l'UI reagit sur le premier clic.
+  const storeDevice = (audit.devices || []).find(x => x.id === d.id)
+  if (storeDevice) Object.assign(storeDevice, fullPatch)
   // PATCH non bloquant : le toggle a déjà réagi visuellement via Object.assign,
   // pas besoin de attendre la réponse serveur pour rendre la main à l'utilisateur.
   updateBacsDevice(d.id, fullPatch)
@@ -188,6 +196,11 @@ async function patchMeter(m, patch) {
     fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(m, fullPatch)
+  // Idem devicesWithMeta : metersPresent peut être un simple filter sur
+  // le store, mais on sécurise en synchronisant explicitement le store
+  // (aligné sur le pattern patchDeviceMb ci-dessus).
+  const storeMeter = (audit.meters || []).find(x => x.id === m.id)
+  if (storeMeter) Object.assign(storeMeter, fullPatch)
   updateBacsMeter(m.id, fullPatch)
     .then(scheduleActionItemsRefresh)
     .catch(() => error('Sauvegarde compteur impossible'))

@@ -267,6 +267,16 @@ async function routes(fastify) {
       db.db.prepare(`UPDATE bacs_audit_systems SET ${sets.join(', ')} WHERE id = ?`).run(...args);
       logBacsAudit(request, 'bacs.system.update', row.document_id, { systemId: id, fields: Object.keys(body) });
     }
+    // Resync des compteurs quand un flag qui influe sur la génération
+    // change : `present`, `not_concerned`, `marked_negligible_under_5pct`
+    // (R175-2 §5 exempte les postes < 5% du comptage) ou `is_bacs`.
+    // Sans ça, l'auditeur cochait « négligeable » sur un poste, l'UI
+    // action items s'ajustait mais la card 04 Compteurs continuait à
+    // exiger un compteur required=1.
+    const NEEDS_METER_RESYNC = ['present', 'not_concerned', 'marked_negligible_under_5pct'];
+    if (NEEDS_METER_RESYNC.some(k => k in body)) {
+      resyncBacsAuditWithSiteZones(row.document_id);
+    }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
   });

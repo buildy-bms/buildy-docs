@@ -2,6 +2,24 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.227",
+      "date": "2026-06-25",
+      "title": "Audit BACS : toggle 5% resync auto + toggles GTB instantanés",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Toggle négligeable < 5% déclenche le resync des compteurs automatiquement",
+          "what": "PATCH `/bacs-audit/systems/:id` régénérait les action items (correct — R175-2 §5 exempte les postes < 5%) mais pas les compteurs. L'auditeur cochait « négligeable » sur un poste, l'action item d'exemption s'ajoutait mais la card 04 Compteurs continuait à afficher `required=1`. Ajout d'un resync ciblé quand `present` / `not_concerned` / `marked_negligible_under_5pct` change : les compteurs orphelins sont purgés (Fix B) ou marqués `required=0` (Fix synchronisation) selon leur historique d'observation."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 06 GTB : toggles Intégré/Opérationnel enfin instantanés (Fix #10)",
+          "what": "Bug perçu depuis longtemps : premier clic sur un toggle « Intégré à la GTB » ou « Opérationnel » réagissait avec ~1.5s de latence. Cause identifiée : `devicesWithMeta` dans `BacsAuditDetailView` spread chaque device (`...d`) → renvoyait une copie plain non tracée par le proxy Vue. `Object.assign(d, patch)` dans `patchDeviceMb` mutait la copie, pas le store, donc `devicesWithMeta` ne re-calculait pas → l'UI ne se rafraîchissait qu'après PATCH backend (200-500ms) + debounce 800ms + refetch store. Fix : mutation directe du device dans `audit.devices` (id-matched) en plus de la copie. `devicesWithMeta` re-compute instantanément, l'UI réagit sur le premier clic. Même pattern appliqué à `patchMeter` par cohérence.",
+          "where": "`frontend/src/components/audit/BmsSection.vue`."
+        }
+      ]
+    },
+    {
       "version": "0.1.226",
       "date": "2026-06-25",
       "title": "Audit BACS : distribution cross-system ciblée + granularité verte + règle 5%",
