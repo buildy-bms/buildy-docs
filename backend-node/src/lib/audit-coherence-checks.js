@@ -81,6 +81,22 @@ function validateThermalDeviceCoherence(body, currentRow) {
   function checkDevice(deviceId, col) {
     const ctx = getDeviceContext(deviceId);
     if (!ctx) return `Équipement #${deviceId} introuvable pour ${col}.`;
+    // Exception équipements réversibles (heating ↔ cooling) — une PAC
+    // air/eau ou un DRV réversible sert à la fois chauffage ET
+    // refroidissement, mais côté DB il n'a qu'un seul system_id. Quand
+    // l'auditeur veut le désigner (production, distribution, émission ou
+    // extras) dans la régul thermique de l'autre catégorie sur la même
+    // zone, on accepte tant que le document et la zone matchent. Placé
+    // AVANT l'exception distribution pour couvrir aussi les circuits
+    // d'un système réversible qui desservent l'autre catégorie.
+    if (ctx.document_id === currentRow.document_id
+        && ctx.zone_id === effectiveZone
+        && (effectiveCat === 'heating' || effectiveCat === 'cooling')
+        && (ctx.system_category === 'heating' || ctx.system_category === 'cooling')
+        && ctx.system_category !== effectiveCat) {
+      return null;
+    }
+
     // Exception niveau distribution — un circuit de distribution (bouclage
     // ECS, circuits eau chaude/glacée…) est souvent rattaché au système
     // central de production (chaufferie, PAC air/eau) mais dessert plusieurs
@@ -94,20 +110,6 @@ function validateThermalDeviceCoherence(body, currentRow) {
       if (ctx.system_category !== effectiveCat) {
         return `Équipement « ${ctx.name || '#' + deviceId} » est dans une autre catégorie d'usage (${ctx.system_category}) que la régulation (${effectiveCat}).`;
       }
-      return null;
-    }
-
-    // Exception équipements réversibles (heating ↔ cooling) — une PAC
-    // air/eau ou un DRV réversible sert à la fois chauffage ET
-    // refroidissement, mais côté DB il n'a qu'un seul system_id. Quand
-    // l'auditeur veut le désigner en production dans la régul thermique
-    // de l'autre catégorie (même zone), on accepte tant que le document
-    // et la zone matchent.
-    if (ctx.document_id === currentRow.document_id
-        && ctx.zone_id === effectiveZone
-        && (effectiveCat === 'heating' || effectiveCat === 'cooling')
-        && (ctx.system_category === 'heating' || ctx.system_category === 'cooling')
-        && ctx.system_category !== effectiveCat) {
       return null;
     }
     if (effectiveSystemId != null) {

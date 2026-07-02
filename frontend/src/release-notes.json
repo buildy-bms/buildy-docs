@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.231",
+      "date": "2026-06-25",
+      "title": "Audit BACS : PAC réversible utilisable aussi en distribution + émission",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Ordre des exceptions coherence corrigé",
+          "what": "Suite au 0.1.229 : l'exception réversibles heating↔cooling ne s'appliquait qu'à la production car placée APRÈS l'exception distribution stricte (même-catégorie). Ordre inversé : la PAC air-eau / DRV réversible est maintenant utilisable à tous les niveaux (production, distribution, émission) sur les deux catégories de la même zone."
+        }
+      ]
+    },
+    {
       "version": "0.1.230",
       "date": "2026-06-25",
       "title": "Audit BACS : log détaillé des 400 sur PATCH thermal-regulation (debug)",
