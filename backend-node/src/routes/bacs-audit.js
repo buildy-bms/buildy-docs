@@ -938,7 +938,10 @@ async function routes(fastify) {
     // et le rapport de revue (partie B chantier 2).
     const { validateThermalDeviceCoherence } = require('../lib/audit-coherence-checks');
     const coherenceErr = validateThermalDeviceCoherence(body, row);
-    if (coherenceErr) return reply.code(400).send({ detail: coherenceErr });
+    if (coherenceErr) {
+      log.warn(`PATCH thermal-regulation/${id} 400 coherence: ${coherenceErr} | body=${JSON.stringify(body)} | row.system_id=${row.system_id} row.zone_id=${row.zone_id} row.category=${row.category}`);
+      return reply.code(400).send({ detail: coherenceErr });
+    }
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
