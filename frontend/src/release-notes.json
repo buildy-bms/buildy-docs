@@ -2,6 +2,19 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.229",
+      "date": "2026-06-25",
+      "title": "Audit BACS : équipements réversibles PAC/DRV utilisables en heating + cooling",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "PATCH thermal accepte les équipements réversibles cross-catégorie",
+          "what": "Bug audit #56 : la PAC air-eau (d185, rôle production sur système cooling z128) ne pouvait pas être désignée comme production de la régulation heating de la même zone → 400 « n'appartient pas à ce système ». `validateThermalDeviceCoherence` autorise maintenant cross-category heating ↔ cooling quand le device est dans la même zone et le même document — le cas nominal d'un équipement réversible (PAC air-eau, DRV réversible).",
+          "where": "`backend-node/src/lib/audit-coherence-checks.js`."
+        }
+      ]
+    },
+    {
       "version": "0.1.228",
       "date": "2026-06-25",
       "title": "Audit BACS : cohérence auto — thermal system_id backfill + justification négligeable obligatoire",
