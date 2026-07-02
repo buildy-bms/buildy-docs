@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.232",
+      "date": "2026-06-25",
+      "title": "Audit BACS : dédup automatique des régulations thermiques doublons",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Un système = une ligne de régulation (dédup auto au resync)",
+          "what": "Bug audit #56 : Plot Bureaux affichait 5 lignes dans la card 05 alors qu'il n'y a que 3 systèmes (2 en doublon sur system_id). La contrainte UNIQUE(document, zone, category) avait été retirée en mig 170 (plusieurs systèmes hétérogènes possibles), mais deux rows avec le MÊME system_id restaient bien un doublon. Le resync détecte maintenant les doublons par system_id, garde la row la plus riche (compte des champs non-null), fusionne les valeurs non-null des autres dedans, puis supprime les doublons."
+        }
+      ]
+    },
+    {
       "version": "0.1.231",
       "date": "2026-06-25",
       "title": "Audit BACS : PAC réversible utilisable aussi en distribution + émission",
