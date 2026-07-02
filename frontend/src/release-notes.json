@@ -2,6 +2,25 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.225",
+      "date": "2026-06-25",
+      "title": "Audit BACS : pill « Ventilation » + backend accepte distribution cross-system",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "MeterUsagePill : cas 'ventilation' ajouté (pill teal + icône fan)",
+          "what": "Suite au passage de usage='other' → 'ventilation' en 0.1.224, la pilule tombait sur le fallback 'other' et affichait « Général » avec l'icône `circle-notch`. Ajout de l'entrée `ventilation` dans USAGE_CFG avec icône `fan` FontAwesome + couleurs teal.",
+          "where": "`frontend/src/components/MeterUsagePill.vue`."
+        },
+        {
+          "kind": "fix",
+          "title": "PATCH thermal-regulation : accepte les devices distribution cross-system (audit #56)",
+          "what": "Régression de Fix E (0.1.222) : le frontend proposait les circuits distribution site-wide (ex. circuits eau chaude chaufferie desservant les cellules), mais le backend `validateThermalDeviceCoherence` rejetait l'assignation avec 400 « n'appartient pas à ce système ». Exception ajoutée : pour `distribution_device_id` (et `distribution_extra_device_ids`), on accepte cross-system tant que la catégorie d'usage (heating/cooling/dhw) matche et que c'est le même document.",
+          "where": "`backend-node/src/lib/audit-coherence-checks.js` — `validateThermalDeviceCoherence`."
+        }
+      ]
+    },
+    {
       "version": "0.1.224",
       "date": "2026-06-25",
       "title": "Audit BACS : usage compteur « Ventilation » à part entière (fin de l'overload 'other')",

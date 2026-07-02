@@ -3,19 +3,20 @@ import { computed } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
-  faFire, faSnowflake, faFaucet, faSolarPanel, faLightbulb, faCircleNotch,
+  faFire, faSnowflake, faFaucet, faSolarPanel, faLightbulb, faCircleNotch, faFan,
 } from '@fortawesome/pro-solid-svg-icons'
 
-library.add(faFire, faSnowflake, faFaucet, faSolarPanel, faLightbulb, faCircleNotch)
+library.add(faFire, faSnowflake, faFaucet, faSolarPanel, faLightbulb, faCircleNotch, faFan)
 
 // Pilule colorée pour les usages de compteurs (alignée sur SystemCategoryIcon).
 const USAGE_CFG = {
-  heating:  { name: 'fire',        label: 'Chauffage',     bg: 'bg-red-50',     text: 'text-red-700',    ring: 'ring-red-200' },
-  cooling:  { name: 'snowflake',   label: 'Climatisation', bg: 'bg-cyan-50',    text: 'text-cyan-700',   ring: 'ring-cyan-200' },
-  dhw:      { name: 'faucet',      label: 'ECS',           bg: 'bg-sky-50',     text: 'text-sky-700',    ring: 'ring-sky-200' },
-  pv:       { name: 'solar-panel', label: 'PV',            bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
-  lighting: { name: 'lightbulb',   label: 'Éclairage',     bg: 'bg-amber-50',   text: 'text-amber-700',  ring: 'ring-amber-200' },
-  other:    { name: 'circle-notch', label: 'Général',      bg: 'bg-gray-50',    text: 'text-gray-700',   ring: 'ring-gray-200' },
+  heating:     { name: 'fire',        label: 'Chauffage',     bg: 'bg-red-50',     text: 'text-red-700',    ring: 'ring-red-200' },
+  cooling:     { name: 'snowflake',   label: 'Climatisation', bg: 'bg-cyan-50',    text: 'text-cyan-700',   ring: 'ring-cyan-200' },
+  ventilation: { name: 'fan',         label: 'Ventilation',   bg: 'bg-teal-50',    text: 'text-teal-700',   ring: 'ring-teal-200' },
+  dhw:         { name: 'faucet',      label: 'ECS',           bg: 'bg-sky-50',     text: 'text-sky-700',    ring: 'ring-sky-200' },
+  pv:          { name: 'solar-panel', label: 'PV',            bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200' },
+  lighting:    { name: 'lightbulb',   label: 'Éclairage',     bg: 'bg-amber-50',   text: 'text-amber-700',  ring: 'ring-amber-200' },
+  other:       { name: 'circle-notch', label: 'Général',      bg: 'bg-gray-50',    text: 'text-gray-700',   ring: 'ring-gray-200' },
 }
 
 const props = defineProps({

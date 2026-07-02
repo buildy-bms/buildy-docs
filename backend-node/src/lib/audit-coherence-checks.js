@@ -81,6 +81,21 @@ function validateThermalDeviceCoherence(body, currentRow) {
   function checkDevice(deviceId, col) {
     const ctx = getDeviceContext(deviceId);
     if (!ctx) return `Équipement #${deviceId} introuvable pour ${col}.`;
+    // Exception niveau distribution — un circuit de distribution (bouclage
+    // ECS, circuits eau chaude/glacée…) est souvent rattaché au système
+    // central de production (chaufferie, PAC air/eau) mais dessert plusieurs
+    // zones aval. On accepte cross-system tant que la catégorie d'usage
+    // correspond et que le document est le même (site cohérent). Aligné sur
+    // le comportement UI (frontend/audit/ThermalSection deviceOptionsForLevel).
+    if (col === 'distribution_device_id' || col === 'distribution_extra_device_ids') {
+      if (ctx.document_id !== currentRow.document_id) {
+        return `Équipement « ${ctx.name || '#' + deviceId} » appartient à un autre audit.`;
+      }
+      if (ctx.system_category !== effectiveCat) {
+        return `Équipement « ${ctx.name || '#' + deviceId} » est dans une autre catégorie d'usage (${ctx.system_category}) que la régulation (${effectiveCat}).`;
+      }
+      return null;
+    }
     if (effectiveSystemId != null) {
       if (!deviceBelongsToSystem(ctx, effectiveSystemId)) {
         return `Équipement « ${ctx.name || '#' + deviceId} » n'appartient pas à ce système (et n'y est pas partagé). Choisis un équipement du système courant ou partagé explicitement.`;
