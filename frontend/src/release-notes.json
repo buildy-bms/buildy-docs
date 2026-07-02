@@ -2,6 +2,25 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.228",
+      "date": "2026-06-25",
+      "title": "Audit BACS : cohérence auto — thermal system_id backfill + justification négligeable obligatoire",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Régulation thermique : backfill automatique du system_id (Fix K)",
+          "what": "10 thermal rows sur audit #56 avaient system_id=NULL (rows créées avant migration 188). Impact : la card 05 ne pouvait pas récupérer les devices via generatorDevicesForZoneCategory(system_id). `resyncBacsAuditDataForZones` backfill maintenant à chaque passe : pour chaque row NULL, il cherche le premier bacs_audit_systems matching (document_id, zone_id, category) et relie. Priorité au système présent (ORDER BY present=1 DESC).",
+          "where": "Backend `seeder.js` — `resyncBacsAuditDataForZones`."
+        },
+        {
+          "kind": "fix",
+          "title": "R175-2 §5 : justification obligatoire pour un poste négligeable (Fix M)",
+          "what": "La FAQ ministère juin 2025 exige une justification textuelle sur les postes exemptés < 5%. Le backend refuse maintenant `marked_negligible_under_5pct=1` avec justification vide (400 « Une justification est obligatoire »). Côté UI : `toggleNegligible` (SystemsSection) et `setNegligible` (SystemSettingsModal) prompt l'auditeur inline pour saisir la justification quand il coche négligeable ; annulation → aucun PATCH. `setJustification` refuse aussi de vider la justif si le flag est encore actif.",
+          "where": "Backend `bacs-audit.js` PATCH systems + frontend `SystemsSection.vue` + `SystemSettingsModal.vue`."
+        }
+      ]
+    },
+    {
       "version": "0.1.227",
       "date": "2026-06-25",
       "title": "Audit BACS : toggle 5% resync auto + toggles GTB instantanés",

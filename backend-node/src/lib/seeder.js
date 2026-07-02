@@ -879,6 +879,37 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     }
   }
 
+  // Fix K — Backfill system_id sur les thermal_regulation rows où NULL.
+  // Migration 188 avait introduit system_id sur bacs_audit_thermal_regulation
+  // pour lier chaque row à un système précis (permettant de rendre plusieurs
+  // systèmes distincts pour la même zone × catégorie). Mais les rows créées
+  // avant cette migration gardent system_id=NULL. Le resync les backfill à
+  // chaque passe en cherchant le premier système matching (zone_id, category).
+  // Sans ça, la card 05 Régulation thermique ne peut pas récupérer les
+  // devices via generatorDevicesForZoneCategory(system_id).
+  const orphanThermal = db.db.prepare(`
+    SELECT t.id, t.zone_id, t.category
+    FROM bacs_audit_thermal_regulation t
+    WHERE t.document_id = ? AND t.system_id IS NULL
+  `).all(documentId);
+  let thermalBackfilled = 0;
+  if (orphanThermal.length) {
+    const findSystem = db.db.prepare(`
+      SELECT id FROM bacs_audit_systems
+      WHERE document_id = ? AND zone_id = ? AND system_category = ?
+      ORDER BY (present = 1) DESC, id ASC LIMIT 1
+    `);
+    const setSystemId = db.db.prepare('UPDATE bacs_audit_thermal_regulation SET system_id = ? WHERE id = ?');
+    for (const t of orphanThermal) {
+      const s = findSystem.get(documentId, t.zone_id, t.category);
+      if (s) {
+        setSystemId.run(s.id, t.id);
+        thermalBackfilled++;
+      }
+    }
+    if (thermalBackfilled) log.info(`Resync audit ${documentId} — thermal system_id backfill : ${thermalBackfilled} row(s) reliée(s)`);
+  }
+
   // Ligne 1-1 vide dans bacs_audit_bms (sera editee dans le formulaire GTB)
   db.db.prepare(`
     INSERT OR IGNORE INTO bacs_audit_bms (document_id) VALUES (?)
