@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.224",
+      "date": "2026-06-25",
+      "title": "Audit BACS : usage compteur « Ventilation » à part entière (fin de l'overload 'other')",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Compteurs ventilation identifiés (usage='ventilation' au lieu de 'other')",
+          "what": "Historiquement `CATEGORY_TO_USAGE.ventilation = 'other'` : les compteurs zonaux ventilation apparaissaient avec le label « Autre » dans la card 04 Compteurs — l'auditeur ne les identifiait pas comme compteurs ventilation. Migration 199 (SQLite `writable_schema` + bump `schema_version` pour forcer le reload du CHECK compilé) qui étend l'enum `bacs_audit_meters.usage` avec `'ventilation'` et backfill les compteurs zonaux `other` (zone_id NOT NULL) vers `ventilation`. Les compteurs généraux du bâtiment (zone_id NULL) gardent `'other'` (compteur électrique/gaz global). Seeder / labels / enums UI + backend mis à jour. `gtbManagesMeterUsage` simplifié : cas `'ventilation'` direct → `manages_ventilation` (au lieu du hack `'other' + zone_id != null`).",
+          "where": "Migration 199 + `seeder.js` + `_shared.js` + `_labels.js` + `bacs-audit-action-generator.js` + `BacsAuditDetailView.vue` METER_USAGES + `BmsSection.vue` gtbManagesMeterUsage.",
+          "how_to_test": "Sur audit 56 après resync : les 4 compteurs zonaux ventilation (m184 Plot Bureaux, m199 Local de charge, m201 Vestiaires) apparaissent avec le label « Ventilation ». Ils deviennent aussi éligibles dans la card 06 GTB si manages_ventilation est activé."
+        }
+      ]
+    },
+    {
       "version": "0.1.223",
       "date": "2026-06-25",
       "title": "Audit BACS : compteur thermique zonal (Fix G) + compteurs 'other' visibles dans la GTB (Fix H)",

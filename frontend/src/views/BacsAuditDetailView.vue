@@ -203,6 +203,7 @@ const newZone = ref({ name: '', nature: null, surface_m2: null })
 const METER_USAGES = [
   { value: 'heating', label: 'Chauffage' },
   { value: 'cooling', label: 'Climatisation' },
+  { value: 'ventilation', label: 'Ventilation' },
   { value: 'dhw', label: 'ECS' },
   { value: 'pv', label: 'Production PV' },
   { value: 'lighting', label: 'Éclairage' },

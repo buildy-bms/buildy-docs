@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 198;
+const TARGET_VERSION = 199;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7524,6 +7524,52 @@ function runMigrations() {
     `);
     log.info('Migration 198 appliquee : table published_offerings (catalog + brochure)');
     db.pragma('user_version = 198');
+  }
+
+  // ── Migration 199 : ajouter 'ventilation' à l'enum usage des compteurs ──
+  // Historiquement CATEGORY_TO_USAGE.ventilation = 'other' (un des rares
+  // mappings hérités où l'usage compteur ne colle pas au libellé du système).
+  // Résultat côté UI : les compteurs zonaux ventilation apparaissaient avec
+  // le label « Autre », l'auditeur ne les identifiait pas. On introduit
+  // 'ventilation' comme usage à part entière et on backfill les compteurs
+  // zonaux 'other' vers 'ventilation' (les compteurs généraux du bâtiment
+  // gardent 'other' — zone_id NULL = compteur électrique / gaz global).
+  if (current < 199) {
+    // 1) Étendre le CHECK constraint sur bacs_audit_meters.usage via
+    //    writable_schema (pas de recréation de table — 0 risque sur FKs
+    //    entrantes cf. mémoire feedback_sqlite_check_constraint_safe_migration).
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = ON');
+      const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bacs_audit_meters'").get();
+      if (!row || !row.sql) throw new Error('bacs_audit_meters introuvable');
+      if (row.sql.includes("'ventilation'")) {
+        log.info('Migration 199 : ventilation déjà dans l\'enum usage, skip ALTER');
+      } else {
+        // Match toute variation: usage IN ('heating','cooling','dhw','pv','lighting','other')
+        const match = row.sql.match(/usage\s*IN\s*\(([^)]+)\)/i);
+        if (!match) throw new Error("CHECK usage introuvable dans bacs_audit_meters");
+        const newSql = row.sql.replace(match[0], match[0].replace(/\)$/, ",'ventilation')"));
+        db.prepare("UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'bacs_audit_meters'").run(newSql);
+        // Force SQLite à recompiler le CHECK en mémoire (sans ça, l'ancien
+        // enum reste actif jusqu'au prochain reboot du process → INSERT
+        // usage='ventilation' échouent en runtime alors que sqlite_master
+        // est à jour).
+        const nextSchemaVer = db.pragma('schema_version', { simple: true }) + 1;
+        db.pragma(`schema_version = ${nextSchemaVer}`);
+        log.info('Migration 199 : enum usage étendu avec ventilation dans bacs_audit_meters');
+      }
+      db.pragma('writable_schema = OFF');
+    } finally {
+      db.unsafeMode(false);
+    }
+    // 2) Backfill : les compteurs zonaux (zone_id NOT NULL) avec usage='other'
+    //    sont des compteurs ventilation dans l'ancien modèle. Migrer vers
+    //    usage='ventilation'. Les compteurs généraux bâtiment (zone_id IS NULL)
+    //    gardent 'other' (compteur électrique/gaz global).
+    const bf = db.prepare(`UPDATE bacs_audit_meters SET usage = 'ventilation' WHERE usage = 'other' AND zone_id IS NOT NULL`).run();
+    log.info(`Migration 199 appliquee : ${bf.changes} compteur(s) zonal 'other' migré(s) vers 'ventilation'`);
+    db.pragma('user_version = 199');
   }
 
   if (current > TARGET_VERSION) {

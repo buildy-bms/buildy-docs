@@ -74,6 +74,7 @@ const METER_TYPE_LABEL = {
 const METER_USAGE_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
+  ventilation: 'Ventilation',
   dhw: 'ECS',
   pv: 'Production PV',
   lighting: 'Éclairage',
