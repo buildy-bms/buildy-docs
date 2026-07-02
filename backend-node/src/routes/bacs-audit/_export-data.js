@@ -590,14 +590,16 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Listes GTB integration : devices + meters integres ET ce qui reste a
   // integrer (gap analysis pour l'integrateur Buildy — c'est la partie a
   // chiffrer dans le devis).
-  const bmsManagedDevices = devices.filter(d => d.managed_by_bms).map(d => ({
+  // Ternaires stricts (incident Communay) : managed_by_bms null = non
+  // répondu → bucket « à qualifier » distinct, jamais fusionné avec le
+  // « à intégrer » (qui chiffre le devis).
+  const withCatLabel = d => ({
     ...d,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
-  }));
-  const bmsUnmanagedDevices = devices.filter(d => !d.managed_by_bms && !d.out_of_service).map(d => ({
-    ...d,
-    categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
-  }));
+  });
+  const bmsManagedDevices = devices.filter(d => isTrue(d.managed_by_bms)).map(withCatLabel);
+  const bmsUnmanagedDevices = devices.filter(d => isFalse(d.managed_by_bms) && !isTrue(d.out_of_service)).map(withCatLabel);
+  const bmsUnansweredDevices = devices.filter(d => d.managed_by_bms == null && !isTrue(d.out_of_service)).map(withCatLabel);
   // Vue regroupée par zone pour le tableau « Équipements intégrés à la GTB »
   // du PDF chapitre 6. Évite les lignes plates « Nom · Usage · Zone · Marque »
   // qui sont peu lisibles et redondent la zone à chaque ligne.
@@ -612,8 +614,12 @@ async function buildBacsAuditExportData(af, opts = {}) {
   }
   const bmsManagedDevicesByZone = groupDevicesByZone(bmsManagedDevices);
   const bmsUnmanagedDevicesByZone = groupDevicesByZone(bmsUnmanagedDevices);
-  const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
-  const bmsUnmanagedMeters = enrichedMeters.filter(m => !m.managed_by_bms && m.present_actual && !m.out_of_service);
+  const bmsUnansweredDevicesByZone = groupDevicesByZone(bmsUnansweredDevices);
+  const bmsManagedMeters = enrichedMeters.filter(m => isTrue(m.managed_by_bms));
+  const bmsUnmanagedMeters = enrichedMeters.filter(m =>
+    isFalse(m.managed_by_bms) && isTrue(m.present_actual) && !isTrue(m.out_of_service));
+  const bmsUnansweredMeters = enrichedMeters.filter(m =>
+    m.managed_by_bms == null && isTrue(m.present_actual) && !isTrue(m.out_of_service));
 
   // Compteurs groupes par zone fonctionnelle (pour le PDF tableaux de
   // synthese paysage). Les compteurs sans zone (general batiment) vont
@@ -1433,8 +1439,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
     bmsManagedDevicesByZone,
     bmsUnmanagedDevices,
     bmsUnmanagedDevicesByZone,
+    bmsUnansweredDevices,
+    bmsUnansweredDevicesByZone,
     bmsManagedMeters,
     bmsUnmanagedMeters,
+    bmsUnansweredMeters,
     metersByZone,
     meterCoverageMatrix,
     meterEnergyGroups,

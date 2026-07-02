@@ -915,6 +915,7 @@
   <div class="coverage-legend">
     <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-present"></span>Présent</span>
     <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-missing"></span>Requis manquant</span>
+    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-unanswered"></span>À qualifier</span>
     <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-hs"></span>Hors service</span>
   </div>
 </div>
@@ -935,6 +936,10 @@
       {{#if stats.missing}}
         <span class="energy-sep">·</span>
         <span class="energy-stat-missing">{{stats.missing}} requis manquant{{#unless (eq stats.missing 1)}}s{{/unless}}</span>
+      {{/if}}
+      {{#if stats.unanswered}}
+        <span class="energy-sep">·</span>
+        <span class="energy-stat-unanswered">{{stats.unanswered}} à qualifier</span>
       {{/if}}
     </span>
   </div>
@@ -1625,6 +1630,23 @@
       </table>
     {{/each}}
     {{/if}}
+    {{#if bmsUnansweredDevices.length}}
+    <div class="bms-section-head">
+      <span class="bms-section-icon">?</span>
+      <span class="bms-section-title">Intégration à qualifier (non renseignée lors de l'audit)</span>
+      <span class="bms-section-count">{{bmsUnansweredDevices.length}}</span>
+    </div>
+    {{#each bmsUnansweredDevicesByZone}}
+      <div class="bms-list">
+        {{#each devices}}
+        <div class="bms-row">
+          <span class="bms-row-pills"><strong>{{name}}</strong> {{{systemCategoryPill system_category "sm"}}}</span>
+          <span class="bms-row-meta">{{../zone_name}}</span>
+        </div>
+        {{/each}}
+      </div>
+    {{/each}}
+    {{/if}}
     {{#if bmsTopicNotes.equipements}}
     <div class="panel-inline-note" style="margin: 3mm 4mm 0;">
       <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.equipements}}}</span>
@@ -1671,6 +1693,21 @@
     <div class="bms-list">
       {{#each bmsUnmanagedMeters}}
         <div class="bms-row bms-row-gap">
+          <span class="bms-row-pills">{{{meterTypePill meter_type "sm"}}}{{{meterUsagePill usage "sm"}}}</span>
+          <span class="bms-row-meta">{{zoneLabel}}</span>
+        </div>
+      {{/each}}
+    </div>
+    {{/if}}
+    {{#if bmsUnansweredMeters.length}}
+    <div class="bms-section-head">
+      <span class="bms-section-icon">?</span>
+      <span class="bms-section-title">Intégration à qualifier (non renseignée lors de l'audit)</span>
+      <span class="bms-section-count">{{bmsUnansweredMeters.length}}</span>
+    </div>
+    <div class="bms-list">
+      {{#each bmsUnansweredMeters}}
+        <div class="bms-row">
           <span class="bms-row-pills">{{{meterTypePill meter_type "sm"}}}{{{meterUsagePill usage "sm"}}}</span>
           <span class="bms-row-meta">{{zoneLabel}}</span>
         </div>

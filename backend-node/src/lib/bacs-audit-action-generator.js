@@ -21,6 +21,7 @@
 
 const db = require('../database');
 const log = require('./logger').system;
+const { isTrue, isFalse } = require('../routes/bacs-audit/_ternary');
 
 // Mappings FR pour les libellés affichés dans les actions correctives
 // (utilisés dans tout le code BACS — détail view, action items view, PDF).
@@ -175,7 +176,9 @@ function computeTargetActions(documentId) {
     // ce qui a été observé en panne (cf retour Kevin v2.7).
     // Si l'auditeur veut signaler une absence problématique, il ajoute
     // une action manuelle via la vue commerciale.
-    if (!s.present) continue;
+    // present est ternaire : null (non répondu) et 0 (absent) skippent
+    // tous les deux — on ne génère d'action que sur du constaté présent.
+    if (!isTrue(s.present)) continue;
 
     // Item 1 — Règle des 5 % : si l'auditeur a marqué le système comme
     // négligeable (< 5 % de la consommation totale, FAQ ministère juin
@@ -299,15 +302,21 @@ function computeTargetActions(documentId) {
     //   - dispose d'un protocole de communication actif ET
     //   - est raccorde a la GTB (wired OU managed_by_bms).
     // Si aucun device pertinent ne remplit ces criteres → 1 action systeme.
-    const relevantActive = sysDevices.filter(d => !d.out_of_service && isInteropRelevant(d));
+    const relevantActive = sysDevices.filter(d => !isTrue(d.out_of_service) && isInteropRelevant(d));
     const hasInteropPath = relevantActive.some(d => {
       const protos = deviceProtocols(d);
-      return protos.length > 0 && (d.wired || d.managed_by_bms);
+      return protos.length > 0 && (isTrue(d.wired) || isTrue(d.managed_by_bms));
     });
     // On ne genere pas l'action si le systeme ne contient AUCUN device pertinent
     // (ex : usage sans production/distribution/regulation saisis), pour eviter
     // un faux positif quand l'auditeur n'a pas encore complete la saisie.
-    if (relevantActive.length > 0 && !hasInteropPath) {
+    // Idem si AUCUN device pertinent n'a de reponse explicite sur le
+    // raccordement (wired / managed_by_bms tous null = non repondu) :
+    // le constat « aucune voie GTB » n'est pas etabli, on ne conclut pas
+    // sur du non-qualifie (principe ternaire, incident Communay).
+    const interopAnswered = relevantActive.some(d =>
+      d.wired != null || d.managed_by_bms != null);
+    if (relevantActive.length > 0 && interopAnswered && !hasInteropPath) {
       // Balises {{type:id}} resolues en pilules cliquables cote UI et en
       // pilules visuelles SVG FontAwesome cote PDF.
       // Structure description : sections "Titre\nContenu" separees par
@@ -339,10 +348,15 @@ function computeTargetActions(documentId) {
     // sens du decret). Contre-indications par device : tracees en action
     // informative non-bloquante.
     const ecsLoopedAtSystem = ecsLooped; // shortcut
-    const hasManualStop = relevantActive.some(d => d.meets_r175_3_p4);
-    const hasAutonomous  = relevantActive.some(d => d.meets_r175_3_p4_autonomous);
+    const hasManualStop = relevantActive.some(d => isTrue(d.meets_r175_3_p4));
+    const hasAutonomous  = relevantActive.some(d => isTrue(d.meets_r175_3_p4_autonomous));
+    // Gating ternaire : ne conclure « pas d'arret manuel / pas autonome »
+    // que si au moins un device pertinent a une reponse explicite. Tous
+    // null = question non posee → pas d'action (principe Communay).
+    const manualStopAnswered = relevantActive.some(d => d.meets_r175_3_p4 != null);
+    const autonomousAnswered = relevantActive.some(d => d.meets_r175_3_p4_autonomous != null);
 
-    if (relevantActive.length > 0 && !hasManualStop && !ecsLoopedAtSystem) {
+    if (relevantActive.length > 0 && manualStopAnswered && !hasManualStop && !ecsLoopedAtSystem) {
       addTarget({
         source_system_id: s.id, source_subtype: 'system_no_manual_stop',
         category: 'bms_upgrade', severity: 'major',
@@ -356,7 +370,7 @@ function computeTargetActions(documentId) {
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });
     }
-    if (relevantActive.length > 0 && !hasAutonomous) {
+    if (relevantActive.length > 0 && autonomousAnswered && !hasAutonomous) {
       addTarget({
         source_system_id: s.id, source_subtype: 'system_not_autonomous',
         category: 'bms_upgrade', severity: 'major',
@@ -379,7 +393,7 @@ function computeTargetActions(documentId) {
       const contraindications = loadContraindications(d.equipment_template_id);
       const cutPowerContraindicated = ecsLooped || contraindications.some(
         c => CONTRAINDICATION_INFO[c]?.blocksCutPower);
-      if (!d.meets_r175_3_p4 && cutPowerContraindicated && !ecsLooped) {
+      if (isFalse(d.meets_r175_3_p4) && cutPowerContraindicated && !ecsLooped) {
         const devName = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
         const codes = contraindications.filter(c => CONTRAINDICATION_INFO[c]?.blocksCutPower);
         const infoText = codes.map(c => CONTRAINDICATION_INFO[c].label).join(' ');
@@ -406,7 +420,10 @@ function computeTargetActions(documentId) {
     const typeFr = METER_TYPE_LABEL_FR[m.meter_type] || m.meter_type;
     const usageFr = METER_USAGE_LABEL_FR[m.usage] || m.usage;
     const zoneStr = m.zone_name ? ` en zone « ${m.zone_name} »` : ' (général bâtiment)';
-    if (m.required && !m.present_actual) {
+    // Ternaires stricts : `required=1 + present_actual=null` (non vérifié
+    // sur place) ne génère PAS « Ajouter compteur » — seul un constat
+    // explicite d'absence (present_actual=0) le fait. Idem communicating.
+    if (isTrue(m.required) && isFalse(m.present_actual)) {
       addTarget({
         source_meter_id: m.id,
         category: 'meter_addition', severity: 'blocking',
@@ -415,7 +432,7 @@ function computeTargetActions(documentId) {
         description: `Le suivi continu R175-3 §1 requiert un compteur ${typeFr} pour l'usage « ${usageFr} ».`,
         zone_id: m.zone_id, equipment_id: null,
       });
-    } else if (m.present_actual && !m.communicating) {
+    } else if (isTrue(m.present_actual) && isFalse(m.communicating)) {
       addTarget({
         source_meter_id: m.id,
         category: 'meter_connection', severity: 'major',

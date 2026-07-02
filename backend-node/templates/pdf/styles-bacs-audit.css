@@ -3179,6 +3179,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .coverage-dot-present { background: #10b981; }
 .coverage-dot-missing { background: #ef4444; }
 .coverage-dot-hs { background: #111827; }
+.coverage-dot-unanswered { background: #f5c259; }
 .coverage-dot-neutral { display: none; }
 .coverage-legend {
   display: flex;
@@ -3240,6 +3241,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .energy-sep { color: #d1d5db; margin: 0 1mm; }
 .energy-stat-present { color: #047857; font-weight: 600; }
 .energy-stat-missing { color: #b91c1c; font-weight: 600; }
+.energy-stat-unanswered { color: #b45309; font-weight: 600; }
 .energy-section-table {
   width: 100%;
   border-collapse: separate;

@@ -24,10 +24,18 @@ const COVERAGE_USAGE_ICONS = {
   other:    { icon: 'circle-question', color: '#6b7280' },
 };
 
+// États ternaires stricts (incident Communay) : un compteur requis dont la
+// présence n'a pas été vérifiée (present_actual = null) est « à qualifier »
+// (unanswered), PAS « manquant » — le badge rouge « Requis manquant » ne
+// s'affiche que sur constat explicite d'absence (present_actual = 0).
 function coverageMeterState(m) {
-  if (m.out_of_service) return 'hs';
-  if (m.present_actual) return 'present';
-  if (m.required) return 'missing';
+  if (m.out_of_service === 1 || m.out_of_service === true) return 'hs';
+  if (m.present_actual === 1 || m.present_actual === true) return 'present';
+  if (m.present_actual == null) {
+    return (m.required === 1 || m.required === true) ? 'unanswered' : 'neutral';
+  }
+  // present_actual = 0 explicite
+  if (m.required === 1 || m.required === true) return 'missing';
   return 'neutral';
 }
 
@@ -71,8 +79,9 @@ function buildMeterCoverage(enrichedMeters, zones) {
         : allKeys;
       const stats = {
         total: list.length,
-        present: list.filter(m => m.present_actual).length,
-        missing: list.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+        present: list.filter(m => coverageMeterState(m) === 'present').length,
+        missing: list.filter(m => coverageMeterState(m) === 'missing').length,
+        unanswered: list.filter(m => coverageMeterState(m) === 'unanswered').length,
       };
       return {
         energy: et,

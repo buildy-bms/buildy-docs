@@ -512,9 +512,11 @@ async function routes(fastify) {
       usage: z.enum(METER_USAGES),
       meter_type: z.enum(METER_TYPES),
       equipment_id: z.number().int().nullable().optional(),
-      required: z.boolean().optional().default(true),
-      present_actual: z.boolean().optional().default(false),
-      communicating: z.boolean().optional().default(false),
+      required: z.boolean().nullable().optional().default(true),
+      // Ternaires : absent du body = null en DB (non répondu), jamais 0.
+      // Un 0 ne doit venir que d'une réponse « Non » explicite de l'auditeur.
+      present_actual: z.boolean().nullable().optional(),
+      communicating: z.boolean().nullable().optional(),
       communication_protocol: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
     });
@@ -522,6 +524,7 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+    const toTernary = v => (v == null ? null : (v ? 1 : 0));
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_meters
         (document_id, zone_id, usage, meter_type, equipment_id,
@@ -530,7 +533,7 @@ async function routes(fastify) {
     `).run(
       documentId, body.zone_id || null, body.usage, body.meter_type,
       body.equipment_id || null,
-      body.required ? 1 : 0, body.present_actual ? 1 : 0, body.communicating ? 1 : 0,
+      toTernary(body.required), toTernary(body.present_actual), toTernary(body.communicating),
       body.communication_protocol || null, body.notes || null,
     );
     logBacsAudit(request, 'bacs.meter.create', documentId, { meterId: r.lastInsertRowid, usage: body.usage, type: body.meter_type });
@@ -548,9 +551,9 @@ async function routes(fastify) {
       location_zone_id: z.number().int().positive().nullable().optional(),
       usage: z.enum(METER_USAGES).optional(),
       meter_type: z.enum(METER_TYPES).optional(),
-      required: z.boolean().optional(),
-      present_actual: z.boolean().optional(),
-      communicating: z.boolean().optional(),
+      required: z.boolean().nullable().optional(),
+      present_actual: z.boolean().nullable().optional(),
+      communicating: z.boolean().nullable().optional(),
       communication_protocol: z.string().nullable().optional(),
       communication_protocols: z.string().nullable().optional(),
       wired: z.boolean().nullable().optional(),

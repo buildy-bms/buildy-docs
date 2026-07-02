@@ -808,8 +808,13 @@ async function buildFixturePreviewData({ user = null } = {}) {
     managed_by_bms: 0,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   }));
-  const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
-  const bmsUnmanagedMeters = enrichedMeters.filter(m => !m.managed_by_bms && m.present_actual && !m.out_of_service);
+  const bmsManagedMeters = enrichedMeters.filter(m => isTrue(m.managed_by_bms));
+  const bmsUnmanagedMeters = enrichedMeters.filter(m =>
+    isFalse(m.managed_by_bms) && isTrue(m.present_actual) && !isTrue(m.out_of_service));
+  // Fixture : toutes les réponses sont explicites, buckets « à qualifier » vides.
+  const bmsUnansweredDevices = [];
+  const bmsUnansweredMeters = enrichedMeters.filter(m =>
+    m.managed_by_bms == null && isTrue(m.present_actual) && !isTrue(m.out_of_service));
 
   // Compteurs groupes par zone fonctionnelle (pour PDF tableaux paysage)
   const metersByZoneMap = new Map();
@@ -1062,8 +1067,11 @@ async function buildFixturePreviewData({ user = null } = {}) {
     bms,
     bmsManagedDevices,
     bmsUnmanagedDevices,
+    bmsUnansweredDevices,
+    bmsUnansweredDevicesByZone: [],
     bmsManagedMeters,
     bmsUnmanagedMeters,
+    bmsUnansweredMeters,
     metersByZone,
     meterCoverageMatrix,
     meterEnergyGroups,

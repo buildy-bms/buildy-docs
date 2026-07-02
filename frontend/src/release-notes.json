@@ -2,6 +2,33 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.241",
+      "date": "2026-07-02",
+      "title": "Conformité décret BACS : fin des faux verdicts sur questions non répondues",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plan d'action : plus d'actions générées à tort sur du non-répondu",
+          "what": "Le générateur d'actions ne conclut plus « non conforme » quand une question est restée sans réponse : arrêt manuel / redémarrage autonome (R175-3 §4), raccordement GTB (§3), compteur requis non vérifié (§1). L'action n'apparaît que sur constat explicite de l'auditeur."
+        },
+        {
+          "kind": "fix",
+          "title": "PDF : nouveau bucket « Intégration à qualifier »",
+          "what": "Les équipements et compteurs dont l'intégration GTB n'a pas été renseignée ne sont plus comptés « à intégrer » dans le PDF — ils apparaissent dans une section « À qualifier » distincte. Idem plan de comptage : pastille ambre « À qualifier » pour un compteur requis non vérifié."
+        },
+        {
+          "kind": "new",
+          "title": "Tableau de bord R175 : 2 axes manquants ajoutés",
+          "what": "R175-3 2° (détection des pertes d'efficacité) et R175-5-1 (inspection périodique par un tiers) ont maintenant leur propre ligne de verdict — avant, leurs actions étaient noyées dans le suivi pas horaire et la formation exploitant."
+        },
+        {
+          "kind": "fix",
+          "title": "Synthèse Claude : les non-répondus sont visibles",
+          "what": "Le dump envoyé à Claude expose désormais true / false / « unanswered » sur tous les champs ternaires (avant : null écrasé en false) — Claude peut signaler un audit incomplet au lieu d'affirmer des non-conformités."
+        }
+      ]
+    },
+    {
       "version": "0.1.240",
       "date": "2026-07-02",
       "title": "Card GTB : conservation 5 ans vérifiée en qa-grid",

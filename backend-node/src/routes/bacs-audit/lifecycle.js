@@ -14,6 +14,11 @@ const { regenerateActionItems } = require('../../lib/bacs-audit-action-generator
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../../lib/seeder');
 const gitLib = require('../../lib/git');
 const { assertBacsAuditExists } = require('./_shared');
+const { isTrue, isUnanswered } = require('./_ternary');
+// Sérialisation ternaire pour le dump Claude : ne JAMAIS collapser null en
+// false (incident Communay) — Claude doit voir « unanswered » pour pouvoir
+// signaler les questions restées sans réponse dans sa synthèse.
+const tri = v => (v == null ? 'unanswered' : isTrue(v));
 const { isStepComplete } = require('../../lib/bacs-audit-step-completion');
 const { buildPrecheck } = require('../../lib/bacs-audit-precheck');
 
@@ -332,12 +337,16 @@ async function routes(fastify) {
         name: z.name, nature: z.nature, surface_m2: z.surface_m2,
         notes: stripHtml(z.notes_html) || z.notes,
       })),
-      systems: systems.filter(s => s.present).map(s => ({
+      // Champs ternaires exposés via tri() : true / false / 'unanswered'.
+      // Les systèmes non répondus (present=null) sont inclus avec leur état
+      // pour que Claude puisse signaler l'audit incomplet.
+      systems: systems.map(s => ({
         category: s.system_category, zone: s.zone_name,
-        meets_r175_3_p3: !!s.meets_r175_3_p3,
-        meets_r175_3_p4: !!s.meets_r175_3_p4,
-        meets_r175_3_p4_autonomous: !!s.meets_r175_3_p4_autonomous,
-        managed_by_bms: !!s.managed_by_bms,
+        present: tri(s.present),
+        meets_r175_3_p3: tri(s.meets_r175_3_p3),
+        meets_r175_3_p4: tri(s.meets_r175_3_p4),
+        meets_r175_3_p4_autonomous: tri(s.meets_r175_3_p4_autonomous),
+        managed_by_bms: tri(s.managed_by_bms),
         notes: stripHtml(s.notes_html) || s.notes,
       })),
       devices: devices.map(d => ({
@@ -345,16 +354,16 @@ async function routes(fastify) {
         category: d.system_category, zone: d.zone_name,
         energy_source: d.energy_source, power_kw: d.power_kw,
         communication_protocol: d.communication_protocol,
-        meets_r175_3_p4: !!d.meets_r175_3_p4,
-        managed_by_bms: !!d.managed_by_bms,
+        meets_r175_3_p4: tri(d.meets_r175_3_p4),
+        managed_by_bms: tri(d.managed_by_bms),
         out_of_service: !!d.out_of_service,
         notes: stripHtml(d.notes_html) || d.notes,
       })),
       meters: meters.map(m => ({
         zone: m.zone_name || 'Compteur general', usage: m.usage,
-        type: m.meter_type, required: !!m.required,
-        present: !!m.present_actual, communicating: !!m.communicating,
-        managed_by_bms: !!m.managed_by_bms,
+        type: m.meter_type, required: tri(m.required),
+        present: tri(m.present_actual), communicating: tri(m.communicating),
+        managed_by_bms: tri(m.managed_by_bms),
         notes: stripHtml(m.notes_html) || m.notes,
       })),
       bms: bms ? {
@@ -366,20 +375,20 @@ async function routes(fastify) {
           ventilation: !!bms.manages_ventilation, dhw: !!bms.manages_dhw,
           lighting: !!bms.manages_lighting,
         },
-        meets_r175_3_p1: !!bms.meets_r175_3_p1,
+        meets_r175_3_p1: tri(bms.meets_r175_3_p1),
         r175_3_p1_archival_format: bms.r175_3_p1_archival_format,
-        r175_3_p1_retention_verified: !!bms.r175_3_p1_retention_verified,
-        meets_r175_3_p2: !!bms.meets_r175_3_p2,
+        r175_3_p1_retention_verified: tri(bms.r175_3_p1_retention_verified),
+        meets_r175_3_p2: tri(bms.meets_r175_3_p2),
         r175_3_p2_anomaly_rules: stripHtml(bms.r175_3_p2_anomaly_rules_html),
-        data_provision_to_manager: !!bms.data_provision_to_manager,
-        data_provision_to_operators: !!bms.data_provision_to_operators,
+        data_provision_to_manager: tri(bms.data_provision_to_manager),
+        data_provision_to_operators: tri(bms.data_provision_to_operators),
         data_provision_mechanism: bms.notes_data_provision,
         data_provision_frequency: bms.data_provision_frequency,
         data_provision_format: bms.data_provision_format,
-        has_maintenance_procedures: !!bms.has_maintenance_procedures,
+        has_maintenance_procedures: tri(bms.has_maintenance_procedures),
         maintenance_periodicity: bms.maintenance_periodicity,
         maintenance_responsible: bms.maintenance_responsible,
-        operator_trained: !!bms.operator_trained,
+        operator_trained: tri(bms.operator_trained),
         operator_training_date: bms.operator_training_date,
         operator_training_provider: bms.operator_training_provider,
         overall_compliance: bms.overall_compliance,
@@ -416,10 +425,12 @@ async function routes(fastify) {
       })),
       stats: {
         zones_count: zones.length,
-        systems_present: systems.filter(s => s.present).length,
+        systems_present: systems.filter(s => isTrue(s.present)).length,
+        systems_unanswered: systems.filter(s => isUnanswered(s.present)).length,
         devices_count: devices.length,
-        meters_required: meters.filter(m => m.required).length,
-        meters_present: meters.filter(m => m.present_actual).length,
+        meters_required: meters.filter(m => isTrue(m.required)).length,
+        meters_present: meters.filter(m => isTrue(m.present_actual)).length,
+        meters_presence_unanswered: meters.filter(m => isUnanswered(m.present_actual)).length,
         actions_blocking: actionItems.filter(a => a.severity === 'blocking').length,
         actions_major: actionItems.filter(a => a.severity === 'major').length,
         actions_minor: actionItems.filter(a => a.severity === 'minor').length,

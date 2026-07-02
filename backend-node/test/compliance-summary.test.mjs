@@ -148,11 +148,55 @@ describe('buildComplianceSummary — Lectures Buildy attachées', () => {
   });
 });
 
-describe('R175_EXIGENCES — 8 axes ordonnés', () => {
-  it('contient exactement les 8 axes attendus', () => {
+describe('nouveaux axes r175_3_2 et r175_5_1', () => {
+  it('une action R175-5-1 atterrit sur l\'axe r175_5_1, pas sur r175_5', () => {
+    const a = { r175_article: 'R175-5-1', severity: 'major', title: 'Programmer une inspection' };
+    const c = buildComplianceSummary(makeArgs({
+      actionItems: { blocking: [], major: [a], minor: [] },
+      actionItemsRaw: [a],
+    }));
+    const insp = c.r175Dashboard.find(r => r.axis === 'r175_5_1');
+    const training = c.r175Dashboard.find(r => r.axis === 'r175_5');
+    expect(insp.actionsCount).toBe(1);
+    expect(insp.verdict).toBe('partial');
+    expect(training.actionsCount).toBe(0);
+    expect(training.verdict).toBe('compliant');
+  });
+
+  it('une action R175-3 §2 atterrit sur l\'axe r175_3_2, pas sur r175_3_1', () => {
+    const a = { r175_article: 'R175-3 §2', severity: 'major', title: 'Activer la détection' };
+    const c = buildComplianceSummary(makeArgs({
+      actionItems: { blocking: [], major: [a], minor: [] },
+      actionItemsRaw: [a],
+    }));
+    const p2 = c.r175Dashboard.find(r => r.axis === 'r175_3_2');
+    const p1 = c.r175Dashboard.find(r => r.axis === 'r175_3_1');
+    expect(p2.actionsCount).toBe(1);
+    expect(p1.actionsCount).toBe(0);
+  });
+
+  it('r175_5_1 = na sans GTB, unknown si GTB non qualifiée', () => {
+    const noGtb = buildComplianceSummary(makeArgs({ bms: { present: 0 } }));
+    expect(noGtb.r175Dashboard.find(r => r.axis === 'r175_5_1').verdict).toBe('na');
+    const unqualified = buildComplianceSummary(makeArgs({ bms: { present: null } }));
+    expect(unqualified.r175Dashboard.find(r => r.axis === 'r175_5_1').verdict).toBe('unknown');
+  });
+
+  it('r175_3_2 expose l\'evidence meets_r175_3_p2', () => {
+    const c = buildComplianceSummary(makeArgs({
+      bms: { present: 1, meets_r175_3_p2: 1, r175_3_p2_anomaly_rules_html: '<p>ΔT > 5°C</p>' },
+    }));
+    const row = c.r175Dashboard.find(r => r.axis === 'r175_3_2');
+    expect(row.evidence.kpis.find(k => k.key === 'bms_meets_p2').value).toBe('Oui');
+    expect(row.evidence.kpis.find(k => k.key === 'anomaly_rules').value).toMatch(/ΔT/);
+  });
+});
+
+describe('R175_EXIGENCES — 10 axes ordonnés', () => {
+  it('contient exactement les 10 axes attendus', () => {
     expect(R175_EXIGENCES.map(e => e.axis)).toEqual([
-      'r175_2', 'r175_3_1', 'r175_3_3', 'r175_3_4', 'r175_3_data',
-      'r175_4', 'r175_5', 'r175_6',
+      'r175_2', 'r175_3_1', 'r175_3_2', 'r175_3_3', 'r175_3_4', 'r175_3_data',
+      'r175_4', 'r175_5', 'r175_5_1', 'r175_6',
     ]);
   });
 });

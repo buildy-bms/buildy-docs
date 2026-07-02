@@ -23,6 +23,8 @@ const R175_EXIGENCES = [
     summary: 'Le bâtiment relève-t-il du décret BACS et à quelle échéance ?' },
   { code: 'R175-3 1°',             axis: 'r175_3_1',   label: 'Suivi continu pas horaire',
     summary: 'Toutes les consommations énergétiques sont mesurées et archivées 5 ans.' },
+  { code: 'R175-3 2°',             axis: 'r175_3_2',   label: 'Détection des pertes d\'efficacité',
+    summary: 'La GTB compare aux valeurs de référence et signale les dérives de consommation.' },
   { code: 'R175-3 3°',             axis: 'r175_3_3',   label: 'Interopérabilité des systèmes',
     summary: 'Tous les équipements communiquent avec la GTB de supervision.' },
   { code: 'R175-3 4°',             axis: 'r175_3_4',   label: 'Arrêt manuel et autonome',
@@ -33,6 +35,8 @@ const R175_EXIGENCES = [
     summary: 'Une procédure de maintenance écrite est en place et appliquée.' },
   { code: 'R175-5',                axis: 'r175_5',     label: 'Formation de l\'exploitant',
     summary: 'L\'exploitant est formé au paramétrage et au pilotage.' },
+  { code: 'R175-5-1',              axis: 'r175_5_1',   label: 'Inspection périodique par un tiers',
+    summary: 'Une inspection indépendante du BACS est réalisée et son rapport conservé 10 ans.' },
   { code: 'R175-6',                axis: 'r175_6',     label: 'Régulation thermique automatique',
     summary: 'Chaque système thermique (chauffage / refroidissement) dispose d\'une régulation déclarée.' },
 ];
@@ -43,13 +47,16 @@ function axisOfArticle(article) {
   if (!article) return null;
   const a = String(article).trim();
   if (/^R175-?2/i.test(a)) return 'r175_2';
-  if (/R175-?3.*1°/i.test(a) || /R175-?3.*§\s*1/i.test(a)) return 'r175_3_1';
-  if (/R175-?3.*3°/i.test(a) || /R175-?3.*§\s*3/i.test(a)) return 'r175_3_3';
-  if (/R175-?3.*4°/i.test(a) || /R175-?3.*§\s*4/i.test(a)) return 'r175_3_4';
+  if (/R175-?3.*1°/i.test(a) || /R175-?3.*§\s*1\b/i.test(a)) return 'r175_3_1';
+  if (/R175-?3.*2°/i.test(a) || /R175-?3.*(§\s*2\b|§\s*P2)/i.test(a)) return 'r175_3_2';
+  if (/R175-?3.*3°/i.test(a) || /R175-?3.*§\s*3\b/i.test(a)) return 'r175_3_3';
+  if (/R175-?3.*4°/i.test(a) || /R175-?3.*§\s*4\b/i.test(a)) return 'r175_3_4';
   if (/R175-?3.*(dernier|alin|donn)/i.test(a)) return 'r175_3_data';
-  if (/R175-?3.*(§\s*2|§\s*P2)/i.test(a)) return 'r175_3_1'; // P2 anomalies → assimilé suivi
   if (/R175-?3/i.test(a)) return 'r175_3_1';                  // R175-3 nu = 1° par défaut
   if (/R175-?4/i.test(a)) return 'r175_4';
+  // R175-5-1 (inspection tiers) AVANT R175-5 (formation) : le regex R175-5
+  // matcherait aussi « R175-5-1 » et gonflerait à tort l'axe formation.
+  if (/R175-?5-?1/i.test(a)) return 'r175_5_1';
   if (/R175-?5/i.test(a)) return 'r175_5';
   if (/R175-?6/i.test(a)) return 'r175_6';
   return null;
@@ -164,6 +171,19 @@ function evR175_3_1({ recapStats }) {
         : null,
   };
 }
+function evR175_3_2({ bms }) {
+  if (!bms) return { kpis: [], explanation: 'GTB non encore qualifiée — verdict indéterminable.' };
+  const rules = (bms.r175_3_p2_anomaly_rules_html || '').replace(/<[^>]*>/g, '').trim();
+  return {
+    kpis: [
+      { key: 'bms_meets_p2', label: 'Détection des dérives par la GTB (R175-3 2°)',
+        value: isTrue(bms.meets_r175_3_p2) ? 'Oui' : isFalse(bms.meets_r175_3_p2) ? 'Non' : 'Non renseigné',
+        hint: 'La GTB compare les consommations aux valeurs de référence et signale les pertes d\'efficacité.' },
+      ...(rules ? [{ key: 'anomaly_rules', label: 'Règles / seuils / alertes actives', value: rules }] : []),
+    ],
+    explanation: null,
+  };
+}
 function evR175_3_3({ devices }) {
   if (!Array.isArray(devices)) return null;
   const live = devices.filter(d => !d.out_of_service);
@@ -246,6 +266,24 @@ function evR175_5({ bms }) {
     explanation: null,
   };
 }
+function evR175_5_1({ inspections }) {
+  if (!Array.isArray(inspections) || !inspections.length) {
+    return {
+      kpis: [{ key: 'inspection', label: 'Inspection R175-5-1 réalisée', value: 'Aucune déclarée',
+        hint: 'Le décret impose une inspection périodique du BACS par un tiers indépendant, rapport conservé 10 ans.' }],
+      explanation: null,
+    };
+  }
+  const last = inspections[0];
+  return {
+    kpis: [
+      { key: 'last_inspection', label: 'Dernière inspection', value: last.last_inspection_date || 'Date non renseignée' },
+      ...(last.next_inspection_due_date ? [{ key: 'next_due', label: 'Prochaine échéance', value: last.next_inspection_due_date }] : []),
+      ...(last.inspector_name ? [{ key: 'inspector', label: 'Organisme inspecteur', value: last.inspector_name }] : []),
+    ],
+    explanation: null,
+  };
+}
 function evR175_6({ thermal, r175_6_applicable }) {
   if (r175_6_applicable && !r175_6_applicable.applies) {
     return {
@@ -276,11 +314,13 @@ function buildEvidence(axis, ctx) {
   switch (axis) {
     case 'r175_2':      return evR175_2(ctx);
     case 'r175_3_1':    return evR175_3_1(ctx);
+    case 'r175_3_2':    return evR175_3_2(ctx);
     case 'r175_3_3':    return evR175_3_3(ctx);
     case 'r175_3_4':    return evR175_3_4(ctx);
     case 'r175_3_data': return evR175_3_data(ctx);
     case 'r175_4':      return evR175_4(ctx);
     case 'r175_5':      return evR175_5(ctx);
+    case 'r175_5_1':    return evR175_5_1(ctx);
     case 'r175_6':      return evR175_6(ctx);
     default:            return null;
   }
@@ -345,7 +385,7 @@ function buildComplianceSummary({
   const noGtb = !!bms && bms.present === 0;
   const bmsUnanswered = !bms || bms.present == null;
   const GTB_DEPENDENT_AXES = new Set([
-    'r175_3_3', 'r175_3_4', 'r175_3_data', 'r175_4', 'r175_5',
+    'r175_3_2', 'r175_3_3', 'r175_3_4', 'r175_3_data', 'r175_4', 'r175_5',
   ]);
 
   const r175Dashboard = R175_EXIGENCES.map(ex => {
@@ -357,6 +397,12 @@ function buildComplianceSummary({
       v = 'info';
     } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       v = 'na';
+    } else if (ex.axis === 'r175_5_1' && noGtb) {
+      // Sans GTB, il n'y a pas de BACS à inspecter — l'inspection n'a pas
+      // d'objet (cohérent avec le generator qui skip l'action no_inspection).
+      v = 'na';
+    } else if (ex.axis === 'r175_5_1' && bmsUnanswered) {
+      v = 'unknown';
     } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
       // Pas de GTB → exigence GTB non satisfaite par construction.
       v = 'non_compliant';
@@ -372,9 +418,11 @@ function buildComplianceSummary({
       contextSummary = applicabilityLabel;
     } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       contextSummary = `Non applicable — ${r175_6_applicable.reason}.`;
+    } else if (ex.axis === 'r175_5_1' && noGtb) {
+      contextSummary = 'Aucune GTB sur le site — pas de BACS à inspecter.';
     } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
       contextSummary = 'Aucune GTB sur le site — exigence non satisfaite.';
-    } else if (bmsUnanswered && GTB_DEPENDENT_AXES.has(ex.axis)) {
+    } else if (bmsUnanswered && (GTB_DEPENDENT_AXES.has(ex.axis) || ex.axis === 'r175_5_1')) {
       contextSummary = 'GTB non renseignée — verdict non calculable tant que la question n\'est pas répondue.';
     }
     // Lot 1 — evidence par axe : les chiffres-preuve qui ont mené au verdict.
