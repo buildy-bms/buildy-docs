@@ -204,7 +204,14 @@ function granularityForRow(t) {
 // signaler « pas de surcharge » (l'UI re-tombera sur la dérivée).
 async function patchGranularity(t, value) {
   const info = granularityForRow(t)
-  if (!info.deviceId) return
+  if (!info.deviceId) {
+    // Sans émetteur sélectionné, la granularité ne peut pas être stockée
+    // (elle vit sur le device émission). Avant : no-op silencieux → la
+    // pastille restait rouge « Centralisée » et l'auditeur croyait que
+    // son clic n'avait pas eu d'effet. Maintenant : notification claire.
+    error('Sélectionne d\'abord un équipement d\'émission (colonne « Émission ») pour pouvoir régler la granularité.')
+    return
+  }
   const next = (value && value !== info.derivedKey) ? value : null
   try {
     await updateBacsDevice(info.deviceId, { regulation_granularity: next })
@@ -288,9 +295,36 @@ function deviceOptionsForLevel(t, level) {
   // Filtre sur le system_id exact (mig 188) : on ne propose que les
   // équipements du système courant + ses équipements partagés. Fallback
   // (zone × catégorie) si le system_id manque (rétro-compat).
-  const devices = t.system_id
+  //
+  // Exception distribution : les circuits de distribution (bouclage ECS,
+  // circuits eau chaude/glacée…) sont souvent rattachés au système central
+  // de production (chaufferie, PAC air/eau) mais desservent plusieurs
+  // zones. Restreindre au system_id local rendait ces équipements
+  // introuvables depuis les thermal rows aval — bug audit #56 : les
+  // circuits « Eau Chaude Cellule 1 / Extension » sur la chaufferie z131
+  // ne pouvaient pas être sélectionnés pour la régulation de z126/z127.
+  // On élargit à tous les devices de même catégorie (heating/cooling) sur
+  // le document, avec le rôle recherché — le filtre par rôle du
+  // filterAndSortByRole écarte les faux positifs.
+  let devices = t.system_id
     ? (props.generatorDevicesForZoneCategory(t.system_id) || [])
     : (props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || [])
+  if (level === 'distribution') {
+    const cat = t.category || 'heating'
+    const sysIdsSameCat = new Set(
+      (audit.systems || [])
+        .filter(s => s.system_category === cat && s.present)
+        .map(s => s.id)
+    )
+    const seen = new Set(devices.map(d => d.id))
+    for (const d of (audit.devices || [])) {
+      if (seen.has(d.id)) continue
+      if (sysIdsSameCat.has(d.system_id)) {
+        devices = [...devices, d]
+        seen.add(d.id)
+      }
+    }
+  }
   return filterAndSortByRole(devices, level).map(d => ({
     value: d.id,
     label: d.name || d.brand || d.model_reference || `Équipement #${d.id}`,

@@ -783,6 +783,28 @@ function resyncBacsAuditDataForZones(documentId, zones) {
   // technique, TGBT, local compteurs…) sont hors perimetre BACS : elles
   // sont inventoriees dans leur propre card mais ne generent rien ici.
   const functionalZones = zones.filter(z => (z.kind || 'functional') !== 'technical');
+  // Fix D — quand une zone bascule fonctionnel → technique, ses rows
+  // techniques (systems, thermal_regulation, meters) restent en DB si on
+  // ne les purge pas. Elles polluent alors la card 05 (thermal) et la
+  // card 04 (compteurs). On les nettoie ici, uniquement pour les rows
+  // n'ayant JAMAIS été observées sur le terrain (safe : on préserve les
+  // saisies réelles avec present=1 / present_actual=1).
+  const technicalZoneIds = zones.filter(z => (z.kind || 'functional') === 'technical').map(z => z.zone_id ?? z.id);
+  if (technicalZoneIds.length) {
+    const placeholders = technicalZoneIds.map(() => '?').join(',');
+    const cleanedSystems = db.db.prepare(
+      `DELETE FROM bacs_audit_systems WHERE document_id = ? AND zone_id IN (${placeholders}) AND (present IS NULL OR present = 0) AND (not_concerned IS NULL OR not_concerned = 0)`
+    ).run(documentId, ...technicalZoneIds).changes;
+    const cleanedThermal = db.db.prepare(
+      `DELETE FROM bacs_audit_thermal_regulation WHERE document_id = ? AND zone_id IN (${placeholders}) AND (has_automatic_regulation IS NULL OR has_automatic_regulation = 0) AND (regulation_type IS NULL OR regulation_type = '')`
+    ).run(documentId, ...technicalZoneIds).changes;
+    const cleanedMeters = db.db.prepare(
+      `DELETE FROM bacs_audit_meters WHERE document_id = ? AND zone_id IN (${placeholders}) AND (present_actual IS NULL OR present_actual = 0)`
+    ).run(documentId, ...technicalZoneIds).changes;
+    if (cleanedSystems || cleanedThermal || cleanedMeters) {
+      log.info(`Resync audit ${documentId} — purge zones techniques : ${cleanedSystems} systems + ${cleanedThermal} thermal + ${cleanedMeters} meters supprimes (rows jamais observees)`);
+    }
+  }
 
   const reqByNature = {};
   for (const r of db.db.prepare('SELECT zone_nature, required_categories FROM bacs_requirements_by_zone_nature').all()) {
@@ -1049,22 +1071,82 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     inserted++;
   }
 
+  // Fix A — Fallback compteur pour les systemes presents SANS device saisi
+  // (ou avec des devices sans energy_source). La doctrine « no device, no
+  // meter » ratait l'obligation BACS pour les usages ou le type d'energie
+  // est certain par nature :
+  //   - ventilation → toujours electrique (VMC, CTA, extracteurs)
+  //   - cooling → toujours electrique (climatisation, split)
+  //   - lighting_indoor / lighting_outdoor → toujours electrique
+  // Pour heating / dhw / electricity_production, on ne fait pas de fallback :
+  // l'energie primaire depend du generateur (gaz, fioul, reseau, solaire…)
+  // et l'auditeur doit renseigner le device pour qu'on puisse trancher.
+  const CATEGORY_ELECTRIC_FALLBACK = new Set(['ventilation', 'cooling', 'lighting_indoor', 'lighting_outdoor']);
+  const presentSystemsForFallback = db.db.prepare(`
+    SELECT id, zone_id, system_category FROM bacs_audit_systems
+    WHERE document_id = ? AND is_bacs = 1 AND present = 1
+      AND system_category IN ('ventilation', 'cooling', 'lighting_indoor', 'lighting_outdoor')
+  `).all(documentId);
+  for (const s of presentSystemsForFallback) {
+    if (!CATEGORY_ELECTRIC_FALLBACK.has(s.system_category) || !s.zone_id) continue;
+    const usage = CATEGORY_TO_USAGE[s.system_category] || 'other';
+    const meterType = 'electric';
+    const key = keyZonal(s.zone_id, usage, meterType);
+    // Toujours marquer comme cible pour que required=1 soit conserve dans
+    // le pass de synchronisation ci-dessous, meme si un device saisi
+    // ulterieurement generait deja ce meme compteur (idempotent).
+    targetKeys.add(key);
+    if (findExistingZonal.get(documentId, s.zone_id, usage, meterType)) continue;
+    const zoneName = db.db.prepare('SELECT name FROM zones WHERE id = ?').get(s.zone_id)?.name || '?';
+    const typeFr = METER_TYPE_FR[meterType];
+    const usageFr = USAGE_FR[usage] || usage;
+    insZonal.run(
+      documentId, s.zone_id, usage, meterType,
+      `Compteur ${typeFr} en zone « ${zoneName} » (${usageFr}) — fallback système présent sans device saisi`,
+    );
+    inserted++;
+  }
+
   // 3. Synchronise le flag `required` : un compteur encore dans la cible
   //    reste requis ; un compteur orphelin (energie changee/supprimee, usage
-  //    hors BACS) repasse a required=0 — sans suppression (tracabilite +
-  //    saisies present_actual/photos conservees). Evite les actions
-  //    bloquantes fantomes sur des compteurs qui n'ont plus lieu d'etre.
+  //    hors BACS) repasse a required=0. Fix B — pour les orphelins qui
+  //    n'ont JAMAIS ete observes sur le terrain (present_actual=0/null,
+  //    equipment_id NULL, pas de photo rattachee), on les SUPPRIME
+  //    reellement au lieu de les laisser trainer avec required=0. Cela
+  //    reduit le bruit UI (m182/m193/m195 sur audit #56 qui polluaient la
+  //    card Compteurs). Les saisies terrain (present_actual=1 ou photo
+  //    rattachee ou notes utilisateur) sont preservees en required=0.
   const allMeters = db.db.prepare(
-    'SELECT id, zone_id, usage, meter_type, required FROM bacs_audit_meters WHERE document_id = ?'
+    `SELECT m.id, m.zone_id, m.usage, m.meter_type, m.required, m.present_actual,
+            m.communicating, m.equipment_id, m.notes,
+            (SELECT COUNT(*) FROM site_documents sd WHERE sd.bacs_audit_meter_id = m.id) AS photo_count
+     FROM bacs_audit_meters m WHERE m.document_id = ?`
   ).all(documentId);
   const setRequired = db.db.prepare('UPDATE bacs_audit_meters SET required = ? WHERE id = ?');
+  const delMeter = db.db.prepare('DELETE FROM bacs_audit_meters WHERE id = ?');
+  let purged = 0;
   for (const m of allMeters) {
     const k = m.zone_id != null
       ? keyZonal(m.zone_id, m.usage, m.meter_type)
       : keyGeneral(m.usage, m.meter_type);
     const wanted = targetKeys.has(k) ? 1 : 0;
-    if ((m.required ? 1 : 0) !== wanted) setRequired.run(wanted, m.id);
+    if (wanted === 1) {
+      if ((m.required ? 1 : 0) !== 1) setRequired.run(1, m.id);
+      continue;
+    }
+    // Orphelin (wanted=0). Purger si jamais observe.
+    const observed = m.present_actual === 1 || m.communicating === 1
+      || m.equipment_id != null
+      || m.photo_count > 0
+      || (m.notes && !/^Compteur\s.+—\sfallback|^Compteur\s.+\((chauffage|refroidissement|éclairage|général|ECS|production PV|autre)\)$|^Compteur général /.test(m.notes));
+    if (observed) {
+      if ((m.required ? 1 : 0) !== 0) setRequired.run(0, m.id);
+    } else {
+      delMeter.run(m.id);
+      purged++;
+    }
   }
+  if (purged) log.info(`Resync audit ${documentId} — purge ${purged} compteur(s) orphelin(s) jamais observe(s)`);
 
   return inserted;
 }
