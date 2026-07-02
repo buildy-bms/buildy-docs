@@ -1107,6 +1107,51 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     inserted++;
   }
 
+  // Fix G — Fallback compteur THERMIQUE zonal pour les systemes heating /
+  // cooling / dhw qui ont un device local d'emission ou de distribution
+  // (ex : aérotherme eau chaude, ventilo-convecteur, radiateur) mais AUCUN
+  // device de production locale. Cas typique : chaufferie centrale en
+  // zone technique z131 avec devices distribution qui alimentent des
+  // aérothermes dans d'autres zones (Cellule 1, Extension…). R175-3 §1
+  // exige un comptage par usage par zone — le compteur gaz de la
+  // chaudière mesure la conso primaire globale, mais un compteur
+  // thermique zonal (BTU meter sur le retour d'eau) est nécessaire pour
+  // ventiler la consommation par zone. Distinct du compteur primaire, pas
+  // de doublon.
+  const THERMAL_ZONAL_CATEGORIES = ['heating', 'cooling', 'dhw'];
+  const systemsWithLocalEmitters = db.db.prepare(`
+    SELECT s.id, s.zone_id, s.system_category,
+      SUM(CASE WHEN d.device_role LIKE '%production%' OR d.device_role LIKE '%generator%' THEN 1 ELSE 0 END) AS n_prod,
+      SUM(CASE WHEN d.device_role LIKE '%emission%' OR d.device_role LIKE '%distribution%' THEN 1 ELSE 0 END) AS n_downstream
+    FROM bacs_audit_systems s
+    LEFT JOIN bacs_audit_system_devices d ON d.system_id = s.id
+    WHERE s.document_id = ? AND s.is_bacs = 1 AND s.present = 1
+      AND s.system_category IN ('heating', 'cooling', 'dhw')
+      AND s.zone_id IS NOT NULL
+    GROUP BY s.id
+  `).all(documentId);
+  for (const s of systemsWithLocalEmitters) {
+    if (!THERMAL_ZONAL_CATEGORIES.includes(s.system_category)) continue;
+    // Deja couvert par un device production local → le compteur primaire
+    // (gaz/electrique/thermique) suffit, pas besoin d'un thermique zonal.
+    if (s.n_prod > 0) continue;
+    // Pas de device d'emission/distribution local non plus → rien a
+    // compter dans cette zone (aucun equipement receveur d'energie).
+    if (s.n_downstream === 0) continue;
+    const usage = CATEGORY_TO_USAGE[s.system_category];
+    const meterType = 'thermal';
+    const key = keyZonal(s.zone_id, usage, meterType);
+    targetKeys.add(key);
+    if (findExistingZonal.get(documentId, s.zone_id, usage, meterType)) continue;
+    const zoneName = db.db.prepare('SELECT name FROM zones WHERE id = ?').get(s.zone_id)?.name || '?';
+    const usageFr = USAGE_FR[usage] || usage;
+    insZonal.run(
+      documentId, s.zone_id, usage, meterType,
+      `Compteur thermique zonal en zone « ${zoneName} » (${usageFr}) — équipement alimenté par production distante, comptage BTU sur retour`,
+    );
+    inserted++;
+  }
+
   // 3. Synchronise le flag `required` : un compteur encore dans la cible
   //    reste requis ; un compteur orphelin (energie changee/supprimee, usage
   //    hors BACS) repasse a required=0. Fix B — pour les orphelins qui
