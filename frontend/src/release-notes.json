@@ -2,6 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.235",
+      "date": "2026-06-25",
+      "title": "Card GTB : équipements et compteurs regroupés + triés",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Équipements intégrés à la GTB : groupés par zone, triés par usage",
+          "what": "Table réorganisée en sous-groupes par zone (en-tête gris). Dans chaque zone, tri par catégorie BACS : Chauffage → Refroidissement → Ventilation → ECS → Éclairage → PV."
+        },
+        {
+          "kind": "feature",
+          "title": "Compteurs intégrés à la GTB : groupés par énergie puis par zone, triés par usage",
+          "what": "Hiérarchie à 2 niveaux : premier en-tête indigo par type d'énergie (Électrique / Gaz / Thermique / Électrique de production / Eau), puis sous-en-têtes gris par zone (Général bâtiment en premier). Compteurs triés par usage dans chaque zone. Colonne compteur allégée : la pilule énergie est retirée de la ligne (déjà dans l'en-tête de groupe), il ne reste que l'usage."
+        }
+      ]
+    },
+    {
       "version": "0.1.234",
       "date": "2026-06-25",
       "title": "Audit BACS : cards 04/05 inversées + wording plan action « communication » au lieu de « voie d'interface »",

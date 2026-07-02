@@ -148,6 +148,78 @@ const filteredDevices = computed(() =>
   props.devicesWithMeta.filter(d => gtbManagesCategory(d.system_category)))
 const filteredMeters = computed(() =>
   props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage)))
+
+// Ordre canonique des catégories/usages BACS pour tri intra-groupe.
+const CATEGORY_ORDER = ['heating', 'cooling', 'ventilation', 'dhw',
+  'lighting_indoor', 'lighting_outdoor', 'electricity_production']
+const catRank = (c) => {
+  const i = CATEGORY_ORDER.indexOf(c)
+  return i < 0 ? 99 : i
+}
+const USAGE_ORDER = ['heating', 'cooling', 'ventilation', 'dhw', 'lighting', 'pv', 'other']
+const usageRank = (u) => {
+  const i = USAGE_ORDER.indexOf(u)
+  return i < 0 ? 99 : i
+}
+// Labels lisibles pour les types de compteur (source de l'énergie).
+const METER_TYPE_LABEL = {
+  electric: 'Électrique',
+  electric_production: 'Électrique de production',
+  gas: 'Gaz',
+  thermal: 'Thermique',
+  water: 'Eau',
+}
+const METER_TYPE_ORDER = ['electric', 'gas', 'thermal', 'electric_production', 'water']
+const meterTypeRank = (t) => {
+  const i = METER_TYPE_ORDER.indexOf(t)
+  return i < 0 ? 99 : i
+}
+
+// Équipements groupés par zone, puis triés par usage.
+const devicesByZone = computed(() => {
+  const groups = new Map()
+  for (const d of filteredDevices.value) {
+    const key = d.zone_name || 'Sans zone'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(d)
+  }
+  const out = []
+  for (const [zone, arr] of groups) {
+    arr.sort((a, b) => catRank(a.system_category) - catRank(b.system_category) || (a.name || '').localeCompare(b.name || ''))
+    out.push({ zone, devices: arr })
+  }
+  out.sort((a, b) => a.zone.localeCompare(b.zone))
+  return out
+})
+
+// Compteurs groupés par type d'énergie, puis par zone, puis triés par usage.
+const metersByEnergyThenZone = computed(() => {
+  const byType = new Map()
+  for (const m of filteredMeters.value) {
+    if (!byType.has(m.meter_type)) byType.set(m.meter_type, new Map())
+    const zoneKey = m.zone_id ? (m.zone_name || 'Zone ?') : 'Général bâtiment'
+    const byZone = byType.get(m.meter_type)
+    if (!byZone.has(zoneKey)) byZone.set(zoneKey, [])
+    byZone.get(zoneKey).push(m)
+  }
+  const out = []
+  for (const [type, byZone] of byType) {
+    const zones = []
+    for (const [zone, arr] of byZone) {
+      arr.sort((a, b) => usageRank(a.usage) - usageRank(b.usage))
+      zones.push({ zone, meters: arr })
+    }
+    zones.sort((a, b) => {
+      // « Général bâtiment » toujours en premier de son groupe énergie.
+      if (a.zone === 'Général bâtiment') return -1
+      if (b.zone === 'Général bâtiment') return 1
+      return a.zone.localeCompare(b.zone)
+    })
+    out.push({ type, typeLabel: METER_TYPE_LABEL[type] || type, zones })
+  }
+  out.sort((a, b) => meterTypeRank(a.type) - meterTypeRank(b.type))
+  return out
+})
 // Bascule un champ booléen de la GTB (1/0) + sauvegarde debounced.
 function setBmsFlag(field, v) {
   bms.value[field] = v == null ? null : (v ? 1 : 0)
@@ -444,15 +516,20 @@ function hasNotes(html) {
                     <th class="text-center py-1 font-semibold w-28"><Tooltip text="L.auditeur a vérifié sur place que la GTB voit cet équipement et que les valeurs remontent correctement."><span>Opérationnel</span></Tooltip></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                  <tr v-for="d in filteredDevices" :key="d.id"
+                <tbody v-for="group in devicesByZone" :key="group.zone" class="divide-y divide-gray-100">
+                  <tr class="bg-gray-50/60">
+                    <td colspan="3" class="px-2 py-1 text-[10px] uppercase tracking-wider text-gray-600 font-semibold">
+                      {{ group.zone }}
+                    </td>
+                  </tr>
+                  <tr v-for="d in group.devices" :key="d.id"
                       :class="[d.out_of_service ? 'opacity-50' : '', d.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
                     <td class="px-2 py-1">
                       <span class="inline-flex items-center gap-2">
                         <SystemCategoryIcon :category="d.system_category" size="sm" />
                         <strong>{{ d.name || d.brand || d.model_reference || 'Sans nom' }}</strong>
                         <span :class="d.bms_integration_out_of_service ? 'text-red-500' : 'text-gray-400'">
-                          — {{ systemLabels[d.system_category] || d.system_category }} / {{ d.zone_name || '?' }}
+                          — {{ systemLabels[d.system_category] || d.system_category }}
                         </span>
                       </span>
                     </td>
@@ -494,34 +571,46 @@ function hasNotes(html) {
                     <th class="text-center py-1 font-semibold w-28"><Tooltip text="L.auditeur a vérifié sur place que la GTB relève bien le compteur et que les index remontent."><span>Opérationnel</span></Tooltip></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                  <tr v-for="m in filteredMeters" :key="m.id"
-                      :class="[m.out_of_service ? 'opacity-50' : '', m.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
-                    <td class="px-2 py-1">
-                      <span class="inline-flex items-center gap-2">
-                        <MeterTypePill :type="m.meter_type" />
-                        <MeterUsagePill :usage="m.usage" />
-                        <span :class="m.bms_integration_out_of_service ? 'text-red-500' : 'text-gray-400'">
-                          — {{ m.zone_name || 'général' }}
+                <template v-for="typeGroup in metersByEnergyThenZone" :key="typeGroup.type">
+                  <tbody class="divide-y divide-gray-100">
+                    <tr class="bg-indigo-50/50">
+                      <td colspan="3" class="px-2 py-1 text-[11px] tracking-wider font-semibold text-indigo-800 flex items-center gap-2">
+                        <MeterTypePill :type="typeGroup.type" />
+                        {{ typeGroup.typeLabel }}
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tbody v-for="zoneGroup in typeGroup.zones" :key="typeGroup.type + '::' + zoneGroup.zone"
+                         class="divide-y divide-gray-100">
+                    <tr class="bg-gray-50/60">
+                      <td colspan="3" class="px-2 py-1 pl-8 text-[10px] uppercase tracking-wider text-gray-600 font-semibold">
+                        {{ zoneGroup.zone }}
+                      </td>
+                    </tr>
+                    <tr v-for="m in zoneGroup.meters" :key="m.id"
+                        :class="[m.out_of_service ? 'opacity-50' : '', m.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
+                      <td class="px-2 py-1 pl-8">
+                        <span class="inline-flex items-center gap-2">
+                          <MeterUsagePill :usage="m.usage" />
                         </span>
-                      </span>
-                    </td>
-                    <td class="py-1 text-center">
-                      <Tooltip :text="!m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
-                        <CompactToggle compact :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
-                                       :disabled="!!m.out_of_service || !m.communicating"
-                                       @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
-                      </Tooltip>
-                    </td>
-                    <td class="py-1 text-center">
-                      <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB relève le compteur.'">
-                        <CompactToggle compact :model-value="(!m.managed_by_bms || !m.wired) ? null : triState(!m.bms_integration_out_of_service)"
-                                       :disabled="!m.managed_by_bms || !m.wired"
-                                       @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
-                      </Tooltip>
-                    </td>
-                  </tr>
-                </tbody>
+                      </td>
+                      <td class="py-1 text-center">
+                        <Tooltip :text="!m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
+                          <CompactToggle compact :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
+                                         :disabled="!!m.out_of_service || !m.communicating"
+                                         @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
+                        </Tooltip>
+                      </td>
+                      <td class="py-1 text-center">
+                        <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB relève le compteur.'">
+                          <CompactToggle compact :model-value="(!m.managed_by_bms || !m.wired) ? null : triState(!m.bms_integration_out_of_service)"
+                                         :disabled="!m.managed_by_bms || !m.wired"
+                                         @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
+                        </Tooltip>
+                      </td>
+                    </tr>
+                  </tbody>
+                </template>
               </table>
               <p v-else-if="!anyUsageManaged" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
                 ⚠ Coche d'abord au moins un usage dans « Usages traités par la GTB » ci-dessus pour voir les compteurs concernés.
