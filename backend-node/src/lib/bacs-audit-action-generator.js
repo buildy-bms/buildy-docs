@@ -63,6 +63,7 @@ const METER_TYPE_LABEL_FR = {
 const METER_USAGE_LABEL_FR = {
   heating: 'chauffage',
   cooling: 'refroidissement',
+  ventilation: 'ventilation',
   dhw: 'ECS',
   pv: 'production PV',
   lighting: 'éclairage',

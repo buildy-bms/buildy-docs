@@ -118,21 +118,19 @@ const gtbManagesCategory = (cat) => {
     default: return false
   }
 }
-const gtbManagesMeterUsage = (usage, meter) => {
+const gtbManagesMeterUsage = (usage) => {
   if (!bms.value) return false
   switch (usage) {
     case 'heating': return !!bms.value.manages_heating
     case 'cooling': return !!bms.value.manages_cooling
+    case 'ventilation': return !!bms.value.manages_ventilation
     case 'dhw': return !!bms.value.manages_dhw
     case 'lighting': return !!bms.value.manages_lighting
     case 'pv': return !!(bms.value.manages_electricity_production || bms.value.manages_electricity)
     case 'other':
-      // 'other' recouvre deux réalités : les compteurs ventilation zonaux
-      // (zone_id renseigné) mappés au flag manages_ventilation, ET les
-      // compteurs généraux du bâtiment (électrique/gaz/thermique global,
-      // zone_id NULL) qui sont utiles dès qu'un usage BACS quelconque est
+      // Compteurs généraux du bâtiment (électrique/gaz/thermique global,
+      // zone_id NULL) : utiles dès qu'un usage BACS quelconque est
       // supervisé par la GTB.
-      if (meter && meter.zone_id != null) return !!bms.value.manages_ventilation
       return !!(
         bms.value.manages_heating || bms.value.manages_cooling ||
         bms.value.manages_ventilation || bms.value.manages_dhw ||
@@ -149,7 +147,7 @@ const anyUsageManaged = computed(() => !!bms.value && (
 const filteredDevices = computed(() =>
   props.devicesWithMeta.filter(d => gtbManagesCategory(d.system_category)))
 const filteredMeters = computed(() =>
-  props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage, m)))
+  props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage)))
 // Bascule un champ booléen de la GTB (1/0) + sauvegarde debounced.
 function setBmsFlag(field, v) {
   bms.value[field] = v == null ? null : (v ? 1 : 0)

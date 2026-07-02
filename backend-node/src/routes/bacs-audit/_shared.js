@@ -10,7 +10,7 @@ const COMMUNICATION_VALUES = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp
   'knx','mbus','mqtt','autre','non_communicant','absent'];
 const DEVICE_COMM = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
   'knx','mbus','mqtt','lorawan','autre','non_communicant','absent'];
-const METER_USAGES = ['heating','cooling','dhw','pv','lighting','other'];
+const METER_USAGES = ['heating','cooling','ventilation','dhw','pv','lighting','other'];
 const METER_TYPES = ['electric','electric_production','gas','water','thermal'];
 const RECOMMENDATIONS = ['to_add','to_replace','to_connect','compliant'];
 const REGULATION_TYPES = ['per_room','per_zone','central_only','none'];

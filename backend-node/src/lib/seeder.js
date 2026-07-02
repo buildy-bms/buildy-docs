@@ -934,7 +934,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   const CATEGORY_TO_USAGE = {
     heating: 'heating',
     cooling: 'cooling',
-    ventilation: 'other',
+    ventilation: 'ventilation',
     dhw: 'dhw',
     lighting_indoor: 'lighting',
     lighting_outdoor: 'lighting',
@@ -953,7 +953,8 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   };
   const USAGE_FR = {
     heating: 'chauffage', cooling: 'refroidissement', dhw: 'ECS',
-    pv: 'production PV', lighting: 'éclairage', other: 'général',
+    pv: 'production PV', lighting: 'éclairage', ventilation: 'ventilation',
+    other: 'général',
   };
 
   const findExistingZonal = db.db.prepare(`
