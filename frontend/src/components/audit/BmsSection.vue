@@ -643,19 +643,19 @@ function hasNotes(html) {
             </div>
             <div v-if="bms.meets_r175_3_p1" class="ml-4 mt-2 space-y-3">
               <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
+                <label class="block text-[11px] text-gray-600 mb-1">Sous quel format les données sont-elles archivées ?</label>
                 <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
                        @input="saveBmsDebounced"
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </div>
-              <div class="qa-grid">
-                <div class="qa-question text-xs">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-sm text-gray-800 leading-snug flex-1">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</div>
                 <SegmentedToggle :model-value="triState(bms.r175_3_p1_retention_verified)"
                                  @update:model-value="v => setBmsFlag('r175_3_p1_retention_verified', v)" />
               </div>
             </div>
-            <div v-if="bms.meets_r175_3_p2" class="ml-6 mt-2">
-              <label class="block text-[11px] text-gray-600 mb-1">Règles / seuils / alertes actives</label>
+            <div v-if="bms.meets_r175_3_p2" class="ml-4 mt-2">
+              <label class="block text-[11px] text-gray-600 mb-1">Quelles règles, seuils ou alertes de détection sont actives aujourd'hui ?</label>
               <textarea v-model="bms.r175_3_p2_anomaly_rules_html" @input="saveBmsDebounced"
                         placeholder="ex : alerte si ΔT > 5 °C, surconso > 20% j-1, COP < 2.5…"
                         rows="2"
@@ -673,13 +673,17 @@ function hasNotes(html) {
                                   topic-label="R175-3 — Mise à disposition des données"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
-            <div class="qa-grid text-sm">
-              <div class="qa-question">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</div>
-              <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
-                               @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
-              <div class="qa-question">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</div>
-              <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
-                               @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
+            <div class="space-y-3 text-sm">
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-sm text-gray-800 leading-snug flex-1">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</div>
+                <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
+                                 @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-sm text-gray-800 leading-snug flex-1">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</div>
+                <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
+                                 @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
+              </div>
             </div>
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
@@ -687,14 +691,14 @@ function hasNotes(html) {
                         class="mt-2 input-base text-xs py-1.5" rows="2"></textarea>
               <div class="mt-3 space-y-3">
                 <div>
-                  <label class="block text-[11px] text-gray-600 mb-1">Fréquence de mise à dispo</label>
+                  <label class="block text-[11px] text-gray-600 mb-1">À quelle fréquence les données sont-elles mises à disposition ?</label>
                   <input v-model="bms.data_provision_frequency" type="text"
                          placeholder="ex : temps réel, quotidien, hebdo, mensuel"
                          @input="saveBmsDebounced"
                          class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
                 </div>
                 <div>
-                  <label class="block text-[11px] text-gray-600 mb-1">Format de sortie</label>
+                  <label class="block text-[11px] text-gray-600 mb-1">Sous quel format les données sont-elles transmises ?</label>
                   <input v-model="bms.data_provision_format" type="text"
                          placeholder="ex : CSV, PDF mensuel, dashboard web, API"
                          @input="saveBmsDebounced"

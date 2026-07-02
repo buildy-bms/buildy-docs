@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.238",
+      "date": "2026-07-02",
+      "title": "Card GTB R175-3 : questions harmonisées, plus de retours à la ligne",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Tout formulé en questions + alignement plein largeur",
+          "what": "Bloc R175-3 (capacités + mise à disposition) : labels reformulés en questions (« Sous quel format… ? », « À quelle fréquence… ? »), alignement gauche cohérent (`ml-4`) et layout flex full-width pour éviter les retours à la ligne parasites de la grille `max-content`."
+        }
+      ]
+    },
+    {
       "version": "0.1.237",
       "date": "2026-06-25",
       "title": "Card GTB : questions R175-3 en colonne unique",
