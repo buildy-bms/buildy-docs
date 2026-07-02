@@ -96,6 +96,20 @@ function validateThermalDeviceCoherence(body, currentRow) {
       }
       return null;
     }
+
+    // Exception équipements réversibles (heating ↔ cooling) — une PAC
+    // air/eau ou un DRV réversible sert à la fois chauffage ET
+    // refroidissement, mais côté DB il n'a qu'un seul system_id. Quand
+    // l'auditeur veut le désigner en production dans la régul thermique
+    // de l'autre catégorie (même zone), on accepte tant que le document
+    // et la zone matchent.
+    if (ctx.document_id === currentRow.document_id
+        && ctx.zone_id === effectiveZone
+        && (effectiveCat === 'heating' || effectiveCat === 'cooling')
+        && (ctx.system_category === 'heating' || ctx.system_category === 'cooling')
+        && ctx.system_category !== effectiveCat) {
+      return null;
+    }
     if (effectiveSystemId != null) {
       if (!deviceBelongsToSystem(ctx, effectiveSystemId)) {
         return `Équipement « ${ctx.name || '#' + deviceId} » n'appartient pas à ce système (et n'y est pas partagé). Choisis un équipement du système courant ou partagé explicitement.`;
