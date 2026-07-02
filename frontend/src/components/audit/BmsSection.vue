@@ -673,17 +673,13 @@ function hasNotes(html) {
                                   topic-label="R175-3 — Mise à disposition des données"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
-            <div class="space-y-3 text-sm">
-              <div class="flex items-center justify-between gap-3">
-                <div class="text-sm text-gray-800 leading-snug flex-1">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</div>
-                <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
-                                 @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
-              </div>
-              <div class="flex items-center justify-between gap-3">
-                <div class="text-sm text-gray-800 leading-snug flex-1">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</div>
-                <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
-                                 @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
-              </div>
+            <div class="qa-grid text-sm">
+              <div class="qa-question">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</div>
+              <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
+                               @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
+              <div class="qa-question">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</div>
+              <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
+                               @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
             </div>
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
