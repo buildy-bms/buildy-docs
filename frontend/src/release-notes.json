@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.240",
+      "date": "2026-07-02",
+      "title": "Card GTB : conservation 5 ans vérifiée en qa-grid",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Toggle de la conservation vérifiée à côté de la question",
+          "what": "Le sous-bloc P1 « La conservation des données sur 5 ans a-t-elle été vérifiée sur place ? » passe aussi en qa-grid — le toggle Oui/Non revient à côté de la question au lieu d'être plaqué à droite."
+        }
+      ]
+    },
+    {
       "version": "0.1.239",
       "date": "2026-07-02",
       "title": "Card GTB : dimensions des toggles Oui/Non normalisées",

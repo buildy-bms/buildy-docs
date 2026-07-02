@@ -648,8 +648,8 @@ function hasNotes(html) {
                        @input="saveBmsDebounced"
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </div>
-              <div class="flex items-center justify-between gap-3">
-                <div class="text-sm text-gray-800 leading-snug flex-1">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</div>
+              <div class="qa-grid text-sm">
+                <div class="qa-question">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</div>
                 <SegmentedToggle :model-value="triState(bms.r175_3_p1_retention_verified)"
                                  @update:model-value="v => setBmsFlag('r175_3_p1_retention_verified', v)" />
               </div>
