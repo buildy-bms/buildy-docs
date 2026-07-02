@@ -2,6 +2,25 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.223",
+      "date": "2026-06-25",
+      "title": "Audit BACS : compteur thermique zonal (Fix G) + compteurs 'other' visibles dans la GTB (Fix H)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Compteur thermique zonal pour équipements alimentés à distance (Fix G)",
+          "what": "Bug audit #56 : les aérothermes à eau chaude en Cellule 1 / Cellule Extension (rôle emission/regulation, alimentés par la chaudière gaz de la chaufferie z131) n'avaient AUCUN compteur zonal — R175-3 §1 exige pourtant un comptage par usage par zone. Ajout d'un fallback dans `resyncBacsAuditMetersForZones` : pour chaque système heating/cooling/dhw présent qui a au moins un device rôle emission/distribution mais AUCUN device rôle production local (pas de générateur en zone), on génère un compteur `usage=heating|cooling|dhw` `meter_type=thermal` `required=1` avec la note « comptage BTU sur retour ». Distinct du compteur primaire de la chaudière — ce dernier mesure l'énergie consommée globale, le compteur thermique zonal mesure l'énergie utile reçue par la zone.",
+          "where": "Backend `seeder.js` — `resyncBacsAuditMetersForZones`."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 06 GTB : compteurs ventilation + généraux enfin listables (Fix H)",
+          "what": "`gtbManagesMeterUsage(usage)` ne gérait pas `usage='other'` (ventilation zonale + compteurs généraux bâtiment) ni `usage='pv'`. Résultat : ces compteurs étaient invisibles dans la table « Compteurs intégrés à la GTB » même quand la GTB traitait la ventilation. Mapping ajouté : `usage='other'` + `zone_id≠null` → `manages_ventilation` ; `usage='other'` + `zone_id=null` (général bâtiment) → visible dès qu'un usage BACS quelconque est managed ; `usage='pv'` → `manages_electricity_production`.",
+          "where": "`frontend/src/components/audit/BmsSection.vue` `gtbManagesMeterUsage`."
+        }
+      ]
+    },
+    {
       "version": "0.1.222",
       "date": "2026-06-25",
       "title": "Audit BACS : cohérence compteurs / zones techniques / régulation thermique",
