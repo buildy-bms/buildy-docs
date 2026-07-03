@@ -13,6 +13,8 @@ const { parseRoles } = require('../../lib/device-roles');
 const { isTrue, isFalse } = require('./_ternary');
 const { sortActions, groupByCard, cardOfAction } = require('./_action-cards');
 const { buildMeterCoverage } = require('./_meter-coverage');
+const { systemInteropStatus } = require('./_interop');
+const { METER_USAGE_TO_SYSTEM_CATS } = require('./_shared');
 const { buildSiteStaticMap, buildZonesStaticMap } = require('../../lib/static-map');
 const { regulationTypeLabel } = require('../../lib/regulation-defaults');
 const bacsArticlesData = require('../../seeds/bacs-articles');
@@ -41,7 +43,7 @@ const {
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
 // Items 5 + 8 — cumul automatique des puissances chaud / froid.
-const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL } = require('../../lib/bacs-audit-power');
+const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL, POWER_EXCLUSION_REASON_LABEL } = require('../../lib/bacs-audit-power');
 // Item 7 — calcul des zones fonctionnelles de suivi (regroupement BACS).
 const { computeFunctionalZones } = require('../../lib/bacs-functional-zones');
 // Item 4 — calcul automatique de l'assujetti par système.
@@ -77,7 +79,20 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // Distingue zones fonctionnelles BACS vs locaux techniques (tableaux
     // électriques, locaux compteurs, locaux techniques). Affichés dans des
     // blocs séparés du PDF (ch.2) pour clarté.
-    isTechnical: z.nature ? TECHNICAL_ZONE_NATURES.has(z.nature) : false,
+    // Source de vérité UNIFIÉE avec l'UI (ZonesSection.vue filtre par `kind`) :
+    // le `kind` explicite de l'auditeur prime ; repli sur la nature pour les
+    // zones legacy sans kind. Sans ça, une zone basculée « Technique » en UI
+    // (ex. chaufferie, nature 'boiler-room' hors TECHNICAL_ZONE_NATURES) était
+    // comptée à tort comme zone fonctionnelle BACS dans le PDF.
+    isTechnical: z.kind
+      ? (z.kind === 'technical')
+      : (z.nature ? TECHNICAL_ZONE_NATURES.has(z.nature) : false),
+    // Contrainte de confort saisie en texte libre. Si l'auditeur n'a mis qu'un
+    // nombre (« 14 »), on suffixe « °C » (température = cas quasi systématique)
+    // pour qu'un lecteur non-technicien ne se demande pas « 14 quoi ? ».
+    comfort_constraint_display: /^\s*-?\d+([.,]\d+)?\s*$/.test(z.comfort_constraint || '')
+      ? `${String(z.comfort_constraint).trim()} °C`
+      : (z.comfort_constraint || null),
   }));
   // Split en deux listes pour le PDF — l'ordre interne (par position)
   // est préservé. `zonesFunctional` est la liste R175-1 6° au sens strict.
@@ -95,8 +110,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ORDER BY z.position, z.name, s.system_category
   `).all(documentId);
   const meters = db.db.prepare(`
-    SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
+    SELECT m.*, z.name AS zone_name, lz.name AS location_zone_name
+    FROM bacs_audit_meters m
     LEFT JOIN zones z ON z.id = m.zone_id
+    LEFT JOIN zones lz ON lz.id = m.location_zone_id
     WHERE m.document_id = ?
     ORDER BY z.position NULLS LAST, m.usage
   `).all(documentId);
@@ -213,12 +230,31 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // le template affiche « 3 kW × 2 = 6 kW » ; sinon la puissance simple.
     const qty = Number(d.quantity) || 1;
     d.total_power_kw = d.power_kw != null
-      ? Math.round((Number(d.power_kw) || 0) * qty * 10) / 10
+      ? Math.round((Number(d.power_kw) || 0) * qty * 100) / 100
       : null;
     d.has_multiple = qty > 1;
-    d.commLabel = d.communication_protocol
-      ? (COMM_LABEL[d.communication_protocol] || d.communication_protocol)
-      : 'Non communicant';
+    // Protocole(s) de communication du device : tableau JSON `communication_protocols`
+    // (source utilisée par l'UI + le moteur de conformité), repli sur la colonne
+    // singulière `communication_protocol` (dépréciée). Sans ça le PDF affichait
+    // « Non communicant » sur des équipements KNX/BACnet réellement communicants
+    // (colonne singulière null mais tableau rempli), contredisant la pastille
+    // « ✓ Communicant » dérivée de is_communicating.
+    let devProtocols = [];
+    if (d.communication_protocols) {
+      try {
+        const arr = JSON.parse(d.communication_protocols);
+        if (Array.isArray(arr)) devProtocols = arr.map(p => COMM_LABEL[p] || p).filter(Boolean);
+      } catch { /* legacy */ }
+    }
+    if (!devProtocols.length && d.communication_protocol) {
+      devProtocols = [COMM_LABEL[d.communication_protocol] || d.communication_protocol];
+    }
+    d.commProtocolsLabel = devProtocols.join(' / ');
+    d.commLabel = devProtocols.length
+      ? devProtocols.join(' / ')
+      : (isTrue(d.is_communicating)
+          ? 'Communicant (protocole non précisé)'
+          : (isFalse(d.is_communicating) ? 'Non communicant' : '—'));
     if (!devicesBySystem.has(d.system_id)) devicesBySystem.set(d.system_id, []);
     devicesBySystem.get(d.system_id).push(d);
   }
@@ -319,19 +355,23 @@ async function buildBacsAuditExportData(af, opts = {}) {
         reasons: ['Le poste est déclaré présent mais aucun équipement actif (hors secours et hors service) n\'a été inventorié — la conformité ne peut donc pas être statuée.'],
       };
     }
+    // R175-3 §3 — interopérabilité évaluée au NIVEAU SYSTÈME (source unique
+    // _interop.js, alignée sur le générateur d'actions). L'ancienne lecture
+    // `d.meets_r175_3_p3` portait sur une colonne inexistante côté device.
+    const interop = systemInteropStatus(active);
     const failComm  = active.filter(d => isFalse(d.is_communicating));
-    const failIop   = active.filter(d => isFalse(d.meets_r175_3_p3));
     const failStop  = active.filter(d => isFalse(d.meets_r175_3_p4));
     const failAuto  = active.filter(d => isFalse(d.meets_r175_3_p4_autonomous));
+    const iopFail   = interop.verdict === 'fail';
     const pending   = active.filter(d =>
-      d.is_communicating == null || d.meets_r175_3_p3 == null
+      d.is_communicating == null
       || d.meets_r175_3_p4 == null || d.meets_r175_3_p4_autonomous == null);
     const reasons = [];
     if (failComm.length) {
       reasons.push(`Ne remonte${failComm.length > 1 ? 'nt' : ''} pas ${failComm.length > 1 ? 'leurs' : 'ses'} données à une GTB — donc ni pilotable${failComm.length > 1 ? 's' : ''}, ni mesurable${failComm.length > 1 ? 's' : ''} : ${listDeviceNames(failComm)} (R175-3 §1°).`);
     }
-    if (failIop.length) {
-      reasons.push(`Communique${failIop.length > 1 ? 'nt' : ''} en protocole propriétaire fermé — donc non intégrable${failIop.length > 1 ? 's' : ''} à la GTB du site : ${listDeviceNames(failIop)} (R175-3 §3°).`);
+    if (iopFail) {
+      reasons.push(`Aucun équipement de production, distribution ou régulation ne communique avec la GTB via un protocole ouvert — le système n'est pas interopérable (R175-3 §3°).`);
     }
     if (failStop.length) {
       reasons.push(`Pas d'arrêt manuel à proximité — l'occupant ne peut pas couper rapidement en cas d'inconfort ou de problème : ${listDeviceNames(failStop)} (R175-3 §4°).`);
@@ -345,7 +385,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
       // l'équipement → non_compliant. §4° (arrêt manuel) et §4° alinéa
       // (autonomie au défaut) sont graves mais ne bloquent pas
       // l'intégration → partial.
-      const verdict = (failComm.length + failIop.length) > 0 ? 'non_compliant' : 'partial';
+      const verdict = (failComm.length > 0 || iopFail) ? 'non_compliant' : 'partial';
       return {
         verdict,
         label: verdict === 'non_compliant'
@@ -354,15 +394,18 @@ async function buildBacsAuditExportData(af, opts = {}) {
         reasons,
       };
     }
-    if (pending.length) {
+    if (pending.length || interop.verdict === 'pending') {
+      const reasonsPending = [];
+      if (pending.length) {
+        reasonsPending.push(`La remontée GTB, l'arrêt manuel local ou l'autonomie au défaut n'${pending.length === 1 ? 'a' : 'ont'} pas été qualifié${pending.length === 1 ? '' : 's'} sur le terrain pour ${pending.length === 1 ? 'cet équipement' : 'ces équipements'} : ${listDeviceNames(pending)}.`);
+      }
+      if (interop.verdict === 'pending') {
+        reasonsPending.push(`Le raccordement à la GTB (câblage / intégration) des équipements de production, distribution ou régulation n'a pas encore été renseigné — l'interopérabilité R175-3 §3° ne peut donc pas être statuée.`);
+      }
       return {
         verdict: 'pending',
-        label: pending.length === 1
-          ? 'Conformité non statuée — 1 équipement non qualifié'
-          : `Conformité non statuée — ${pending.length} équipements non qualifiés`,
-        reasons: [
-          `Les 4 critères de conformité (remontée GTB, interopérabilité, arrêt manuel local, autonomie au défaut) n'ont pas été qualifiés sur le terrain pour ${pending.length === 1 ? 'cet équipement' : 'ces équipements'} : ${listDeviceNames(pending)}.`,
-        ],
+        label: 'Conformité non statuée — qualification incomplète',
+        reasons: reasonsPending,
       };
     }
     return {
@@ -374,7 +417,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   const enrichedSystems = systems.map(s => {
     const devs = devicesBySystem.get(s.id) || [];
-    const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0);
+    const totalKw = Math.round(devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0) * 100) / 100;
     const derivedSubstation = (substationTplId
       ? devs.some(d => d.equipment_template_id === substationTplId)
       : false)
@@ -432,20 +475,24 @@ async function buildBacsAuditExportData(af, opts = {}) {
   }
   const systemsByZone = [...systemsByZoneMap.values()];
 
-  // Zones fonctionnelles sans système thermique présent → hors périmètre
-  // R175-2 (assujettissement BACS calé sur chauffage/clim/ECS). Affichées
-  // sous forme de note pédagogique en tête du chapitre 3 pour qu'un
-  // lecteur exigeant (BE, organisme tiers R175-5-1) sache pourquoi
-  // ces zones n'apparaissent pas dans l'inventaire des systèmes.
-  const THERMAL_CATS = new Set(['heating', 'cooling', 'dhw']);
-  const zonesWithThermal = new Set();
+  // Zones fonctionnelles ne portant AUCUN système technique concerné par le
+  // décret (chauffage, clim, ECS, ventilation, éclairage, production) → elles
+  // n'ont rien à afficher dans l'inventaire du chapitre 3. Affichées en note
+  // pédagogique pour qu'un lecteur exigeant sache pourquoi elles n'y
+  // apparaissent pas.
+  // ⚠️ On teste TOUTES les catégories R175 (pas seulement le thermique) : une
+  // zone à éclairage/ventilation SANS thermique est bien listée ci-dessous
+  // (elle porte des systèmes) — l'exclure ici produisait un callout mensonger
+  // « ces zones ne sont pas listées ci-dessous » alors qu'elles l'étaient,
+  // avec des systèmes non conformes.
+  const zonesWithR175System = new Set();
   for (const s of enrichedSystems) {
-    if (s.zone_id != null && THERMAL_CATS.has(s.system_category) && s.present === 1) {
-      zonesWithThermal.add(s.zone_id);
+    if (s.zone_id != null && R175_CATS.has(s.system_category) && s.present === 1) {
+      zonesWithR175System.add(s.zone_id);
     }
   }
   const zonesOutOfBacsScope = zonesFunctional
-    .filter(z => !zonesWithThermal.has(z.zone_id))
+    .filter(z => !zonesWithR175System.has(z.zone_id))
     .map(z => ({ name: z.name, natureLabel: z.natureLabel, surface_m2: z.surface_m2 || null }));
 
   // ── Item 4 — calcul automatique de l'assujetti par système ──
@@ -492,6 +539,24 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // l'énergie du site, pas un usage particulier) — on remplace par '—'
   // côté PDF/affichage. Le champ `location_zone_name` (mig 176) vient
   // du JOIN dans la route GET /bacs-audit/:id/meters.
+  // Libellé « Système » d'un compteur (miroir de MeterEnergyGroup.vue) : le ou
+  // les noms personnalisés des systèmes BACS de la zone qui partagent l'usage
+  // du compteur, sinon un libellé GÉNÉRIQUE dérivé de l'usage (« Système ECS »,
+  // « Système Éclairage »…). Sert de colonne « Système » du tableau compteurs
+  // PDF quand celui-ci est groupé par zone (la zone est déjà en sous-en-tête).
+  const meterSystemLabel = (m) => {
+    if (m.zone_id == null) return null; // compteur général : pas de système
+    const cats = METER_USAGE_TO_SYSTEM_CATS[m.usage] || [];
+    const names = cats.length
+      ? systems
+        .filter(s => s.zone_id === m.zone_id && cats.includes(s.system_category)
+          && s.custom_label && s.custom_label.trim())
+        .map(s => s.custom_label.trim())
+      : [];
+    if (names.length) return names.join(' + ');
+    const usageLabel = METER_USAGE_LABEL[m.usage];
+    return usageLabel && m.usage !== 'other' ? `Système ${usageLabel}` : null;
+  };
   const enrichedMeters = meters.map(m => {
     // Décodage des protocoles communiquant (JSON array TEXT) → libellés FR.
     let protocolsList = [];
@@ -521,6 +586,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
       typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
       usageLabel: m.zone_id ? (METER_USAGE_LABEL[m.usage] || m.usage) : '—',
       zoneLabel: m.zone_name || 'Compteur général',
+      systemLabel: meterSystemLabel(m),
       locationLabel: m.location_zone_name || null,
       isGeneral: !m.zone_id,
       protocolsList,
@@ -597,9 +663,27 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ...d,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   });
-  const bmsManagedDevices = devices.filter(d => isTrue(d.managed_by_bms)).map(withCatLabel);
-  const bmsUnmanagedDevices = devices.filter(d => isFalse(d.managed_by_bms) && !isTrue(d.out_of_service)).map(withCatLabel);
-  const bmsUnansweredDevices = devices.filter(d => d.managed_by_bms == null && !isTrue(d.out_of_service)).map(withCatLabel);
+  // Périmètre GTB : la question « intégré ? » n'a de sens que pour un usage que
+  // la GTB est CENSÉE piloter (flags bms.manages_*). Aligne le PDF sur l'UI
+  // (BmsSection.vue gtbManagesCategory). Sans ce filtre, le PDF chiffrait
+  // « à intégrer » (donc à facturer dans le devis) des équipements
+  // ventilation/ECS que l'auditeur a explicitement exclus du scope GTB.
+  const gtbManagesCategory = (cat) => {
+    if (!bms) return false;
+    switch (cat) {
+      case 'heating': return !!bms.manages_heating;
+      case 'cooling': return !!bms.manages_cooling;
+      case 'ventilation': return !!bms.manages_ventilation;
+      case 'dhw': return !!bms.manages_dhw;
+      case 'lighting_indoor':
+      case 'lighting_outdoor': return !!bms.manages_lighting;
+      default: return false;
+    }
+  };
+  const gtbScopedDevices = devices.filter(d => gtbManagesCategory(d.system_category));
+  const bmsManagedDevices = gtbScopedDevices.filter(d => isTrue(d.managed_by_bms)).map(withCatLabel);
+  const bmsUnmanagedDevices = gtbScopedDevices.filter(d => isFalse(d.managed_by_bms) && !isTrue(d.out_of_service)).map(withCatLabel);
+  const bmsUnansweredDevices = gtbScopedDevices.filter(d => d.managed_by_bms == null && !isTrue(d.out_of_service)).map(withCatLabel);
   // Vue regroupée par zone pour le tableau « Équipements intégrés à la GTB »
   // du PDF chapitre 6. Évite les lignes plates « Nom · Usage · Zone · Marque »
   // qui sont peu lisibles et redondent la zone à chaque ligne.
@@ -615,6 +699,12 @@ async function buildBacsAuditExportData(af, opts = {}) {
   const bmsManagedDevicesByZone = groupDevicesByZone(bmsManagedDevices);
   const bmsUnmanagedDevicesByZone = groupDevicesByZone(bmsUnmanagedDevices);
   const bmsUnansweredDevicesByZone = groupDevicesByZone(bmsUnansweredDevices);
+  // Vue UNIFIÉE (tableau unique du PDF) : tous les équipements pertinents
+  // (hors service exclus), groupés par zone, chacun portant son statut
+  // d'intégration ternaire (managed_by_bms : 1=Oui / 0=Non / null=à qualifier).
+  const bmsDevicesByZone = groupDevicesByZone(
+    gtbScopedDevices.filter(d => !isTrue(d.out_of_service)).map(withCatLabel)
+  );
   const bmsManagedMeters = enrichedMeters.filter(m => isTrue(m.managed_by_bms));
   const bmsUnmanagedMeters = enrichedMeters.filter(m =>
     isFalse(m.managed_by_bms) && isTrue(m.present_actual) && !isTrue(m.out_of_service));
@@ -646,9 +736,25 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // ── Matrice de couverture + sections par énergie du plan de comptage
   // (logique partagée avec la preview-fixture via `_meter-coverage.js`).
   const { meterCoverageMatrix, meterEnergyGroups } = buildMeterCoverage(enrichedMeters, zones);
-  // Compteurs avec notes ou photos : pour le sous-bloc "Notes terrain"
-  // de la section 4 (sinon on n'affiche rien, plutot que des cards vides).
-  const metersWithDetails = enrichedMeters.filter(m => m.notes_html || m.notes || (m.photos && m.photos.length));
+  // Vue des compteurs groupés PAR ÉNERGIE (comme l'UI card comptage) pour le
+  // tableau « Compteurs et leur intégration à la GTB ». Réutilise les groupes
+  // d'énergie (label + icône + couleur) ; ne garde que les compteurs
+  // physiquement présents (hors service exclus), chacun portant son statut
+  // d'intégration ternaire (managed_by_bms).
+  const bmsMetersByEnergy = meterEnergyGroups
+    .map(g => ({
+      energy: g.energy,
+      meters: g.zones
+        .flatMap(z => z.items)
+        .filter(m => isTrue(m.present_actual) && !isTrue(m.out_of_service)),
+    }))
+    .filter(g => g.meters.length);
+  // Compteurs avec de VRAIES notes d'auditeur (notes_html, saisies via
+  // l'éditeur riche) ou des photos. On EXCLUT le champ `notes` plein texte :
+  // il est auto-rempli par le resync avec une description du compteur
+  // (« Compteur électrique en zone … ») qui n'est PAS une note de l'auditeur —
+  // l'afficher sous « Détails relevés par l'auditeur » induisait en erreur.
+  const metersWithDetails = enrichedMeters.filter(m => m.notes_html || (m.photos && m.photos.length));
 
   // Map id → device pour résoudre les FK équipement / équipement de régulation
   // (mig 129) à l'export. Sinon les noms ne s'afficheraient pas dans le PDF.
@@ -671,7 +777,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     return 'central_only';
   };
 
-  const thermal = thermalRaw.map(t => {
+  const thermalAll = thermalRaw.map(t => {
     const prodDevice = t.generator_device_id ? devicesById.get(t.generator_device_id) : null;
     const distDevice = t.distribution_device_id ? devicesById.get(t.distribution_device_id) : null;
     const emitDevice = t.emission_device_id ? devicesById.get(t.emission_device_id) : null;
@@ -706,8 +812,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     productionRegulationType: regulationTypeLabel(prodDevice?.regulation_type_production),
     distributionRegulationType: regulationTypeLabel(distDevice?.regulation_type_distribution),
     emissionRegulationType: regulationTypeLabel(emitDevice?.regulation_type_emission),
-    // Exemption R175-6 II déduite de l'énergie de production.
-    generator_exempt_wood: generatorEnergy === 'wood',
+    // Exemption R175-6 II = appareil INDÉPENDANT de chauffage au bois, marqué
+    // explicitement par l'auditeur (colonne generator_exempt_wood). Ne PAS la
+    // déduire de l'énergie : une chaudière bois collective n'est pas exemptée.
+    generator_exempt_wood: isTrue(t.generator_exempt_wood),
     // Compat ascendante : `generatorLabel` et `generator_age_years` exposés
     // ici à partir du device pointé pour ne pas casser les templates PDF
     // qui les référencent (bacs-audit-tables.hbs).
@@ -733,6 +841,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
         regulator_brand: prodDevice?.regulator_brand || null,
         regulator_model_reference: prodDevice?.regulator_model_reference || null,
         regulator_location: prodDevice?.regulator_location_production || null,
+        has_any_regulation: !!(prodDevice?.regulation_type_production
+          || prodDevice?.has_regulation === 1 || prodDevice?.has_regulation === true
+          || prodDevice?.regulator_brand || prodDevice?.regulator_model_reference),
       },
       {
         key: 'distribution',
@@ -745,6 +856,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
         regulator_brand: distDevice?.regulator_brand || null,
         regulator_model_reference: distDevice?.regulator_model_reference || null,
         regulator_location: distDevice?.regulator_location_distribution || null,
+        has_any_regulation: !!(distDevice?.regulation_type_distribution
+          || distDevice?.has_regulation === 1 || distDevice?.has_regulation === true
+          || distDevice?.regulator_brand || distDevice?.regulator_model_reference),
       },
       {
         key: 'emission',
@@ -757,10 +871,34 @@ async function buildBacsAuditExportData(af, opts = {}) {
         regulator_brand: emitDevice?.regulator_brand || null,
         regulator_model_reference: emitDevice?.regulator_model_reference || null,
         regulator_location: emitDevice?.regulator_location_emission || null,
+        has_any_regulation: !!(emitDevice?.regulation_type_emission
+          || emitDevice?.has_regulation === 1 || emitDevice?.has_regulation === true
+          || emitDevice?.regulator_brand || emitDevice?.regulator_model_reference),
       },
     ],
     };
   });
+  // Parité avec l'UI (BacsAuditDetailView.thermalFiltered) : on ne garde que les
+  // couples (zone, catégorie) dont un système est réellement PRÉSENT dans la
+  // zone, et on exclut les zones techniques. Sans ce filtre, le chapitre 5 du
+  // PDF affichait des lignes de régulation pour des usages absents (ex. une
+  // « climatisation » dans une zone qui n'a pas de clim).
+  const thermalTechnicalZoneIds = new Set(
+    zones.filter(z => (z.kind || 'functional') === 'technical').map(z => z.zone_id)
+  );
+  const thermalPresentCats = new Map(); // zone_id -> Set('heating'|'cooling')
+  for (const s of enrichedSystems) {
+    if (s.present !== 1) continue;
+    if (thermalTechnicalZoneIds.has(s.zone_id)) continue;
+    if (s.system_category === 'heating' || s.system_category === 'cooling') {
+      if (!thermalPresentCats.has(s.zone_id)) thermalPresentCats.set(s.zone_id, new Set());
+      thermalPresentCats.get(s.zone_id).add(s.system_category);
+    }
+  }
+  const thermal = thermalAll.filter(t =>
+    !thermalTechnicalZoneIds.has(t.zone_id)
+    && thermalPresentCats.get(t.zone_id)?.has(t.category || 'heating')
+  );
 
   // Plan de mise en conformite groupe par severite
   // metersById construit ici (avant l'usage dans la map ci-dessous) ; la
@@ -925,30 +1063,40 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Décision de groupement = même clé + au moins 3 items.
   // `devicesById` est déjà construite plus haut (cf. backfill thermal).
   const metersById = new Map(meters.map(m => [m.id, m]));
+  // `justification` = le POURQUOI légal, en langage non-technique, affiché en
+  // tête de chaque carte groupée (à parité avec les cartes individuelles qui
+  // portent Constat/Recommandation). Sans elle, les actions BLOQUANTES — les
+  // plus graves — étaient les seules du plan sans explication.
   const GROUP_LABELS = {
     meter_addition: {
       label: 'Ajouter les compteurs manquants pour le suivi continu',
       columns: ['zone', 'usage', 'meter_type'],
+      justification: 'Le décret (R175-3 1°) impose de mesurer en continu, usage par usage et zone par zone, les consommations d\'énergie du bâtiment, et de conserver ces relevés cinq ans. Chaque usage listé ci-dessous n\'a pas de compteur dédié : sa consommation ne peut être ni suivie ni optimisée. Un compteur communicant est à installer pour chacun.',
     },
     meter_connection: {
       label: 'Raccorder les compteurs présents mais non communicants',
       columns: ['zone', 'usage', 'meter_type'],
+      justification: 'Ces compteurs existent mais ne transmettent pas leurs données à la supervision : la mesure est là, mais reste invisible pour le suivi continu exigé par le décret (R175-3 1°). Chacun doit être raccordé (liaison bus ou passerelle) pour que sa consommation remonte automatiquement.',
     },
     r175_3_p4: {
       label: 'Permettre l\'arrêt manuel des équipements',
       columns: ['zone', 'system', 'device'],
+      justification: 'Le décret (R175-3 4°) exige que chaque équipement technique puisse être arrêté manuellement depuis la supervision. Les équipements ci-dessous n\'offrent pas encore cette commande à distance — à ajouter pour la conformité.',
     },
     r175_3_p4_autonomous: {
       label: 'Activer le fonctionnement autonome des équipements',
       columns: ['zone', 'system', 'device'],
+      justification: 'Le décret (R175-3 4°) exige que les équipements s\'ajustent automatiquement aux besoins (arrêt et relance selon l\'occupation, la température…). Les équipements ci-dessous ne disposent pas encore de ce fonctionnement autonome.',
     },
     r175_3_p3_replace: {
       label: 'Prévoir le remplacement des équipements non communicants',
       columns: ['zone', 'system', 'device'],
+      justification: 'Le décret (R175-3 3°) impose des équipements interopérables, capables de dialoguer avec la supervision. Les équipements ci-dessous ne sont pas communicants et ne peuvent pas être raccordés en l\'état : leur remplacement est à prévoir lors du prochain renouvellement.',
     },
     r175_3_p3_connect: {
       label: 'Raccorder les équipements communicants à la GTB',
       columns: ['zone', 'system', 'device'],
+      justification: 'Ces équipements sont communicants mais pas encore reliés à la supervision. Les raccorder permet le pilotage centralisé exigé par le décret (R175-3 3°), sans remplacer le matériel.',
     },
   };
   function deriveGroupKey(item) {
@@ -1019,6 +1167,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
           kind: 'group',
           key,
           label: cfg.label,
+          justification: cfg.justification || null,
           columns: cfg.columns,
           count: list.length,
           r175_article: list[0].r175_article,
@@ -1067,28 +1216,66 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   // Justifications (Annexe C). La source est derivee de la FK non-NULL
   // (mig 125) pour rester lisible dans le PDF.
+  // Libellé LISIBLE de l'origine d'une action (Annexe C « Donnée audit »).
+  // On résout les ids internes en noms d'équipement/système/zone — un
+  // « #10818 » n'a aucun sens pour un property/asset manager.
   function actionSourceLabel(a) {
-    if (a.source_system_id)        return `système (#${a.source_system_id})`;
-    if (a.source_meter_id)         return `compteur (#${a.source_meter_id})`;
-    if (a.source_thermal_id)       return `régulation thermique (#${a.source_thermal_id})`;
-    if (a.source_device_id)        return `équipement (#${a.source_device_id})`;
-    if (a.source_inspection_id)    return `inspection (#${a.source_inspection_id})`;
-    if (a.source_bms_document_id)  return `GTB (${a.source_subtype || ''})`;
-    return 'Item manuel';
+    if (a.source_system_id)        return resolveTagAsPlain('system', a.source_system_id);
+    if (a.source_meter_id) {
+      const m = enrichedMeters.find(mm => mm.id === a.source_meter_id);
+      return m
+        ? `Compteur ${m.usageLabel && m.usageLabel !== '—' ? m.usageLabel : (m.typeLabel || '')}`.trim()
+          + (m.zoneLabel ? ` · ${m.zoneLabel}` : '')
+        : 'Compteur';
+    }
+    if (a.source_thermal_id) {
+      const t = thermal.find(tt => tt.id === a.source_thermal_id);
+      return t
+        ? `Régulation ${(t.categoryLabel || '').toLowerCase()}`.trim() + (t.zone_name ? ` · ${t.zone_name}` : '')
+        : 'Régulation thermique';
+    }
+    if (a.source_device_id)        return resolveTagAsPlain('device', a.source_device_id);
+    if (a.source_inspection_id)    return 'Inspection périodique';
+    if (a.source_bms_document_id)  return 'Système de supervision (GTB)';
+    return 'Point relevé pendant l\'audit';
   }
+  // Annexe C — on RÉSOUT les balises {{system:NNNN}} / {{zone:...}} / {{device:...}}
+  // en libellé lisible (« ventilation · Plot Bureaux »), comme le chapitre 7.
+  // Sans ça, un property/asset manager voyait « Raccorder {{system:10818}} au BACS ».
   const justifications = actionItemsRaw.map(a => ({
-    title: a.title,
+    title: stripActionTagsToPlain(a.title),
     article: a.r175_article || '—',
     source: actionSourceLabel(a),
-    description: a.description || a.title,
+    // Structure la description en sous-sections HTML (Constat / Exigence /
+    // Recommandation…) comme le chapitre 7, au lieu d'un pavé aplati. Les
+    // balises {{system:…}} sont d'abord résolues en libellé lisible.
+    description: descriptionToHtml(stripActionTagsToPlain(a.description || a.title)),
   }));
 
-  // Articles BACS (Annexe A)
-  const bacsArticles = bacsArticlesData.BACS_ARTICLES.map(a => ({
-    code: a.code,
-    title: a.title,
-    html: a.full_html,
-  }));
+  // Articles BACS (Annexe A). Le texte riche vient du seed, mais la
+  // TRAÇABILITÉ (version du décret + lien Légifrance + date d'effet) est
+  // sourcée de bacs_knowledge — source unique opposable — pour que le PDF
+  // livré au client renvoie au texte officiel et affiche la bonne version.
+  const decreeMeta = new Map(
+    db.db.prepare(`
+      SELECT code, title, body_html, source_url, version_label, effective_from
+      FROM bacs_knowledge WHERE source = 'decree' AND kind = 'article'
+    `).all().map(r => [r.code, r])
+  );
+  // Le TEXTE de l'annexe vient de bacs_knowledge (body_html), source unique
+  // partagée avec les tooltips UI. Repli sur le seed uniquement si la base
+  // n'a pas encore été ré-ingérée (body_html null).
+  const bacsArticles = bacsArticlesData.BACS_ARTICLES.map(a => {
+    const meta = decreeMeta.get(a.code) || {};
+    return {
+      code: a.code,
+      title: a.title,
+      html: meta.body_html || a.full_html,
+      source_url: meta.source_url || null,
+      version_label: meta.version_label || null,
+      effective_from: meta.effective_from || null,
+    };
+  });
 
   // Detection solution Buildy (pour mention R175-5 native)
   const buildySolution = bms && /buildy/i.test(`${bms.existing_solution || ''} ${bms.existing_solution_brand || ''}`);
@@ -1131,6 +1318,26 @@ async function buildBacsAuditExportData(af, opts = {}) {
         reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)',
         permitDateFr: frDate(af.bacs_building_permit_date),
         worksDateFr: frDate(af.bacs_generator_works_date) };
+  // Réconciliation âge générateur ↔ applicabilité (point de vigilance ciblé) :
+  // quand aucun déclencheur document-level n'est renseigné mais qu'un générateur
+  // PRÉSENT est assez récent pour avoir été installé vers/après le 21/07/2021,
+  // la conclusion « non applicable » peut simplement refléter une date de
+  // travaux non saisie. On invite alors l'auditeur à la renseigner.
+  if (!r175_6_applicable.applies && !worksAfter) {
+    const currentYear = new Date().getFullYear();
+    const seen = new Set();
+    const recent = [];
+    for (const t of thermal) {
+      const age = Number(t.generator_age_years);
+      if (Number.isFinite(age) && age > 0 && (currentYear - age) >= 2021) {
+        const key = `${t.zone_name}|${age}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        recent.push({ zone: t.zone_name, installYear: currentYear - age });
+      }
+    }
+    if (recent.length) r175_6_applicable.recentGeneratorVigilance = recent;
+  }
 
   // Detail du calcul auto chauffage + clim — initial sans contributions.
   // Les contributions effectives (heat_contrib / cool_contrib / inScope)
@@ -1229,14 +1436,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     devicesIntegratedFalse: devices.filter(d => isFalse(d.managed_by_bms)).length,
     devicesHs: devices.filter(d => d.out_of_service).length,
     metersRequired: enrichedMeters.filter(m => m.required).length,
-    metersPresent: enrichedMeters.filter(m => m.present_actual && !m.out_of_service).length,
+    metersPresent: enrichedMeters.filter(m => isTrue(m.present_actual) && !m.out_of_service).length,
     metersIntegrated: enrichedMeters.filter(m => isTrue(m.managed_by_bms)).length,
     metersIntegratedUnanswered: enrichedMeters.filter(m => m.managed_by_bms == null).length,
     metersIntegratedFalse: enrichedMeters.filter(m => isFalse(m.managed_by_bms)).length,
-    // Gap analysis : compteurs requis ET absents. Les compteurs hors-service
-    // sont EXCLUS (un compteur HS n'est pas "manquant", il existe physiquement
-    // mais sera remplace). Aligne avec audit_get_summary cote MCP.
-    metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+    // Gap analysis : compteurs requis ET CONSTATÉS absents (present_actual = 0
+    // explicite). Un compteur requis dont la présence n'a PAS été vérifiée
+    // (present_actual = null) n'est PAS « manquant » — il est « à qualifier »
+    // (metersPresenceUnanswered). Les hors-service sont exclus (existent
+    // physiquement, seront remplacés). Aligne avec _meter-coverage et le MCP.
+    metersMissing: enrichedMeters.filter(m => m.required && isFalse(m.present_actual) && !m.out_of_service).length,
+    metersPresenceUnanswered: enrichedMeters.filter(m => m.required && m.present_actual == null && !m.out_of_service).length,
   };
 
   // ── Items 5 + 8 — cumul automatique des puissances ──
@@ -1252,6 +1462,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     powerCalcByDeviceId.set(d.id, {
       ...d._power,
       typeLabel: POWER_CALC_TYPE_LABEL[d._power.type] || d._power.type,
+      reasonLabel: d._power.reason ? (POWER_EXCLUSION_REASON_LABEL[d._power.reason] || null) : null,
     });
   }
   for (const sys of enrichedSystems) {
@@ -1272,6 +1483,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
       row.cool_contrib = Math.round((pc.cool || 0) * 10) / 10;
       row.in_scope = !!pc.inScope;
       row.calc_type_label = pc.typeLabel;
+      // Motif lisible de l'exclusion (émetteur aval / secours / hors service),
+      // rendu dans le PDF à côté de « Hors cumul » pour justifier l'exclusion.
+      row.exclusion_reason_label = pc.reason ? (POWER_EXCLUSION_REASON_LABEL[pc.reason] || null) : null;
     } else {
       row.heat_contrib = 0;
       row.cool_contrib = 0;
@@ -1315,6 +1529,21 @@ async function buildBacsAuditExportData(af, opts = {}) {
     },
     recapStats,
   });
+
+  // Lien Légifrance par axe du tableau de bord R175 : chaque exigence renvoie
+  // au texte officiel de son article parent (source unique bacs_knowledge).
+  // Pas d'extraction d'alinéa (risque de mauvais découpage sur un texte de
+  // loi) — le texte intégral est en Annexe A, ici on ne pose que le lien.
+  if (compliance?.r175Dashboard) {
+    const parentDecreeCode = (code) => {
+      const m = String(code || '').match(/^R175-\d+(?:-\d+)?/);
+      return m ? m[0] : null;
+    };
+    for (const ax of compliance.r175Dashboard) {
+      const parent = parentDecreeCode(ax.code);
+      ax.source_url = parent ? (decreeMeta.get(parent)?.source_url || null) : null;
+    }
+  }
 
   // Vue satellite statique du site (Google Static Maps) embarquée en data
   // URL. Best-effort : null si la clé/API est indisponible → PDF sans vue.
@@ -1392,19 +1621,12 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // armoire TGBT inventoriée mais sans contenu n'apporte rien au
     // lecteur (incident PDF Communay 2026-06-08).
     zonesFunctional,
-    zonesTechnical: (() => {
-      const zonesWithStuff = new Set();
-      for (const s of enrichedSystems) {
-        if (s.zone_id != null && (s.devices?.length || hasZoneNotes({ ...s, photos: [] }))) {
-          zonesWithStuff.add(s.zone_id);
-        }
-      }
-      for (const m of meters) {
-        if (m.zone_id != null) zonesWithStuff.add(m.zone_id);
-        if (m.location_zone_id != null) zonesWithStuff.add(m.location_zone_id);
-      }
-      return zonesTechnical.filter(z => zonesWithStuff.has(z.id) || hasZoneNotes(z));
-    })(),
+    // Parité UI↔PDF : on liste TOUTES les zones techniques inventoriées par
+    // l'auditeur (le tableau « Locaux techniques » est un simple inventaire
+    // nom/nature/surface). L'ancien filtre « anti-encombrement » masquait les
+    // locaux sans compteur/note (ex. « PDL Enedis »), pourtant visibles dans
+    // l'UI — créant un écart. Un local inventorié doit figurer au rapport.
+    zonesTechnical,
     zonesFunctionalHaveNotes,
     zonesTechnicalHaveNotes,
     systemsByZone,
@@ -1441,9 +1663,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
     bmsUnmanagedDevicesByZone,
     bmsUnansweredDevices,
     bmsUnansweredDevicesByZone,
+    bmsDevicesByZone,
     bmsManagedMeters,
     bmsUnmanagedMeters,
     bmsUnansweredMeters,
+    bmsMetersByEnergy,
     metersByZone,
     meterCoverageMatrix,
     meterEnergyGroups,

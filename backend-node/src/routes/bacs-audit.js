@@ -1757,9 +1757,10 @@ async function routes(fastify) {
     // Items 5 + 8 — cumul automatique différencié chaud / froid.
     const { computeAutoPower, resolveTotalPower } = require('../lib/bacs-audit-power');
     const allDevices = db.db.prepare(`
-      SELECT d.*, s.system_category
+      SELECT d.*, s.system_category, t.slug AS equipment_template_slug
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
+      LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
       WHERE s.document_id = ?
     `).all(id);
     const af = db.afs.getById(id);

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 199;
+const TARGET_VERSION = 200;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1249,8 +1249,12 @@ function runMigrations() {
               ('electric','electric_production','gas','water','thermal')),
           equipment_id INTEGER REFERENCES equipments(equipment_id) ON DELETE SET NULL,
           required INTEGER NOT NULL DEFAULT 1,
-          present_actual INTEGER NOT NULL DEFAULT 0,
-          communicating INTEGER NOT NULL DEFAULT 0,
+          -- Ternaires (null = non répondu / 0 = constaté absent-non / 1 = oui).
+          -- PAS de DEFAULT 0 : un compteur requis nouvellement créé par le
+          -- resync ne doit pas naître « absent constaté » (sinon le PDF
+          -- affirme « N compteurs requis mais absents » sans qu'on ait vérifié).
+          present_actual INTEGER DEFAULT NULL,
+          communicating INTEGER DEFAULT NULL,
           communication_protocol TEXT,
           notes TEXT,
           recommendation TEXT
@@ -7570,6 +7574,46 @@ function runMigrations() {
     const bf = db.prepare(`UPDATE bacs_audit_meters SET usage = 'ventilation' WHERE usage = 'other' AND zone_id IS NOT NULL`).run();
     log.info(`Migration 199 appliquee : ${bf.changes} compteur(s) zonal 'other' migré(s) vers 'ventilation'`);
     db.pragma('user_version = 199');
+  }
+
+  if (current < 200) {
+    // bacs_audit_meters.present_actual / communicating : passage de
+    // `INTEGER NOT NULL DEFAULT 0` à `INTEGER DEFAULT NULL` (ternaire strict).
+    // Motif : avec DEFAULT 0, tout compteur requis créé par le resync naissait
+    // « absent constaté » → le PDF et le MCP pouvaient affirmer « N compteurs
+    // requis mais absents » sans qu'aucune vérification terrain ait eu lieu.
+    // On distingue désormais null (non répondu) de 0 (constaté absent).
+    // Pas de backfill des 0 existants : on ne peut pas savoir lesquels sont
+    // de vrais constats d'absence — seuls les nouveaux compteurs bénéficient
+    // de la distinction. Pattern writable_schema (cf. mig 59 / 106).
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = 1');
+      db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'bacs_audit_meters'"
+      ).run(
+        'present_actual INTEGER NOT NULL DEFAULT 0',
+        'present_actual INTEGER DEFAULT NULL',
+      );
+      db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'bacs_audit_meters'"
+      ).run(
+        'communicating INTEGER NOT NULL DEFAULT 0',
+        'communicating INTEGER DEFAULT NULL',
+      );
+      db.pragma('writable_schema = 0');
+    } finally {
+      db.unsafeMode(false);
+    }
+    // Contrôle d'intégrité après édition directe du schéma.
+    const ic = db.pragma('integrity_check', { simple: true });
+    if (ic !== 'ok') {
+      throw new Error(`Migration 200 : integrity_check a échoué (${ic}) après passage nullable de present_actual/communicating`);
+    }
+    db.pragma('user_version = 200');
+    log.info('Migration 200 appliquee : bacs_audit_meters.present_actual / communicating rendus NULLABLE (ternaire strict)');
   }
 
   if (current > TARGET_VERSION) {

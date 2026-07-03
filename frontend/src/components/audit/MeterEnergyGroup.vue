@@ -49,8 +49,20 @@ function systemNameForMeter(m) {
       && s.custom_label && s.custom_label.trim())
     .map(s => s.custom_label.trim())
   if (!names.length) return null
-  // Lighting (2 sous-catégories) : on concat séparé par « / ».
-  return names.join(' / ')
+  // Plusieurs systèmes de même usage dans la zone (ou éclairage int./ext.) :
+  // on liste les noms séparés par « + ».
+  return names.join(' + ')
+}
+
+// Libellé de la colonne « Système » : le nom personnalisé s'il existe, sinon
+// un libellé GÉNÉRIQUE dérivé de l'usage (« Système ECS », « Système
+// Éclairage »…). Le compteur général (sans zone) n'a pas de système générique.
+function meterSystemLabel(m) {
+  const custom = systemNameForMeter(m)
+  if (custom) return custom
+  if (!m || m.zone_id == null) return null
+  const usageLabel = props.meterUsages.find(u => u.value === m.usage)?.label || meterUsageLabel(m.usage)
+  return usageLabel ? `Système ${usageLabel}` : null
 }
 
 // Options du SearchableSelect « Localisation » : zones techniques d'abord
@@ -264,8 +276,8 @@ onBeforeUnmount(teardownSortable)
           <thead>
             <tr>
               <th class="w-8"></th>
-              <th>Zone</th>
-              <th>Usage</th>
+              <th v-if="groupBy !== 'usage'">Usage</th>
+              <th v-if="groupBy !== 'zone'">Zone</th>
               <th>Requis</th>
               <th>Présent</th>
               <th>Localisation</th>
@@ -313,22 +325,24 @@ onBeforeUnmount(teardownSortable)
                   <Bars3Icon class="w-4 h-4" />
                 </button>
               </td>
-              <td class="text-gray-700 whitespace-nowrap">
-                <span v-if="row.meter.required && !row.meter.present_actual && !row.meter.out_of_service"
-                      class="text-red-600 mr-1" v-tooltip="'Compteur requis non présent'">⚠</span>
-                {{ row.meter.zone_name || 'Compteur général' }}
-              </td>
-              <td>
-                <div class="flex flex-col gap-0.5">
+              <!-- Colonne Usage — masquée quand on groupe déjà par usage
+                   (le sous-en-tête EST l'usage → doublon). -->
+              <td v-if="groupBy !== 'usage'">
+                <div class="flex items-center gap-1">
+                  <span v-if="row.meter.required && !row.meter.present_actual && !row.meter.out_of_service"
+                        class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
                   <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
                   <span v-else class="text-xs text-gray-400 italic">—</span>
-                  <!-- Nom du système BACS rattaché (zone × usage) si défini.
-                       Permet de distinguer plusieurs systèmes de même usage. -->
-                  <span v-if="systemNameForMeter(row.meter)"
-                        class="text-[10px] text-gray-500 truncate"
-                        v-tooltip="systemNameForMeter(row.meter)">
-                    {{ systemNameForMeter(row.meter) }}
-                  </span>
+                </div>
+              </td>
+              <!-- Colonne Zone — masquée quand on groupe déjà par zone (le
+                   sous-en-tête EST la zone → doublon). Le ⚠ n'est repris ici que
+                   lorsque la colonne Usage est masquée (groupé par usage). -->
+              <td v-if="groupBy !== 'zone'" class="text-gray-700">
+                <div class="flex items-center gap-1">
+                  <span v-if="groupBy === 'usage' && row.meter.required && !row.meter.present_actual && !row.meter.out_of_service"
+                        class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
+                  <span v-truncate-tooltip class="truncate max-w-60">{{ row.meter.zone_name || 'Compteur général' }}</span>
                 </div>
               </td>
               <td class="whitespace-nowrap">

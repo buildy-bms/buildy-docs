@@ -28,6 +28,7 @@ const path = require('path');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 const { buildMeterCoverage } = require('./_meter-coverage');
+const { METER_USAGE_TO_SYSTEM_CATS } = require('./_shared');
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
 const { isTrue, isFalse } = require('./_ternary');
@@ -97,7 +98,10 @@ const DOCUMENT = {
   // Travaux generateur post-2021-07-21 declenchent R175-6 (remplacement
   // des bruleurs des aerothermes Reznor en 2023 par Sodexo).
   bacs_generator_works_date: '2023-04-12',
-  bacs_applicability_status: 'subject_immediate',
+  // > 290 kW (522) dans l'existant (PC 2017, antérieur au 21/07/2021) → R175-2
+  // II 2°, échéance 1er janvier 2025. « subject_immediate » (bâtiment neuf)
+  // serait juridiquement impossible avec ce permis.
+  bacs_applicability_status: 'subject_2025',
   audit_existing_af_status: 'absent',
   audit_synthesis_html: `
     <p>La <strong>Plateforme Logistique Atlas Sud</strong> (45 000 m² bâtis, mise en service 2019) est <strong>assujettie au décret BACS R175-2</strong> dès aujourd'hui : la puissance nominale utile cumulée chauffage + climatisation atteint <strong>522 kW</strong>, soit largement au-dessus du seuil de 290 kW. La conformité doit être atteinte sans délai.</p>
@@ -373,6 +377,7 @@ const DEVICES_RAW = [
 const METERS_RAW = [
   { id: 7001, ref: 'M-001', zone_id: null, usage: 'other',     meter_type: 'electric',
     required: 1, present_actual: 1, communicating: 1, managed_by_bms: 1, out_of_service: 0,
+    location_zone_name: 'Local TGBT',
     notes_html: '<p>Schneider iEM3155 sur le départ TGBT général. Donnée horaire archivée 5 ans dans EcoStruxure.</p>',
     photoFiles: ['P-004.png', 'P-005.png', 'P-006.png'] },
   { id: 7002, ref: 'M-002', zone_id: 1,    usage: 'other',     meter_type: 'electric',
@@ -730,7 +735,7 @@ async function buildFixturePreviewData({ user = null } = {}) {
   const enrichedSystems = SYSTEMS_RAW.map(s => {
     const z = ZONES_RAW.find(zz => zz.zone_id === s.zone_id);
     const devs = devicesBySystem.get(s.id) || [];
-    const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0), 0);
+    const totalKw = Math.round(devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0), 0) * 100) / 100; // 2 décimales
     return {
       ...s,
       zone_name: z?.name,
@@ -755,6 +760,19 @@ async function buildFixturePreviewData({ user = null } = {}) {
   const systemsByZone = [...systemsByZoneMap.values()];
 
   // Meters : enrichissements
+  const fixtureMeterSystemLabel = (m) => {
+    if (m.zone_id == null) return null;
+    const cats = METER_USAGE_TO_SYSTEM_CATS[m.usage] || [];
+    const names = cats.length
+      ? SYSTEMS_RAW
+        .filter(s => s.zone_id === m.zone_id && cats.includes(s.system_category)
+          && s.custom_label && s.custom_label.trim())
+        .map(s => s.custom_label.trim())
+      : [];
+    if (names.length) return names.join(' + ');
+    const usageLabel = METER_USAGE_LABEL[m.usage];
+    return usageLabel && m.usage !== 'other' ? `Système ${usageLabel}` : null;
+  };
   const enrichedMeters = METERS_RAW.map(m => {
     const z = ZONES_RAW.find(zz => zz.zone_id === m.zone_id);
     return {
@@ -763,10 +781,14 @@ async function buildFixturePreviewData({ user = null } = {}) {
       typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
       usageLabel: METER_USAGE_LABEL[m.usage] || m.usage,
       zoneLabel: z?.name || 'Général bâtiment',
+      systemLabel: fixtureMeterSystemLabel(m),
+      locationLabel: m.location_zone_name || null,
       photos: (m.photoFiles || []).map((f, i) => photoItem(`m-${m.id}-${i}`, f)).filter(Boolean),
     };
   });
-  const metersWithDetails = enrichedMeters.filter(m => m.notes_html || m.notes || (m.photos && m.photos.length));
+  // Aligné sur le chemin réel : « Notes terrain » n'affiche que les vraies
+  // notes d'auditeur (notes_html) + photos, pas le plein texte auto.
+  const metersWithDetails = enrichedMeters.filter(m => m.notes_html || (m.photos && m.photos.length));
 
   // Thermal regulations
   const thermal = THERMAL_RAW.map(t => {
@@ -808,6 +830,16 @@ async function buildFixturePreviewData({ user = null } = {}) {
     managed_by_bms: 0,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   }));
+  // Vue unifiée par zone (tableau unique « Intégré ? » du PDF).
+  const bmsDevicesByZone = (() => {
+    const map = new Map();
+    for (const d of [...bmsManagedDevices, ...bmsUnmanagedDevices]) {
+      const z = d.zone_name || 'Hors zone';
+      if (!map.has(z)) map.set(z, { zone_name: z, devices: [] });
+      map.get(z).devices.push(d);
+    }
+    return [...map.values()].sort((a, b) => a.zone_name.localeCompare(b.zone_name, 'fr'));
+  })();
   const bmsManagedMeters = enrichedMeters.filter(m => isTrue(m.managed_by_bms));
   const bmsUnmanagedMeters = enrichedMeters.filter(m =>
     isFalse(m.managed_by_bms) && isTrue(m.present_actual) && !isTrue(m.out_of_service));
@@ -815,7 +847,8 @@ async function buildFixturePreviewData({ user = null } = {}) {
   const bmsUnansweredDevices = [];
   const bmsUnansweredMeters = enrichedMeters.filter(m =>
     m.managed_by_bms == null && isTrue(m.present_actual) && !isTrue(m.out_of_service));
-
+  // Vue unifiée compteurs par zone (miroir de bmsDevicesByZone) pour le tableau
+  // PDF « Compteurs et leur intégration à la GTB ».
   // Compteurs groupes par zone fonctionnelle (pour PDF tableaux paysage)
   const metersByZoneMap = new Map();
   for (const m of enrichedMeters) {
@@ -841,6 +874,16 @@ async function buildFixturePreviewData({ user = null } = {}) {
     enrichedMeters,
     ZONES_RAW,
   );
+  // Compteurs groupés PAR ÉNERGIE pour le tableau « Compteurs et leur
+  // intégration à la GTB » (miroir de _export-data.js).
+  const bmsMetersByEnergy = meterEnergyGroups
+    .map(g => ({
+      energy: g.energy,
+      meters: g.zones
+        .flatMap(z => z.items)
+        .filter(m => isTrue(m.present_actual) && !isTrue(m.out_of_service)),
+    }))
+    .filter(g => g.meters.length);
 
   // Actions : numérotation BACS-XXX par sévérité (bloq → maj → min)
   const actionItemsRaw = ACTIONS_RAW.map(a => ({
@@ -893,9 +936,14 @@ async function buildFixturePreviewData({ user = null } = {}) {
     description: a.description || a.title,
   }));
 
-  // BACS articles (Annexe A) + methodology + disclaimers : depuis seeds réels
+  // BACS articles (Annexe A) + methodology + disclaimers : depuis seeds réels.
+  // Traçabilité (version + Légifrance) statique pour l'atelier de design ; en
+  // production elle vient de bacs_knowledge (cf. _export-data.js).
   const bacsArticles = bacsArticlesData.BACS_ARTICLES.map(a => ({
     code: a.code, title: a.title, html: a.full_html,
+    version_label: 'Modifié par décret n°2023-259 du 7 avril 2023',
+    effective_from: '2025-12-26',
+    source_url: 'https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000047422489',
   }));
   const methodology = bacsAuditMethodologyStatic;
   const disclaimers = bacsAuditDisclaimersStatic;
@@ -1017,6 +1065,12 @@ async function buildFixturePreviewData({ user = null } = {}) {
     r175_6_applicable,
     applicabilityLabel: applicabilityLabelForSummary,
   });
+  // Lien Légifrance par axe (atelier design — URL statique du décret).
+  if (compliance?.r175Dashboard) {
+    for (const ax of compliance.r175Dashboard) {
+      ax.source_url = 'https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000047422489';
+    }
+  }
 
   // Surface du site + pont decret tertiaire (item 12) — meme calcul que
   // _export-data.js : sites.surface_m2 sinon cumul des zones.
@@ -1068,10 +1122,12 @@ async function buildFixturePreviewData({ user = null } = {}) {
     bmsManagedDevices,
     bmsUnmanagedDevices,
     bmsUnansweredDevices,
+    bmsDevicesByZone,
     bmsUnansweredDevicesByZone: [],
     bmsManagedMeters,
     bmsUnmanagedMeters,
     bmsUnansweredMeters,
+    bmsMetersByEnergy,
     metersByZone,
     meterCoverageMatrix,
     meterEnergyGroups,
@@ -1097,6 +1153,7 @@ async function buildFixturePreviewData({ user = null } = {}) {
     complianceLabel: COMPLIANCE_LABEL[BMS.overall_compliance] || null,
     applicabilityLabel: applicabilityLabelForSummary,
     bacsArticles,
+    currentDecreeVersionLabel: 'R175 version en vigueur au 26/12/2025',
     methodology,
     disclaimers,
     justifications,

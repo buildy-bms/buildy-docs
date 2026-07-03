@@ -334,7 +334,7 @@ function computeTargetActions(documentId) {
           // Décret en tête — seule source opposable.
           `Décret R175-3 §3\n« [Les systèmes d'automatisation et de contrôle des bâtiments] sont interopérables avec les différents systèmes techniques du bâtiment. »`,
           `Constat\nAucune communication n'est possible aujourd'hui entre {{system:${s.id}}} et la GTB.`,
-          `Recommandation Buildy pour la conformité\nÉtablir une communication entre {{system:${s.id}}} et la GTB. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle protocolaire (BACnet / Modbus / KNX / M-Bus / MQTT) sur le composant qui porte la régulation centrale.`,
+          `Recommandation Buildy pour la conformité\nÉtablir une communication entre {{system:${s.id}}} et la GTB. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle de communication (un petit boîtier qui fait dialoguer l'équipement avec la supervision) sur le composant qui porte la régulation centrale.`,
           `Lecture Buildy du décret\nLes émetteurs passifs sans interface technique (radiateurs simples, ventilo-convecteurs passifs) et la régulation d'émission autonome (vanne thermostatique mécanique, thermostat de zone) ne sont pas concernés par l'exigence d'interopérabilité R175-3 §3. L'action ne porte pas sur eux.`,
         ].join('\n\n'),
         zone_id: s.zone_id, equipment_id: s.equipment_id,
@@ -600,34 +600,34 @@ function computeTargetActions(documentId) {
       LEFT JOIN bacs_audit_system_devices dEmit ON dEmit.id = t.emission_device_id
       WHERE t.document_id = ?
     `).all(documentId);
+    // Granularité conforme R175-6 II 2° : « par pièce ou par zone chauffée ».
+    const GRANULAR_REG = new Set(['per_room', 'per_zone']);
     for (const t of thermal) {
-      // Exemption R175-6 II : appareil indépendant de chauffage au bois.
-      // Auto-détectée via l'énergie du device en Production = 'wood'.
-      if (t.prod_energy_source === 'wood') continue;
-      // « Régulation déclarée » : on considère le système régulé si AU MOINS
-      // un de ces signaux est positif sur un device impliqué (production /
-      // distribution / émission) :
-      //  (a) un type de régulation est saisi (regulation_type_X ≠ null)
-      //  (b) le toggle has_regulation = true (mig 179) sur le device
-      //  (c) l'archive legacy regulation_type au niveau thermal_regulation
-      //      ≠ 'none' (compat audits pré-mig 180)
-      // Un toggle Non explicite (has_regulation = false) sur un niveau ne
-      // suffit pas à invalider le système si un autre niveau est régulé.
-      const typeDeclared = !!(t.prod_reg_type || t.dist_reg_type || t.emit_reg_type);
-      const flagSet = t.prod_has_regulation === 1 || t.dist_has_regulation === 1 || t.emit_has_regulation === 1;
-      const legacyTypeOk = t.regulation_type && t.regulation_type !== 'none';
-      if (!typeDeclared && !flagSet && !legacyTypeOk) {
-        const cat = t.category || 'heating';
-        const defaultLabel = cat === 'cooling' ? 'Refroidissement' : 'Chauffage';
+      const cat = t.category || 'heating';
+      // R175-6 vise la régulation de la CHALEUR. La régulation du froid relève
+      // d'un autre texte (décret n°2023-444 du 7 juin 2023) — hors du périmètre
+      // de cet axe. On ne cite pas R175-6 pour un système de refroidissement.
+      if (cat === 'cooling') continue;
+      // Exemption R175-6 II : uniquement l'« appareil INDÉPENDANT de chauffage
+      // au bois » (poêle, insert), marqué explicitement par l'auditeur via
+      // generator_exempt_wood. NE PAS déduire de l'énergie : une chaudière bois
+      // collective n'est pas un appareil indépendant et reste soumise.
+      if (isTrue(t.generator_exempt_wood)) continue;
+      // Conformité = régulation automatique PAR PIÈCE ou PAR ZONE au niveau de
+      // l'ÉMISSION. Une loi d'eau de production seule ou une régulation
+      // centralisée (central_only) ne satisfait PAS la granularité terminale.
+      const emissionGranular = GRANULAR_REG.has(t.emit_reg_type)
+        || GRANULAR_REG.has(t.regulation_type); // fallback legacy (pré-mig 180)
+      if (!emissionGranular) {
         const entryLabel = (t.system_label && t.system_label.trim())
           || (t.label && t.label.trim())
-          || defaultLabel;
+          || 'Chauffage';
         addTarget({
           source_thermal_id: t.id,
           category: 'thermal_regulation', severity: 'major',
           r175_article: 'R175-6',
-          title: `Mettre en place une régulation thermique automatique en zone « ${t.zone_name || '?'} » — ${entryLabel}`,
-          description: `L'article R175-6 exige une régulation thermique automatique par pièce ou par zone ${cat === 'cooling' ? 'refroidie' : 'chauffée'}. Le système « ${entryLabel} » n'en dispose pas actuellement. Selon l'existant, l'intégrateur arbitre entre : mise à niveau d'un thermostat déjà câblé, ajout d'un module de pilotage piloté par la GTB, ou pose d'une régulation neuve.`,
+          title: `Mettre en place une régulation thermique automatique par pièce ou par zone en zone « ${t.zone_name || '?'} » — ${entryLabel}`,
+          description: `L'article R175-6 exige une régulation automatique de la température PAR PIÈCE ou PAR ZONE chauffée, au niveau des émetteurs. Le système « ${entryLabel} » n'en dispose pas à ce niveau (une régulation centralisée ou une simple loi d'eau de production ne suffit pas). Selon l'existant, l'intégrateur arbitre entre : mise à niveau d'un thermostat déjà câblé, ajout de robinets/têtes thermostatiques ou d'un module de pilotage par la GTB, ou pose d'une régulation terminale neuve.`,
           zone_id: t.zone_id,
         });
       }

@@ -254,19 +254,23 @@ function buildPrecheck(documentId) {
     LEFT JOIN zones z ON z.id = t.zone_id
     WHERE t.document_id = ?
   `).all(documentId);
-  for (const t of thermal) {
-    if (!t.emission_device_id && !isTrue(t.generator_exempt_wood)) {
-      // Vérifier l'applicabilité R175-6 — si bâtiment hors champ, c'est un warning, pas blocking.
-      const r175_6_required = af.bacs_building_permit_date && new Date(af.bacs_building_permit_date) > new Date('2021-07-21');
-      const severity = r175_6_required ? 'blocking' : 'warning';
-      const list = r175_6_required ? blocking : warnings;
-      const catFr = t.category === 'cooling' ? 'refroidissement' : 'chauffage';
-      list.push(newFinding('THERMAL-001', severity, 'thermal', t.id, 'emission_device_id',
-        `Régulation thermique de la zone « ${t.zone_name || '?'} » (${catFr}) : aucun équipement d'émission désigné.`,
-        r175_6_required
-          ? 'R175-6 impose d\'identifier l\'émetteur (radiateur, ventilo-convecteur, plancher chauffant…) qui matérialise la régulation par zone.'
-          : 'R175-6 n\'est pas applicable sur ce bâtiment (permis antérieur au 21/07/2021), mais le PDF affichera quand même « régulation incomplète » sur cette ligne.',
-        `Ouvre la carte Systèmes, descends jusqu'à la zone « ${t.zone_name || '?'} » et désigne l'équipement d'émission ${catFr} dans le panneau Régulation R175-6 (ou marque l'exemption bois si applicable).`,
+  // R175-6 vise la régulation de la CHALEUR et ne s'applique que si le permis
+  // de construire OU des travaux sur le générateur sont postérieurs au
+  // 21/07/2021 (aligné sur le générateur d'actions). Sinon aucun émetteur n'est
+  // requis → pas de point d'attention (évite les faux positifs, ex. une ligne
+  // « refroidissement » ou un bâtiment hors champ comme un PC de 1998).
+  const R6_TRIGGER = '2021-07-21';
+  const r175_6_applicable =
+    (af.bacs_building_permit_date && af.bacs_building_permit_date > R6_TRIGGER)
+    || (af.bacs_generator_works_date && af.bacs_generator_works_date > R6_TRIGGER);
+  for (const t of (r175_6_applicable ? thermal : [])) {
+    if (t.category === 'cooling') continue;            // R175-6 = chaleur uniquement
+    if (t.emission_device_id || isTrue(t.generator_exempt_wood)) continue;
+    {
+      blocking.push(newFinding('THERMAL-001', 'blocking', 'thermal', t.id, 'emission_device_id',
+        `Régulation thermique de la zone « ${t.zone_name || '?'} » (chauffage) : aucun équipement d'émission désigné.`,
+        'R175-6 impose d\'identifier l\'émetteur (radiateur, ventilo-convecteur, plancher chauffant…) qui matérialise la régulation par pièce ou par zone chauffée.',
+        `Ouvre la carte Systèmes, descends jusqu'à la zone « ${t.zone_name || '?'} » et désigne l'émetteur chauffage dans le panneau Régulation R175-6 (ou marque l'exemption bois si applicable).`,
         { systemCategory: t.category }));
     }
   }

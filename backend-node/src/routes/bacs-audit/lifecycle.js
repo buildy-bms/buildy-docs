@@ -8,13 +8,14 @@ const { z } = require('zod');
 const config = require('../../config');
 const db = require('../../database');
 const log = require('../../lib/logger').system;
-const { assistAuditSynthesis } = require('../../lib/claude');
+const { assistAuditSynthesis, assistActionAlternatives } = require('../../lib/claude');
 const { sanitize: sanitizeHtmlField } = require('../../lib/html-sanitize');
 const { regenerateActionItems } = require('../../lib/bacs-audit-action-generator');
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../../lib/seeder');
 const gitLib = require('../../lib/git');
 const { assertBacsAuditExists } = require('./_shared');
 const { isTrue, isUnanswered } = require('./_ternary');
+const { systemInteropStatus } = require('./_interop');
 // Sérialisation ternaire pour le dump Claude : ne JAMAIS collapser null en
 // false (incident Communay) — Claude doit voir « unanswered » pour pouvoir
 // signaler les questions restées sans réponse dans sa synthèse.
@@ -310,12 +311,14 @@ async function routes(fastify) {
     // une synthese fidele aux donnees saisies sans avoir a inventer.
     const stripHtml = (s) => s ? String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : null;
     const auditDump = {
-      // Cadre legal de l'audit : se positionne comme rapport d'inspection
-      // periodique R175-5-1 du decret BACS (a conserver 10 ans).
+      // Cadre legal : AUDIT DE CONFORMITE prealable, DISTINCT de l'inspection
+      // periodique R175-5-1 (celle-ci est un acte separe a l'initiative du
+      // proprietaire, dont le rapport se conserve 10 ans). Ne jamais affirmer
+      // dans la synthese que l'obligation d'inspection est remplie.
       regulatory_frame: {
         decree: 'R175 (Decret BACS, modifie par decret 2023-259)',
-        report_type: 'Inspection periodique R175-5-1',
-        retention_years: 10,
+        report_type: 'Audit de conformite prealable — distinct de l\'inspection periodique R175-5-1',
+        note: 'Cet audit ne constitue pas l\'inspection R175-5-1 et ne remplace pas l\'obligation d\'inspection a l\'initiative du proprietaire.',
       },
       audit: {
         client_name: af.client_name,
@@ -340,15 +343,23 @@ async function routes(fastify) {
       // Champs ternaires exposés via tri() : true / false / 'unanswered'.
       // Les systèmes non répondus (present=null) sont inclus avec leur état
       // pour que Claude puisse signaler l'audit incomplet.
-      systems: systems.map(s => ({
-        category: s.system_category, zone: s.zone_name,
-        present: tri(s.present),
-        meets_r175_3_p3: tri(s.meets_r175_3_p3),
-        meets_r175_3_p4: tri(s.meets_r175_3_p4),
-        meets_r175_3_p4_autonomous: tri(s.meets_r175_3_p4_autonomous),
-        managed_by_bms: tri(s.managed_by_bms),
-        notes: stripHtml(s.notes_html) || s.notes,
-      })),
+      systems: systems.map(s => {
+        // Interopérabilité R175-3 §3 dérivée des équipements du système
+        // (source unique _interop.js). Les anciennes colonnes système
+        // meets_r175_3_p3/p4/p4_autonomous sont legacy (non saisies depuis la
+        // mig 42) et renvoyaient toujours « unanswered » — elles trompaient
+        // la synthèse. La qualification réelle par équipement est dans le
+        // bloc `devices` ci-dessous.
+        const sysDevs = (devices || []).filter(d => d.system_id === s.id
+          && !isTrue(d.out_of_service) && !isTrue(d.is_backup));
+        return {
+          category: s.system_category, zone: s.zone_name,
+          present: tri(s.present),
+          interop_r175_3_3: systemInteropStatus(sysDevs).verdict, // ok | fail | pending | na
+          managed_by_bms: tri(s.managed_by_bms),
+          notes: stripHtml(s.notes_html) || s.notes,
+        };
+      }),
       devices: devices.map(d => ({
         name: d.name, brand: d.brand, model: d.model_reference,
         category: d.system_category, zone: d.zone_name,

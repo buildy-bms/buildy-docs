@@ -53,6 +53,22 @@ function expand(row) {
   };
 }
 
+// Convertit un body_text brut (paragraphes separes par \n\n) en HTML simple
+// et echappe le contenu. Utilise quand body_html n'est pas fourni (cas des
+// entrees `decree`, stockees en texte). Sert de rendu par defaut pour les
+// tooltips UI et l'annexe PDF sourcees sur bacs_knowledge.
+function textToHtml(text) {
+  if (!text) return '';
+  const esc = (s) => s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return text
+    .split(/\n{2,}/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+}
+
 async function routes(fastify) {
 
   // GET /bacs-knowledge/search?q=...&source=...&kind=...&limit=20
@@ -139,6 +155,48 @@ async function routes(fastify) {
       out[src] = db.db.prepare(sql).all(...params).map(r => summarize(r, 500));
     }
     return out;
+  });
+
+  // GET /bacs-knowledge/decree-refs
+  // Source UNIQUE des references au decret pour l'UI (tooltips R175) et le
+  // PDF (annexe + citations d'axe). Renvoie, par code d'article, le texte
+  // officiel opposable + son lien Legifrance + le libelle de version + la
+  // date d'effet. Remplace les textes du decret dupliques en dur
+  // (R175Tooltip.vue, seeds/bacs-articles.js). Cache HTTP 1 h : le decret ne
+  // change qu'a la reingestion.
+  fastify.get('/bacs-knowledge/decree-refs', async (request, reply) => {
+    const rows = db.db.prepare(`
+      SELECT * FROM bacs_knowledge
+      WHERE source = 'decree' AND kind = 'article'
+      ORDER BY position, id
+    `).all();
+    const refs = {};
+    let latestEffective = null;
+    for (const r of rows) {
+      if (r.effective_from && (!latestEffective || r.effective_from > latestEffective)) {
+        latestEffective = r.effective_from;
+      }
+      refs[r.code] = {
+        code: r.code,
+        title: r.title,
+        authority: r.authority, // 'opposable'
+        official_html: r.body_html || textToHtml(r.body_text),
+        source_url: r.source_url || null,
+        version_label: r.version_label || null,
+        effective_from: r.effective_from || null,
+        r175_refs: r.r175_refs
+          ? r.r175_refs.split(',').map(s => s.trim()).filter(Boolean) : [],
+      };
+    }
+    reply.header('Cache-Control', 'private, max-age=3600');
+    return {
+      decree_version: {
+        effective_from: latestEffective,
+        label: 'Décret n°2023-259 du 7 avril 2023 (échéance 70 kW reportée au 1ᵉʳ janvier 2030, JO du 26/12/2025)',
+        generated_from: 'bacs_knowledge',
+      },
+      refs,
+    };
   });
 
   // GET /bacs-knowledge/glossary

@@ -82,28 +82,28 @@
     <div class="gtb-summary-cell">
       <span class="gtb-cell-label">R175-3 supervision</span>
       <div class="gtb-cell-value gtb-checks">
-        <span class="check {{#if bms.meets_r175_3_p1}}check-ok{{else}}check-ko{{/if}}">{{#if bms.meets_r175_3_p1}}✓{{else}}✗{{/if}} P1 horaire 5 ans</span>
-        <span class="check {{#if bms.meets_r175_3_p2}}check-ok{{else}}check-ko{{/if}}">{{#if bms.meets_r175_3_p2}}✓{{else}}✗{{/if}} P2 anomalies</span>
+        <span class="check {{triCls bms.meets_r175_3_p1 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.meets_r175_3_p1}} P1 horaire 5 ans</span>
+        <span class="check {{triCls bms.meets_r175_3_p2 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.meets_r175_3_p2}} P2 anomalies</span>
       </div>
     </div>
     <div class="gtb-summary-cell">
       <span class="gtb-cell-label">R175-3 mise à dispo</span>
       <div class="gtb-cell-value gtb-checks">
-        <span class="check {{#if bms.data_provision_to_manager}}check-ok{{else}}check-ko{{/if}}">{{#if bms.data_provision_to_manager}}✓{{else}}✗{{/if}} Gestionnaire</span>
-        <span class="check {{#if bms.data_provision_to_operators}}check-ok{{else}}check-ko{{/if}}">{{#if bms.data_provision_to_operators}}✓{{else}}✗{{/if}} Exploitants</span>
+        <span class="check {{triCls bms.data_provision_to_manager 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.data_provision_to_manager}} Gestionnaire</span>
+        <span class="check {{triCls bms.data_provision_to_operators 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.data_provision_to_operators}} Exploitants</span>
       </div>
     </div>
     <div class="gtb-summary-cell">
       <span class="gtb-cell-label">R175-4 maintenance</span>
       <div class="gtb-cell-value gtb-checks">
-        <span class="check {{#if bms.has_maintenance_procedures}}check-ok{{else}}check-ko{{/if}}">{{#if bms.has_maintenance_procedures}}✓{{else}}✗{{/if}} Procédure</span>
+        <span class="check {{triCls bms.has_maintenance_procedures 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.has_maintenance_procedures}} Procédure</span>
         {{#if bms.maintenance_periodicity}}<span class="gtb-meta">{{bms.maintenance_periodicity}}</span>{{/if}}
       </div>
     </div>
     <div class="gtb-summary-cell">
       <span class="gtb-cell-label">R175-5 formation</span>
       <div class="gtb-cell-value gtb-checks">
-        <span class="check {{#if bms.operator_trained}}check-ok{{else}}check-ko{{/if}}">{{#if bms.operator_trained}}✓{{else}}✗{{/if}} Exploitant formé</span>
+        <span class="check {{triCls bms.operator_trained 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.operator_trained}} Exploitant formé</span>
         {{#if bms.operator_training_date}}<span class="gtb-meta">{{bms.operator_training_date}}</span>{{/if}}
       </div>
     </div>

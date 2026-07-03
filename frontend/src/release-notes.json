@@ -2,6 +2,38 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.242",
+      "date": "2026-07-03",
+      "title": "Rapport de conformité BACS : parité PDF ↔ interface et lisibilité pour non-techniciens",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le PDF reflète fidèlement ce qui est saisi dans l'app",
+          "what": "Revue systématique des écarts entre l'interface et le PDF : une zone basculée « technique » (chaufferie) n'est plus comptée comme zone fonctionnelle BACS ; les équipements « communicants » affichent leur vrai protocole (KNX, BACnet) au lieu de « Non communicant » ; les compteurs de ventilation s'affichent « Ventilation » (au lieu de « Général ») ; l'inventaire de régulation thermique reste dans le rapport même quand R175-6 ne s'applique pas ; les équipements hors périmètre GTB (ventilation/ECS non pilotés) ne sont plus facturés « à intégrer »."
+        },
+        {
+          "kind": "improvement",
+          "title": "Un vrai rapport de conformité, compréhensible sans être technicien",
+          "what": "Chaque exigence du décret est expliquée avant d'être jugée : intitulé « Ce que le décret exige » sur le tableau de bord, justification légale sur les actions bloquantes (compteurs), explication du chapitre comptage (R175-3 1°), motif d'exclusion d'un équipement « hors cumul » (ex. émetteur dont la puissance est déjà comptée sur la production). Le jargon est vulgarisé (« passerelle de communication », GTB définie en ouverture de chapitre) et l'annexe des justifications affiche des noms lisibles au lieu d'identifiants internes."
+        },
+        {
+          "kind": "improvement",
+          "title": "Chapitre régulation thermique repensé",
+          "what": "Les trois étages Production / Distribution / Émission sont désormais des sous-cartes distinctes (accent coloré par niveau). Le champ « Régulateur » est toujours affiché : identité du régulateur si connue, « Non renseigné » s'il y a une régulation sans matériel saisi, « Aucune régulation » sinon. L'âge du générateur a son propre champ, et un point de vigilance signale un générateur récent quand la date de travaux n'est pas renseignée."
+        },
+        {
+          "kind": "fix",
+          "title": "Vocabulaire et unités harmonisés",
+          "what": "« Refroidissement » partout (au lieu de « Climatisation » dans les compteurs et « Refroidissement » dans les systèmes), « API REST » au lieu de « rest », puissance retenue affichée comme un maximum chaud/froid (pas une somme), contrainte de confort suffixée « °C » quand seule une valeur numérique est saisie, légende des colonnes des tableaux de comptage."
+        },
+        {
+          "kind": "improvement",
+          "title": "Compteurs et intégration GTB plus clairs",
+          "what": "Tableau « Compteurs et leur intégration à la GTB » regroupé par énergie avec pastilles colorées ; distinction nette entre les compteurs présents mais non relevés par la GTB et les compteurs totalement absents (renvoi au chapitre comptage) ; suppression de la carte « Usages couverts par la GTB » redondante."
+        }
+      ]
+    },
+    {
       "version": "0.1.241",
       "date": "2026-07-02",
       "title": "Conformité décret BACS : fin des faux verdicts sur questions non répondues",
