@@ -53,44 +53,13 @@ const updateAfSchema = z.object({
 });
 
 /**
- * Calcule l'applicabilite BACS R175-2 selon la puissance cumulee chauffage+clim
- * et la date du permis de construire.
- *
- * Regles synthetisees :
- * - puissance < 70 kW => not_subject (hors champ)
- * - puissance >= 290 kW => subject_2025 (echeance 1er janvier 2025)
- *   - sauf si PC > 8 avril 2024 => subject_immediate (s'applique a la livraison)
- * - 70 kW <= puissance < 290 kW => subject_2030 (echeance 1er janvier 2030,
- *   report acte par le decret publie au JO le 26 decembre 2025)
- *
- * **Regle protective** (3eme arg `incompletePowerCount`) : si la puissance
- * calculee est sous 70 kW MAIS des equipements thermiques in-scope n'ont
- * pas de puissance saisie, on PRESUME l'assujettissement (subject_2030)
- * plutot que de classer 'not_subject' a tort. L'auditeur peut completer
- * les puissances ; le statut sera recalcule au prochain PATCH.
- *
- * Retourne { status, deadline, presumed? } ou null si la puissance n'est
- * pas renseignee du tout.
+ * Applicabilite BACS R175-2 — source UNIQUE dans lib/bacs-audit-power.js
+ * (computeBacsApplicabilityFromPower). L'ancienne copie locale divergeait
+ * du calcul persiste (seuils larges, date charniere 08/04/2024 appliquee au
+ * mauvais palier). On reexporte l'implementation canonique sous l'ancien nom
+ * pour ne pas casser les appels existants.
  */
-function computeBacsApplicability(powerKw, buildingPermitDate, incompletePowerCount = 0) {
-  if (powerKw == null || isNaN(powerKw)) return null;
-  if (powerKw < 70) {
-    if (incompletePowerCount > 0) {
-      // Protective : on suppose qu'avec les puissances manquantes complétées
-      // l'audit pourrait dépasser le seuil. Verdict 'subject_2030' présumé
-      // (le moins défavorable des deux états subject_*).
-      return { status: 'subject_2030', deadline: '2030-01-01', presumed: true };
-    }
-    return { status: 'not_subject', deadline: null };
-  }
-  if (powerKw >= 290) {
-    if (buildingPermitDate && Date.parse(buildingPermitDate) >= Date.parse('2024-04-08')) {
-      return { status: 'subject_immediate', deadline: buildingPermitDate };
-    }
-    return { status: 'subject_2025', deadline: '2025-01-01' };
-  }
-  return { status: 'subject_2030', deadline: '2030-01-01' };
-}
+const { computeBacsApplicabilityFromPower: computeBacsApplicability } = require('../lib/bacs-audit-power');
 
 async function routes(fastify) {
   // GET /api/afs — liste (filtres optionnels)
@@ -432,9 +401,10 @@ async function routes(fastify) {
       // total faible parce que des power_kw manquent → on présume subject).
       const { computeAutoPower } = require('../lib/bacs-audit-power');
       const devices = db.db.prepare(`
-        SELECT d.*, s.system_category
+        SELECT d.*, s.system_category, t.slug AS equipment_template_slug
         FROM bacs_audit_system_devices d
         JOIN bacs_audit_systems s ON s.id = d.system_id
+        LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
         WHERE s.document_id = ?
       `).all(id);
       const auto = computeAutoPower(devices);

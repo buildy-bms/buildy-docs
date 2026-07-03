@@ -173,6 +173,10 @@ export const listInstanceCategories = (id) => api.get(`/instances/${id}/categori
 export const setInstanceCategories = (id, category_keys) => api.put(`/instances/${id}/categories`, { category_keys })
 export const listSystemCategories = () => api.get('/system-categories')
 export const createSystemCategory = (data) => api.post('/system-categories', data)
+
+// Base de connaissance réglementaire BACS — références au décret (texte
+// officiel opposable + lien Légifrance + version) servies depuis bacs_knowledge.
+export const getDecreeRefs = () => api.get('/bacs-knowledge/decree-refs')
 export const updateSystemCategory = (id, data) => api.patch(`/system-categories/${id}`, data)
 export const getSystemCategoryUsage = (id) => api.get(`/system-categories/${id}/usage`)
 export const deleteSystemCategory = (id) => api.delete(`/system-categories/${id}`)

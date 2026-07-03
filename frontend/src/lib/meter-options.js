@@ -23,7 +23,7 @@ export const METER_TYPES = [
 // 6 usages BACS pour le sous-comptage R175-3 1°.
 export const METER_USAGES = [
   { value: 'heating',  label: 'Chauffage',     icon: 'fa-fire',            color: '#dc2626' },
-  { value: 'cooling',  label: 'Climatisation', icon: 'fa-snowflake',       color: '#0ea5e9' },
+  { value: 'cooling',  label: 'Refroidissement', icon: 'fa-snowflake',       color: '#0ea5e9' },
   { value: 'dhw',      label: 'ECS',           icon: 'fa-faucet-drip',     color: '#0891b2' },
   { value: 'pv',       label: 'Production PV', icon: 'fa-solar-panel',     color: '#facc15' },
   { value: 'lighting', label: 'Éclairage',     icon: 'fa-lightbulb',       color: '#eab308' },

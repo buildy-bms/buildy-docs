@@ -125,8 +125,9 @@ const METER_TYPE_PILL = {
   other:               { icon: 'gauge',            label: 'Autre',            bg: '#f3f4f6', fg: '#374151', border: '#d1d5db' },
 };
 const METER_USAGE_PILL = {
-  heating:  { icon: 'fire',         label: 'Chauffage',     bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
-  cooling:  { icon: 'snowflake',    label: 'Climatisation', bg: '#ecfeff', fg: '#155e75', border: '#a5f3fc' },
+  heating:     { icon: 'fire',      label: 'Chauffage',     bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
+  cooling:     { icon: 'snowflake', label: 'Refroidissement', bg: '#ecfeff', fg: '#155e75', border: '#a5f3fc' },
+  ventilation: { icon: 'fan',       label: 'Ventilation',   bg: '#f0fdfa', fg: '#0f766e', border: '#99f6e4' },
   dhw:      { icon: 'faucet',       label: 'ECS',           bg: '#f0f9ff', fg: '#0369a1', border: '#bae6fd' },
   pv:       { icon: 'solar-panel',  label: 'PV',            bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
   lighting: { icon: 'lightbulb',    label: 'Éclairage',     bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },

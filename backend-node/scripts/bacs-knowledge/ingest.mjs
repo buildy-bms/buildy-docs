@@ -98,15 +98,23 @@ function chunkByHeadings(rawText, sourcePages = 1) {
 
 async function ingestDecree() {
   const items = JSON.parse(await readFile(join(__dirname, 'decree-articles.json'), 'utf-8'));
+  // Texte riche (HTML formaté) repris du seed bacs-articles.js pour être stocké
+  // dans body_html — bacs_knowledge devient ainsi la SOURCE UNIQUE affichée :
+  // l'annexe PDF ET les tooltips UI lisent ce body_html (plus de texte du
+  // décret dupliqué entre le seed et la base). body_text (brut) reste pour la
+  // recherche FTS et le MCP.
+  const { BACS_ARTICLES } = require('../../src/seeds/bacs-articles');
+  const htmlByCode = new Map((BACS_ARTICLES || []).map(a => [a.code, a.full_html || null]));
   db.prepare("DELETE FROM bacs_knowledge WHERE source = 'decree'").run();
   const ins = db.prepare(`
     INSERT INTO bacs_knowledge
-      (source, authority, kind, code, title, body_text, r175_refs, version_label, source_url, position)
-    VALUES ('decree','opposable','article',?,?,?,?,?,?,?)
+      (source, authority, kind, code, title, body_text, body_html, r175_refs, version_label, source_url, position)
+    VALUES ('decree','opposable','article',?,?,?,?,?,?,?,?)
   `);
   const tx = db.transaction((rows) => {
     rows.forEach((row, i) => ins.run(
       row.code, row.title, row.body_text,
+      htmlByCode.get(row.code) || null,
       row.r175_refs || extractR175Refs(row.body_text),
       row.version_label || null,
       'https://www.legifrance.gouv.fr/codes/section_lc/LEGITEXT000006074096/LEGISCTA000043819533/',

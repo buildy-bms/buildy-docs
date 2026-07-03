@@ -13,15 +13,26 @@
 // Utilisé identiquement par _export-data.js (audit réel) et
 // _preview-fixture.js (dataset fictif). Ne dépend pas de la DB.
 
-const { isTrue, isFalse } = require('./_ternary');
+const { isTrue, isFalse, isUnanswered } = require('./_ternary');
+
+// Axes GTB à champ pivot ternaire unique : si le champ n'a pas été répondu
+// (null) et qu'aucune action n'a été générée, l'axe ne doit PAS conclure
+// « conforme » par simple absence d'action (le générateur ne crée d'action
+// que sur un « non » explicite). On force alors 'unknown'. Évite le faux
+// « conforme » de type Communay au niveau du verdict d'axe.
+const AXIS_PIVOT_FIELD = {
+  r175_3_2: 'meets_r175_3_p2',
+  r175_4: 'has_maintenance_procedures',
+  r175_5: 'operator_trained',
+};
 const { readingsForAxis } = require('../../lib/bacs-buildy-readings');
 
 // Mapping exigence R175 → libellé court grand public + référence article
 // pour le tableau de bord. La liste est volontairement courte et tenue.
 const R175_EXIGENCES = [
   { code: 'R175-2',                axis: 'r175_2',     label: 'Assujettissement du bâtiment',
-    summary: 'Le bâtiment relève-t-il du décret BACS et à quelle échéance ?' },
-  { code: 'R175-3 1°',             axis: 'r175_3_1',   label: 'Suivi continu pas horaire',
+    summary: 'Déterminer si le bâtiment est soumis au décret BACS, et à quelle échéance de mise en conformité.' },
+  { code: 'R175-3 1°',             axis: 'r175_3_1',   label: 'Relevé des consommations au pas horaire',
     summary: 'Toutes les consommations énergétiques sont mesurées et archivées 5 ans.' },
   { code: 'R175-3 2°',             axis: 'r175_3_2',   label: 'Détection des pertes d\'efficacité',
     summary: 'La GTB compare aux valeurs de référence et signale les dérives de consommation.' },
@@ -135,10 +146,11 @@ function evR175_2({ document, powerSummary }) {
   const threshold = status === 'subject_2030' ? 70 : 290;
   const kpis = [
     { key: 'cumul_retained', label: 'Puissance retenue', value: power, unit: 'kW',
-      hint: 'Cumul chaud + froid (max retenu si réversible), équipements de secours et bois exclus.' },
+      hint: 'Cumul chaud d\'un côté, froid de l\'autre ; on retient le maximum des deux (ils ne s\'additionnent pas). Équipements de secours et systèmes mobiles exclus.' },
     { key: 'threshold', label: 'Seuil applicable', value: status ? threshold : null, unit: 'kW',
-      hint: status === 'subject_2030' ? 'Seuil R175-2 §1 b) — échéance 1ᵉʳ janvier 2030.'
-        : status === 'subject_2025' || status === 'subject_immediate' ? 'Seuil R175-2 §1 a) — échéance 1ᵉʳ janvier 2025.'
+      hint: status === 'subject_2030' ? 'Seuil R175-2 II 4° (> 70 kW) — échéance 1ᵉʳ janvier 2030.'
+        : status === 'subject_2025' ? 'Seuil R175-2 II 2° (> 290 kW, existant) — échéance 1ᵉʳ janvier 2025.'
+        : status === 'subject_immediate' ? 'R175-2 II 1° / 3° (bâtiment neuf) — obligation dès la mise en service, tous les systèmes techniques reliés.'
         : 'Seuil non déterminé tant que la puissance et la date de permis ne sont pas renseignées.' },
   ];
   if (powerSummary?.autoHeatKw != null) {
@@ -235,8 +247,10 @@ function evR175_3_data({ bms }) {
   return {
     kpis: [
       { key: 'bms_present', label: 'GTB présente sur le site', value: isTrue(bms.present) ? 'Oui' : isFalse(bms.present) ? 'Non' : 'Non renseigné' },
-      { key: 'bms_meets_p2', label: 'Mise à disposition des données (R175-3 dernier alinéa)',
-        value: isTrue(bms.meets_r175_3_p2) ? 'Oui' : isFalse(bms.meets_r175_3_p2) ? 'Non' : 'Non renseigné' },
+      { key: 'data_provision_manager', label: 'Données mises à disposition du gestionnaire',
+        value: isTrue(bms.data_provision_to_manager) ? 'Oui' : isFalse(bms.data_provision_to_manager) ? 'Non' : 'Non renseigné' },
+      { key: 'data_provision_operators', label: 'Données transmises aux exploitants',
+        value: isTrue(bms.data_provision_to_operators) ? 'Oui' : isFalse(bms.data_provision_to_operators) ? 'Non' : 'Non renseigné' },
     ],
     explanation: null,
   };
@@ -296,15 +310,17 @@ function evR175_6({ thermal, r175_6_applicable }) {
   }
   if (!Array.isArray(thermal)) return null;
   const total = thermal.length;
-  const withEmission = thermal.filter(t => t.emission_device_id != null).length;
   const woodExempt  = thermal.filter(t => isTrue(t.generator_exempt_wood)).length;
-  const complete    = withEmission + woodExempt;
+  // « Complète » = régulation d'émission saisie OU exemption bois. Union (pas
+  // somme) sinon une ligne à la fois régulée et exemptée compterait double et
+  // la couverture pouvait dépasser 100 %.
+  const complete = thermal.filter(t => t.emission_device_id != null || isTrue(t.generator_exempt_wood)).length;
   return {
     kpis: [
       { key: 'thermal_total', label: 'Régulations thermiques requises', value: total,
         hint: 'Une par couple (zone × catégorie chauffage/refroidissement) attendu sur le site.' },
       { key: 'thermal_complete', label: 'Régulations complètes saisies', value: complete },
-      ...(woodExempt > 0 ? [{ key: 'thermal_wood_exempt', label: 'Exemptions bois (R175-6 §3)', value: woodExempt }] : []),
+      ...(woodExempt > 0 ? [{ key: 'thermal_wood_exempt', label: 'Exemptions bois (R175-6 II)', value: woodExempt }] : []),
       { key: 'coverage', label: 'Couverture R175-6', value: pct(complete, total), unit: '%' },
     ],
     explanation: null,
@@ -397,6 +413,13 @@ function buildComplianceSummary({
       v = 'info';
     } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       v = 'na';
+    } else if (ex.axis === 'r175_5_1' && isTrue(document.inspection_not_applicable)) {
+      // L'auditeur a marqué l'inspection périodique « non applicable ».
+      // Verdict 'na' (jamais 'compliant') : ne JAMAIS affirmer qu'une
+      // inspection est réalisée alors qu'aucune ne l'a été. Un motif comme
+      // « contrat de maintenance » relève de R175-4 et n'exonère pas de
+      // l'obligation d'inspection R175-5-1.
+      v = 'na';
     } else if (ex.axis === 'r175_5_1' && noGtb) {
       // Sans GTB, il n'y a pas de BACS à inspecter — l'inspection n'a pas
       // d'objet (cohérent avec le generator qui skip l'action no_inspection).
@@ -409,6 +432,14 @@ function buildComplianceSummary({
     } else if (bmsUnanswered && GTB_DEPENDENT_AXES.has(ex.axis)) {
       // GTB non qualifiée → verdict indéterminable sur cet axe.
       v = 'unknown';
+    } else if (
+      AXIS_PIVOT_FIELD[ex.axis] && bms && total === 0
+      && isUnanswered(bms[AXIS_PIVOT_FIELD[ex.axis]])
+    ) {
+      // Champ pivot de l'axe non répondu et aucune action → ne pas conclure
+      // « conforme » par défaut (le générateur ne crée d'action que sur un
+      // « non » explicite). Verdict indéterminé.
+      v = 'unknown';
     } else {
       v = verdictFromActions({ blocking: bucket.blocking, major: bucket.major });
     }
@@ -418,12 +449,17 @@ function buildComplianceSummary({
       contextSummary = applicabilityLabel;
     } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       contextSummary = `Non applicable — ${r175_6_applicable.reason}.`;
+    } else if (ex.axis === 'r175_5_1' && isTrue(document.inspection_not_applicable)) {
+      const inspReason = (document.inspection_not_applicable_reason || '').trim().replace(/\s+\.$/, '.');
+      contextSummary = `Inspection périodique marquée non applicable${inspReason ? ` — ${inspReason}` : ''}. À noter : un contrat de maintenance ne dispense pas de l'inspection périodique réalisée par un tiers indépendant.`;
     } else if (ex.axis === 'r175_5_1' && noGtb) {
       contextSummary = 'Aucune GTB sur le site — pas de BACS à inspecter.';
     } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
       contextSummary = 'Aucune GTB sur le site — exigence non satisfaite.';
     } else if (bmsUnanswered && (GTB_DEPENDENT_AXES.has(ex.axis) || ex.axis === 'r175_5_1')) {
       contextSummary = 'GTB non renseignée — verdict non calculable tant que la question n\'est pas répondue.';
+    } else if (v === 'unknown' && AXIS_PIVOT_FIELD[ex.axis]) {
+      contextSummary = 'Question non répondue — verdict non calculable tant que le point n\'est pas renseigné.';
     }
     // Lot 1 — evidence par axe : les chiffres-preuve qui ont mené au verdict.
     // Permet au PDF (Lot 4) et aux consommateurs MCP de tracer chaque

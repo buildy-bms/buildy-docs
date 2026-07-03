@@ -76,8 +76,13 @@ function inferPowerCalculationType(device) {
   // puissance retenue est celle de la station d'échange, pas du cumul
   // aval). On les rend explicitement hors cumul.
   if (energy === 'district_heating') return 'out_of_scope';
-  // Bois (appareil indépendant) → hors périmètre.
-  if (energy === 'wood' || energy === 'biomass') return 'out_of_scope';
+  // Bois / biomasse en chauffage = générateur par COMBUSTION (R175-1 8°a) :
+  // sa puissance nominale entre dans le cumul R175-2 (→ boiler_sum via la
+  // règle « catégorie chaud » ci-dessous). Seul l'« appareil INDÉPENDANT de
+  // chauffage au bois » (poêle, insert — R175-6 II / PROFEEL-2) est hors
+  // périmètre ; il doit être modélisé par un modèle bibliothèque dédié
+  // marqué out_of_scope, PAS déduit de l'énergie seule (une chaudière bois
+  // collective n'est pas un appareil indépendant et reste assujettie).
   // Thermodynamique : PAC (heat_pump) ou catégorie froid.
   if (energy === 'heat_pump' || COOL_CATEGORIES.has(cat)) return 'thermodynamic_max';
   // Gaz / fioul en chauffage → chaudière.
@@ -95,7 +100,16 @@ const POWER_CALC_TYPE_LABEL = {
   boiler_sum: 'somme des puissances nominales',
   joule_sum: 'somme des puissances électriques',
   district_heating_substation: 'puissance de la sous-station',
-  out_of_scope: 'hors cumul (secours / process / bois)',
+  out_of_scope: 'hors cumul (secours / process / aval réseau urbain)',
+};
+
+// Motif LISIBLE (par équipement) de l'exclusion du cumul R175-2. Rendu à côté
+// de « Hors cumul » dans le PDF pour qu'un non-technicien comprenne POURQUOI un
+// équipement — parfois le plus gros du site — n'est pas additionné.
+const POWER_EXCLUSION_REASON_LABEL = {
+  emitter_no_production: 'émetteur — puissance déjà comptée sur la production amont',
+  excluded_type: 'secours, process ou aval réseau de chaleur',
+  out_of_service: 'équipement hors service',
 };
 
 /**
@@ -113,7 +127,7 @@ function devicePowerContribution(device) {
   // saisi explicitement. Garantit l'absence de double comptage UE DRV / UI DRV,
   // chiller / FCU, chaudière / radiateurs eau chaude, etc.
   if (!rolesAllowEnergySource(device.device_role)) {
-    return { heat: 0, cool: 0, type: 'out_of_scope', inScope: false };
+    return { heat: 0, cool: 0, type: 'out_of_scope', inScope: false, reason: 'emitter_no_production' };
   }
   const type = device.power_calculation_type || inferPowerCalculationType(device);
   const qty = Number(device.quantity) || 1;
@@ -121,7 +135,7 @@ function devicePowerContribution(device) {
   const pCool = (Number(device.power_kw_cooling) || 0) * qty;
 
   if (type === 'out_of_scope') {
-    return { heat: 0, cool: 0, type, inScope: false };
+    return { heat: 0, cool: 0, type, inScope: false, reason: 'excluded_type' };
   }
   if (type === 'thermodynamic_max') {
     // Une machine thermodynamique compte UNE fois, sur sa puissance la plus
@@ -135,11 +149,14 @@ function devicePowerContribution(device) {
     if (COOL_CATEGORIES.has(cat)) {
       return { heat: 0, cool: pCool || pHeat, type, inScope: true };
     }
-    // Réversible (cat heating/mixte) : la puissance dominante est portée
-    // par le poste chaud (cas le plus fréquent d'une PAC en chauffage).
-    // Si seule la frigorifique est saisie, elle bascule en froid.
-    if (pHeat >= pCool) return { heat: pHeat, cool: 0, type, inScope: true };
-    return { heat: 0, cool: pCool, type, inScope: true };
+    // Réversible (cat heating/mixte) : conformément à la FAQ ministérielle
+    // n°11, la puissance chaud alimente le cumul CHAUD et la puissance froid
+    // alimente le cumul FROID (« la puissance en chaud … cumulée avec les
+    // autres puissances en chaud … la puissance en froid … avec les autres
+    // puissances en froid »). La non-addition chaud+froid reste garantie au
+    // niveau site par retainedKw = max(heatKw, coolKw) : la machine n'est
+    // jamais comptée deux fois dans la puissance retenue.
+    return { heat: pHeat, cool: pCool, type, inScope: true };
   }
   // boiler_sum / joule_sum / district_heating_substation : on somme la
   // puissance sur le poste correspondant à la catégorie du système.
@@ -173,7 +190,7 @@ function computeAutoPower(devices) {
   for (const d of devices || []) {
     // Les équipements Hors-Service ne comptent pas dans le cumul.
     if (d.out_of_service) {
-      detailed.push({ ...d, _power: { heat: 0, cool: 0, type: 'out_of_scope', inScope: false } });
+      detailed.push({ ...d, _power: { heat: 0, cool: 0, type: 'out_of_scope', inScope: false, reason: 'out_of_service' } });
       continue;
     }
     const contrib = devicePowerContribution(d);
@@ -215,10 +232,17 @@ function computeAutoPower(devices) {
  * }
  */
 function resolveTotalPower(document, auto) {
-  const source = document.bacs_total_power_source === 'manual' ? 'manual' : 'auto';
+  // Le CHECK DB de bacs_total_power_source vaut ('auto','manual_override').
+  // Tester 'manual' (valeur inexistante) revenait à ignorer TOUJOURS la
+  // saisie manuelle → l'assujettissement était recalculé sur le cumul auto,
+  // voire effacé quand bacs_total_power_kw restait null (incident audit #56 :
+  // 949 kW saisis à la main, statut livré « non renseigné »).
+  const source = document.bacs_total_power_source === 'manual_override' ? 'manual' : 'auto';
   const manualKw = document.bacs_total_power_kw != null
     ? Number(document.bacs_total_power_kw) : null;
   const autoKw = auto.retainedKw;
+  // En mode manuel sans valeur saisie, on retombe sur le cumul auto plutôt
+  // que sur null (sinon l'applicabilité ne peut plus être calculée).
   const effectiveKw = source === 'manual' && manualKw != null ? manualKw : autoKw;
 
   // Alerte d'écart : on compare toujours auto vs manuel quand les deux
@@ -290,14 +314,19 @@ function recomputeAndPersistAuditPower(db, documentId) {
   if (!af) return null;
   // Ne touche bacs_total_power_kw QUE si source='auto' (ou null = auto par défaut).
   // Si source='manual' ou 'manual_override', l'auditeur a saisi à la main → respect.
-  const source = af.bacs_total_power_source || 'auto';
+  // Normalise : seul 'manual_override' est un mode manuel (cf. CHECK DB).
+  const source = af.bacs_total_power_source === 'manual_override' ? 'manual_override' : 'auto';
   if (source === 'auto') {
     db.prepare('UPDATE afs SET bacs_total_power_kw = ? WHERE id = ?').run(auto.retainedKw, documentId);
   }
   // Recalcul du statut d'assujettissement intégrant la règle protective :
   // si la puissance effective est sous 70 kW mais qu'il manque des
   // puissances saisies, on présume subject_2030 (au lieu de not_subject).
-  const powerKw = source === 'auto' ? auto.retainedKw : af.bacs_total_power_kw;
+  // En mode manuel sans valeur saisie, on retombe sur le cumul auto (sinon
+  // powerKw=null → statut effacé, incident audit #56).
+  const powerKw = source === 'auto'
+    ? auto.retainedKw
+    : (af.bacs_total_power_kw != null ? af.bacs_total_power_kw : auto.retainedKw);
   const applic = computeBacsApplicabilityFromPower(powerKw, af.bacs_building_permit_date, auto.incompletePowerCount);
   if (applic) {
     db.prepare('UPDATE afs SET bacs_applicability_status = ?, bacs_applicable_deadline = ? WHERE id = ?')
@@ -315,26 +344,48 @@ function recomputeAndPersistAuditPower(db, documentId) {
  */
 function computeBacsApplicabilityFromPower(powerKw, buildingPermitDate, incompletePowerCount = 0) {
   if (powerKw == null || isNaN(powerKw)) return null;
-  if (powerKw < 70) {
+  // PC « déposé APRÈS » une date charnière → comparaison stricte (>).
+  const pcAfter = (iso) => !!buildingPermitDate
+    && !isNaN(Date.parse(buildingPermitDate))
+    && Date.parse(buildingPermitDate) > Date.parse(iso);
+
+  // Seuil d'assujettissement : « puissance SUPÉRIEURE à 70 kW » (strict) —
+  // R175-2 I. À 70,0 kW exactement, le bâtiment n'est pas assujetti.
+  if (powerKw <= 70) {
+    // Protective : puissances thermiques incomplètes → on présume
+    // l'assujettissement (subject_2030) plutôt que 'not_subject' à tort.
     if (incompletePowerCount > 0) {
-      return { status: 'subject_2030', deadline: '2030-01-01', presumed: true };
+      return { status: 'subject_2030', deadline: '2030-01-01', presumed: true, basis: 'R175-2 II 4° (présumé)' };
     }
     return { status: 'not_subject', deadline: null };
   }
-  if (powerKw >= 290) {
-    if (buildingPermitDate && Date.parse(buildingPermitDate) >= Date.parse('2024-04-08')) {
-      return { status: 'subject_immediate', deadline: buildingPermitDate };
+  if (powerKw > 290) {
+    // R175-2 II 1° : > 290 kW ET PC déposé après le 21/07/2021 → dès la mise
+    // en service, avec obligation de relier TOUS les systèmes techniques.
+    if (pcAfter('2021-07-21')) {
+      return { status: 'subject_immediate', deadline: buildingPermitDate, scope: 'all_connected', basis: 'R175-2 II 1°' };
     }
-    return { status: 'subject_2025', deadline: '2025-01-01' };
+    // R175-2 II 2° : autres > 290 kW → au plus tard le 1er janvier 2025.
+    return { status: 'subject_2025', deadline: '2025-01-01', basis: 'R175-2 II 2°' };
   }
-  return { status: 'subject_2030', deadline: '2030-01-01' };
+  // 70 kW < powerKw <= 290 kW
+  // R175-2 II 3° : > 70 kW ET PC déposé après le 08/04/2024 → dès la mise en
+  // service, avec obligation de relier TOUS les systèmes techniques.
+  if (pcAfter('2024-04-08')) {
+    return { status: 'subject_immediate', deadline: buildingPermitDate, scope: 'all_connected', basis: 'R175-2 II 3°' };
+  }
+  // R175-2 II 4° : autres > 70 kW → lors du renouvellement du système, au
+  // plus tard le 1er janvier 2030 (report 2027→2030, JO du 26/12/2025).
+  return { status: 'subject_2030', deadline: '2030-01-01', basis: 'R175-2 II 4°' };
 }
 
 module.exports = {
   POWER_CALC_TYPE_LABEL,
+  POWER_EXCLUSION_REASON_LABEL,
   inferPowerCalculationType,
   devicePowerContribution,
   computeAutoPower,
   resolveTotalPower,
   recomputeAndPersistAuditPower,
+  computeBacsApplicabilityFromPower,
 };

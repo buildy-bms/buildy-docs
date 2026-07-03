@@ -1048,15 +1048,22 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     SELECT 1 FROM bacs_audit_meters
     WHERE document_id = ? AND zone_id IS NULL AND usage = ? AND meter_type = ?
   `);
+  // Compteur requis créé automatiquement = required=1, mais present_actual /
+  // communicating à NULL (non répondu), PAS 0 : tant que l'auditeur n'a pas
+  // vérifié sur le terrain, on ne doit pas affirmer que le compteur est absent.
+  // On N'ÉCRIT PAS de note : le champ `notes` est réservé aux relevés de
+  // l'auditeur. L'identité du compteur (type / usage / zone) est déjà portée
+  // par ses colonnes ; une description auto s'afficherait à tort comme une
+  // « note relevée par l'auditeur » dans le PDF.
   const insZonal = db.db.prepare(`
     INSERT INTO bacs_audit_meters
-      (document_id, zone_id, usage, meter_type, required, present_actual, communicating, notes)
-    VALUES (?, ?, ?, ?, 1, 0, 0, ?)
+      (document_id, zone_id, usage, meter_type, required, present_actual, communicating)
+    VALUES (?, ?, ?, ?, 1, NULL, NULL)
   `);
   const insGeneral = db.db.prepare(`
     INSERT INTO bacs_audit_meters
-      (document_id, zone_id, usage, meter_type, required, present_actual, communicating, notes)
-    VALUES (?, NULL, 'other', ?, 1, 0, 0, ?)
+      (document_id, zone_id, usage, meter_type, required, present_actual, communicating)
+    VALUES (?, NULL, 'other', ?, 1, NULL, NULL)
   `);
 
   // Recupere tous les devices avec leur zone parent. is_bacs = 1 : les
@@ -1134,10 +1141,8 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     if (findExistingZonal.get(documentId, d.zone_id, usage, meterType)) continue;
     const typeFr = METER_TYPE_FR[meterType] || meterType;
     const usageFr = USAGE_FR[usage] || usage;
-    insZonal.run(
-      documentId, d.zone_id, usage, meterType,
-      `Compteur ${typeFr} en zone « ${d.zone_name || '?'} » (${usageFr})`,
-    );
+    void typeFr; void usageFr; // (libellés conservés pour d'éventuels logs)
+    insZonal.run(documentId, d.zone_id, usage, meterType);
     inserted++;
   }
 
@@ -1149,7 +1154,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   if (devices.length > 0) {
     targetKeys.add(keyGeneral('other', 'electric'));
     if (!findExistingGeneral.get(documentId, 'other', 'electric')) {
-      insGeneral.run(documentId, 'electric', 'Compteur général électrique du bâtiment');
+      insGeneral.run(documentId, 'electric');
       inserted++;
     }
   }
@@ -1158,7 +1163,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     if (!map) continue;
     targetKeys.add(keyGeneral('other', map.meter_type));
     if (findExistingGeneral.get(documentId, 'other', map.meter_type)) continue;
-    insGeneral.run(documentId, map.meter_type, map.notes);
+    insGeneral.run(documentId, map.meter_type);
     inserted++;
   }
 
@@ -1189,13 +1194,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     // ulterieurement generait deja ce meme compteur (idempotent).
     targetKeys.add(key);
     if (findExistingZonal.get(documentId, s.zone_id, usage, meterType)) continue;
-    const zoneName = db.db.prepare('SELECT name FROM zones WHERE id = ?').get(s.zone_id)?.name || '?';
-    const typeFr = METER_TYPE_FR[meterType];
-    const usageFr = USAGE_FR[usage] || usage;
-    insZonal.run(
-      documentId, s.zone_id, usage, meterType,
-      `Compteur ${typeFr} en zone « ${zoneName} » (${usageFr}) — fallback système présent sans device saisi`,
-    );
+    insZonal.run(documentId, s.zone_id, usage, meterType);
     inserted++;
   }
 
@@ -1236,12 +1235,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     const key = keyZonal(s.zone_id, usage, meterType);
     targetKeys.add(key);
     if (findExistingZonal.get(documentId, s.zone_id, usage, meterType)) continue;
-    const zoneName = db.db.prepare('SELECT name FROM zones WHERE id = ?').get(s.zone_id)?.name || '?';
-    const usageFr = USAGE_FR[usage] || usage;
-    insZonal.run(
-      documentId, s.zone_id, usage, meterType,
-      `Compteur thermique zonal en zone « ${zoneName} » (${usageFr}) — équipement alimenté par production distante, comptage BTU sur retour`,
-    );
+    insZonal.run(documentId, s.zone_id, usage, meterType);
     inserted++;
   }
 

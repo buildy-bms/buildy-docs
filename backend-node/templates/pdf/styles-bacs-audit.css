@@ -669,6 +669,27 @@ h1, h2, h3, h4, h5 {
   color: var(--neutral-600);
   line-height: 1.4;
 }
+/* Intitulé « Ce que le décret exige » avant le résumé : évite qu'un lecteur
+   non-technique lise l'exigence (phrase affirmative) comme un constat sur son
+   site, alors qu'un verdict rouge/orange peut la contredire juste à droite. */
+.r175-row-req-eyebrow {
+  display: block;
+  font-size: 5.6pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neutral-400, #9ca3af);
+  margin-bottom: 0.3mm;
+}
+/* Lien vers le texte officiel de l'article (Légifrance) — chaque exigence du
+   tableau de bord renvoie au décret. Discret, sans souligné. */
+.r175-row-legifrance {
+  display: inline-block;
+  margin-top: 0.4mm;
+  font-size: 6.6pt;
+  color: #4f628c;
+  text-decoration: none;
+}
 .r175-row-verdict {
   display: inline-flex;
   align-items: center;
@@ -1155,11 +1176,52 @@ table .total-row td {
 }
 .bms-devices-table tbody td.bms-col-name strong { color: #1b2842; font-weight: 600; }
 .bms-devices-table tbody td .muted { color: #6b7280; font-size: 6.5pt; }
+/* Le tiret « — » (bool-na) hérite sinon du 10pt gras global : on l'aligne sur
+   l'échelle de la table pour rester cohérent avec les pilules et le texte. */
+.bms-devices-table tbody td .bool-na { font-size: 7.5pt; font-weight: 400; }
 .bms-devices-table tbody tr:last-child td { border-bottom: none; }
 .bms-devices-table tbody tr:nth-child(odd) td { background: #fafbfc; }
 .bms-col-pwr { text-align: right; white-space: nowrap; font-weight: 600; color: #1b2842; }
 .bms-col-roles { white-space: nowrap; }
 .bms-col-usage, .bms-col-loc { white-space: nowrap; }
+/* Tableau unique « intégration GTB » : ligne-séparateur de zone dans le tbody
+   (en-têtes de colonnes non répétés) + colonne « Intégré ? » Oui/Non. */
+.bms-devices-table tbody tr.bms-zone-row td {
+  background: #eef2f7;
+  color: #1b2842;
+  font-weight: 600;
+  font-size: 7.5pt;
+  letter-spacing: 0.03em;
+  text-align: left;
+  padding: 1.8mm 2mm 1mm;
+  border-bottom: 0.3pt solid #e5e7eb;
+}
+.bms-col-int { white-space: nowrap; text-align: center; width: 24mm; }
+/* En-tête de groupe ÉNERGIE dans le tableau compteurs (icône colorée + label),
+   même logique visuelle que la card comptage de l'UI. */
+.bms-devices-table tbody tr.bms-energy-row td {
+  background: #f9fafb;
+  padding: 1.6mm 2mm 1mm;
+  border-bottom: 0.3pt solid #e5e7eb;
+  text-align: left;
+}
+.bms-energy-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.2mm;
+  height: 4.2mm;
+  border-radius: 1mm;
+  vertical-align: middle;
+  margin-right: 1.5mm;
+}
+.bms-energy-label {
+  font-weight: 600;
+  font-size: 7.5pt;
+  color: #1b2842;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
 /* Variante « à intégrer » : tonalité ambrée pour signaler le gap. */
 .bms-devices-table-gap thead th.bms-devices-zone { background: #fff7ed; color: #9a3412; }
 
@@ -1527,6 +1589,18 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
 .article-body strong { color: #1b2842; font-weight: 600; }
 .article-body ul, .article-body ol { padding-left: 6mm; margin: 1.5mm 0; }
 .article-body li { margin: 0.5mm 0; }
+/* Traçabilite : version du decret + lien Legifrance imprime en toutes lettres
+   (lisible sur papier, cliquable a l'ecran). */
+.article-source {
+  margin: 2.5mm 0 0;
+  padding-top: 1.5mm;
+  border-top: 0.3mm solid #e5e7eb;
+  font-size: 7pt;
+  color: #6b7280;
+  line-height: 1.35;
+  word-break: break-all;
+}
+.article-source a { color: #4f628c; text-decoration: none; }
 
 /* ── Cartes methodologie (Annexe B) ───────────────────────────────
    Pendant des article-card mais ton plus pose / methodologique. */
@@ -1951,6 +2025,19 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   font-weight: 600;
   letter-spacing: 0.01em;
 }
+/* Justification légale partagée d'une carte groupée (le POURQUOI du décret),
+   affichée au-dessus du tableau des N actions — parité avec le Constat des
+   cartes individuelles. Encadré discret pour se distinguer du tableau. */
+.action-group-justif {
+  font-size: 6.4pt;
+  color: #3f4a5a;
+  line-height: 1.55;
+  margin: 0 0 1.8mm;
+  padding: 1.6mm 2mm;
+  background: #f8fafc;
+  border-left: 1.2pt solid #cbd5e1;
+  border-radius: 0 1mm 1mm 0;
+}
 .action-card-desc {
   font-size: 6.3pt;
   color: #4b5563;
@@ -2192,12 +2279,25 @@ table.action-group-table td.agt-num {
   background: #f1f5f9;
   border-left: 2.5pt solid #1b2842;
 }
+/* Glose d'ouverture de chapitre (définition d'un acronyme pour non-techniciens). */
+.chapter-intro {
+  font-size: 8pt;
+  line-height: 1.5;
+  color: #4b5563;
+  margin: 0 0 3mm;
+}
 .info-card-label {
   font-size: 6.8pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #6b7280;
+}
+.info-card-label-hint {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #9ca3af;
 }
 .info-card-value {
   font-size: 10pt;
@@ -2872,20 +2972,39 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .thermal-meta-item { display: inline-flex; align-items: center; gap: 1mm; }
 .thermal-meta-label { color: #6b7280; }
 .thermal-notes-global { margin-top: 1.8mm; font-size: 8pt; color: #374151; }
-.thermal-levels { display: flex; flex-direction: column; }
+/* Chaîne thermique en 3 sous-cards distinctes (Production → Distribution →
+   Émission), chacune avec un accent coloré et un badge de niveau, pour qu'un
+   lecteur non-technicien distingue nettement les 3 étages. */
+.thermal-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 2mm;
+  padding: 2.5mm 3mm 3mm;
+}
 .thermal-level {
-  padding: 2mm 3mm;
-  border-top: 0.3pt solid #f3f4f6;
+  padding: 2mm 2.5mm;
+  border: 0.3pt solid #e5e7eb;
+  border-left-width: 1.4pt;
+  border-radius: 1.5mm;
+  background: #fcfcfd;
 }
-.thermal-level:first-child { border-top: 0; }
-.thermal-level-head { margin-bottom: 1mm; }
-.thermal-level-label {
-  font-size: 8pt;
-  font-weight: 600;
+.thermal-level-head { margin-bottom: 1.4mm; }
+.thermal-level-badge {
+  display: inline-block;
+  font-size: 6.6pt;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.4pt;
-  color: #1b2842;
+  letter-spacing: 0.5pt;
+  padding: 0.6mm 2mm;
+  border-radius: 1mm;
 }
+/* Accents par niveau : Production (amber) → Distribution (sky) → Émission (violet). */
+.thermal-level-production   { border-left-color: #d97706; }
+.thermal-level-production   .thermal-level-badge { background: #fef3c7; color: #92400e; }
+.thermal-level-distribution { border-left-color: #0284c7; }
+.thermal-level-distribution .thermal-level-badge { background: #e0f2fe; color: #075985; }
+.thermal-level-emission     { border-left-color: #7c3aed; }
+.thermal-level-emission     .thermal-level-badge { background: #ede9fe; color: #5b21b6; }
 .thermal-level-body {
   display: flex;
   flex-wrap: wrap;
@@ -3242,6 +3361,17 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .energy-stat-present { color: #047857; font-weight: 600; }
 .energy-stat-missing { color: #b91c1c; font-weight: 600; }
 .energy-stat-unanswered { color: #b45309; font-weight: 600; }
+.meter-col-legend {
+  font-size: 6.6pt;
+  line-height: 1.5;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 0.3pt solid #eef2f7;
+  border-radius: 1.5mm;
+  padding: 1.6mm 2.5mm;
+  margin: 0 0 3mm;
+}
+.meter-col-legend strong { color: #374151; font-weight: 600; }
 .energy-section-table {
   width: 100%;
   border-collapse: separate;
@@ -3253,6 +3383,15 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   padding: 1.2mm 2mm;
   border-bottom: 0.3pt solid #f3f4f6;
 }
+/* Cohérence typographique : sans ces règles, le texte brut des cellules
+   (« Local TGBT », protocoles) hérite du 8pt de la règle globale `table td`
+   et le tiret « — » du 10pt gras de `.bool-na`, créant des tailles disparates
+   à côté des pilules. On aligne tout le contenu textuel sur l'échelle
+   déclarée de la table (7.5pt, poids normal). */
+.energy-section-table td { font-size: 7.5pt; }
+.energy-section-table td .bool-na { font-size: 7.5pt; font-weight: 400; }
+.energy-section-table .meter-protocols-cell,
+.energy-section-table .meter-protocols-cell .muted { font-size: 7.5pt; }
 .energy-section-table tbody tr:last-child td { border-bottom: none; }
 .energy-section-table thead th {
   background: #fafafa;

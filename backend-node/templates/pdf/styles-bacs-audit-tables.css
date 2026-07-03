@@ -203,6 +203,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 }
 .check-ok { color: var(--verdict-ok); }
 .check-ko { color: var(--sev-blocking); }
+.check-na { color: #9ca3af; }
 .gtb-meta {
   font-size: 7pt;
   color: var(--neutral-500);

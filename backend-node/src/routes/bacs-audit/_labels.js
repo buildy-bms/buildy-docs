@@ -35,7 +35,10 @@ const COMM_LABEL = {
   bacnet_mstp: 'BACnet MS/TP',
   knx: 'KNX',
   mbus: 'M-Bus',
+  lonworks: 'LonWorks',
   mqtt: 'MQTT',
+  opcua: 'OPC-UA',
+  rest: 'API REST',
   lorawan: 'LoRaWAN',
   autre: 'Autre',
   non_communicant: 'Non communicant',
@@ -98,10 +101,10 @@ const GENERATOR_LABEL = {
 };
 
 const APPLICABILITY_LABEL = {
-  subject_immediate: 'Immédiate (bâtiment > 290 kW déjà existant)',
-  subject_2025: '1er janvier 2025 (puissance > 290 kW)',
-  subject_2030: '1er janvier 2030 (puissance entre 70 et 290 kW)',
-  not_subject: 'Non assujetti (puissance < 70 kW)',
+  subject_immediate: 'Dès la mise en service (bâtiment neuf, tous systèmes reliés)',
+  subject_2025: '1er janvier 2025 (puissance > 290 kW, existant)',
+  subject_2030: '1er janvier 2030 (puissance > 70 kW, au renouvellement)',
+  not_subject: 'Non assujetti (puissance ≤ 70 kW)',
 };
 
 const COMPLIANCE_LABEL = {

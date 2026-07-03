@@ -16,8 +16,9 @@ const COVERAGE_ENERGY_ORDER = [
 ];
 
 const COVERAGE_USAGE_ICONS = {
-  heating:  { icon: 'fire',            color: '#dc2626' },
-  cooling:  { icon: 'snowflake',       color: '#0ea5e9' },
+  heating:     { icon: 'fire',         color: '#dc2626' },
+  cooling:     { icon: 'snowflake',    color: '#0ea5e9' },
+  ventilation: { icon: 'fan',          color: '#0f766e' },
   dhw:      { icon: 'faucet-drip',     color: '#0891b2' },
   pv:       { icon: 'solar-panel',     color: '#facc15' },
   lighting: { icon: 'lightbulb',       color: '#eab308' },

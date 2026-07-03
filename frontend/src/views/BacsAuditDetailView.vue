@@ -202,7 +202,7 @@ const newZone = ref({ name: '', nature: null, surface_m2: null })
 // Compteurs (R175-3 1°)
 const METER_USAGES = [
   { value: 'heating', label: 'Chauffage' },
-  { value: 'cooling', label: 'Climatisation' },
+  { value: 'cooling', label: 'Refroidissement' },
   { value: 'ventilation', label: 'Ventilation' },
   { value: 'dhw', label: 'ECS' },
   { value: 'pv', label: 'Production PV' },
