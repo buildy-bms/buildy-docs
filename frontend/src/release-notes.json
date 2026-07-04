@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.243",
+      "date": "2026-07-04",
+      "title": "Fiabilité : la base réglementaire est rafraîchie à chaque mise à jour serveur",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Texte du décret et échéances toujours à jour après déploiement",
+          "what": "Le texte officiel du décret R175 (articles, échéances 2025 / 2030, seuils, FAQ et guides) est stocké en base et n'était pas rafraîchi par une simple mise à jour du code. Le script de déploiement relance désormais automatiquement l'ingestion de cette base réglementaire à chaque mise à jour serveur (opération idempotente et non bloquante) — l'échéance de conformité à 2030 (report acté au Journal officiel du 26 décembre 2025) est ainsi garantie en production."
+        }
+      ]
+    },
+    {
       "version": "0.1.242",
       "date": "2026-07-03",
       "title": "Rapport de conformité BACS : parité PDF ↔ interface et lisibilité pour non-techniciens",
