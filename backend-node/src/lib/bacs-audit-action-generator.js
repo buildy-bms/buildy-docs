@@ -322,20 +322,31 @@ function computeTargetActions(documentId) {
       // Structure description : sections "Titre\nContenu" separees par
       // \n\n. ActionDescription.vue / stripActionTags() rendent les titres
       // en sous-titres distinctifs.
-      // Pas de bloc « Equipement actif concerne » : la card systeme dans
-      // l'audit liste deja les equipements en detail, le repeter ici dans
-      // chaque action est redondant.
+      // On NOMME les équipements concernés (les vrais porteurs de la
+      // communication) plutôt que le système abstrait, et on résout
+      // CONCRÈTEMENT les émetteurs passifs exclus (retour Kévin 2026-07-04) :
+      // le décret parle de « systèmes interopérables », mais ce sont les
+      // équipements qui communiquent ou non — l'utilisateur doit voir lesquels.
+      const targets = relevantActive; // le système entier échoue → tous les pertinents sont visés
+      const targetTags = targets.map(d => `{{device:${d.id}}}`).join(', ');
+      const isPlural = targets.length > 1;
+      const passiveEmitters = sysDevices.filter(d =>
+        !isTrue(d.out_of_service) && !isInteropRelevant(d) && deviceRoleArr(d).includes('emission'));
+      const passiveTags = passiveEmitters.map(d => `{{device:${d.id}}}`).join(', ');
+      const lectureBuildy = passiveEmitters.length
+        ? `Lecture Buildy du décret\nDans ce système, ${passiveTags} ${passiveEmitters.length > 1 ? 'sont des émetteurs passifs' : 'est un émetteur passif'} sans interface de communication (radiateur simple, ventilo-convecteur passif, vanne thermostatique mécanique…) : R175-3 §3 ne ${passiveEmitters.length > 1 ? 'les' : 'le'} vise pas. L'action ne porte donc que sur ${targetTags}.`
+        : `Lecture Buildy du décret\nL'exigence porte sur ${targetTags} parce ${isPlural ? "qu'ils portent" : "qu'il porte"} une régulation active censée dialoguer avec la GTB — ce n'est pas l'émission de chaleur/froid en elle-même qui est visée. Un émetteur purement passif (radiateur simple sans interface, ventilo-convecteur passif, vanne thermostatique mécanique) ne serait, lui, pas concerné par R175-3 §3.`;
       addTarget({
         source_system_id: s.id, source_subtype: 'system_not_interoperable',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §3',
-        title: `Raccorder {{system:${s.id}}} au BACS`,
+        title: `Raccorder au BACS : ${targetTags}`,
         description: [
           // Décret en tête — seule source opposable.
           `Décret R175-3 §3\n« [Les systèmes d'automatisation et de contrôle des bâtiments] sont interopérables avec les différents systèmes techniques du bâtiment. »`,
-          `Constat\nAucune communication n'est possible aujourd'hui entre {{system:${s.id}}} et la GTB.`,
-          `Recommandation Buildy pour la conformité\nÉtablir une communication entre {{system:${s.id}}} et la GTB. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle de communication (un petit boîtier qui fait dialoguer l'équipement avec la supervision) sur le composant qui porte la régulation centrale.`,
-          `Lecture Buildy du décret\nLes émetteurs passifs sans interface technique (radiateurs simples, ventilo-convecteurs passifs) et la régulation d'émission autonome (vanne thermostatique mécanique, thermostat de zone) ne sont pas concernés par l'exigence d'interopérabilité R175-3 §3. L'action ne porte pas sur eux.`,
+          `Constat\nDans {{system:${s.id}}}, ${isPlural ? 'les équipements suivants ne communiquent pas' : "l'équipement suivant ne communique pas"} avec la GTB : ${targetTags}.`,
+          `Recommandation Buildy pour la conformité\nÉtablir une communication entre ${targetTags} et la GTB. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle de communication (un petit boîtier qui fait dialoguer l'équipement avec la supervision).`,
+          lectureBuildy,
         ].join('\n\n'),
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });
