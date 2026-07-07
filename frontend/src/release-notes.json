@@ -2,6 +2,19 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.249",
+      "date": "2026-07-04",
+      "title": "Protocoles de mise à disposition : tous affichés",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le champ protocoles affiche plusieurs protocoles au lieu d'un seul + « +1 »",
+          "what": "Le sélecteur « Protocoles de mise à disposition des points » (card GTB) n'affichait que le premier protocole et un badge « +N », alors qu'il y a largement la place. Il affiche désormais jusqu'à 6 protocoles en pilules (avec retour à la ligne si besoin), et un badge « +N » seulement au-delà.",
+          "where": "Détail d'un audit → card GTB → « Protocoles de mise à disposition des points »."
+        }
+      ]
+    },
+    {
       "version": "0.1.248",
       "date": "2026-07-04",
       "title": "Validation « Régulation » : plus de blocage par des régulations fantômes",
