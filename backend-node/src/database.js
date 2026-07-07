@@ -7607,10 +7607,25 @@ function runMigrations() {
     } finally {
       db.unsafeMode(false);
     }
-    // Contrôle d'intégrité après édition directe du schéma.
+    // Contrôle d'intégrité après édition directe du schéma. On TOLÈRE les
+    // avertissements bénins « Page N: never used » (pages libres non listées
+    // dans la freelist) : fréquents sur une DB live longue durée, sans rapport
+    // avec notre édition de schéma et sans risque pour les données (un VACUUM
+    // les nettoie). On ne bloque la migration que sur une VRAIE anomalie.
+    // Incident prod 2026-07-04 : la DB live avait ces pages libres → la
+    // migration crashait en boucle alors que la copie dev (VACUUM'ée) passait.
     const ic = db.pragma('integrity_check', { simple: true });
+    const icIssues = String(ic).split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .filter(l => l !== 'ok'
+        && !/^\*\*\* in database /.test(l)          // ligne d'en-tête, pas une erreur
+        && !/^Page \d+: never used$/.test(l));       // page libre non listée = bénin
+    if (icIssues.length) {
+      throw new Error(`Migration 200 : integrity_check a échoué (${icIssues.join(' | ')}) après passage nullable de present_actual/communicating`);
+    }
     if (ic !== 'ok') {
-      throw new Error(`Migration 200 : integrity_check a échoué (${ic}) après passage nullable de present_actual/communicating`);
+      log.warn(`Migration 200 : integrity_check signale des pages libres non listées (bénin, VACUUM recommandé) — migration poursuivie.`);
     }
     db.pragma('user_version = 200');
     log.info('Migration 200 appliquee : bacs_audit_meters.present_actual / communicating rendus NULLABLE (ternaire strict)');
