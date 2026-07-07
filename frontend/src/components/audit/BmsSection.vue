@@ -144,8 +144,15 @@ const anyUsageManaged = computed(() => !!bms.value && (
   bms.value.manages_ventilation || bms.value.manages_dhw ||
   bms.value.manages_lighting
 ))
+// Périmètre GTB par équipement : défaut = usage (gtbManagesCategory), surchargé
+// par gtb_scope_override (1/true = forcé dans, 0/false = forcé hors, null = usage).
+const gtbInScope = (d) => {
+  if (d.gtb_scope_override === 1 || d.gtb_scope_override === true) return true
+  if (d.gtb_scope_override === 0 || d.gtb_scope_override === false) return false
+  return gtbManagesCategory(d.system_category)
+}
 const filteredDevices = computed(() =>
-  props.devicesWithMeta.filter(d => gtbManagesCategory(d.system_category)))
+  props.devicesWithMeta.filter(gtbInScope))
 const filteredMeters = computed(() =>
   props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage)))
 

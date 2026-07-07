@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 200;
+const TARGET_VERSION = 201;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7629,6 +7629,21 @@ function runMigrations() {
     }
     db.pragma('user_version = 200');
     log.info('Migration 200 appliquee : bacs_audit_meters.present_actual / communicating rendus NULLABLE (ternaire strict)');
+  }
+
+  if (current < 201) {
+    // Migration 201 — Exception PAR ÉQUIPEMENT du périmètre GTB (0.1.250).
+    // Le périmètre d'intégration GTB est déterminé par usage (bms.manages_*).
+    // Ce champ permet de SURCHARGER ce défaut sur un équipement précis :
+    //   - NULL → suit l'usage (comportement par défaut)
+    //   - 1    → forcé DANS le périmètre GTB (même si l'usage n'est pas coché)
+    //   - 0    → forcé HORS périmètre GTB (même si l'usage est coché)
+    // Aligne le scope sur le décret (qui vise les équipements, pas des usages
+    // abstraits) sans obliger à flaguer chaque équipement.
+    try { db.exec(`ALTER TABLE bacs_audit_system_devices ADD COLUMN gtb_scope_override INTEGER`); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    log.info('Migration 201 appliquee : bacs_audit_system_devices.gtb_scope_override (exception perimetre GTB par equipement)');
+    db.pragma('user_version = 201');
   }
 
   if (current > TARGET_VERSION) {

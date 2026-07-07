@@ -1535,6 +1535,10 @@ async function routes(fastify) {
       meets_r175_3_p4: z.boolean().nullable().optional(),
       meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
+      // Mig 201 : exception PAR ÉQUIPEMENT du périmètre GTB (surcharge le
+      // défaut par usage). null = suit l'usage ; true = forcé DANS le
+      // périmètre ; false = forcé HORS périmètre. Booléen → 1/0/null en DB.
+      gtb_scope_override: z.boolean().nullable().optional(),
       out_of_service: z.boolean().nullable().optional(),
       bms_integration_out_of_service: z.boolean().nullable().optional(),
       // Mig 134 : nombre d'exemplaires identiques de ce device sur la zone.

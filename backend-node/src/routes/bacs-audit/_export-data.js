@@ -680,7 +680,15 @@ async function buildBacsAuditExportData(af, opts = {}) {
       default: return false;
     }
   };
-  const gtbScopedDevices = devices.filter(d => gtbManagesCategory(d.system_category));
+  // Périmètre GTB par ÉQUIPEMENT : le défaut suit l'usage (gtbManagesCategory),
+  // mais gtb_scope_override le surcharge sur un équipement précis
+  // (1 = forcé dans le périmètre, 0 = forcé hors périmètre, null = défaut usage).
+  const gtbInScope = (d) => {
+    if (d.gtb_scope_override === 1) return true;
+    if (d.gtb_scope_override === 0) return false;
+    return gtbManagesCategory(d.system_category);
+  };
+  const gtbScopedDevices = devices.filter(gtbInScope);
   const bmsManagedDevices = gtbScopedDevices.filter(d => isTrue(d.managed_by_bms)).map(withCatLabel);
   const bmsUnmanagedDevices = gtbScopedDevices.filter(d => isFalse(d.managed_by_bms) && !isTrue(d.out_of_service)).map(withCatLabel);
   const bmsUnansweredDevices = gtbScopedDevices.filter(d => d.managed_by_bms == null && !isTrue(d.out_of_service)).map(withCatLabel);
