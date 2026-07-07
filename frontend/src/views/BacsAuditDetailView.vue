@@ -1119,11 +1119,16 @@ async function recomputePowerFromEquipments() {
     // Cf retour Kevin : la source de verite est l'audit, pas les equipments
     // du site qui sont une autre table (peut-etre vide).
     const { data } = await getBacsPowerSummary(docId)
+    // R175-2 : on retient la PUISSANCE RETENUE (max chaud/froid, émetteurs
+    // déjà comptés sur leur production amont EXCLUS), pas la somme brute
+    // chauffage+climatisation — sinon on gonfle la puissance (ex. audit #56 :
+    // 2025 kW brut vs 941,5 kW retenus, l'aérotherme émetteur compté à tort).
+    const retained = data.power_summary?.autoKw ?? data.power_summary?.retainedKw ?? data.heating_cooling_total_kw
     saveDocDebounced({
-      bacs_total_power_kw: data.heating_cooling_total_kw,
+      bacs_total_power_kw: retained,
       bacs_total_power_source: 'auto',
     })
-    success(`Puissance recalculée : ${data.heating_cooling_total_kw} kW (chauffage + climatisation)`)
+    success(`Puissance retenue R175-2 recalculée : ${retained} kW (max chaud/froid, hors émetteurs déjà comptés en amont)`)
   } catch (e) {
     error(e.response?.data?.detail || 'Calcul de puissance impossible')
   }

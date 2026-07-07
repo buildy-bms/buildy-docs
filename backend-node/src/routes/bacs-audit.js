@@ -1755,7 +1755,7 @@ async function routes(fastify) {
       ORDER BY s.system_category, z.name, d.position, d.id
     `).all(id);
     // Items 5 + 8 — cumul automatique différencié chaud / froid.
-    const { computeAutoPower, resolveTotalPower } = require('../lib/bacs-audit-power');
+    const { computeAutoPower, resolveTotalPower, POWER_EXCLUSION_REASON_LABEL } = require('../lib/bacs-audit-power');
     const allDevices = db.db.prepare(`
       SELECT d.*, s.system_category, t.slug AS equipment_template_slug
       FROM bacs_audit_system_devices d
@@ -1766,6 +1766,15 @@ async function routes(fastify) {
     const af = db.afs.getById(id);
     const autoPower = computeAutoPower(allDevices);
     const powerSummary = resolveTotalPower(af, autoPower);
+    // Enrichit le détail avec le statut R175-2 de chaque équipement : un
+    // émetteur (aérotherme, radiateur…) est HORS CUMUL car sa puissance est
+    // déjà comptée sur sa production amont. Aligne l'UI sur le panneau PDF.
+    const powerByDevice = new Map(autoPower.devices.map(d => [d.id, d._power]));
+    for (const b of breakdown) {
+      const pc = powerByDevice.get(b.id);
+      b.in_scope = pc ? !!pc.inScope : true;
+      b.exclusion_reason_label = pc && pc.reason ? (POWER_EXCLUSION_REASON_LABEL[pc.reason] || null) : null;
+    }
     return {
       by_category: byCategory,
       heating_cooling_total_kw: heatingCooling,

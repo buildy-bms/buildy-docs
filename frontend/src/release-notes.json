@@ -2,6 +2,25 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.245",
+      "date": "2026-07-04",
+      "title": "Puissance R175-2 : « Auto-calculer » retient la bonne valeur (émetteurs exclus)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "« Auto-calculer » n'additionne plus les émetteurs déjà comptés",
+          "what": "Le bouton « Auto-calculer » de la puissance chauffage/climatisation enregistrait la somme brute de tous les équipements — en comptant deux fois les émetteurs (aérothermes, radiateurs…) dont la puissance est déjà portée par leur production amont, et en additionnant chaud + froid. Il enregistre désormais la puissance retenue au sens du décret : le maximum entre le cumul chaud et le cumul froid, émetteurs exclus. Exemple audit CLR : 2025 kW affichés à tort → 941,5 kW réels.",
+          "where": "Onglet Identification → champ « Puissance nominale utile », bouton « Auto-calculer ».",
+          "how_to_test": "Sur un audit avec des émetteurs (aérothermes) et une production (chaudière), cliquer « Auto-calculer » : la valeur retenue exclut les émetteurs et prend le max chaud/froid."
+        },
+        {
+          "kind": "ux",
+          "title": "Le détail du calcul distingue les équipements hors cumul",
+          "what": "Le détail déplié grise les équipements exclus du cumul (émetteurs, secours…) avec la raison, et affiche « Puissance retenue R175-2 (max chaud/froid, émetteurs exclus) » au lieu d'un total brut trompeur — cohérent avec le rapport PDF."
+        }
+      ]
+    },
+    {
       "version": "0.1.244",
       "date": "2026-07-04",
       "title": "Correctif : migration base tolérante aux pages libres bénignes",
