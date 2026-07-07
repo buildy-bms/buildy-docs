@@ -133,16 +133,18 @@ const buttonCls = computed(() => {
       @click="open ? (open = false) : openPopover()"
     >
       <span v-if="!selected.length" class="text-gray-400 italic flex-1 text-left">{{ placeholder }}</span>
-      <span v-else class="flex items-center gap-1 flex-1 text-left whitespace-nowrap">
-        <!-- 1er protocole en pill, "+N" badge si d'autres existent. Click
-             sur le bouton ouvre le popover qui les liste tous. -->
-        <span class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200">
-          {{ selectedLabels[0] }}
+      <span v-else class="flex items-center gap-1 flex-1 text-left flex-wrap">
+        <!-- On affiche jusqu'à 6 protocoles en pilules (il y a la place), et
+             un badge "+N" seulement au-delà. Click sur le bouton ouvre le
+             popover qui les liste tous. -->
+        <span v-for="(lbl, i) in selectedLabels.slice(0, 6)" :key="i"
+              class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200 whitespace-nowrap">
+          {{ lbl }}
         </span>
-        <span v-if="selectedLabels.length > 1"
+        <span v-if="selectedLabels.length > 6"
               class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200"
-              :title="selectedLabels.slice(1).join(', ')">
-          +{{ selectedLabels.length - 1 }}
+              :title="selectedLabels.slice(6).join(', ')">
+          +{{ selectedLabels.length - 6 }}
         </span>
       </span>
       <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 shrink-0"
