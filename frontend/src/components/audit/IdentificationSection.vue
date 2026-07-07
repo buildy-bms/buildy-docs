@@ -116,20 +116,21 @@ const showPowerDetail = ref(false)
           <div v-if="showPowerDetail && powerSummary?.heating_cooling_breakdown?.length"
                class="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-2 text-[11px] text-gray-600">
             <ul class="space-y-0.5 font-mono">
-              <li v-for="d in powerSummary.heating_cooling_breakdown" :key="d.id" class="flex justify-between gap-2">
+              <li v-for="d in powerSummary.heating_cooling_breakdown" :key="d.id"
+                  :class="['flex justify-between gap-2', d.in_scope === false ? 'opacity-50' : '']">
                 <span class="truncate">
                   <span :class="d.system_category === 'heating' ? 'text-orange-600' : 'text-cyan-600'">●</span>
-                  {{ d.name || (d.brand ? d.brand : '—') }}<span class="text-gray-400"> ({{ d.zone_name || '—' }})</span>
+                  {{ d.name || (d.brand ? d.brand : '—') }}<span class="text-gray-400"> ({{ d.zone_name || '—' }})</span><span v-if="d.in_scope === false" class="text-gray-400"> · hors cumul<template v-if="d.exclusion_reason_label"> ({{ d.exclusion_reason_label }})</template></span>
                 </span>
-                <span class="font-semibold whitespace-nowrap">
+                <span :class="['font-semibold whitespace-nowrap', d.in_scope === false ? 'line-through text-gray-400' : '']">
                   <template v-if="(d.quantity || 1) > 1">{{ d.quantity }} × {{ d.power_kw }} = {{ Math.round((Number(d.power_kw) || 0) * d.quantity * 10) / 10 }} kW</template>
                   <template v-else>{{ d.power_kw }} kW</template>
                 </span>
               </li>
             </ul>
             <p class="mt-1 pt-1 border-t border-gray-200 flex justify-between font-semibold">
-              <span>Total chauffage + climatisation :</span>
-              <span class="font-mono">{{ powerSummary.heating_cooling_total_kw }} kW</span>
+              <span>Puissance retenue R175-2 <span class="font-normal text-gray-400">(max chaud/froid, émetteurs exclus)</span> :</span>
+              <span class="font-mono">{{ powerSummary.power_summary?.retainedKw ?? powerSummary.heating_cooling_total_kw }} kW</span>
             </p>
           </div>
         </div>
