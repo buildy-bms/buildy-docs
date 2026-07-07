@@ -445,9 +445,11 @@ function buildComplianceSummary({
     }
     // Résumé contextualisé selon les saisies (pour donner du sens)
     let contextSummary = ex.summary;
-    if (ex.axis === 'r175_2' && applicabilityLabel) {
-      contextSummary = applicabilityLabel;
-    } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
+    // R175-2 : on NE remplace PAS le résumé par le statut — le résumé reste
+    // « ce que le décret exige » (déterminer l'assujettissement), et le STATUT
+    // réel (Assujetti / Non assujetti) est porté par la pilule verdict
+    // ci-dessous. Sinon la ligne affiche un statut sous l'intitulé « exigence ».
+    if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       contextSummary = `Non applicable — ${r175_6_applicable.reason}.`;
     } else if (ex.axis === 'r175_5_1' && isTrue(document.inspection_not_applicable)) {
       const inspReason = (document.inspection_not_applicable_reason || '').trim().replace(/\s+\.$/, '.');
@@ -474,13 +476,25 @@ function buildComplianceSummary({
     const buildy_readings = readingsForAxis(ex.axis).map(r => ({
       code: r.code, title: r.title, summary: r.summary,
     }));
+    // R175-2 : la pilule verdict porte le STATUT d'assujettissement réel
+    // (Assujetti / Non assujetti / Assujetti · 2030) au lieu du générique
+    // « Statut » — c'est le « où en est le site » de la ligne.
+    let verdictLabel = VERDICT_LABEL[v];
+    if (ex.axis === 'r175_2') {
+      const st = document.bacs_applicability_status;
+      verdictLabel =
+        (st === 'subject_immediate' || st === 'subject_2025') ? 'Assujetti'
+        : st === 'subject_2030' ? 'Assujetti · 2030'
+        : st === 'not_subject' ? 'Non assujetti'
+        : 'À déterminer';
+    }
     return {
       code: ex.code,
       axis: ex.axis,
       label: ex.label,
       summary: contextSummary,
       verdict: v,
-      verdictLabel: VERDICT_LABEL[v],
+      verdictLabel,
       verdictIcon: VERDICT_ICON[v],
       actionsCount: total,
       actionsBlocking: bucket.blocking,
