@@ -679,14 +679,19 @@ const STEP_DEFINITIONS = [
     label: 'Régulation',
     description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
     incomplete: () => {
-      if (thermal.value.length === 0) {
+      // On valide sur thermalFiltered (systèmes chauffage/refroidissement
+      // réellement PRÉSENTS, zones techniques exclues) — PAS thermal.value qui
+      // contient des lignes fantômes pour des couples zone×usage sans système
+      // (ex. Cellule 1 refroidissement, Chaufferie technique). Sinon l'étape
+      // est bloquée par des régulations qu'on ne montre même pas à l'auditeur.
+      if (thermalFiltered.value.length === 0) {
         return ["aucune régulation thermique R175-6 n'a été saisie"]
       }
       // Chaque ligne doit avoir au moins un équipement d'émission saisi
       // OU être déclarée exemptée (bois). Sinon le PDF générera des
       // actions « Régulation manquante » que l'auditeur ne s'attend pas
       // à voir, alors qu'il a validé l'étape.
-      const incomplete = thermal.value.filter(t =>
+      const incomplete = thermalFiltered.value.filter(t =>
         !t.emission_device_id && !t.generator_exempt_wood
       )
       if (incomplete.length === 0) return []
