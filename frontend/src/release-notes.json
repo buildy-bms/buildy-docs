@@ -2,6 +2,30 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.246",
+      "date": "2026-07-04",
+      "title": "Plan d'action R175-3 §3 : on nomme les équipements réellement concernés",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les actions d'interopérabilité pointent l'équipement, pas seulement le système",
+          "what": "Le décret parle de « systèmes techniques interopérables », mais ce sont les équipements qui communiquent ou non. Les actions R175-3 §3 nomment désormais explicitement le ou les équipements concernés (ex. « Raccorder au BACS : Convecteur électrique ») au lieu du système abstrait. Le lecteur voit précisément quoi raccorder.",
+          "where": "Plan de mise en conformité → actions « Raccorder au BACS » (R175-3 §3), UI et PDF.",
+          "how_to_test": "Régénérer le plan d'action d'un audit avec un équipement non communicant : l'action nomme cet équipement."
+        },
+        {
+          "kind": "ux",
+          "title": "« Lecture Buildy » résolue au cas par cas (émetteurs passifs)",
+          "what": "Au lieu d'un disclaimer générique sur les « radiateurs simples / ventilo-convecteurs passifs », l'action explique concrètement pourquoi CET équipement est concerné (il porte une régulation censée dialoguer avec la GTB), et nomme explicitement les émetteurs passifs exclus s'il y en a. Fini le doute « mes convecteurs sont-ils concernés ? »."
+        },
+        {
+          "kind": "fix",
+          "title": "Pilules alignées dans le texte du PDF",
+          "what": "Les pilules (zone, système, équipement) insérées dans le texte des actions sont désormais centrées verticalement sur la ligne, au lieu d'être légèrement décalées vers le haut."
+        }
+      ]
+    },
+    {
       "version": "0.1.245",
       "date": "2026-07-04",
       "title": "Puissance R175-2 : « Auto-calculer » retient la bonne valeur (émetteurs exclus)",
