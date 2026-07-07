@@ -43,6 +43,19 @@ const YESNO = [
   { value: true, label: 'Oui', tone: 'green' },
   { value: false, label: 'Non', tone: 'slate' },
 ]
+// Mig 201 — exception par équipement du périmètre GTB. null = suit l'usage
+// (« usages traités par la GTB »), true = forcé dans, false = forcé hors.
+const SCOPE_OPTIONS = [
+  { value: null,  label: 'Par défaut' },
+  { value: true,  label: 'Oui' },
+  { value: false, label: 'Non' },
+]
+const gtbScopeSel = computed(() => {
+  const v = props.device.gtb_scope_override
+  if (v === 1 || v === true) return true
+  if (v === 0 || v === false) return false
+  return null
+})
 // Régulation intégrée à l'équipement (true) vs portée par un module
 // déporté (false). Mig 183 — pilote l'affichage des champs régulateur.
 const REGULATION_PLACEMENT_OPTS = [
@@ -682,6 +695,23 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           </p>
         </div>
         <div class="border-t border-gray-100 px-3 py-3 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-sm flex-1">
+              <div class="font-medium text-gray-800">
+                Cet équipement est-il concerné par l'intégration à la GTB ?
+                <span class="font-normal text-gray-400 ml-1">· périmètre</span>
+              </div>
+              <div class="text-xs text-gray-500 mt-0.5">Par défaut, le périmètre suit les « usages traités par la GTB » (card GTB). Forcez « Oui » ou « Non » pour cet équipement précis (ex. exclure un émetteur passif, inclure un équipement d'un usage non coché).</div>
+            </div>
+            <div class="inline-flex rounded-md overflow-hidden border border-gray-200 shrink-0">
+              <button v-for="opt in SCOPE_OPTIONS" :key="String(opt.value)" type="button"
+                      @click="patch({ gtb_scope_override: opt.value })"
+                      :class="['px-2.5 py-1 text-xs whitespace-nowrap transition',
+                               gtbScopeSel === opt.value ? 'bg-indigo-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50']">
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">

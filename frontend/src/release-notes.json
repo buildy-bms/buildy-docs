@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.250",
+      "date": "2026-07-04",
+      "title": "Périmètre GTB : exception par équipement (au-delà du par-usage)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Forcer un équipement dans ou hors du périmètre GTB",
+          "what": "Le périmètre d'intégration à la GTB est déterminé par usage (« usages traités par la GTB »). On peut désormais surcharger ce défaut sur un équipement précis : dans la fiche équipement, le contrôle « Cet équipement est-il concerné par l'intégration à la GTB ? » propose « Par défaut » (suit l'usage), « Oui » (forcé dans le périmètre) ou « Non » (forcé hors). Aligne le périmètre sur le décret, qui vise les équipements interopérables et non des usages abstraits, sans obliger à flaguer chaque équipement.",
+          "where": "Détail d'un audit → card Systèmes → fiche équipement (Modifier) → section GTB.",
+          "how_to_test": "Ouvrir un équipement d'un usage traité par la GTB et le passer à « Non » : il disparaît des tableaux d'intégration GTB (UI + PDF). Un équipement d'un usage non traité passé à « Oui » y apparaît."
+        }
+      ]
+    },
+    {
       "version": "0.1.249",
       "date": "2026-07-04",
       "title": "Protocoles de mise à disposition : tous affichés",
