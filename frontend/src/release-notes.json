@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.248",
+      "date": "2026-07-04",
+      "title": "Validation « Régulation » : plus de blocage par des régulations fantômes",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "L'étape Régulation ne se bloque plus sur des couples zone×usage sans système",
+          "what": "La validation de l'étape « Régulation thermique » vérifiait toutes les lignes de régulation, y compris celles générées pour des couples zone×usage sans système réellement présent (ex. « Cellule 1 refroidissement », « Chaufferie chauffage » sur une zone technique) — pourtant masquées de l'affichage. Résultat : l'étape restait non validable pour des régulations qu'on ne montre même pas. La validation ne considère désormais que les régulations affichées (systèmes chauffage/refroidissement réellement présents, zones techniques exclues).",
+          "where": "Détail d'un audit → étape « Régulation » → bouton Valider.",
+          "how_to_test": "Sur un audit avec des systèmes chauffage/refroidissement absents dans certaines zones : l'étape Régulation se valide si toutes les régulations VISIBLES ont leur équipement d'émission."
+        }
+      ]
+    },
+    {
       "version": "0.1.247",
       "date": "2026-07-04",
       "title": "Tableau de bord : la ligne « Assujettissement » affiche un statut clair",
