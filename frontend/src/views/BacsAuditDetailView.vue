@@ -1123,7 +1123,10 @@ async function recomputePowerFromEquipments() {
     // déjà comptés sur leur production amont EXCLUS), pas la somme brute
     // chauffage+climatisation — sinon on gonfle la puissance (ex. audit #56 :
     // 2025 kW brut vs 941,5 kW retenus, l'aérotherme émetteur compté à tort).
-    const retained = data.power_summary?.autoKw ?? data.power_summary?.retainedKw ?? data.heating_cooling_total_kw
+    // `||` (pas `??`) : un 0 fortuit (état transitoire) ne doit pas écraser une
+    // puissance réelle — on retombe sur la source suivante. Un vrai 0 (aucun
+    // équipement) reste 0 par le dernier terme.
+    const retained = data.power_summary?.autoKw || data.power_summary?.retainedKw || data.heating_cooling_total_kw || 0
     saveDocDebounced({
       bacs_total_power_kw: retained,
       bacs_total_power_source: 'auto',

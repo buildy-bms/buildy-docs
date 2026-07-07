@@ -2,6 +2,25 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.247",
+      "date": "2026-07-04",
+      "title": "Tableau de bord : la ligne « Assujettissement » affiche un statut clair",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "La pilule de la ligne R175-2 indique le statut réel",
+          "what": "Sur le tableau de bord de conformité, la ligne « Assujettissement du bâtiment » affichait une pilule générique « Statut » et reprenait le statut dans le résumé (sous l'intitulé « ce que le décret exige »). Désormais : le résumé indique l'exigence (déterminer l'assujettissement), et la pilule affiche le statut réel — « Assujetti », « Assujetti · 2030 » ou « Non assujetti ».",
+          "where": "Rapport PDF → tableau de bord « Conformité par exigence », ligne R175-2.",
+          "how_to_test": "Ouvrir le PDF d'un audit assujetti : la ligne R175-2 affiche « Assujetti » (et non « Statut »)."
+        },
+        {
+          "kind": "fix",
+          "title": "« Auto-calculer » ne persiste plus un 0 fortuit",
+          "what": "Le recalcul de puissance retombe sur la source suivante si la valeur retenue ressort à 0 par un état transitoire, pour ne pas écraser une puissance réelle (qui ferait basculer le bâtiment à tort en « non assujetti »)."
+        }
+      ]
+    },
+    {
       "version": "0.1.246",
       "date": "2026-07-04",
       "title": "Plan d'action R175-3 §3 : on nomme les équipements réellement concernés",
