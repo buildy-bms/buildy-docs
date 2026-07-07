@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.251",
+      "date": "2026-07-04",
+      "title": "Correctif critique : la puissance ne retombe plus à 0 au recalcul",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La puissance retenue reste correcte après une modification d'équipement",
+          "what": "Le recalcul automatique de la puissance (déclenché à chaque modification d'équipement ou régénération du plan d'action) omettait le rôle des équipements dans sa requête. Résultat : tous les équipements étaient considérés « sans production » et exclus du cumul → la puissance retombait à 0 kW et le bâtiment était marqué « non assujetti » à tort. Corrigé : le rôle (et la quantité) sont désormais pris en compte, la puissance retenue est juste."
+        }
+      ]
+    },
+    {
       "version": "0.1.250",
       "date": "2026-07-04",
       "title": "Périmètre GTB : exception par équipement (au-delà du par-usage)",

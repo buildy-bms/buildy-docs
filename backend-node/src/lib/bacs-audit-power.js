@@ -299,9 +299,15 @@ function recomputeAndPersistAuditPower(db, documentId) {
   // Lis tous les devices in-scope de l'audit avec leur catégorie système +
   // le slug du modèle bibliothèque (pour que inferPowerCalculationType
   // puisse distinguer sous-station vs émetteur aval — refactor 2026-05-26).
+  // ⚠️ device_role ET quantity sont INDISPENSABLES : devicePowerContribution
+  // exclut tout équipement sans rôle Production (rolesAllowEnergySource) et
+  // multiplie la puissance par quantity. Les omettre = TOUS les équipements
+  // exclus → retenue 0 → bâtiment « non assujetti » à tort (incident #56/#45,
+  // 2026-07-04 : chaque recompute mettait la puissance à 0).
   const devices = db.prepare(`
     SELECT d.id, d.power_kw, d.power_kw_cooling, d.power_calculation_type,
            d.energy_source, d.is_backup, d.out_of_service,
+           d.device_role, d.quantity,
            s.system_category, t.slug AS equipment_template_slug
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
