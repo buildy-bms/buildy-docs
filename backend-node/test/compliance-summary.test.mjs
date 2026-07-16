@@ -154,6 +154,9 @@ describe('nouveaux axes r175_3_2 et r175_5_1', () => {
     const c = buildComplianceSummary(makeArgs({
       actionItems: { blocking: [], major: [a], minor: [] },
       actionItemsRaw: [a],
+      // operator_trained répondu : sans lui, AXIS_PIVOT_FIELD force l'axe
+      // r175_5 à 'unknown' (champ pivot non répondu, régime 0.1.242+).
+      bms: { present: 1, operator_trained: 1 },
     }));
     const insp = c.r175Dashboard.find(r => r.axis === 'r175_5_1');
     const training = c.r175Dashboard.find(r => r.axis === 'r175_5');

@@ -2,6 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.252",
+      "date": "2026-07-16",
+      "title": "Bibliothèque : calendrier BACS de la section 14.1.2 corrigé (migration 202)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Calendrier R175-2 périmé remplacé par le calendrier officiel",
+          "what": "Le body_html du template « R175-2 — Champ d'application » (et les 28 sections déjà instanciées dans les AF) affirmait une échéance au 1er janvier 2027 pour les existants (repoussée au 1er janvier 2030, décret JO 26/12/2025) et une obligation « depuis le 1er janvier 2023 » pour les neufs (en réalité déclenchée par la date du permis de construire : 21/07/2021 pour > 290 kW, 08/04/2024 pour > 70 kW). REPLACE ciblés sur le texte exact, current_version bumpé → badge de mise à jour dans les AF. Détecté par l'audit RAG du copilote."
+        },
+        {
+          "kind": "info",
+          "title": "Section 5.3 « Journal centralisé des alarmes » vérifiée, non modifiée",
+          "what": "La fiche copilote annonçait 3 mois de journal ; le code réel (gojee-api allAlertsForSites) applique 30 jours glissants pour les anomalies terminées — le texte biblio « 30 jours » est donc correct, c'est la fiche copilote qui est à corriger."
+        }
+      ]
+    },
+    {
       "version": "0.1.251",
       "date": "2026-07-04",
       "title": "Correctif critique : la puissance ne retombe plus à 0 au recalcul",

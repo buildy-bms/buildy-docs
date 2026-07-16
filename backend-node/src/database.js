@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 201;
+const TARGET_VERSION = 202;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7644,6 +7644,59 @@ function runMigrations() {
     catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
     log.info('Migration 201 appliquee : bacs_audit_system_devices.gtb_scope_override (exception perimetre GTB par equipement)');
     db.pragma('user_version = 201');
+  }
+
+  if (current < 202) {
+    // Migration 202 — Calendrier BACS périmé dans la bibliothèque (0.1.252).
+    // Détecté par l'audit RAG du copilote (2026-07-16) : le body_html du
+    // section_template 14.1.2 « R175-2 — Champ d'application » (et les
+    // sections déjà instanciées dans les AF) affirmait :
+    //   - existants : échéance au 1er janvier 2027 → FAUX, repoussée au
+    //     1er janvier 2030 (décret publié au JO le 26 décembre 2025) ;
+    //   - neufs : « applicable depuis le 1er janvier 2023 » → FAUX, le
+    //     déclencheur des neufs est la DATE DU PERMIS DE CONSTRUIRE
+    //     (21/07/2021 pour > 290 kW, 08/04/2024 pour > 70 kW).
+    // Même précédent que la migration 169 (qui n'avait corrigé que
+    // pdf_boilerplate kind='methodology' — les section_templates étaient
+    // passés au travers). REPLACE ciblés sur le texte exact, appliqués au
+    // template ET aux sections AF instanciées. Référence : calendrier
+    // canonique de scripts/bacs-knowledge/decree-articles.json
+    // (entrée DECRET-HISTORIQUE).
+    const OLD_LI_NEUFS = '<li>Bâtiments neufs et systèmes neufs : obligation applicable depuis le <strong>1er janvier 2023</strong>.</li>';
+    const NEW_LI_NEUFS = '<li>Bâtiments neufs : obligation déclenchée par la date de dépôt du permis de construire — après le <strong>21 juillet 2021</strong> pour les bâtiments &gt; 290 kW, après le <strong>8 avril 2024</strong> pour les bâtiments &gt; 70 kW.</li>';
+    const OLD_LI_EXIST = '<li>Bâtiments existants : échéance fixée au <strong>1er janvier 2027</strong>, ou lors du renouvellement du système technique si cette date est antérieure.</li>';
+    const NEW_LI_EXIST = '<li>Bâtiments existants : conformité au plus tard le <strong>1er janvier 2025</strong> pour les bâtiments &gt; 290 kW ; lors du renouvellement du système technique et au plus tard le <strong>1er janvier 2030</strong> pour les bâtiments &gt; 70 kW (échéance repoussée de 2027 à 2030 par le décret publié au Journal officiel le 26 décembre 2025).</li>';
+    // Variante ancien seed (chapter-14-bodies.js pré-correction) encore
+    // présente dans certaines AF : dates 2027 dans le bloc « Réponse Buildy ».
+    const OLD_SEED_CAL = 'calendrier 2024 / 2027';
+    const NEW_SEED_CAL = 'calendrier 2024 / 2030';
+    const OLD_SEED_SUP = '<em>1<sup>er</sup> janvier 2027</em>';
+    const NEW_SEED_SUP = '<em>1<sup>er</sup> janvier 2030</em>';
+    const REPLACEMENTS = [
+      [OLD_LI_NEUFS, NEW_LI_NEUFS],
+      [OLD_LI_EXIST, NEW_LI_EXIST],
+      [OLD_SEED_CAL, NEW_SEED_CAL],
+      [OLD_SEED_SUP, NEW_SEED_SUP],
+    ];
+    // Bump de current_version AVANT les REPLACE (après, le texte périmé ne
+    // matche plus) : cible uniquement le ou les templates qui portaient
+    // réellement le calendrier faux. Le badge de divergence / sync-library
+    // signale la mise à jour aux AF qui utilisent la section.
+    db.prepare(`
+      UPDATE section_templates SET current_version = COALESCE(current_version, 1) + 1
+      WHERE body_html LIKE ? OR body_html LIKE ?
+    `).run(`%${OLD_LI_EXIST}%`, `%${OLD_SEED_CAL}%`);
+    let touched = 0;
+    for (const table of ['section_templates', 'sections']) {
+      for (const [oldStr, newStr] of REPLACEMENTS) {
+        const r = db.prepare(
+          `UPDATE ${table} SET body_html = REPLACE(body_html, ?, ?) WHERE body_html LIKE ?`
+        ).run(oldStr, newStr, `%${oldStr}%`);
+        touched += r.changes;
+      }
+    }
+    log.info(`Migration 202 appliquee : calendrier BACS 14.1.2 corrige (2027→2030, neufs par date de PC) — ${touched} body_html mis a jour`);
+    db.pragma('user_version = 202');
   }
 
   if (current > TARGET_VERSION) {
