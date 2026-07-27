@@ -19,7 +19,7 @@ import {
 import {
   getEquipmentTemplate, addTemplatePoint, updateTemplatePoint,
   deleteTemplatePoint, reorderTemplatePoints,
-  listEquipmentTemplates, importTemplatePoints,
+  listEquipmentTemplates, importTemplatePoints, listSystemCategories,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -90,14 +90,32 @@ async function openImportModal() {
   importSourceId.value = null
   importModalOpen.value = true
   try {
-    const { data } = await listEquipmentTemplates()
-    importCandidates.value = (data || [])
+    const [{ data: templates }, { data: categories }] = await Promise.all([
+      listEquipmentTemplates(),
+      listSystemCategories(),
+    ])
+    // Groupé par catégorie (ordre des catégories de la biblio), avec
+    // l'icône colorée de la catégorie en en-tête de groupe et celle du
+    // système sur chaque ligne.
+    const catByKey = new Map((categories || []).map(c => [c.key, c]))
+    const catOrder = k => catByKey.get(k)?.position ?? 999
+    importCandidates.value = (templates || [])
       .filter(t => t.id !== props.templateId && (t.points_count || 0) > 0)
-      .map(t => ({
-        value: t.id,
-        label: t.name,
-        hint: `${t.category} — ${t.points_count} point${t.points_count > 1 ? 's' : ''}`,
-      }))
+      .sort((a, b) =>
+        (catOrder(a.category) - catOrder(b.category))
+        || String(a.name).localeCompare(String(b.name), 'fr'))
+      .map(t => {
+        const cat = catByKey.get(t.category)
+        return {
+          value: t.id,
+          label: `${t.name} (${t.points_count} point${t.points_count > 1 ? 's' : ''})`,
+          hint: cat?.label || t.category,
+          groupIcon: cat?.icon_value || null,
+          groupColor: cat?.icon_color || null,
+          icon: t.icon_value || null,
+          color: t.icon_color || null,
+        }
+      })
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec du chargement des systèmes')
     importModalOpen.value = false
@@ -392,6 +410,7 @@ onBeforeUnmount(teardownSortables)
           Les points dont l'identifiant existe déjà ici sont conservés tels quels (jamais écrasés).
         </p>
         <SearchableSelect v-model="importSourceId" :options="importCandidates"
+                          group-by-hint
                           placeholder="Choisir le système source…"
                           search-placeholder="Rechercher un système…" />
         <div class="flex justify-end gap-2 pt-1">

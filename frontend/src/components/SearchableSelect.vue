@@ -395,8 +395,15 @@ function clear() {
             <!-- Sous-titre de groupe (groupByHint) : sépare visuellement
                  les options ayant un hint commun (ex: zone fonctionnelle). -->
             <div v-if="groupByHint && o.hint && (i === 0 || filteredOptions[i - 1].hint !== o.hint)"
-                 :class="['mx-1 mb-1 px-2.5 py-1 rounded bg-slate-100 border-l-2 border-slate-400 text-[11px] font-semibold uppercase tracking-wider text-slate-700',
-                          i === 0 ? 'mt-0' : 'mt-2']">
+                 :class="['mx-1 mb-1 px-2.5 py-1 rounded bg-slate-100 border-l-2 text-[11px] font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5',
+                          i === 0 ? 'mt-0' : 'mt-2']"
+                 :style="{ borderLeftColor: o.groupColor || '#94a3b8' }">
+              <!-- Icône de groupe optionnelle (ex: catégorie de système) —
+                   portée par les options via groupIcon / groupColor. -->
+              <FontAwesomeIcon v-if="o.groupIcon"
+                               :icon="['fas', faName(o.groupIcon)]"
+                               :style="{ color: o.groupColor || '#64748b' }"
+                               class="w-3.5 h-3.5 shrink-0" />
               {{ o.hint }}
             </div>
           <button type="button" @click="pick(o)"

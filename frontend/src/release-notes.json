@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.254",
+      "date": "2026-07-16",
+      "title": "Import de points : liste des systèmes groupée par catégorie",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Choix du système source groupé par catégories avec icônes colorées",
+          "what": "La liste déroulante de la modale « Importer d'un autre système » regroupe les systèmes par catégorie de la bibliothèque (Chauffage, Climatisation, Ventilation…), chaque en-tête portant l'icône colorée de la catégorie et chaque ligne l'icône du système + son nombre de points. SearchableSelect gagne des en-têtes de groupe avec icône (props groupIcon / groupColor sur les options, rétro-compatible)."
+        }
+      ]
+    },
+    {
       "version": "0.1.253",
       "date": "2026-07-16",
       "title": "Bibliothèque : import des points d'un autre système",
