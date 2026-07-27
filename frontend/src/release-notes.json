@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.255",
+      "date": "2026-07-16",
+      "title": "Fix : valider un point ne ferme plus la modale du système",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Ajout / édition d'une donnée lue-écrite sans fermeture intempestive",
+          "what": "L'éditeur de points vit dans le formulaire de la modale du système : les boutons Ajouter / Enregistrer / Annuler / Supprimer (sans type=button) et la touche Entrée déclenchaient la soumission du formulaire parent, qui enregistrait le système et fermait la modale. Corrigé : 13 boutons passés en type=button, et Entrée dans un champ valide la ligne en cours (ajout ou édition) au lieu de soumettre le formulaire. Le point reste enregistré immédiatement à chaque validation de ligne — une fermeture accidentelle ne perd rien."
+        }
+      ]
+    },
+    {
       "version": "0.1.254",
       "date": "2026-07-16",
       "title": "Import de points : liste des systèmes groupée par catégorie",

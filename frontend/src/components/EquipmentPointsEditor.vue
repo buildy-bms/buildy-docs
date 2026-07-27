@@ -512,7 +512,7 @@ onBeforeUnmount(teardownSortables)
                   <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap" @click.stop>
-                  <button @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
+                  <button type="button" @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
                     <TrashIcon class="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -522,15 +522,15 @@ onBeforeUnmount(teardownSortables)
                 <td class="px-2"></td>
                 <td class="px-2 text-center text-gray-300"><Bars3Icon class="w-4 h-4 inline-block" /></td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].slug" type="text"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].slug" type="text"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].tech_name" type="text" placeholder="ex: Supply_Water_Temp_R"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].tech_name" type="text" placeholder="ex: Supply_Water_Temp_R"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].label" type="text"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].label" type="text"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
@@ -540,7 +540,7 @@ onBeforeUnmount(teardownSortables)
                   </select>
                 </td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].unit" type="text"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].unit" type="text"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
@@ -550,14 +550,14 @@ onBeforeUnmount(teardownSortables)
                   </select>
                 </td>
                 <td class="px-2 py-1.5 text-center">
-                  <input v-model="editing[p.id].is_optional" type="checkbox"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].is_optional" type="checkbox"
                          class="rounded text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
+                  <button type="button" @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
                     <CheckIcon class="w-4 h-4" />
                   </button>
-                  <button @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                  <button type="button" @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                     <XMarkIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -568,15 +568,15 @@ onBeforeUnmount(teardownSortables)
               <td class="px-2"></td>
               <td class="px-2 text-center text-emerald-400"><PlusIcon class="w-4 h-4 inline-block" /></td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.slug" type="text" placeholder="ex: temp.depart_eau"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.slug" type="text" placeholder="ex: temp.depart_eau"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.tech_name" type="text" placeholder="ex: Supply_Water_Temp_R"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.tech_name" type="text" placeholder="ex: Supply_Water_Temp_R"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.label" type="text" placeholder="ex: Température départ d'eau"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.label" type="text" placeholder="ex: Température départ d'eau"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
@@ -586,7 +586,7 @@ onBeforeUnmount(teardownSortables)
                 </select>
               </td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.unit" type="text" placeholder="°C"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.unit" type="text" placeholder="°C"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
@@ -596,14 +596,14 @@ onBeforeUnmount(teardownSortables)
                 </select>
               </td>
               <td class="px-2 py-1.5 text-center">
-                <input v-model="addDraft.is_optional" type="checkbox"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.is_optional" type="checkbox"
                        class="rounded text-indigo-600 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                <button @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
+                <button type="button" @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
                   <CheckIcon class="w-4 h-4" />
                 </button>
-                <button @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                <button type="button" @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                   <XMarkIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -703,7 +703,7 @@ onBeforeUnmount(teardownSortables)
                   <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap" @click.stop>
-                  <button @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
+                  <button type="button" @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
                     <TrashIcon class="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -712,15 +712,15 @@ onBeforeUnmount(teardownSortables)
                 <td class="px-2"></td>
                 <td class="px-2 text-center text-gray-300"><Bars3Icon class="w-4 h-4 inline-block" /></td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].slug" type="text"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].slug" type="text"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].tech_name" type="text" placeholder="ex: Supply_Water_Temp_R"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].tech_name" type="text" placeholder="ex: Supply_Water_Temp_R"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].label" type="text"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].label" type="text"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
@@ -730,7 +730,7 @@ onBeforeUnmount(teardownSortables)
                   </select>
                 </td>
                 <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].unit" type="text"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].unit" type="text"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
@@ -740,14 +740,14 @@ onBeforeUnmount(teardownSortables)
                   </select>
                 </td>
                 <td class="px-2 py-1.5 text-center">
-                  <input v-model="editing[p.id].is_optional" type="checkbox"
+                  <input @keydown.enter.prevent="saveEdit(p.id)" v-model="editing[p.id].is_optional" type="checkbox"
                          class="rounded text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
+                  <button type="button" @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
                     <CheckIcon class="w-4 h-4" />
                   </button>
-                  <button @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                  <button type="button" @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                     <XMarkIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -757,11 +757,11 @@ onBeforeUnmount(teardownSortables)
               <td class="px-2"></td>
               <td class="px-2 text-center text-emerald-400"><PlusIcon class="w-4 h-4 inline-block" /></td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.slug" type="text" placeholder="ex: cmd.marche_arret"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.slug" type="text" placeholder="ex: cmd.marche_arret"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.label" type="text" placeholder="ex: Commande marche/arrêt"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.label" type="text" placeholder="ex: Commande marche/arrêt"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
@@ -771,7 +771,7 @@ onBeforeUnmount(teardownSortables)
                 </select>
               </td>
               <td class="px-2 py-1.5">
-                <input v-model="addDraft.unit" type="text" placeholder="°C"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.unit" type="text" placeholder="°C"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
@@ -781,14 +781,14 @@ onBeforeUnmount(teardownSortables)
                 </select>
               </td>
               <td class="px-2 py-1.5 text-center">
-                <input v-model="addDraft.is_optional" type="checkbox"
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.is_optional" type="checkbox"
                        class="rounded text-indigo-600 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                <button @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
+                <button type="button" @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
                   <CheckIcon class="w-4 h-4" />
                 </button>
-                <button @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                <button type="button" @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                   <XMarkIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -805,17 +805,17 @@ onBeforeUnmount(teardownSortables)
 
     <!-- Barre d'actions bulk : visible quand >=1 ligne cochee. -->
     <BulkActionBar :count="sel.size.value" noun="point" @clear="sel.clear()">
-      <button @click="bulkSetOptional(true)" :disabled="bulkBusy"
+      <button type="button" @click="bulkSetOptional(true)" :disabled="bulkBusy"
               class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap"
               v-tooltip="'Marquer la sélection comme optionnels'">
         Marquer optionnels
       </button>
-      <button @click="bulkSetOptional(false)" :disabled="bulkBusy"
+      <button type="button" @click="bulkSetOptional(false)" :disabled="bulkBusy"
               class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap"
               v-tooltip="'Marquer la sélection comme obligatoires'">
         Marquer obligatoires
       </button>
-      <button @click="bulkDelete" :disabled="bulkBusy"
+      <button type="button" @click="bulkDelete" :disabled="bulkBusy"
               class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap"
               v-tooltip="'Supprimer la sélection'">
         <TrashIcon class="w-4 h-4" />
