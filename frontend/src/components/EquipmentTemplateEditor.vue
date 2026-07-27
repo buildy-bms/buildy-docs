@@ -789,7 +789,10 @@ async function destroy() {
         <p class="text-[11px] text-gray-500 mt-1 mb-2">
           Lectures (mesures, états) et écritures (commandes, consignes). Cliquer pour éditer, glisser pour réordonner.
         </p>
-        <EquipmentPointsEditor :template-id="template.id" @updated="$emit('saved', template)" />
+        <!-- 'saved-inline' et surtout PAS 'saved' : 'saved' ferme la modale
+             côté vue parente — or ajouter/éditer un point doit laisser la
+             modale ouverte (incident 2026-07-16, fermeture à chaque ✓). -->
+        <EquipmentPointsEditor :template-id="template.id" @updated="$emit('saved-inline', template)" />
       </details>
 
       <details v-if="isEdit" class="group pt-2 border-t border-gray-100"

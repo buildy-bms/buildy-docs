@@ -761,6 +761,10 @@ onBeforeUnmount(teardownSortables)
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
+                <input @keydown.enter.prevent="submitAdd" v-model="addDraft.tech_name" type="text" placeholder="ex: On_Off_W"
+                       class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+              </td>
+              <td class="px-2 py-1.5">
                 <input @keydown.enter.prevent="submitAdd" v-model="addDraft.label" type="text" placeholder="ex: Commande marche/arrêt"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
