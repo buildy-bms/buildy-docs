@@ -484,6 +484,68 @@ async function routes(fastify) {
     }
   });
 
+  // POST /api/equipment-templates/:id/points/import-from/:sourceId — copier
+  // les points (données lues / écrites) d'un autre modèle vers celui-ci.
+  // Utile entre systèmes similaires (ex : Chaudière Gaz → Chaudière
+  // électrique). Dédup par slug : les points dont le slug existe déjà dans
+  // la cible sont ignorés (jamais écrasés). fact_check_status repart à
+  // 'unverified' — la vérification de source ne se transfère pas d'un
+  // équipement à l'autre.
+  fastify.post('/equipment-templates/:id/points/import-from/:sourceId', async (request, reply) => {
+    const templateId = parseInt(request.params.id, 10);
+    const sourceId = parseInt(request.params.sourceId, 10);
+    const tpl = db.equipmentTemplates.getById(templateId);
+    if (!tpl) return reply.code(404).send({ detail: 'Template cible non trouvé' });
+    const src = db.equipmentTemplates.getById(sourceId);
+    if (!src) return reply.code(404).send({ detail: 'Template source non trouvé' });
+    if (templateId === sourceId) return reply.code(400).send({ detail: 'Source et cible identiques' });
+
+    const sourcePoints = db.equipmentTemplatePoints.listByTemplate(sourceId);
+    if (!sourcePoints.length) return reply.code(400).send({ detail: 'Le template source n\'a aucun point' });
+
+    const existingSlugs = new Set(
+      db.db.prepare('SELECT slug FROM equipment_template_points WHERE template_id = ?')
+        .all(templateId).map(r => r.slug)
+    );
+    const maxPos = db.db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM equipment_template_points WHERE template_id = ?'
+    ).get(templateId).m;
+
+    let imported = 0, skipped = 0, pos = maxPos;
+    const tx = db.db.transaction(() => {
+      for (const p of sourcePoints) {
+        if (existingSlugs.has(p.slug)) { skipped++; continue; }
+        pos += 10;
+        db.equipmentTemplatePoints.create(templateId, {
+          slug: p.slug, position: pos, label: p.label,
+          dataType: p.data_type, direction: p.direction, unit: p.unit,
+          notes: p.notes, isOptional: p.is_optional,
+          techName: p.tech_name, nature: p.nature,
+        });
+        // Résurrection : lever le tombstone éventuel (même logique que le
+        // POST point unitaire) pour que le seeder puisse re-enrichir.
+        db.db.prepare(
+          'DELETE FROM deleted_equipment_template_point_slugs WHERE template_id = ? AND slug = ?'
+        ).run(templateId, p.slug);
+        imported++;
+      }
+    });
+    tx();
+
+    if (imported > 0) {
+      snapshotAndBump(templateId, {
+        changelog: `Import de ${imported} point(s) depuis « ${src.name} »`,
+        authorId: request.authUser?.id,
+      });
+    }
+    db.auditLog.add({
+      templateId, userId: request.authUser?.id, action: 'template.points.import',
+      payload: { source_id: sourceId, source_slug: src.slug, imported, skipped },
+    });
+    log.info(`Points imported: #${sourceId} → #${templateId} (${imported} imported, ${skipped} skipped) by user #${request.authUser?.id}`);
+    return { imported, skipped, points: db.equipmentTemplatePoints.listByTemplate(templateId) };
+  });
+
   // DELETE /api/equipment-templates/:id/points/:pointId — retirer un point
   fastify.delete('/equipment-templates/:id/points/:pointId', async (request) => {
     const pointId = parseInt(request.params.pointId, 10);

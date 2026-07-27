@@ -334,6 +334,9 @@ export const deleteTemplatePoint = (templateId, pointId) =>
 // reorderTemplatePoints({ ids: [...] }) — reordonne dans une direction
 export const reorderTemplatePoints = (templateId, ids) =>
   api.patch(`/equipment-templates/${templateId}/points/reorder`, { ids })
+// Copie les points d'un autre modèle vers templateId (dédup par slug)
+export const importTemplatePoints = (templateId, sourceId) =>
+  api.post(`/equipment-templates/${templateId}/points/import-from/${sourceId}`)
 export const getTemplateVersions = (id) => api.get(`/equipment-templates/${id}/versions`)
 export const getTemplateAffectedAfs = (id) => api.get(`/equipment-templates/${id}/affected-afs`)
 

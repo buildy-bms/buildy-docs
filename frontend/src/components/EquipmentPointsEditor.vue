@@ -14,15 +14,19 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
   PlusIcon, TrashIcon, Bars3Icon, CheckIcon, XMarkIcon,
+  ArrowDownOnSquareIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getEquipmentTemplate, addTemplatePoint, updateTemplatePoint,
   deleteTemplatePoint, reorderTemplatePoints,
+  listEquipmentTemplates, importTemplatePoints,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import BulkActionBar from '@/components/BulkActionBar.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import SearchableSelect from '@/components/SearchableSelect.vue'
 
 const props = defineProps({
   templateId: { type: Number, required: true },
@@ -75,6 +79,48 @@ async function refresh() {
   }
 }
 onMounted(refresh)
+
+// ── Import des points depuis un autre système (systèmes similaires) ──
+const importModalOpen = ref(false)
+const importSourceId = ref(null)
+const importCandidates = ref([])
+const importing = ref(false)
+
+async function openImportModal() {
+  importSourceId.value = null
+  importModalOpen.value = true
+  try {
+    const { data } = await listEquipmentTemplates()
+    importCandidates.value = (data || [])
+      .filter(t => t.id !== props.templateId && (t.points_count || 0) > 0)
+      .map(t => ({
+        value: t.id,
+        label: t.name,
+        hint: `${t.category} — ${t.points_count} point${t.points_count > 1 ? 's' : ''}`,
+      }))
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du chargement des systèmes')
+    importModalOpen.value = false
+  }
+}
+
+async function submitImport() {
+  if (!importSourceId.value || importing.value) return
+  importing.value = true
+  try {
+    const { data } = await importTemplatePoints(props.templateId, importSourceId.value)
+    points.value = data.points || []
+    importModalOpen.value = false
+    success(data.skipped > 0
+      ? `${data.imported} point(s) importé(s), ${data.skipped} déjà présent(s) ignoré(s)`
+      : `${data.imported} point(s) importé(s)`)
+    emit('updated')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de l\'import des points')
+  } finally {
+    importing.value = false
+  }
+}
 
 watch(() => props.templateId, refresh)
 
@@ -321,14 +367,45 @@ onBeforeUnmount(teardownSortables)
 
 <template>
   <div class="space-y-4">
-    <!-- Filtre global (s'applique aux 2 tableaux) -->
-    <div class="relative max-w-md">
-      <input v-model="filterText" type="text" placeholder="Filtrer (identifiant, nom, nom technique, unité…)"
-             autocomplete="off"
-             class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-      <button v-if="filterText" @click="filterText = ''"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs">×</button>
+    <!-- Filtre global (s'applique aux 2 tableaux) + import inter-systèmes -->
+    <div class="flex items-center gap-2">
+      <div class="relative max-w-md flex-1">
+        <input v-model="filterText" type="text" placeholder="Filtrer (identifiant, nom, nom technique, unité…)"
+               autocomplete="off"
+               class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+        <button v-if="filterText" @click="filterText = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs">×</button>
+      </div>
+      <button type="button" @click="openImportModal"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 hover:bg-indigo-50 rounded-lg transition shrink-0"
+              v-tooltip="'Copier les données lues / écrites d\'un système similaire'">
+        <ArrowDownOnSquareIcon class="w-3.5 h-3.5" /> Importer d'un autre système
+      </button>
     </div>
+
+    <!-- Modale d'import des points d'un autre système -->
+    <BaseModal v-if="importModalOpen" title="Importer les points d'un autre système"
+               size="sm" :dismiss-on-backdrop="false" @close="importModalOpen = false">
+      <div class="space-y-3">
+        <p class="text-xs text-gray-600 leading-relaxed">
+          Copie les données lues et écrites du système choisi vers celui-ci.
+          Les points dont l'identifiant existe déjà ici sont conservés tels quels (jamais écrasés).
+        </p>
+        <SearchableSelect v-model="importSourceId" :options="importCandidates"
+                          placeholder="Choisir le système source…"
+                          search-placeholder="Rechercher un système…" />
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" @click="importModalOpen = false"
+                  class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
+            Annuler
+          </button>
+          <button type="button" @click="submitImport" :disabled="!importSourceId || importing"
+                  class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50">
+            {{ importing ? 'Import en cours…' : 'Importer les points' }}
+          </button>
+        </div>
+      </div>
+    </BaseModal>
 
     <!-- ── Donnees lues ── -->
     <section>

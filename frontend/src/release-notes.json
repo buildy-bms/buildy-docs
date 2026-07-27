@@ -2,6 +2,18 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.253",
+      "date": "2026-07-16",
+      "title": "Bibliothèque : import des points d'un autre système",
+      "highlights": [
+        {
+          "kind": "new",
+          "title": "Copier les données lues / écrites entre systèmes similaires",
+          "what": "Dans l'éditeur de points d'un système de la bibliothèque, nouveau bouton « Importer d'un autre système » : choisis un système source et ses données lues / écrites sont copiées vers le système courant. Les points dont l'identifiant existe déjà sont conservés tels quels (jamais écrasés) ; le statut de vérification repart à « non vérifié ». Un instantané de version est créé avec le détail de l'import."
+        }
+      ]
+    },
+    {
       "version": "0.1.252",
       "date": "2026-07-16",
       "title": "Bibliothèque : calendrier BACS de la section 14.1.2 corrigé (migration 202)",
