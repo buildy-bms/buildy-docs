@@ -139,6 +139,7 @@ async function main() {
   await fastify.register(require('./routes/pdf-boilerplate'), { prefix: '/api' });
   await fastify.register(require('./routes/brochures'), { prefix: '/api' });
   await fastify.register(require('./routes/whitepapers'), { prefix: '/api' });
+  await fastify.register(require('./routes/maintenance-reports'), { prefix: '/api' });
   await fastify.register(require('./routes/offerings'), { prefix: '/api' });
   await fastify.register(require('./routes/faq'), { prefix: '/api' });
 

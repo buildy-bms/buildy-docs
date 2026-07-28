@@ -9,6 +9,9 @@ const config = {
   commissioning: { label: 'Commissionnement en cours',   classes: 'bg-amber-100 text-amber-800' },
   commissioned:  { label: 'Commissionnée',               classes: 'bg-indigo-100 text-indigo-800' },
   livree:        { label: 'Projet livré',                classes: 'bg-emerald-100 text-emerald-800' },
+  // Statuts whitepaper / rapport de maintenance (mig 140/203)
+  draft:         { label: 'Brouillon',                   classes: 'bg-gray-100 text-gray-700' },
+  published:     { label: 'Publié',                      classes: 'bg-emerald-100 text-emerald-800' },
 }
 </script>
 

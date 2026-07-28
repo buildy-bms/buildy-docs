@@ -724,4 +724,10 @@ export const publishWhitepaper = (id) => api.post(`/whitepapers/${id}/publish`)
 export const getWhitepaperClicks = (id) => api.get(`/whitepapers/${id}/clicks`)
 export const refreshWhitepaperClicks = (id) => api.post(`/whitepapers/${id}/clicks/refresh`)
 
+// ── Rapports annuels de maintenance (mig 203) ──────────────────────────
+export const getMaintenanceReport = (id) => api.get(`/maintenance-reports/${id}`)
+export const updateMaintenanceReport = (id, payload) => api.patch(`/maintenance-reports/${id}`, payload)
+export const exportMaintenanceReportPdf = (id) =>
+  api.get(`/maintenance-reports/${id}/export/pdf`, { responseType: 'blob' })
+
 export default api

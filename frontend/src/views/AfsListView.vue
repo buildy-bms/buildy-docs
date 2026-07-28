@@ -173,6 +173,8 @@ const newAf = ref({
   project_name: '',
   site_address: '',
   service_level: null,
+  mr_period_start: null,
+  mr_period_end: null,
 })
 // Selectionne reactivement (charge depuis SitePicker via @change)
 const selectedSite = ref(null)
@@ -185,11 +187,17 @@ function onSiteChange(site) {
   if (newAf.value.kind === 'bacs_audit' && !newAf.value.project_name) {
     newAf.value.project_name = `Audit BACS — ${site.name}`
   }
+  if (newAf.value.kind === 'maintenance_report' && !newAf.value.project_name) {
+    newAf.value.project_name = `Rapport maintenance — ${site.name}`
+  }
 }
 function onKindChange() {
-  // Reset le project_name en cas de switch vers bacs_audit pour appliquer le pattern
+  // Reset le project_name en cas de switch de kind pour appliquer le pattern
   if (newAf.value.kind === 'bacs_audit' && selectedSite.value) {
     newAf.value.project_name = `Audit BACS — ${selectedSite.value.name}`
+  }
+  if (newAf.value.kind === 'maintenance_report' && selectedSite.value) {
+    newAf.value.project_name = `Rapport maintenance — ${selectedSite.value.name}`
   }
 }
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
@@ -250,14 +258,19 @@ async function submitCreate() {
     error('Un audit BACS doit être rattaché à un site')
     return
   }
+  if (newAf.value.kind === 'maintenance_report' && !newAf.value.site_id) {
+    error('Un rapport de maintenance doit être rattaché à un site')
+    return
+  }
   submitting.value = true
   try {
     const { data } = await createAf(newAf.value)
     const kindLabel = data.kind === 'bacs_audit' ? 'Audit BACS'
-      : data.kind === 'brochure' ? 'Brochure' : 'AF'
+      : data.kind === 'brochure' ? 'Brochure'
+      : data.kind === 'maintenance_report' ? 'Rapport de maintenance' : 'AF'
     success(`${kindLabel} créé : ${data.client_name} — ${data.project_name}${data.sections_count ? ` (${data.sections_count} sections seedées)` : ''}`)
     showCreate.value = false
-    newAf.value = { kind: 'af', site_id: null, client_name: '', project_name: '', site_address: '', service_level: null }
+    newAf.value = { kind: 'af', site_id: null, client_name: '', project_name: '', site_address: '', service_level: null, mr_period_start: null, mr_period_end: null }
     selectedSite.value = null
     refresh()
     router.push(routeForDoc(data))
@@ -321,6 +334,7 @@ function formatDate(s) {
 function routeForDoc(doc) {
   if (doc.kind === 'bacs_audit') return `/bacs-audit/${doc.id}`
   if (doc.kind === 'brochure') return `/brochures/${doc.id}`
+  if (doc.kind === 'maintenance_report') return `/maintenance-reports/${doc.id}`
   return `/afs/${doc.id}`
 }
 
@@ -494,6 +508,11 @@ onMounted(refresh)
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
                 >Brochure</span>
                 <span
+                  v-else-if="row.af.kind === 'maintenance_report'"
+                  class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-sky-100 text-sky-700"
+                  v-tooltip="'Rapport annuel de maintenance'"
+                >Maintenance</span>
+                <span
                   v-else
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-green-100 text-green-800"
                   v-tooltip="'Analyse fonctionnelle — livrable de chantier'"
@@ -632,11 +651,12 @@ onMounted(refresh)
         <!-- Selecteur de kind -->
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type de document *</label>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <label
               v-for="opt in [
                 { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
                 { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
+                { value: 'maintenance_report', label: 'Rapport de maintenance', desc: 'Bilan annuel des actions' },
                 // Brochure : option masquee — feature pas encore prete.
                 // Les brochures existantes (kind='brochure' en DB) restent visibles dans la liste.
                 // { value: 'brochure', label: 'Brochure', desc: 'Document commercial composé' },
@@ -664,7 +684,7 @@ onMounted(refresh)
           </div>
         </div>
 
-        <!-- Site (obligatoire pour bacs_audit, optionnel pour af) -->
+        <!-- Site (obligatoire pour bacs_audit et maintenance_report, optionnel pour af) -->
         <div v-if="newAf.kind !== 'af'">
           <label class="block text-xs font-medium text-gray-700 mb-1">
             Site *
@@ -672,7 +692,7 @@ onMounted(refresh)
           </label>
           <SitePicker
             v-model="newAf.site_id"
-            :required="newAf.kind === 'bacs_audit'"
+            :required="newAf.kind === 'bacs_audit' || newAf.kind === 'maintenance_report'"
             @change="onSiteChange"
           />
         </div>
@@ -710,6 +730,25 @@ onMounted(refresh)
             v-model="newAf.site_address"
             placeholder="ex : 42 rue de la Tête d'Or, 69006 Lyon"
           />
+        </div>
+        <!-- Période couverte (rapport de maintenance) -->
+        <div v-if="newAf.kind === 'maintenance_report'" class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Début de période</label>
+            <input
+              v-model="newAf.mr_period_start"
+              type="date"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Fin de période</label>
+            <input
+              v-model="newAf.mr_period_end"
+              type="date"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
         </div>
         <div v-if="newAf.kind === 'af'">
           <label class="block text-xs font-medium text-gray-700 mb-1">
@@ -750,18 +789,24 @@ onMounted(refresh)
           (zones fonctionnelles, systèmes techniques, compteurs, GTB, régulation thermique)
           sera disponible en Phase 2.
         </p>
+        <p v-else-if="newAf.kind === 'maintenance_report'" class="text-xs text-gray-500 leading-relaxed">
+          Le rapport sera pré-rempli d'un squelette (entrées datées avec Signalement /
+          Réponse Buildy / Résultat, puis synthèse) que tu complètes librement dans
+          l'éditeur, avant export PDF avec page de garde Buildy.
+        </p>
       </form>
       <template #footer>
         <button @click="showCreate = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuler</button>
         <button
           @click="submitCreate"
-          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || (newAf.kind === 'bacs_audit' && !newAf.site_id)"
+          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || ((newAf.kind === 'bacs_audit' || newAf.kind === 'maintenance_report') && !newAf.site_id)"
           class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           {{
             submitting ? 'Création…'
             : newAf.kind === 'bacs_audit' ? 'Créer l\'audit BACS'
             : newAf.kind === 'brochure' ? 'Créer la brochure'
+            : newAf.kind === 'maintenance_report' ? 'Créer le rapport'
             : 'Créer l\'AF'
           }}
         </button>

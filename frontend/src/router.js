@@ -148,6 +148,12 @@ const routes = [
     component: () => import('@/views/BrochureDetailView.vue'),
   },
   {
+    path: '/maintenance-reports/:id',
+    name: 'maintenance-report-detail',
+    meta: { title: 'Rapport de maintenance' },
+    component: () => import('@/views/MaintenanceReportDetailView.vue'),
+  },
+  {
     path: '/marketing/whitepapers',
     name: 'whitepapers',
     meta: { title: 'Livres blancs' },

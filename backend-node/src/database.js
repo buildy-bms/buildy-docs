@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 202;
+const TARGET_VERSION = 203;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7699,6 +7699,37 @@ function runMigrations() {
     db.pragma('user_version = 202');
   }
 
+  if (current < 203) {
+    // Rapports annuels de maintenance : nouveau kind 'maintenance_report'
+    // dans la table afs (table unifiee des documents). Site + periode debut/
+    // fin + contenu libre Tiptap (une section unique, comme les chapitres
+    // whitepaper) + export PDF cover full-bleed.
+    //
+    // 1. Etendre le CHECK kind via writable_schema (pattern mig 140).
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = 1');
+      db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'afs'"
+      ).run(
+        "CHECK (kind IN ('af','bacs_audit','brochure','whitepaper'))",
+        "CHECK (kind IN ('af','bacs_audit','brochure','whitepaper','maintenance_report'))",
+      );
+      db.pragma('writable_schema = 0');
+    } finally {
+      db.unsafeMode(false);
+    }
+    // 2. Colonnes specifiques (prefixe mr_, cf. convention wp_/bacs_).
+    //    Dates ISO YYYY-MM-DD (input type=date cote UI).
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN mr_period_start TEXT;
+      ALTER TABLE afs ADD COLUMN mr_period_end TEXT;
+    `);
+    log.info('Migration 203 appliquee : kind maintenance_report + colonnes mr_period_*');
+    db.pragma('user_version = 203');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -8658,6 +8689,8 @@ const afs = {
       'inspection_not_applicable', 'inspection_not_applicable_reason',
       // Livres blancs (mig 140)
       'parent_af_id', 'wp_layout', 'wp_audience', 'wp_version', 'wp_meta_json',
+      // Rapports annuels de maintenance (mig 203)
+      'mr_period_start', 'mr_period_end',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {

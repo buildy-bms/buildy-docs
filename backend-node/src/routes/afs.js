@@ -7,6 +7,7 @@ const { uniqueSlug } = require('../lib/slug');
 const { seedAfStructure, seedBacsAuditStructure } = require('../lib/seeder');
 const { assertWrite, assertRead } = require('../lib/af-permissions');
 const { resolveSectionPoints } = require('../lib/points-resolver');
+const { MAINTENANCE_REPORT_SKELETON_HTML } = require('../lib/maintenance-report');
 
 // ── Zod schemas ──────────────────────────────────────────────────────
 const createAfSchema = z.object({
@@ -16,9 +17,12 @@ const createAfSchema = z.object({
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   // Multi-domaines (Buildy Docs) : kind + site_id. Pour 'bacs_audit', le site
   // est obligatoire (le plan canonique pre-rempli a besoin des zones du site).
-  kind: z.enum(['af', 'bacs_audit', 'brochure']).optional().default('af'),
+  kind: z.enum(['af', 'bacs_audit', 'brochure', 'maintenance_report']).optional().default('af'),
   site_id: z.number().int().positive().nullable().optional(),
   title: z.string().optional(),
+  // Rapport annuel de maintenance (mig 203) : periode couverte, dates ISO.
+  mr_period_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  mr_period_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 const updateAfSchema = z.object({
@@ -297,6 +301,9 @@ async function routes(fastify) {
     if (body.kind === 'bacs_audit' && !body.site_id) {
       return reply.code(400).send({ detail: 'Un audit BACS doit etre rattache a un site (site_id requis)' });
     }
+    if (body.kind === 'maintenance_report' && !body.site_id) {
+      return reply.code(400).send({ detail: 'Un rapport de maintenance doit etre rattache a un site (site_id requis)' });
+    }
     if (body.site_id) {
       const site = db.sites.getById(body.site_id);
       if (!site || site.deleted_at) {
@@ -307,7 +314,9 @@ async function routes(fastify) {
     const slug = uniqueSlug(`${body.client_name}-${body.project_name}`, (s) => !!db.afs.getBySlug(s));
     const userId = request.authUser?.id;
 
-    const af = db.afs.create({
+    // let (et non const) : la branche maintenance_report reassigne af apres
+    // l'update statut/periode pour renvoyer l'etat a jour.
+    let af = db.afs.create({
       slug,
       clientName: body.client_name,
       projectName: body.project_name,
@@ -334,6 +343,21 @@ async function routes(fastify) {
     } else if (body.kind === 'bacs_audit') {
       const seedResult = seedBacsAuditStructure(af.id, body.site_id);
       sectionsCount = seedResult.sections_count;
+    } else if (body.kind === 'maintenance_report') {
+      // Statut draft (comme whitepaper) + periode ; pas de plan AF — le corps
+      // vit dans UNE section unique pre-remplie d'un squelette guide.
+      // Reassigne af pour que la reponse POST reflete le statut/periode a jour.
+      af = db.afs.update(af.id, {
+        status: 'draft',
+        mr_period_start: body.mr_period_start || null,
+        mr_period_end: body.mr_period_end || null,
+      });
+      db.sections.create({
+        afId: af.id, parentId: null, position: 0, kind: 'standard',
+        title: 'Rapport annuel de maintenance',
+        bodyHtml: MAINTENANCE_REPORT_SKELETON_HTML,
+      });
+      sectionsCount = 1;
     }
 
     db.auditLog.add({

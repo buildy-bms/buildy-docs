@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>{{title}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ Couverture pleine page (charte whitepaper #41) ═══════════ --}}
+<section class="cover">
+  <div class="cover-eyebrow">
+    {{#if logoWhiteDataUrl}}
+    <img src="{{logoWhiteDataUrl}}" alt="Buildy" class="cover-logo" />
+    {{/if}}
+    Rapport annuel de maintenance
+    <span class="meta">{{#if periodLabel}}{{periodLabel}} · {{/if}}Édité en {{dateLabel}}</span>
+  </div>
+
+  <div class="cover-center">
+    <h1 class="cover-title">{{siteName}}</h1>
+    <p class="cover-sub">Synthèse des actions de maintenance et d'assistance menées par Buildy{{#if clientName}} pour <strong>{{clientName}}</strong>{{/if}}{{#if periodLabel}} — {{periodLabel}}{{/if}}.</p>
+  </div>
+
+  <div class="cover-foot">
+    <div class="edition">Rapport de maintenance Buildy · document confidentiel</div>
+  </div>
+</section>
+
+{{!-- ═══════════ Corps (contenu libre Tiptap) ═══════════ --}}
+<section class="chapter chapter-untitled">
+  <div class="report-head">
+    <div class="report-head-kicker">Synthèse des actions</div>
+    <div class="report-head-title">{{siteName}}{{#if clientName}} — {{clientName}}{{/if}}</div>
+    {{#if periodLabel}}<div class="report-head-period">Période : {{periodLabel}}</div>{{/if}}
+  </div>
+  <div class="chapter-body report-body">
+    {{{body_html}}}
+  </div>
+</section>
+
+{{!-- ═══════════ Page de fin (styles _buildy-back-cover.css partagés,
+     contenu contact support — pas le CTA démo, inadapté à un client
+     déjà en contrat de maintenance) ═══════════ --}}
+<section class="back">
+  {{#if logoWhiteDataUrl}}
+  <div class="wordmark-top">
+    <img src="{{logoWhiteDataUrl}}" alt="Buildy" />
+  </div>
+  {{/if}}
+
+  <div class="back-center">
+    <h3>Votre équipe Buildy reste à votre écoute.</h3>
+    <div class="back-body">
+      <p>Une question sur ce rapport, un signalement, une demande d'ajustement de votre supervision&nbsp;: notre équipe support vous répond toute l'année.</p>
+      <p>Email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>&nbsp;&nbsp;Tél. 04 28 39 03 34</p>
+    </div>
+
+    <div class="signature">
+      <div class="rule"></div>
+      <div class="name">Buildy</div>
+      <div class="role">Éditeur, intégrateur et mainteneur de solutions de supervision multi-sites pour le bâtiment tertiaire</div>
+    </div>
+  </div>
+
+  <div class="back-foot">
+    Document édité par Buildy à l'attention de {{#if clientName}}{{clientName}}{{else}}son client{{/if}}. {{#if periodLabel}}{{periodLabel}} · {{/if}}{{dateLabel}}. Document confidentiel.
+  </div>
+</section>
+
+</body>
+</html>
