@@ -1,6 +1,6 @@
 {
   "name": "buildy-docs-backend",
-  "version": "0.1.258",
+  "version": "0.1.259",
   "description": "Buildy Docs — App de redaction documentaire (analyses fonctionnelles GTB, audits BACS, brochures commerciales)",
   "main": "src/index.js",
   "scripts": {

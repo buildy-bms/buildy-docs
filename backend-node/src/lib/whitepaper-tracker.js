@@ -58,11 +58,28 @@ $line = implode("\\t", array(
   $clean(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '')
 )) . "\\n";
 @file_put_contents(__DIR__ . '/hits.log', $line, FILE_APPEND | LOCK_EX);
+// Streaming par morceaux avec buffers purgés : readfile() derrière l'output
+// buffering + compression du mutualisé OVH retardait le premier octet sur
+// les gros PDF (7 Mo+) au point de faire tomber le Varnish du CDN en
+// « 503 Backend fetch failed » (incident 2026-07-28, brochure 7,6 Mo).
+@set_time_limit(0);
+@ini_set('zlib.output_compression', 'Off');
+if (function_exists('apache_setenv')) { @apache_setenv('no-gzip', '1'); }
+while (ob_get_level() > 0) { @ob_end_clean(); }
 header('Content-Type: application/pdf');
 header('Content-Disposition: inline; filename="' . $d . '.pdf"');
 header('Content-Length: ' . filesize($pdf));
 header('Cache-Control: public, max-age=300');
-readfile($pdf);
+$fh = fopen($pdf, 'rb');
+if ($fh === false) {
+  http_response_code(500);
+  exit;
+}
+while (!feof($fh)) {
+  echo fread($fh, 65536);
+  flush();
+}
+fclose($fh);
 exit;
 `;
 }
