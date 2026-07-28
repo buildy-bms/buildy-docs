@@ -46,4 +46,54 @@ function formatPeriodLabel(start, end) {
   return '';
 }
 
-module.exports = { MAINTENANCE_REPORT_SKELETON_HTML, formatPeriodLabel };
+/**
+ * Regroupe le HTML Tiptap en blocs insécables pour le rendu PDF :
+ *   1. chaque <h3> + son contenu jusqu'au prochain h2/h3 → <div class="mr-sub">
+ *      (jamais de label « Signalement » orphelin en bas de page) ;
+ *   2. chaque <h2> + le bloc qui le suit → <div class="mr-head">
+ *      (jamais de bandeau d'entrée seul en bas de page — break-after: avoid
+ *      est peu fiable dans Chromium sur les blocs à fond/bordure).
+ * Le CSS applique break-inside: avoid sur .mr-sub / .mr-head ; Chromium
+ * ignore l'avoid si un groupe dépasse une page (pas de page blanche).
+ * @param {string} html - body_html Tiptap (déjà sanitizé à l'écriture)
+ * @returns {string}
+ */
+function groupBodyForPdf(html) {
+  if (!html) return '';
+  const { parse } = require('node-html-parser');
+  const root = parse(html);
+
+  const isHeading = (node, tags) =>
+    node.nodeType === 1 && tags.includes(node.rawTagName?.toLowerCase());
+
+  // Passe 1 — sous-blocs h3.
+  let out = [];
+  let sub = null; // liste de nodes du mr-sub en cours
+  const flushSub = () => {
+    if (!sub) return;
+    out.push(`<div class="mr-sub">${sub.map(n => n.toString()).join('')}</div>`);
+    sub = null;
+  };
+  for (const node of root.childNodes) {
+    if (isHeading(node, ['h2'])) { flushSub(); out.push(node.toString()); }
+    else if (isHeading(node, ['h3'])) { flushSub(); sub = [node]; }
+    else if (sub) { sub.push(node); }
+    else { out.push(node.toString()); }
+  }
+  flushSub();
+
+  // Passe 2 — chaque h2 absorbe le bloc suivant dans un mr-head.
+  const grouped = [];
+  for (let i = 0; i < out.length; i++) {
+    const chunk = out[i];
+    if (/^<h2[\s>]/i.test(chunk) && i + 1 < out.length) {
+      grouped.push(`<div class="mr-head">${chunk}${out[i + 1]}</div>`);
+      i++;
+    } else {
+      grouped.push(chunk);
+    }
+  }
+  return grouped.join('');
+}
+
+module.exports = { MAINTENANCE_REPORT_SKELETON_HTML, formatPeriodLabel, groupBodyForPdf };

@@ -21,7 +21,7 @@ const config = require('../config');
 const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl } = require('../lib/pdf');
 const { sanitize: sanitizeHtmlField } = require('../lib/html-sanitize');
 const { assertRead, assertWrite } = require('../lib/af-permissions');
-const { MAINTENANCE_REPORT_SKELETON_HTML, formatPeriodLabel } = require('../lib/maintenance-report');
+const { MAINTENANCE_REPORT_SKELETON_HTML, formatPeriodLabel, groupBodyForPdf } = require('../lib/maintenance-report');
 const log = require('../lib/logger').system;
 
 const patchSchema = z.object({
@@ -87,7 +87,7 @@ module.exports = async function maintenanceReportRoutes(fastify) {
       clientName: row.client_name,
       periodLabel: formatPeriodLabel(row.mr_period_start, row.mr_period_end),
       dateLabel: now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-      body_html: getBodySection(row.id).body_html || '',
+      body_html: groupBodyForPdf(getBodySection(row.id).body_html || ''),
       logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
     };
   }

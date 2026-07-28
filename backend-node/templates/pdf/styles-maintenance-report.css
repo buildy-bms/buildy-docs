@@ -31,6 +31,10 @@
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.55);
   margin-bottom: auto;
+  /* Réserve la zone du logo (absolute top-right, ~55mm de large) : sans
+     ça, une période longue (« du 1 janvier 2025 au 1 juillet 2026 »)
+     passe SOUS le logo. */
+  padding-right: 62mm;
 }
 .cover .cover-logo {
   position: absolute;
@@ -107,29 +111,43 @@
    avec le début du contenu qui suit. */
 .report-body h2 {
   font-family: 'Poppins', sans-serif;
-  font-size: 12.5pt;
+  font-size: 15pt;
   font-weight: 700;
   color: var(--navy, #1b2842);
   background: #f0faf7;
-  border-left: 1.2mm solid #00cd92;
+  border-left: 1.4mm solid #00cd92;
   border-radius: 1mm;
-  padding: 2.6mm 4mm;
-  margin: 7mm 0 3.5mm 0;
+  padding: 3mm 4.5mm;
+  margin: 8mm 0 4mm 0;
   break-after: avoid;
   break-inside: avoid;
 }
 .report-body h2:first-child { margin-top: 0; }
 
-/* H3 = labels de sous-blocs (Signalement / Réponse Buildy / Résultat /
-   Demande / Intervention Buildy…). Petites capitales grises, collées au
-   paragraphe qui suit. */
+/* H3 = sous-titres (entrées datées ou labels Signalement / Réponse
+   Buildy / Résultat selon la structure choisie). Navy affirmé, collé
+   au paragraphe qui suit. */
 .report-body h3 {
-  font-size: 9pt;
+  font-family: 'Poppins', sans-serif;
+  font-size: 10.5pt;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--gray-600, #4b5563);
-  margin: 4mm 0 1.2mm 0;
+  color: var(--navy, #1b2842);
+  margin: 5mm 0 1.5mm 0;
   break-after: avoid;
 }
 .report-body p { break-inside: avoid; }
+
+/* Groupes insécables construits côté serveur (groupBodyForPdf) :
+   - .mr-sub  : un h3 + son contenu jusqu'au h2/h3 suivant — jamais de
+     label orphelin en bas de page ;
+   - .mr-head : un h2 + son premier bloc suivant — jamais de bandeau
+     seul en bas de page (break-after: avoid seul est peu fiable dans
+     Chromium sur les blocs à fond/bordure).
+   Si un groupe dépasse une page, Chromium ignore l'avoid : pas de
+   page blanche possible. */
+.report-body .mr-sub,
+.report-body .mr-head {
+  break-inside: avoid;
+}
