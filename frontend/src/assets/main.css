@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Chiffres en Sora sans toucher au balisage : famille limitée aux chiffres 0-9,
+   placée en tête de --font-sans / --font-display. On référence directement le
+   woff2 de Sora (sa variante texte n'est plus importée dans main.js). */
+@font-face {
+  font-family: "Sora Digits";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("@fontsource-variable/sora/files/sora-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0030-0039;
+}
+
 /**
  * Brand color (Buildy) — alignee sur edge-fleet-manager / buildy-tools.
  * Couleur principale #1b2842 (bleu marine Buildy) pour les classes indigo.
@@ -17,11 +29,12 @@
   --color-indigo-900: #0a0f1a;
   --color-indigo-950: #050810;
 
-  /* Polices Buildy : Inter (corps / utilities Tailwind font-sans) +
-     Poppins (titres uniquement, via font-display ou h1-h6).
+  /* Polices Buildy (décision 2026-09-16) : TEXTE en Poppins, CHIFFRES en Sora.
+     « Sora Digits » ne couvre que 0-9 (unicode-range, cf. @font-face plus bas) et
+     passe en tête : les nombres sortent en Sora, le reste en Poppins.
      Aligne sur les PDF (cf. docs/pdf-design-system.md). */
-  --font-sans: 'Sora Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Sora Digits', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Sora Digits', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-body: var(--font-sans); /* alias historique */
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   /* Compatibilite descendante : --font-serif pointe sur Inter (anciennement Manrope) */

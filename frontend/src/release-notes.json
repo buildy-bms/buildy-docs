@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.260",
+      "date": "2026-09-16",
+      "title": "Nouvelle typographie : texte en Poppins, chiffres en Sora",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les nombres se distinguent du texte",
+          "what": "L'interface passe en Poppins pour le texte, et tous les chiffres s'affichent en Sora : puissances, surfaces, dates, références d'articles du décret. Les tableaux d'équipements et de compteurs y gagnent en lisibilité. Les polices embarquées sont aussi allégées (68 kilo-octets au lieu de 276). Les PDF livrés aux clients ne changent pas : ils gardent leur charte.",
+          "where": "Toute l'application. Sans effet sur les rapports PDF.",
+          "how_to_test": "Recharger une page : dans un tableau d'équipements, comparer un libellé et une puissance — le texte est en Poppins, les chiffres en Sora."
+        }
+      ]
+    },
+    {
       "version": "0.1.259",
       "date": "2026-07-28",
       "title": "Fix : liens publics /dl en erreur 503 sur les gros PDF",
