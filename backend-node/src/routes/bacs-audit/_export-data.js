@@ -16,7 +16,7 @@ const { buildMeterCoverage } = require('./_meter-coverage');
 const { systemInteropStatus } = require('./_interop');
 const { METER_USAGE_TO_SYSTEM_CATS } = require('./_shared');
 const { buildSiteStaticMap, buildZonesStaticMap } = require('../../lib/static-map');
-const { regulationTypeLabel } = require('../../lib/regulation-defaults');
+const { regulationTypeLabel, resolveEmissionGranularity } = require('../../lib/regulation-defaults');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 // Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
@@ -774,28 +774,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     return d.name || d.brand || d.model_reference || `Équipement #${d.id}`;
   };
 
-  // Mig 180 : 1 ligne par système. La granularité (per_room/per_zone/…)
-  // est désormais dérivée du type de régulation d'émission du device
-  // émetteur (regulation_type_emission). Le nom affichable du système
-  // vient de bacs_audit_systems.custom_label (joint en SQL).
-  const granularityFromEmissionType = emissionType => {
-    if (!emissionType) return 'central_only';
-    if (emissionType === 'thermostat_ambiant' || emissionType === 'vanne_thermostatique') return 'per_room';
-    if (emissionType === 'sonde_zone') return 'per_zone';
-    return 'central_only';
-  };
-
+  // Mig 180 : 1 ligne par système. Le nom affichable du système vient de
+  // bacs_audit_systems.custom_label (joint en SQL).
   const thermalAll = thermalRaw.map(t => {
     const prodDevice = t.generator_device_id ? devicesById.get(t.generator_device_id) : null;
     const distDevice = t.distribution_device_id ? devicesById.get(t.distribution_device_id) : null;
     const emitDevice = t.emission_device_id ? devicesById.get(t.emission_device_id) : null;
     const generatorEnergy = prodDevice?.energy_source || null;
     const generatorAgeYears = prodDevice?.age_years ?? null;
-    // Granularité dérivée de l'émetteur (mig 180), fallback sur l'archive.
-    const derivedKey = granularityFromEmissionType(emitDevice?.regulation_type_emission);
-    // Mig 187 : saisie explicite du champ regulation_granularity sur le device
-    // émetteur prioritaire sur la dérivation depuis le type d'émission.
-    const granularityKey = emitDevice?.regulation_granularity || derivedKey;
+    // Granularité de l'émetteur : saisie explicite (mig 187) sinon dérivée du
+    // type de régulation d'émission — même règle que l'UI et le plan d'action.
+    const granularityKey = resolveEmissionGranularity(emitDevice);
     const hasAutoReg = !!(emitDevice?.regulation_type_emission
       || distDevice?.regulation_type_distribution
       || prodDevice?.regulation_type_production

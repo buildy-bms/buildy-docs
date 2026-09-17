@@ -142,3 +142,48 @@ describe('bacs-audit-action-generator — R175 compliance', () => {
     expect(r175).toHaveLength(0);
   });
 });
+
+// Reproduit l'audit Sénas (2026-09) : cellule sans chauffage (système absent
+// créé d'office par l'inventaire) + bureaux VRF dont l'unité intérieure est
+// « Thermostat ambiant » / « Par pièce ». Aucune action R175-6 attendue.
+describe('bacs-audit-action-generator — R175-6 régulation thermique', () => {
+  function seedThermal({ present, emitter } = {}) {
+    const { afId, zoneId } = seedAudit({});
+    db.db.prepare('UPDATE afs SET bacs_building_permit_date = ? WHERE id = ?').run('2022-01-01', afId);
+    const sysId = db.db.prepare(
+      `INSERT INTO bacs_audit_systems (document_id, zone_id, system_category, present) VALUES (?, ?, 'heating', ?)`
+    ).run(afId, zoneId, present).lastInsertRowid;
+    let emitId = null;
+    if (emitter) {
+      emitId = db.db.prepare(
+        `INSERT INTO bacs_audit_system_devices (system_id, name, device_role, regulation_type_emission, regulation_granularity)
+         VALUES (?, 'Unité intérieure', '["emission","regulation"]', ?, ?)`
+      ).run(sysId, emitter.type ?? null, emitter.granularity ?? null).lastInsertRowid;
+    }
+    db.db.prepare(
+      `INSERT INTO bacs_audit_thermal_regulation (document_id, zone_id, system_id, category, has_automatic_regulation, emission_device_id)
+       VALUES (?, ?, ?, 'heating', 0, ?)`
+    ).run(afId, zoneId, sysId, emitId);
+    return [...computeTargetActions(afId).values()].filter(t => t.r175_article === 'R175-6');
+  }
+
+  it('chauffage déclaré absent => pas d\'action', () => {
+    expect(seedThermal({ present: 0 })).toHaveLength(0);
+  });
+
+  it('émetteur « Thermostat ambiant » + granularité « Par pièce » => pas d\'action', () => {
+    expect(seedThermal({ present: 1, emitter: { type: 'thermostat_ambiant', granularity: 'per_room' } })).toHaveLength(0);
+  });
+
+  it('granularité dérivée du type (sonde de zone, sans saisie explicite) => pas d\'action', () => {
+    expect(seedThermal({ present: 1, emitter: { type: 'sonde_zone' } })).toHaveLength(0);
+  });
+
+  it('granularité explicite « Centralisée » prime sur le type => action', () => {
+    expect(seedThermal({ present: 1, emitter: { type: 'thermostat_ambiant', granularity: 'central_only' } })).toHaveLength(1);
+  });
+
+  it('chauffage présent sans émetteur lié => action', () => {
+    expect(seedThermal({ present: 1 })).toHaveLength(1);
+  });
+});

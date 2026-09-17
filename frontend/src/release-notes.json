@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.261",
+      "date": "2026-09-17",
+      "title": "Fix : fausses non-conformités R175-6 (régulation thermique)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus d'action « régulation thermique » pour un chauffage absent",
+          "what": "Chaque zone intérieure reçoit d'office une ligne « chauffage » pour l'inventaire. Même déclaré absent, ce chauffage était évalué, et une cellule sans aucun chauffage ressortait « non conforme R175-6 ». Seuls les systèmes déclarés présents sont désormais évalués.",
+          "where": "Audit BACS → Plan d'action et rapport PDF, article R175-6.",
+          "how_to_test": "Dans un audit dont le permis de construire est postérieur au 21/07/2021, laisser le chauffage d'une zone sur « absent » : aucune action « Mettre en place une régulation thermique… » pour cette zone."
+        },
+        {
+          "kind": "fix",
+          "title": "La granularité « par pièce / par zone » de l'émetteur est enfin prise en compte",
+          "what": "Le plan d'action ignorait la granularité saisie sur l'équipement émetteur, alors que la carte 06 l'affichait. Un VRF à unités intérieures « par pièce » était déclaré non conforme. Le plan d'action, la carte 06 et le PDF appliquent maintenant la même règle : d'abord la granularité choisie, sinon celle déduite du type (thermostat ambiant ou avec sonde déportée, vanne thermostatique → par pièce ; sonde de zone → par zone). Au passage, le PDF classe correctement le « thermostat avec sonde déportée » en « par pièce ».",
+          "where": "Audit BACS → carte 06 Régulation thermique, Plan d'action, rapport PDF.",
+          "how_to_test": "Relier en émission une unité intérieure « Thermostat ambiant » à un chauffage présent : pas d'action R175-6. Passer sa granularité à « Centralisée » : l'action réapparaît."
+        }
+      ]
+    },
+    {
       "version": "0.1.260",
       "date": "2026-09-16",
       "title": "Nouvelle typographie : texte en Poppins, chiffres en Sora",

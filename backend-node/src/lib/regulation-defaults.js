@@ -216,7 +216,27 @@ function regulationTypeLabel(raw) {
   return REGULATION_TYPE_LABEL[raw] || raw;
 }
 
+// Granularité R175-6 (per_room / per_zone / central_only) d'un device
+// émetteur. Miroir de `resolveGranularity()` + `derivedGranularity()` de
+// frontend/src/lib/audit-options.js : la saisie explicite
+// `regulation_granularity` (mig 187) prime, sinon dérivation depuis
+// `regulation_type_emission`. Toute évolution doit être répercutée côté front.
+function derivedEmissionGranularity(emissionType) {
+  if (!emissionType) return 'central_only';
+  if (emissionType === 'thermostat_ambiant' || emissionType === 'thermostat_sonde_deportee' || emissionType === 'vanne_thermostatique') return 'per_room';
+  if (emissionType === 'sonde_zone') return 'per_zone';
+  return 'central_only';
+}
+function resolveEmissionGranularity(device) {
+  if (device?.regulation_granularity) return device.regulation_granularity;
+  return derivedEmissionGranularity(device?.regulation_type_emission || null);
+}
+const GRANULARITY_R175_COMPLIANT = new Set(['per_room', 'per_zone']);
+
 module.exports = {
+  derivedEmissionGranularity,
+  resolveEmissionGranularity,
+  GRANULARITY_R175_COMPLIANT,
   BACS,
   LIBRARY_TO_BACS,
   defaultsForBacsCategory,

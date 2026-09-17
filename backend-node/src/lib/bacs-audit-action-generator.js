@@ -22,6 +22,7 @@
 const db = require('../database');
 const log = require('./logger').system;
 const { isTrue, isFalse } = require('../routes/bacs-audit/_ternary');
+const { resolveEmissionGranularity, GRANULARITY_R175_COMPLIANT } = require('./regulation-defaults');
 
 // Mappings FR pour les libellés affichés dans les actions correctives
 // (utilisés dans tout le code BACS — détail view, action items view, PDF).
@@ -596,12 +597,14 @@ function computeTargetActions(documentId) {
     const thermal = db.db.prepare(`
       SELECT t.*, z.name AS zone_name,
              s.custom_label AS system_label,
+             s.present AS system_present,
              dProd.energy_source AS prod_energy_source,
              dProd.regulation_type_production AS prod_reg_type,
              dProd.has_regulation AS prod_has_regulation,
              dDist.regulation_type_distribution AS dist_reg_type,
              dDist.has_regulation AS dist_has_regulation,
              dEmit.regulation_type_emission AS emit_reg_type,
+             dEmit.regulation_granularity AS emit_granularity,
              dEmit.has_regulation AS emit_has_regulation
       FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.id = t.zone_id
@@ -611,9 +614,12 @@ function computeTargetActions(documentId) {
       LEFT JOIN bacs_audit_system_devices dEmit ON dEmit.id = t.emission_device_id
       WHERE t.document_id = ?
     `).all(documentId);
-    // Granularité conforme R175-6 II 2° : « par pièce ou par zone chauffée ».
-    const GRANULAR_REG = new Set(['per_room', 'per_zone']);
     for (const t of thermal) {
+      // Seuls les systèmes déclarés PRÉSENTS sont évalués (parité card 06 et
+      // PDF). Le resync crée d'office un système absent + sa ligne thermique
+      // pour chaque zone intérieure (inventaire R175-1) : sans ce filtre, une
+      // cellule sans chauffage était déclarée non conforme (audit Sénas 2026-09).
+      if (t.system_id == null || !isTrue(t.system_present)) continue;
       const cat = t.category || 'heating';
       // R175-6 vise la régulation de la CHALEUR. La régulation du froid relève
       // d'un autre texte (décret n°2023-444 du 7 juin 2023) — hors du périmètre
@@ -627,8 +633,17 @@ function computeTargetActions(documentId) {
       // Conformité = régulation automatique PAR PIÈCE ou PAR ZONE au niveau de
       // l'ÉMISSION. Une loi d'eau de production seule ou une régulation
       // centralisée (central_only) ne satisfait PAS la granularité terminale.
-      const emissionGranular = GRANULAR_REG.has(t.emit_reg_type)
-        || GRANULAR_REG.has(t.regulation_type); // fallback legacy (pré-mig 180)
+      // Granularité résolue comme l'UI et le PDF : saisie explicite sur
+      // l'émetteur, sinon dérivée du type (thermostat ambiant → par pièce…).
+      // Sans émetteur lié, resolveEmissionGranularity renvoie central_only.
+      const emitGranularity = t.emission_device_id != null
+        ? resolveEmissionGranularity({
+            regulation_granularity: t.emit_granularity,
+            regulation_type_emission: t.emit_reg_type,
+          })
+        : null;
+      const emissionGranular = GRANULARITY_R175_COMPLIANT.has(emitGranularity)
+        || GRANULARITY_R175_COMPLIANT.has(t.regulation_type); // fallback legacy (pré-mig 180)
       if (!emissionGranular) {
         const entryLabel = (t.system_label && t.system_label.trim())
           || (t.label && t.label.trim())
