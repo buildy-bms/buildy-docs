@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.262",
+      "date": "2026-09-23",
+      "title": "Fix : validation des inspections, compteurs hors service, compteurs des ventilo-convecteurs",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La carte « Inspection périodique par un tiers » se valide avec la réponse « Non »",
+          "what": "Répondre « Non » à « Y a-t-il une inspection officielle à tracer ? » ne suffisait pas : le serveur exigeait quand même une date d'inspection et refusait la validation (bandeau « Erreur de sauvegarde »). La réponse « Non » est désormais respectée, et une seule inspection datée suffit quand plusieurs sont tracées.",
+          "where": "Audit BACS → carte 07 Inspection périodique par un tiers.",
+          "how_to_test": "Répondre « Non » puis cliquer « Valider » : la carte passe en « Étape validée »."
+        },
+        {
+          "kind": "ux",
+          "title": "« Hors service : Non » n'est plus affiché en rouge",
+          "what": "Dans les tableaux de compteurs, la bonne réponse « pas hors service » (✗) apparaissait en rouge, comme une erreur, ce qui incitait à cliquer ✓ et à déclarer le compteur hors service par mégarde. Elle est maintenant verte. Dans la carte GTB, un compteur ou un équipement hors service indique pourquoi il est grisé et non cochable.",
+          "where": "Audit BACS → carte 05 Compteurs (colonne Hors service) et carte 06 GTB (listes des équipements et compteurs intégrés).",
+          "how_to_test": "Carte 05 : la colonne Hors service affiche ✗ en vert. Passer un compteur à ✓ : en carte 06, sa ligne indique « Hors service (section 5) »."
+        },
+        {
+          "kind": "fix",
+          "title": "Ventilo-convecteurs partagés chaud / froid : compteurs thermiques par zone",
+          "what": "Un émetteur partagé entre le chauffage et le refroidissement d'une zone (ventilo-convecteur 4 tubes) était ignoré pour le chauffage : aucun compteur chauffage n'était demandé dans la zone. Et un refroidissement sur eau glacée sans production dans la zone générait un compteur électrique au lieu d'un compteur thermique. Les deux sont corrigés. Les zones avec leur propre production (PAC réversible, chaudière), et les émetteurs déclarés « comptage non séparable », gardent le comportement actuel.",
+          "where": "Audit BACS → carte 05 Compteurs (bloc Thermique).",
+          "how_to_test": "Dans une zone, mettre un ventilo-convecteur (rôle Émission) en Refroidissement et le partager vers le Chauffage de la même zone : le bloc Thermique demande Chauffage et Refroidissement pour cette zone, et plus de Refroidissement en Électrique."
+        }
+      ]
+    },
+    {
       "version": "0.1.261",
       "date": "2026-09-17",
       "title": "Fix : fausses non-conformités R175-6 (régulation thermique)",

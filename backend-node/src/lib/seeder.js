@@ -1177,6 +1177,53 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // Pour heating / dhw / electricity_production, on ne fait pas de fallback :
   // l'energie primaire depend du generateur (gaz, fioul, reseau, solaire…)
   // et l'auditeur doit renseigner le device pour qu'on puisse trancher.
+  // Exception cooling : un froid HYDRAULIQUE (émetteurs sur eau glacée sans
+  // production locale — ventilo-convecteurs 4 tubes, poutres froides…) n'a
+  // rien d'électrique à compter dans la zone : il relève du compteur
+  // thermique zonal (Fix G) et non de ce fallback (audit STEF #60).
+  //
+  // Systèmes thermiques « émetteurs sans production locale » :
+  //  (a) règle historique : émetteur/distribution PROPRE au système et
+  //      aucune production propre (aérothermes sur chaufferie centrale…) ;
+  //  (b) partage (mig 143) : émetteur partagé vers un chauffage ou un froid
+  //      (VC 4 tubes primaire en froid, partagé en chauffage) quand la zone
+  //      n'a AUCUNE production, ni propre ni partagée depuis la même zone
+  //      (PAC réversible partagée froid→chauffage = production locale).
+  //      Émetteur purement aval (un rooftop partagé n'en est pas un) et
+  //      comptage non déclaré non séparable (metering_separable='no',
+  //      mig 159). Une chaudière centrale d'une autre zone ne compte pas.
+  // (b) n'ajoute que des cas : (a) est inchangé. Rejoué sur les audits
+  // réels #40/#43/#45/#56 : aucun compteur ajouté ni retiré.
+  const THERMAL_ZONAL_CATEGORIES = ['heating', 'cooling', 'dhw'];
+  const ROLE_PROD_SQL = `(d.device_role LIKE '%production%' OR d.device_role LIKE '%generator%')`;
+  const ROLE_DOWNSTREAM_SQL = `(d.device_role LIKE '%emission%' OR d.device_role LIKE '%distribution%')`;
+  const systemsWithLocalEmitters = db.db.prepare(`
+    SELECT s.id, s.zone_id, s.system_category,
+      (SELECT COUNT(*) FROM bacs_audit_system_devices d
+        WHERE d.system_id = s.id AND ${ROLE_PROD_SQL}) AS n_prod,
+      (SELECT COUNT(*) FROM bacs_audit_system_devices d
+        WHERE d.system_id = s.id AND ${ROLE_DOWNSTREAM_SQL}) AS n_downstream,
+      (SELECT COUNT(*) FROM bacs_audit_device_shared_systems ss
+        JOIN bacs_audit_system_devices d ON d.id = ss.device_id
+        JOIN bacs_audit_systems ps ON ps.id = d.system_id
+        WHERE ss.system_id = s.id AND ps.zone_id = s.zone_id AND ${ROLE_PROD_SQL}) AS n_prod_shared_local,
+      (SELECT COUNT(*) FROM bacs_audit_device_shared_systems ss
+        JOIN bacs_audit_system_devices d ON d.id = ss.device_id
+        WHERE ss.system_id = s.id AND ${ROLE_DOWNSTREAM_SQL} AND NOT ${ROLE_PROD_SQL}
+          AND COALESCE(d.metering_separable, '') != 'no') AS n_downstream_shared
+    FROM bacs_audit_systems s
+    WHERE s.document_id = ? AND s.is_bacs = 1 AND s.present = 1
+      AND (s.marked_negligible_under_5pct IS NULL OR s.marked_negligible_under_5pct = 0)
+      AND s.system_category IN ('heating', 'cooling', 'dhw')
+      AND s.zone_id IS NOT NULL
+  `).all(documentId);
+  const hydronicSystemIds = new Set(systemsWithLocalEmitters.filter(s =>
+    s.n_prod === 0 && (
+      s.n_downstream > 0 ||
+      (s.system_category !== 'dhw' && s.n_prod_shared_local === 0 && s.n_downstream_shared > 0)
+    )
+  ).map(s => s.id));
+
   const CATEGORY_ELECTRIC_FALLBACK = new Set(['ventilation', 'cooling', 'lighting_indoor', 'lighting_outdoor']);
   const presentSystemsForFallback = db.db.prepare(`
     SELECT id, zone_id, system_category FROM bacs_audit_systems
@@ -1186,6 +1233,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   `).all(documentId);
   for (const s of presentSystemsForFallback) {
     if (!CATEGORY_ELECTRIC_FALLBACK.has(s.system_category) || !s.zone_id) continue;
+    if (hydronicSystemIds.has(s.id)) continue;
     const usage = CATEGORY_TO_USAGE[s.system_category] || 'other';
     const meterType = 'electric';
     const key = keyZonal(s.zone_id, usage, meterType);
@@ -1208,28 +1256,12 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // chaudière mesure la conso primaire globale, mais un compteur
   // thermique zonal (BTU meter sur le retour d'eau) est nécessaire pour
   // ventiler la consommation par zone. Distinct du compteur primaire, pas
-  // de doublon.
-  const THERMAL_ZONAL_CATEGORIES = ['heating', 'cooling', 'dhw'];
-  const systemsWithLocalEmitters = db.db.prepare(`
-    SELECT s.id, s.zone_id, s.system_category,
-      SUM(CASE WHEN d.device_role LIKE '%production%' OR d.device_role LIKE '%generator%' THEN 1 ELSE 0 END) AS n_prod,
-      SUM(CASE WHEN d.device_role LIKE '%emission%' OR d.device_role LIKE '%distribution%' THEN 1 ELSE 0 END) AS n_downstream
-    FROM bacs_audit_systems s
-    LEFT JOIN bacs_audit_system_devices d ON d.system_id = s.id
-    WHERE s.document_id = ? AND s.is_bacs = 1 AND s.present = 1
-      AND (s.marked_negligible_under_5pct IS NULL OR s.marked_negligible_under_5pct = 0)
-      AND s.system_category IN ('heating', 'cooling', 'dhw')
-      AND s.zone_id IS NOT NULL
-    GROUP BY s.id
-  `).all(documentId);
+  // de doublon. (systemsWithLocalEmitters calculé avant Fix A, partages inclus.)
   for (const s of systemsWithLocalEmitters) {
     if (!THERMAL_ZONAL_CATEGORIES.includes(s.system_category)) continue;
-    // Deja couvert par un device production local → le compteur primaire
-    // (gaz/electrique/thermique) suffit, pas besoin d'un thermique zonal.
-    if (s.n_prod > 0) continue;
-    // Pas de device d'emission/distribution local non plus → rien a
-    // compter dans cette zone (aucun equipement receveur d'energie).
-    if (s.n_downstream === 0) continue;
+    // Production locale (compteur primaire suffisant) ou aucun émetteur
+    // (rien à compter) → pas de thermique zonal. Cf. hydronicSystemIds.
+    if (!hydronicSystemIds.has(s.id)) continue;
     const usage = CATEGORY_TO_USAGE[s.system_category];
     const meterType = 'thermal';
     const key = keyZonal(s.zone_id, usage, meterType);

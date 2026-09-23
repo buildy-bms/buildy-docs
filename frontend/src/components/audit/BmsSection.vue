@@ -538,12 +538,15 @@ function hasNotes(html) {
                         <span :class="d.bms_integration_out_of_service ? 'text-red-500' : 'text-gray-400'">
                           — {{ systemLabels[d.system_category] || d.system_category }}
                         </span>
+                        <span v-if="d.out_of_service" class="text-[11px] text-red-600">Hors service (section 3)</span>
                       </span>
                     </td>
                     <td class="py-1 text-center">
-                      <CompactToggle compact :model-value="triState(d.managed_by_bms)"
-                                     :disabled="!!d.out_of_service"
-                                     @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
+                      <Tooltip :text="d.out_of_service ? 'Équipement déclaré hors service en section 3 — il ne peut pas être intégré à la GTB.' : ''">
+                        <CompactToggle compact :model-value="triState(d.managed_by_bms)"
+                                       :disabled="!!d.out_of_service"
+                                       @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
+                      </Tooltip>
                     </td>
                     <td class="py-1 text-center">
                       <Tooltip
@@ -598,10 +601,11 @@ function hasNotes(html) {
                       <td class="px-2 py-1 pl-8">
                         <span class="inline-flex items-center gap-2">
                           <MeterUsagePill :usage="m.usage" />
+                          <span v-if="m.out_of_service" class="text-[11px] text-red-600">Hors service (section 5)</span>
                         </span>
                       </td>
                       <td class="py-1 text-center">
-                        <Tooltip :text="!m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
+                        <Tooltip :text="m.out_of_service ? 'Compteur déclaré hors service en section 5 — repasse « Hors service » sur ✗ pour pouvoir l\'intégrer.' : !m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
                           <CompactToggle compact :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
                                          :disabled="!!m.out_of_service || !m.communicating"
                                          @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />

@@ -25,8 +25,10 @@ defineProps({
   noLabel: { type: String, default: 'Non' },
   // Tooltip global sur l'ensemble (ex: "Compteur présent sur site ?").
   tooltip: { type: String, default: '' },
-  // Variante "yes danger" : le "Oui" est rouge au lieu de vert. Utilisé pour
+  // Variante "yes danger" : le "Oui" est rouge et le "Non" vert. Utilisé pour
   // les booléens où le "oui" est une mauvaise nouvelle (out_of_service…).
+  // Sans l'inversion du "Non", la bonne réponse s'affichait en rouge et
+  // incitait à cliquer ✓ pour « corriger » — donc à déclarer HS par erreur.
   yesDanger: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   // Taille : 'sm' = 28px (defaut, colonnes tableau, desktop dense),
@@ -61,7 +63,7 @@ function pick(v) {
             :class="['seg-btn font-medium transition whitespace-nowrap select-none border-l border-gray-200',
                      size === 'lg' ? 'min-h-12 px-4' : 'h-7 px-3',
                      modelValue === false
-                       ? 'bg-red-100 text-red-700'
+                       ? (yesDanger ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700')
                        : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50']"
             @click="pick(false)">
       <span class="font-bold">✗</span><span v-if="!compact" class="ml-1">{{ noLabel }}</span>

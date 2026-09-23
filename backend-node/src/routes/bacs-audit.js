@@ -1337,6 +1337,9 @@ async function routes(fastify) {
     );
     for (const sid of requested) markPresent.run(sid);
 
+    // Un émetteur partagé ouvre un comptage thermique zonal dans les
+    // systèmes cibles (seeder Fix G) → resync compteurs.
+    resyncBacsAuditWithSiteZones(dev.document_id);
     regenerateActionItems(dev.document_id);
 
     return {
@@ -1378,6 +1381,7 @@ async function routes(fastify) {
     db.db.prepare('UPDATE bacs_audit_systems SET present = 1, not_concerned = 0 WHERE id = ?')
       .run(body.system_id);
     logBacsAudit(request, 'bacs.device.move', dev.document_id, { deviceId: id, toSystemId: body.system_id });
+    resyncBacsAuditWithSiteZones(dev.document_id);
     regenerateActionItems(dev.document_id);
 
     return {

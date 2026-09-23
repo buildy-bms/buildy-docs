@@ -62,10 +62,14 @@ function isStepComplete(documentId, stepKey) {
         'SELECT present FROM bacs_audit_bms WHERE document_id = ?'
       ).get(documentId);
       if (bms && bms.present === 0) return true;     // étape masquée sans GTB
-      const ins = db.db.prepare(
-        'SELECT last_inspection_date FROM bacs_audit_inspections WHERE document_id = ? ORDER BY id LIMIT 1'
-      ).get(documentId);
-      return !!(ins && ins.last_inspection_date);
+      // Mig 187 — « Y a-t-il une inspection à tracer ? » = Non → bypass.
+      if (af.inspection_not_applicable === 1) return true;
+      // Front : inspections triées par date DESC (NULL en dernier), [0] datée
+      // ⇔ au moins une inspection datée.
+      return count(
+        `SELECT COUNT(*) n FROM bacs_audit_inspections
+         WHERE document_id = ? AND last_inspection_date IS NOT NULL AND last_inspection_date != ''`
+      ) > 0;
     }
 
     case 'docs-checklist': {
