@@ -21,6 +21,7 @@ const {
 } = require('./bacs-audit/_shared');
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
 const { parseRoles, serializeRoles, rolesAllowEnergySource } = require('../lib/device-roles');
+const { BUILDY_OFFER_LEVELS, BUILDY_CLOUD_CREDENTIAL, applyBuildyCloudPreset } = require('../lib/buildy-cloud-preset');
 
 // Mapping d'un row device vers l'API : parse `device_role` en array (mig 117).
 function mapDevice(d) {
@@ -688,6 +689,8 @@ async function routes(fastify) {
       gestionnaire_exploitant_access: z.enum(['yes', 'no', 'partial']).nullable().optional(),
       export_capability: z.enum(['yes', 'no']).nullable().optional(),
       data_access_notes: z.string().nullable().optional(),
+      // Mig 205 — niveau d'offre de la supervision Buildy Cloud.
+      buildy_offer_level: z.enum(BUILDY_OFFER_LEVELS).nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -712,6 +715,31 @@ async function routes(fastify) {
     }
     regenerateActionItems(documentId);
     return db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
+  });
+
+  // Modèle « Supervision Buildy Cloud » : pré-remplit la fiche GTB selon le
+  // niveau d'offre souscrit + crée l'accès « comptes nominatifs » de la
+  // carte Credentials (lib/buildy-cloud-preset.js).
+  fastify.post('/bacs-audit/:documentId/bms/buildy-cloud-preset', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, request, reply, { requiredRole: 'write' });
+    if (!af) return;
+    const schema = z.object({ level: z.enum(BUILDY_OFFER_LEVELS) });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const result = applyBuildyCloudPreset(db.db, {
+      documentId, siteId: af.site_id, level: body.level, userId: request.authUser?.id,
+    });
+    logBacsAudit(request, 'bacs.bms.buildy_cloud_preset', documentId, {
+      level: body.level, fields: result.fields, credentialCreated: result.credentialCreated,
+    });
+    if (result.credentialCreated) {
+      db.auditLog.add({ userId: request.authUser?.id, action: 'site_credential.create',
+        payload: { site_id: af.site_id, title: BUILDY_CLOUD_CREDENTIAL.title, type: BUILDY_CLOUD_CREDENTIAL.type, via: 'buildy_cloud_preset' } });
+    }
+    regenerateActionItems(documentId);
+    return { bms: result.bms, credential_created: result.credentialCreated };
   });
 
   // ─── BMS components (passerelles, automates, contrôleurs, IO…) ─────

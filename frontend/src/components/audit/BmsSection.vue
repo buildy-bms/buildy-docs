@@ -20,7 +20,9 @@ import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import CompactToggle from '@/components/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsDevice, updateBacsMeter, uploadSiteDocument } from '@/api'
+import { useConfirm } from '@/composables/useConfirm'
+import { updateBacsDevice, updateBacsMeter, uploadSiteDocument, applyBuildyCloudPreset } from '@/api'
+import { BUILDY_OFFER_LEVELS, BUILDY_REQUIRED_LEVEL, BUILDY_UNCOVERED_BY_LEVEL, buildyOfferLabel } from '@/lib/buildy-offer'
 
 // Section "Solution GTB / GTC en place" (R175-3 / R175-4 / R175-5).
 // Lit l'etat depuis useAuditStore (bms, document, meters, devices) et
@@ -37,12 +39,41 @@ const props = defineProps({
 })
 const emit = defineEmits([
   'open-notes', 'validate-step', 'invalidate-step',
-  'save-doc', 'refresh-audit-data',
+  'save-doc', 'refresh-audit-data', 'credentials-changed',
 ])
 
 const audit = useAuditStore()
 const { bms, document, meters } = storeToRefs(audit)
 const { success, error } = useNotification()
+const { confirm } = useConfirm()
+
+// Modèle « Supervision Buildy Cloud » (mig 205) : l'auditeur choisit le
+// niveau d'offre souscrit ; le serveur pré-remplit la carte en conséquence
+// et crée l'accès « comptes nominatifs » de la carte 10.
+const buildyUncovered = computed(() => BUILDY_UNCOVERED_BY_LEVEL[bms.value?.buildy_offer_level] || [])
+const applyingPreset = ref(false)
+async function applyBuildyPreset(level) {
+  if (applyingPreset.value) return
+  const ok = await confirm({
+    title: `Supervision Buildy Cloud — niveau ${buildyOfferLabel(level)}`,
+    message: 'La carte GTB est pré-remplie pour ce niveau. Les réponses qui en dépendent (conservation 5 ans, détection des dérives, transmission aux exploitants, maintenance) sont mises à jour ; les autres champs déjà saisis sont conservés. L\'accès « comptes nominatifs » est ajouté en carte 10 s\'il n\'existe pas.',
+    confirmLabel: 'Appliquer',
+  })
+  if (!ok) return
+  clearTimeout(saveTimer) // une sauvegarde en attente écraserait le modèle
+  applyingPreset.value = true
+  try {
+    const { data } = await applyBuildyCloudPreset(audit.docId, level)
+    Object.assign(bms.value, data.bms)
+    audit.refreshActionItems().catch(() => {})
+    if (data.credential_created) emit('credentials-changed')
+    success(`Supervision Buildy Cloud ${buildyOfferLabel(level)} appliquée${data.credential_created ? ' — accès ajouté en carte 10' : ''}`)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Application du modèle impossible')
+  } finally {
+    applyingPreset.value = false
+  }
+}
 
 // Dropzone "Analyse fonctionnelle GTB existante" — accepte PDF/Word/image
 // (contrairement à PhotoDropzone qui n'accepte que les images). Catégorie
@@ -369,6 +400,39 @@ function hasNotes(html) {
         <p v-else-if="bms.present === 0" class="text-xs text-gray-500 mt-3">
           Aucune GTB sur le site — une action « Installer une GTB » est ajoutée au plan de mise en conformité.
         </p>
+
+        <!-- Modèle « Supervision Buildy Cloud » : pré-remplissage selon le niveau d'offre. -->
+        <div v-if="bms.present !== 0" class="mt-4 rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="text-xs text-gray-700 leading-snug flex-1 min-w-60">
+              <div class="font-medium text-gray-800">Supervision Buildy Cloud ? Choisis le niveau d'offre souscrit</div>
+              <div class="text-gray-500 mt-0.5">La carte est pré-remplie pour ce niveau et l'accès « comptes nominatifs » est ajouté en carte 10.</div>
+            </div>
+            <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+              <button v-for="(lvl, i) in BUILDY_OFFER_LEVELS" :key="lvl.value" type="button"
+                      :disabled="applyingPreset"
+                      @click="applyBuildyPreset(lvl.value)"
+                      :class="['h-7 px-3 text-xs font-medium transition whitespace-nowrap disabled:opacity-50',
+                               i > 0 ? 'border-l border-gray-200' : '',
+                               bms.buildy_offer_level === lvl.value ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+                {{ lvl.label }}
+              </button>
+            </div>
+          </div>
+          <div v-if="audit.isBacs && bms.buildy_offer_level && bms.buildy_offer_level !== BUILDY_REQUIRED_LEVEL"
+               class="mt-2.5 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 leading-snug">
+            <strong>Niveau Premium requis pour la conformité au décret BACS.</strong>
+            Le niveau {{ buildyOfferLabel(bms.buildy_offer_level) }} ne couvre pas :
+            <ul class="list-disc ml-4 mt-1 space-y-0.5">
+              <li v-for="u in buildyUncovered" :key="u.article">{{ u.label }} <span class="text-amber-700">({{ u.article }})</span></li>
+            </ul>
+            <div class="mt-1">Une action « Passer la supervision Buildy Cloud au niveau Premium » est ajoutée au plan de mise en conformité.</div>
+          </div>
+          <div v-else-if="audit.isBacs && bms.buildy_offer_level === BUILDY_REQUIRED_LEVEL"
+               class="mt-2.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 leading-snug">
+            Le niveau Premium couvre le décret BACS. Vérifie que l'option API Buildy Connect est souscrite : elle assure la transmission des données aux exploitants (R175-3 dernier alinéa).
+          </div>
+        </div>
       </div>
 
       <div v-if="bms.present === 1" class="px-5 py-4 grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6">
@@ -862,7 +926,7 @@ function hasNotes(html) {
                          class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
                 </div>
               </div>
-              <p v-if="(bms.existing_solution || '').toLowerCase().includes('buildy')" class="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
+              <p v-if="(bms.existing_solution || '').toLowerCase().includes('buildy') && bms.buildy_offer_level !== 'essentials'" class="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
                 ✓ Buildy : exigence R175-5 nativement couverte par le support utilisateur intégré
               </p>
             </div>

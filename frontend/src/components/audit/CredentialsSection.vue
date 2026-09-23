@@ -10,6 +10,9 @@ import { useAuditStore } from '@/stores/audit'
 // systèmes, chiffrés AES-256-GCM côté backend).
 const props = defineProps({
   siteCredCount: { type: Number, default: 0 },
+  // Incrémenté quand un accès est créé ailleurs (modèle Supervision Buildy
+  // Cloud de la carte GTB) : remonte la liste.
+  refreshKey: { type: Number, default: 0 },
   step: { type: Object, default: null },
   active: { type: Boolean, default: false },
 })
@@ -36,6 +39,7 @@ const { document, systems } = storeToRefs(audit)
     <div class="px-5 py-4">
       <SiteCredentialsManager
         v-if="document?.site_uuid"
+        :key="refreshKey"
         :site-uuid="document.site_uuid"
         :systems="systems"
       />

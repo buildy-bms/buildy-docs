@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.266",
+      "date": "2026-09-23",
+      "title": "Nouveau : modèle « Supervision Buildy Cloud » dans la carte GTB",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Pré-remplir la carte GTB d'un site supervisé par Buildy Cloud",
+          "what": "Quand le site est supervisé par Buildy Cloud, il suffit de choisir le niveau d'offre souscrit (Essentials, Smart ou Premium) : la carte GTB est pré-remplie en conséquence (identification, accès aux données, conservation, détection des dérives, transmission aux exploitants, maintenance, formation), et l'accès « Supervision Buildy — comptes nominatifs » est ajouté en carte 10, sans mot de passe puisque chaque utilisateur a son propre compte. Les champs déjà saisis sont conservés, sauf ceux qui dépendent du niveau.",
+          "where": "Audit BACS ou GTB → carte 06 GTB, sous « Une GTB est-elle présente ? ».",
+          "how_to_test": "Carte 06 → « Supervision Buildy Cloud ? » → cliquer un niveau → « Appliquer » : la carte se remplit et un accès apparaît en carte 10."
+        },
+        {
+          "kind": "feature",
+          "title": "Niveau Premium requis pour la conformité BACS : mis en évidence",
+          "what": "En dessous de Premium, un encadré liste les exigences du décret que le niveau souscrit ne couvre pas (en Essentials : conservation 5 ans, détection des dérives, maintenance, accompagnement, transmission aux exploitants ; en Smart : transmission aux exploitants par l'API Buildy Connect). Une seule action « Passer la supervision Buildy Cloud au niveau Premium » est ajoutée au plan (bloquante en Essentials, majeure en Smart) à la place des actions génériques qu'elle couvre. Le rapport PDF affiche le niveau d'offre et le même encadré.",
+          "where": "Carte 06 GTB, plan de mise en conformité et rapport PDF (chapitre GTB).",
+          "how_to_test": "Appliquer le niveau Essentials : l'encadré « Niveau Premium requis » apparaît et le plan contient l'action « Passer la supervision Buildy Cloud au niveau Premium »."
+        }
+      ]
+    },
+    {
       "version": "0.1.265",
       "date": "2026-09-23",
       "title": "Check-list non bloquante, puissance chaud des équipements réversibles",

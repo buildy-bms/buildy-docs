@@ -23,6 +23,9 @@ const db = require('../database');
 const log = require('./logger').system;
 const { isTrue, isFalse } = require('../routes/bacs-audit/_ternary');
 const { resolveEmissionGranularity, GRANULARITY_R175_COMPLIANT } = require('./regulation-defaults');
+const {
+  BUILDY_REQUIRED_LEVEL, BUILDY_OFFER_LEVEL_LABEL, BUILDY_UNCOVERED_BY_LEVEL, isBuildyOfferLevel,
+} = require('./buildy-cloud-preset');
 
 // Mappings FR pour les libellés affichés dans les actions correctives
 // (utilisés dans tout le code BACS — détail view, action items view, PDF).
@@ -486,8 +489,33 @@ function computeTargetActions(documentId) {
     });
   }
   if (!noGtb && bms && !bms.out_of_service) {
-    if (bms.meets_r175_3_p1 === 0) {
+    // Supervision Buildy Cloud sous le niveau requis (mig 205) : UNE action
+    // « passer en Premium » remplace les actions génériques qu'elle couvre
+    // — pour un client Buildy, le remède n'est pas « étendre la rétention »
+    // mais changer de niveau d'offre (lib/buildy-cloud-preset.js).
+    const buildyLevel = bms.buildy_offer_level;
+    const buildyUpgrade = isBuildyOfferLevel(buildyLevel) && buildyLevel !== BUILDY_REQUIRED_LEVEL;
+    const coveredByUpgrade = new Set(!buildyUpgrade ? [] : buildyLevel === 'essentials'
+      ? ['r175_3_p1', 'r175_3_p2', 'data_storage_5y', 'data_provision_operators', 'maintenance']
+      : ['data_provision_operators']);
+    const addBmsTarget = (t) => { if (!coveredByUpgrade.has(t.source_subtype)) addTarget(t); };
+    if (buildyUpgrade) {
+      const levelLabel = BUILDY_OFFER_LEVEL_LABEL[buildyLevel];
+      const uncovered = BUILDY_UNCOVERED_BY_LEVEL[buildyLevel] || [];
       addTarget({
+        source_bms_document_id: documentId, source_subtype: 'buildy_offer_upgrade',
+        category: 'bms_upgrade', severity: buildyLevel === 'essentials' ? 'blocking' : 'major',
+        r175_article: 'R175-3',
+        title: 'Passer la supervision Buildy Cloud au niveau Premium',
+        description: [
+          `Constat\nLa supervision Buildy Cloud du site est souscrite en niveau ${levelLabel}. La conformité au décret BACS exige le niveau Premium, avec l'option API Buildy Connect.`,
+          `Exigences non couvertes par le niveau ${levelLabel}\n${uncovered.map(u => `  • ${u.label} (${u.article})`).join('\n')}`,
+          `Recommandation Buildy pour la conformité\nPasser l'abonnement de supervision au niveau Premium et souscrire l'option API Buildy Connect. Aucune intervention sur site n'est nécessaire : l'évolution se fait sur l'abonnement.`,
+        ].join('\n\n'),
+      });
+    }
+    if (bms.meets_r175_3_p1 === 0) {
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'r175_3_p1',
         category: 'data_retention_upgrade', severity: 'blocking',
         r175_article: 'R175-3 §1',
@@ -496,7 +524,7 @@ function computeTargetActions(documentId) {
       });
     }
     if (bms.meets_r175_3_p2 === 0) {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'r175_3_p2',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §2',
@@ -507,7 +535,7 @@ function computeTargetActions(documentId) {
     // NOTE : meets_r175_3_p3 et p4 sont désormais gérés au niveau des systèmes
     // (cf section systems ci-dessus), pas dans la GTB.
     if (bms.has_maintenance_procedures === 0) {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'maintenance',
         category: 'documentation', severity: 'major',
         r175_article: 'R175-4',
@@ -517,7 +545,7 @@ function computeTargetActions(documentId) {
     }
     // R175-3 dernier alinea : mise a disposition des donnees
     if (bms.data_provision_to_manager === 0) {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'data_provision_manager',
         category: 'documentation', severity: 'major',
         // « dernier alinéa » → axe « Mise à disposition des données » du
@@ -528,7 +556,7 @@ function computeTargetActions(documentId) {
       });
     }
     if (bms.data_provision_to_operators === 0) {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'data_provision_operators',
         category: 'documentation', severity: 'major',
         r175_article: 'R175-3 dernier alinéa',
@@ -539,7 +567,7 @@ function computeTargetActions(documentId) {
     // Item 15 — GTB existante : stockage 5 ans + accès aux données (R175-3).
     // data_storage_5y_compliant = 'no' → action bloquante R175-3 1°.
     if (bms.data_storage_5y_compliant === 'no') {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'data_storage_5y',
         category: 'data_retention_upgrade', severity: 'blocking',
         r175_article: 'R175-3 1°',
@@ -550,7 +578,7 @@ function computeTargetActions(documentId) {
     // data_owner_access = 'no' → action majeure R175-3 (le propriétaire est
     // propriétaire des données et doit y avoir accès).
     if (bms.data_owner_access === 'no') {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'data_owner_access',
         category: 'documentation', severity: 'major',
         r175_article: 'R175-3 dernier alinéa',
@@ -560,7 +588,7 @@ function computeTargetActions(documentId) {
     }
     // export_capability = 'no' → action mineure (facilite le suivi).
     if (bms.export_capability === 'no') {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'data_export_capability',
         category: 'data_retention_upgrade', severity: 'minor',
         r175_article: 'R175-3',
@@ -571,7 +599,7 @@ function computeTargetActions(documentId) {
 
     // R175-5 : formation. Skip si la solution en place est Buildy (support natif).
     if (bms.operator_trained === 0 && !isBuildySolution(bms)) {
-      addTarget({
+      addBmsTarget({
         source_bms_document_id: documentId, source_subtype: 'training',
         category: 'training', severity: 'major',
         r175_article: 'R175-5',

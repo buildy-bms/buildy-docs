@@ -1275,6 +1275,14 @@
   <div class="callout-body"><strong>GTB Hors-Service.</strong> Les exigences R175-3, R175-4 et R175-5 ne sont pas évaluées car la GTB n'est pas opérationnelle au moment de l'audit.</div>
 </div>
 {{/if}}
+{{#if bms.buildyOffer.showRequirement}}
+<div class="callout callout-warn">
+  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
+  <div class="callout-body"><strong>Niveau {{bms.buildyOffer.requiredLabel}} requis pour la conformité au décret BACS.</strong> La supervision Buildy Cloud du site est souscrite en niveau {{bms.buildyOffer.levelLabel}}, qui ne couvre pas :
+    <ul>{{#each bms.buildyOffer.uncovered}}<li>{{label}} ({{article}})</li>{{/each}}</ul>
+    Le passage au niveau {{bms.buildyOffer.requiredLabel}}, avec l'option API Buildy Connect, figure dans le plan de mise en conformité (chapitre 7).</div>
+</div>
+{{/if}}
 
 {{!-- Card 1 — Identité de la solution GTB --}}
 <div class="info-cards">
@@ -1288,6 +1296,12 @@
   <div class="info-card">
     <span class="info-card-label">Marque / éditeur</span>
     <span class="info-card-value">{{bms.existing_solution_brand}}</span>
+  </div>
+  {{/if}}
+  {{#if bms.buildyOffer}}
+  <div class="info-card">
+    <span class="info-card-label">Niveau d'offre Buildy</span>
+    <span class="info-card-value {{#if bms.buildyOffer.showRequirement}}info-card-value-warn{{/if}}">{{bms.buildyOffer.levelLabel}}</span>
   </div>
   {{/if}}
   {{#if bms.model_reference}}

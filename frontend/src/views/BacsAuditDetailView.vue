@@ -636,6 +636,14 @@ async function refreshSiteCounts() {
   } catch { /* silencieux */ }
 }
 
+// Modèle « Supervision Buildy Cloud » (carte GTB) : un accès a été créé en
+// carte 10 → recompte + remonte la liste des accès.
+const credentialsRefreshKey = ref(0)
+function onCredentialsChanged() {
+  credentialsRefreshKey.value++
+  refreshSiteCounts()
+}
+
 // Chaque étape expose `incomplete()` → liste des raisons (texte court) qui
 // empêchent sa validation. Liste vide = étape complète. Ces raisons sont
 // affichées telles quelles à l'auditeur quand il tente de valider.
@@ -1698,6 +1706,7 @@ onBeforeUnmount(() => {
         @invalidate-step="invalidateStep"
         @save-doc="saveDocDebounced"
         @refresh-audit-data="refreshAuditData"
+        @credentials-changed="onCredentialsChanged"
       />
 
       <!-- 8. Inspection périodique par un tiers (R175-5-1).
@@ -1735,6 +1744,7 @@ onBeforeUnmount(() => {
       <CredentialsSection
         :active="activeStepKey === 'credentials'"
         :site-cred-count="siteCredCount"
+        :refresh-key="credentialsRefreshKey"
         :step="stepFor('credentials')"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"

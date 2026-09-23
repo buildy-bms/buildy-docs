@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 204;
+const TARGET_VERSION = 205;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7744,6 +7744,25 @@ function runMigrations() {
     const nDevices = fix('bacs_audit_system_devices');
     log.info(`Migration 204 appliquee : HS + intégré GTB → non opérationnel (${nMeters} compteur(s), ${nDevices} équipement(s))`);
     db.pragma('user_version = 204');
+  }
+
+  if (current < 205) {
+    // Niveau d'offre de la supervision Buildy Cloud en place (modèle
+    // « Supervision Buildy Cloud » de la carte GTB, lib/buildy-cloud-preset.js).
+    // La conformité BACS complète exige Premium : le niveau pilote l'encadré
+    // UI/PDF et l'action « passer en Premium » du plan. NULL = pas une
+    // supervision Buildy, ou niveau non renseigné.
+    // Idempotente : rejouable si user_version a été rabaissé (tests de migration).
+    const hasCol = db.prepare('PRAGMA table_info(bacs_audit_bms)').all()
+      .some(c => c.name === 'buildy_offer_level');
+    if (!hasCol) {
+      db.exec(`
+        ALTER TABLE bacs_audit_bms ADD COLUMN buildy_offer_level TEXT
+          CHECK (buildy_offer_level IS NULL OR buildy_offer_level IN ('essentials','smart','premium'));
+      `);
+    }
+    log.info('Migration 205 appliquee : bacs_audit_bms.buildy_offer_level');
+    db.pragma('user_version = 205');
   }
 
   if (current > TARGET_VERSION) {

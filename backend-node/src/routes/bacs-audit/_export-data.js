@@ -44,6 +44,9 @@ const {
 const { buildComplianceSummary } = require('./_compliance-summary');
 // Items 5 + 8 — cumul automatique des puissances chaud / froid.
 const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL, POWER_EXCLUSION_REASON_LABEL, SHARED_TO_HEATING_SQL } = require('../../lib/bacs-audit-power');
+const {
+  BUILDY_OFFER_LEVEL_LABEL, BUILDY_REQUIRED_LEVEL, BUILDY_UNCOVERED_BY_LEVEL, isBuildyOfferLevel,
+} = require('../../lib/buildy-cloud-preset');
 // Item 7 — calcul des zones fonctionnelles de suivi (regroupement BACS).
 const { computeFunctionalZones } = require('../../lib/bacs-functional-zones');
 // Item 4 — calcul automatique de l'assujetti par système.
@@ -159,6 +162,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
   }
   if (!bms?.providedProtocolsLabels) {
     if (bms) bms.providedProtocolsLabels = [];
+  }
+  // Mig 205 — supervision Buildy Cloud : niveau d'offre + exigences non
+  // couvertes (encadré « niveau Premium requis », audits BACS uniquement).
+  if (bms && isBuildyOfferLevel(bms.buildy_offer_level)) {
+    const level = bms.buildy_offer_level;
+    bms.buildyOffer = {
+      levelLabel: BUILDY_OFFER_LEVEL_LABEL[level],
+      requiredLabel: BUILDY_OFFER_LEVEL_LABEL[BUILDY_REQUIRED_LEVEL],
+      showRequirement: af.kind === 'bacs_audit' && level !== BUILDY_REQUIRED_LEVEL,
+      uncovered: BUILDY_UNCOVERED_BY_LEVEL[level] || [],
+    };
   }
   // Mig 180 : 1 ligne par système. On joint sur bacs_audit_systems pour
   // récupérer le nom du système (custom_label) directement, et on filtre

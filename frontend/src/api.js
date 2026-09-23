@@ -485,6 +485,9 @@ export const deleteChecklistCatalogItem = (key) =>
 export const reorderChecklistCatalog = (keys) =>
   api.patch('/bacs-checklist-catalog/reorder', { keys })
 export const updateBacsBms = (docId, data) => api.put(`/bacs-audit/${docId}/bms`, data)
+// Modèle « Supervision Buildy Cloud » (level ∈ essentials | smart | premium).
+export const applyBuildyCloudPreset = (docId, level) =>
+  api.post(`/bacs-audit/${docId}/bms/buildy-cloud-preset`, { level })
 export const getBacsBmsComponents = (docId) => api.get(`/bacs-audit/${docId}/bms-components`)
 export const createBacsBmsComponent = (docId, data) => api.post(`/bacs-audit/${docId}/bms-components`, data)
 export const updateBacsBmsComponent = (id, data) => api.patch(`/bacs-audit/bms-components/${id}`, data)
