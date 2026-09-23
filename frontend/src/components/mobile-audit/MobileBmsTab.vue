@@ -105,6 +105,10 @@ async function patchDeviceBms(d, patch) {
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
     fullPatch.bms_integration_out_of_service = false
   }
+  // HS + intégré = non opérationnel (miroir de la règle serveur).
+  if (patch.managed_by_bms === true && d.out_of_service) {
+    fullPatch.bms_integration_out_of_service = true
+  }
   Object.assign(d, fullPatch)
   // PATCH non bloquant — le toggle a déjà réagi via Object.assign.
   updateBacsDevice(d.id, fullPatch)
@@ -116,6 +120,10 @@ async function patchMeterBms(m, patch) {
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
     fullPatch.bms_integration_out_of_service = false
+  }
+  // HS + intégré = non opérationnel (miroir de la règle serveur).
+  if (patch.managed_by_bms === true && m.out_of_service) {
+    fullPatch.bms_integration_out_of_service = true
   }
   Object.assign(m, fullPatch)
   updateBacsMeter(m.id, fullPatch)
@@ -596,7 +604,7 @@ const USAGES = [
           <div
             v-for="d in filteredDevices"
             :key="d.id"
-            :class="['px-4 py-4', d.out_of_service ? 'opacity-50' : '', d.bms_integration_out_of_service ? 'bg-red-50/40' : '']"
+            :class="['px-4 py-4', d.bms_integration_out_of_service ? 'bg-red-50/40' : '']"
           >
             <div class="flex items-center gap-3 mb-2">
               <SystemCategoryIcon :category="d.system_category" size="md" />
@@ -604,18 +612,20 @@ const USAGES = [
                 {{ d.name || d.brand || d.model_reference || 'Sans nom' }}
               </p>
             </div>
-            <p class="text-sm text-gray-500 mb-3">{{ SYSTEM_LABEL[d.system_category] || d.system_category }} · {{ d.zone_name }}</p>
+            <p class="text-sm text-gray-500 mb-3">
+              {{ SYSTEM_LABEL[d.system_category] || d.system_category }} · {{ d.zone_name }}
+              <span v-if="d.out_of_service" class="text-red-600"> · Hors service</span>
+            </p>
             <div class="grid grid-cols-2 gap-2">
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Intégré ?</span>
                 <SegmentedToggle size="lg" :model-value="!!d.managed_by_bms"
-                                 :disabled="!!d.out_of_service"
                                  @update:model-value="v => patchDeviceBms(d, { managed_by_bms: v })" />
               </div>
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
-                <SegmentedToggle size="lg" :model-value="(!d.managed_by_bms || !d.wired) ? null : !d.bms_integration_out_of_service"
-                                 :disabled="!d.managed_by_bms || !d.wired"
+                <SegmentedToggle size="lg" :model-value="!d.managed_by_bms ? null : d.out_of_service ? false : !d.wired ? null : !d.bms_integration_out_of_service"
+                                 :disabled="!d.managed_by_bms || !!d.out_of_service || !d.wired"
                                  @update:model-value="v => patchDeviceBms(d, { bms_integration_out_of_service: !v })" />
               </div>
             </div>
@@ -641,24 +651,26 @@ const USAGES = [
           <div
             v-for="m in filteredMeters"
             :key="m.id"
-            :class="['px-4 py-4', m.out_of_service ? 'opacity-50' : '', m.bms_integration_out_of_service ? 'bg-red-50/40' : '']"
+            :class="['px-4 py-4', m.bms_integration_out_of_service ? 'bg-red-50/40' : '']"
           >
             <div class="flex items-center gap-2 mb-3 flex-wrap">
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
               <span class="text-sm text-gray-500">{{ m.zone_name || 'général' }}</span>
+              <span v-if="m.out_of_service" class="text-sm text-red-600">Hors service</span>
+              <span v-if="m.communicating === 0 || m.communicating === false" class="text-sm text-gray-500">Non communicant</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Intégré ?</span>
-                <SegmentedToggle size="lg" :model-value="(m.out_of_service || !m.communicating) ? null : !!m.managed_by_bms"
-                                 :disabled="!!m.out_of_service || !m.communicating"
+                <SegmentedToggle size="lg" :model-value="!m.communicating ? null : !!m.managed_by_bms"
+                                 :disabled="!m.communicating"
                                  @update:model-value="v => patchMeterBms(m, { managed_by_bms: v })" />
               </div>
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
-                <SegmentedToggle size="lg" :model-value="(!m.managed_by_bms || !m.wired) ? null : !m.bms_integration_out_of_service"
-                                 :disabled="!m.managed_by_bms || !m.wired"
+                <SegmentedToggle size="lg" :model-value="!m.managed_by_bms ? null : m.out_of_service ? false : !m.wired ? null : !m.bms_integration_out_of_service"
+                                 :disabled="!m.managed_by_bms || !!m.out_of_service || !m.wired"
                                  @update:model-value="v => patchMeterBms(m, { bms_integration_out_of_service: !v })" />
               </div>
             </div>

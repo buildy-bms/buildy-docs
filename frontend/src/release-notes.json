@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.264",
+      "date": "2026-09-23",
+      "title": "GTB : un compteur hors service peut être déclaré intégré (mais non opérationnel)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Compteurs et équipements hors service : « Intégré » reste répondable",
+          "what": "Dans la carte GTB, un compteur ou un équipement déclaré hors service était entièrement bloqué : impossible d'indiquer qu'il était pourtant raccordé à la GTB. On peut maintenant répondre « Intégré ». « Opérationnel » est alors automatiquement « Non », puisqu'un appareil hors service ne remonte rien. Le rapport PDF et Claude le présentent de la même façon. Les audits existants sont mis à jour : un appareil hors service déjà coché intégré passe en « non opérationnel ». Un compteur non communicant indique aussi pourquoi il ne peut pas être intégré.",
+          "where": "Audit BACS → carte 06 GTB, listes « Équipements intégrés » et « Compteurs intégrés » (ordinateur et mobile).",
+          "how_to_test": "Sur un compteur marqué « Hors service » en carte 05 : en carte 06, cocher « Intégré ✓ » ; « Opérationnel » passe à ✗ et reste verrouillé."
+        }
+      ]
+    },
+    {
       "version": "0.1.263",
       "date": "2026-09-23",
       "title": "Rapport PDF : les équipements partagés apparaissent dans chaque système qu'ils desservent",

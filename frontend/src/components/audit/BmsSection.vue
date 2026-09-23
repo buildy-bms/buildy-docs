@@ -253,6 +253,10 @@ async function patchDeviceMb(d, patch) {
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
     fullPatch.bms_integration_out_of_service = false
   }
+  // HS + intégré = non opérationnel (miroir de la règle serveur).
+  if (patch.managed_by_bms === true && d.out_of_service) {
+    fullPatch.bms_integration_out_of_service = true
+  }
   Object.assign(d, fullPatch)
   // BUG FIX #10 — `d` provient de devicesWithMeta qui SPREAD chaque device
   // (`...d`) et renvoie une copie plain non reactive par le proxy Vue.
@@ -273,6 +277,10 @@ async function patchMeter(m, patch) {
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
     fullPatch.bms_integration_out_of_service = false
+  }
+  // HS + intégré = non opérationnel (miroir de la règle serveur).
+  if (patch.managed_by_bms === true && m.out_of_service) {
+    fullPatch.bms_integration_out_of_service = true
   }
   Object.assign(m, fullPatch)
   // Idem devicesWithMeta : metersPresent peut être un simple filter sur
@@ -530,7 +538,7 @@ function hasNotes(html) {
                     </td>
                   </tr>
                   <tr v-for="d in group.devices" :key="d.id"
-                      :class="[d.out_of_service ? 'opacity-50' : '', d.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
+                      :class="[d.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
                     <td class="px-2 py-1">
                       <span class="inline-flex items-center gap-2">
                         <SystemCategoryIcon :category="d.system_category" size="sm" />
@@ -542,17 +550,16 @@ function hasNotes(html) {
                       </span>
                     </td>
                     <td class="py-1 text-center">
-                      <Tooltip :text="d.out_of_service ? 'Équipement déclaré hors service en section 3 — il ne peut pas être intégré à la GTB.' : ''">
-                        <CompactToggle compact :model-value="triState(d.managed_by_bms)"
-                                       :disabled="!!d.out_of_service"
-                                       @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
-                      </Tooltip>
+                      <!-- Un équipement HS peut avoir été intégré à la GTB :
+                           la question reste ouverte, seul « Opérationnel » est forcé. -->
+                      <CompactToggle compact :model-value="triState(d.managed_by_bms)"
+                                     @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
                     </td>
                     <td class="py-1 text-center">
                       <Tooltip
-                        :text="!d.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB voit l\'équipement.'">
-                        <CompactToggle compact :model-value="(!d.managed_by_bms || !d.wired) ? null : triState(!d.bms_integration_out_of_service)"
-                                       :disabled="!d.managed_by_bms || !d.wired"
+                        :text="!d.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : d.out_of_service ? 'Équipement hors service (section 3) — il ne peut pas être opérationnel dans la GTB.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB voit l\'équipement.'">
+                        <CompactToggle compact :model-value="!d.managed_by_bms ? null : d.out_of_service ? false : !d.wired ? null : triState(!d.bms_integration_out_of_service)"
+                                       :disabled="!d.managed_by_bms || !!d.out_of_service || !d.wired"
                                        @update:model-value="v => patchDeviceMb(d, { bms_integration_out_of_service: !v })" />
                       </Tooltip>
                     </td>
@@ -597,24 +604,28 @@ function hasNotes(html) {
                       </td>
                     </tr>
                     <tr v-for="m in zoneGroup.meters" :key="m.id"
-                        :class="[m.out_of_service ? 'opacity-50' : '', m.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
+                        :class="[m.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
                       <td class="px-2 py-1 pl-8">
                         <span class="inline-flex items-center gap-2">
                           <MeterUsagePill :usage="m.usage" />
                           <span v-if="m.out_of_service" class="text-[11px] text-red-600">Hors service (section 5)</span>
+                          <span v-if="m.communicating === 0 || m.communicating === false" class="text-[11px] text-gray-500">Non communicant (section 5)</span>
                         </span>
                       </td>
                       <td class="py-1 text-center">
-                        <Tooltip :text="m.out_of_service ? 'Compteur déclaré hors service en section 5 — repasse « Hors service » sur ✗ pour pouvoir l\'intégrer.' : !m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
-                          <CompactToggle compact :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
-                                         :disabled="!!m.out_of_service || !m.communicating"
+                        <!-- Un compteur HS peut avoir été intégré à la GTB : la
+                             question reste ouverte, seul « Opérationnel » est forcé.
+                             Un non-communicant, lui, ne peut pas être intégré. -->
+                        <Tooltip :text="m.communicating == null ? 'Indique d\'abord en section 5 si le compteur est communicant.' : !m.communicating ? 'Compteur non communicant (section 5) — il ne peut pas être intégré à la GTB.' : ''">
+                          <CompactToggle compact :model-value="!m.communicating ? null : triState(m.managed_by_bms)"
+                                         :disabled="!m.communicating"
                                          @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
                         </Tooltip>
                       </td>
                       <td class="py-1 text-center">
-                        <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB relève le compteur.'">
-                          <CompactToggle compact :model-value="(!m.managed_by_bms || !m.wired) ? null : triState(!m.bms_integration_out_of_service)"
-                                         :disabled="!m.managed_by_bms || !m.wired"
+                        <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : m.out_of_service ? 'Compteur hors service (section 5) — il ne peut pas être opérationnel dans la GTB.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB relève le compteur.'">
+                          <CompactToggle compact :model-value="!m.managed_by_bms ? null : m.out_of_service ? false : !m.wired ? null : triState(!m.bms_integration_out_of_service)"
+                                         :disabled="!m.managed_by_bms || !!m.out_of_service || !m.wired"
                                          @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
                         </Tooltip>
                       </td>

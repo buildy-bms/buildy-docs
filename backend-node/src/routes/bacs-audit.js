@@ -17,7 +17,7 @@ const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
   METER_USAGES, METER_TYPES, RECOMMENDATIONS,
   REGULATION_TYPES, GENERATOR_TYPES, ENERGY_SOURCES,
-  assertBacsAuditExists, logBacsAudit,
+  assertBacsAuditExists, logBacsAudit, forceNotOperationalWhenOutOfService,
 } = require('./bacs-audit/_shared');
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
 const { parseRoles, serializeRoles, rolesAllowEnergySource } = require('../lib/device-roles');
@@ -575,6 +575,7 @@ async function routes(fastify) {
     if (body.present_actual === false && body.managed_by_bms == null) {
       body.managed_by_bms = false;
     }
+    forceNotOperationalWhenOutOfService(body, row);
 
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
@@ -1582,6 +1583,7 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+    forceNotOperationalWhenOutOfService(body, dev);
 
     // Coercion doctrine `energy_source` (mig 194). On calcule le rôle
     // effectif après patch (body si fourni, sinon valeur actuelle DB) ;

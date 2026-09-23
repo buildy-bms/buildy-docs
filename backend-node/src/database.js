@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 203;
+const TARGET_VERSION = 204;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7728,6 +7728,22 @@ function runMigrations() {
     `);
     log.info('Migration 203 appliquee : kind maintenance_report + colonnes mr_period_*');
     db.pragma('user_version = 203');
+  }
+
+  if (current < 204) {
+    // Un compteur / équipement hors service peut être intégré à la GTB mais
+    // n'y est pas opérationnel. Règle désormais appliquée à l'écriture
+    // (forceNotOperationalWhenOutOfService, routes PATCH) ; rattrapage des
+    // lignes existantes « HS + intégré » restées « opérationnelles ».
+    const fix = (table) => db.prepare(`
+      UPDATE ${table} SET bms_integration_out_of_service = 1
+      WHERE out_of_service = 1 AND managed_by_bms = 1
+        AND COALESCE(bms_integration_out_of_service, 0) = 0
+    `).run().changes;
+    const nMeters = fix('bacs_audit_meters');
+    const nDevices = fix('bacs_audit_system_devices');
+    log.info(`Migration 204 appliquee : HS + intégré GTB → non opérationnel (${nMeters} compteur(s), ${nDevices} équipement(s))`);
+    db.pragma('user_version = 204');
   }
 
   if (current > TARGET_VERSION) {

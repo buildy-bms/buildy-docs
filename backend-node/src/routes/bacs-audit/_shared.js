@@ -108,6 +108,18 @@ const METER_USAGE_TO_SYSTEM_CATS = {
   lighting: ['lighting_indoor', 'lighting_outdoor'],
 };
 
+// Un compteur / équipement hors service peut avoir été intégré à la GTB,
+// mais il n'y est alors pas opérationnel : on force « intégration GTB HS »
+// (état après patch = body sinon ligne DB) pour que UI, PDF et MCP ne le
+// présentent jamais comme opérationnel. Appelé par les PATCH meters/devices ;
+// mig 204 = rattrapage de l'existant. Mute `body`.
+function forceNotOperationalWhenOutOfService(body, row) {
+  const on = (v) => v === true || v === 1;
+  const hs = ('out_of_service' in body) ? on(body.out_of_service) : on(row.out_of_service);
+  const managed = ('managed_by_bms' in body) ? on(body.managed_by_bms) : on(row.managed_by_bms);
+  if (hs && managed) body.bms_integration_out_of_service = true;
+}
+
 module.exports = {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
   METER_USAGES, METER_TYPES, RECOMMENDATIONS,
@@ -115,4 +127,5 @@ module.exports = {
   METER_USAGE_TO_SYSTEM_CATS,
   assertBacsAuditExists,
   logBacsAudit,
+  forceNotOperationalWhenOutOfService,
 };
