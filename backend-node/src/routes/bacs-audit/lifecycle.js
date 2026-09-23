@@ -20,7 +20,7 @@ const { systemInteropStatus } = require('./_interop');
 // false (incident Communay) — Claude doit voir « unanswered » pour pouvoir
 // signaler les questions restées sans réponse dans sa synthèse.
 const tri = v => (v == null ? 'unanswered' : isTrue(v));
-const { isStepComplete } = require('../../lib/bacs-audit-step-completion');
+const { isStepComplete, NON_BLOCKING_STEPS } = require('../../lib/bacs-audit-step-completion');
 const { buildPrecheck } = require('../../lib/bacs-audit-precheck');
 
 async function routes(fastify) {
@@ -163,7 +163,10 @@ async function routes(fastify) {
       // Verrou : on ne valide pas une étape dont les infos essentielles
       // ne sont pas saisies (miroir de STEP_DEFINITIONS.isComplete côté
       // front — cf. lib/bacs-audit-step-completion.js).
-      if (!isStepComplete(documentId, body.step)) {
+      // Étape non bloquante (check-list) : validable même incomplète,
+      // tracée `with_pending` pour savoir qu'il restait des éléments.
+      const complete = isStepComplete(documentId, body.step);
+      if (!complete && !NON_BLOCKING_STEPS.has(body.step)) {
         return reply.code(400).send({
           detail: 'Étape incomplète : renseignez les informations essentielles avant de la valider.',
         });
@@ -174,6 +177,7 @@ async function routes(fastify) {
         validated_at: new Date().toISOString(),
         validated_by: request.authUser?.id || null,
         validated_by_name: user?.display_name || user?.email || null,
+        ...(complete ? {} : { with_pending: true }),
       };
     } else {
       delete progress[body.step];

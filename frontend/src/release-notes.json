@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.265",
+      "date": "2026-09-23",
+      "title": "Check-list non bloquante, puissance chaud des équipements réversibles",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "L'étape « Check-list » n'est plus bloquante",
+          "what": "La check-list exigeait une photo de chaque compteur, y compris ceux déclarés absents (impossible à photographier), et une photo de GTB même sans GTB : l'étape ne pouvait jamais être validée. Seuls les compteurs présents et une GTB existante demandent désormais une photo. Et l'étape devient non bloquante : s'il reste des éléments, un message les liste et propose « Valider quand même ».",
+          "where": "Audit BACS → carte 08 Check-list documentaire, bouton « Valider ».",
+          "how_to_test": "Cliquer « Valider » sur la carte 08 avec des éléments en attente : un message liste ce qui reste, « Valider quand même » valide l'étape."
+        },
+        {
+          "kind": "fix",
+          "title": "La puissance chaud d'un équipement réversible est comptée au R175-2",
+          "what": "Un équipement réversible (DRV, PAC, multisplit) rattaché au refroidissement et partagé vers le chauffage ne comptait que sa puissance froid : le « chaud cumulé » affichait 0 kW. Conformément à la FAQ ministérielle n°11, sa puissance chaud alimente maintenant le cumul chaud et sa puissance froid le cumul froid ; la puissance retenue reste le maximum des deux.",
+          "where": "Audit BACS → carte Identification (puissance R175-2) et rapport PDF (synthèse, calcul d'assujettissement).",
+          "how_to_test": "Sur un DRV rattaché au Refroidissement et partagé vers le Chauffage, avec une puissance chaud et une puissance froid saisies : « Aperçu » affiche un chaud cumulé non nul."
+        }
+      ]
+    },
+    {
       "version": "0.1.264",
       "date": "2026-09-23",
       "title": "GTB : un compteur hors service peut être déclaré intégré (mais non opérationnel)",

@@ -43,7 +43,7 @@ const {
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
 // Items 5 + 8 — cumul automatique des puissances chaud / froid.
-const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL, POWER_EXCLUSION_REASON_LABEL } = require('../../lib/bacs-audit-power');
+const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL, POWER_EXCLUSION_REASON_LABEL, SHARED_TO_HEATING_SQL } = require('../../lib/bacs-audit-power');
 // Item 7 — calcul des zones fonctionnelles de suivi (regroupement BACS).
 const { computeFunctionalZones } = require('../../lib/bacs-functional-zones');
 // Item 4 — calcul automatique de l'assujetti par système.
@@ -200,7 +200,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // dérivation du cas E d'assujettissement).
   const devices = db.db.prepare(`
     SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name,
-           t.slug AS equipment_template_slug
+           t.slug AS equipment_template_slug,
+           ${SHARED_TO_HEATING_SQL}
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     LEFT JOIN zones z ON z.id = s.zone_id

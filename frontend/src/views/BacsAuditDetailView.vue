@@ -735,6 +735,10 @@ const STEP_DEFINITIONS = [
     } },
   { key: 'docs-checklist',
     label: 'Check-list',
+    // Non bloquante (miroir NON_BLOCKING_STEPS serveur) : documents et
+    // photos arrivent souvent après la visite — on liste ce qui reste et
+    // l'auditeur valide quand même s'il le souhaite.
+    blocking: false,
     description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
     incomplete: () => {
       const r = []
@@ -823,6 +827,7 @@ const stepperSteps = computed(() => STEP_DEFINITIONS
       label: def.label,
       description: isBacs.value ? def.description : (def.descriptionSite || def.description.replace(/R175-?[0-9]?\s*(§\s*[0-9]|[0-9]°)?/g, '').replace(/\s+/g, ' ').trim()),
       complete: reasons.length === 0,
+      blocking: def.blocking !== false,
       incompleteReasons: reasons,
       validated: !!p.validated,
       validated_at: p.validated_at || null,
@@ -836,10 +841,19 @@ async function validateStep(stepKey) {
   const step = stepFor(stepKey)
   if (!step?.complete) {
     const reasons = step?.incompleteReasons || []
-    error(reasons.length
-      ? `Étape « ${step.label} » non validable — ${reasons.join(' ; ')}`
-      : 'Complétez l\'étape avant de la valider.')
-    return
+    if (step && !step.blocking) {
+      const ok = await confirm({
+        title: `Valider l'étape « ${step.label} » ?`,
+        message: `Il reste des éléments en attente : ${reasons.join(' ; ')}. Cette étape n'est pas bloquante : tu peux la valider quand même et compléter plus tard.`,
+        confirmLabel: 'Valider quand même',
+      })
+      if (!ok) return
+    } else {
+      error(reasons.length
+        ? `Étape « ${step.label} » non validable — ${reasons.join(' ; ')}`
+        : 'Complétez l\'étape avant de la valider.')
+      return
+    }
   }
   try {
     const { data } = await validateBacsAuditStep(docId, stepKey, true)

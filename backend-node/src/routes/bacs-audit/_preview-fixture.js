@@ -714,6 +714,8 @@ async function buildFixturePreviewData({ user = null } = {}) {
     device_role: roles,
     extra_system_ids: extras,
     shared_zone_count: extras.length,
+    // Miroir SHARED_TO_HEATING_SQL (cumul R175-2 d'un réversible rattaché au froid).
+    shared_to_heating: extras.some(sid => SYSTEMS_RAW.find(s => s.id === sid)?.system_category === 'heating'),
     energyLabel: d.energy_source ? (ENERGY_LABEL[d.energy_source] || d.energy_source) : '—',
     roleLabel: roles.length ? roles.map(r => ROLE_LABEL[r] || r).join(' / ') : '—',
     commLabel: d.communication_protocol

@@ -1765,9 +1765,10 @@ async function routes(fastify) {
       ORDER BY s.system_category, z.name, d.position, d.id
     `).all(id);
     // Items 5 + 8 — cumul automatique différencié chaud / froid.
-    const { computeAutoPower, resolveTotalPower, POWER_EXCLUSION_REASON_LABEL } = require('../lib/bacs-audit-power');
+    const { computeAutoPower, resolveTotalPower, POWER_EXCLUSION_REASON_LABEL, SHARED_TO_HEATING_SQL } = require('../lib/bacs-audit-power');
     const allDevices = db.db.prepare(`
-      SELECT d.*, s.system_category, t.slug AS equipment_template_slug
+      SELECT d.*, s.system_category, t.slug AS equipment_template_slug,
+             ${SHARED_TO_HEATING_SQL}
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
       LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id

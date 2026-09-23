@@ -128,6 +128,32 @@ describe('compteurs requis — équipements partagés', () => {
   });
 });
 
+describe('étape Check-list — couverture photo réaliste + non bloquante', () => {
+  it('Sénas : un compteur absent ou non renseigné ne demande pas de photo', () => {
+    const a = seedAudit(['Cellule']);
+    const ins = db.db.prepare(`INSERT INTO bacs_audit_meters (document_id, usage, meter_type, required, present_actual)
+      VALUES (?, 'other', ?, 1, ?)`);
+    db.db.prepare('DELETE FROM bacs_audit_meters WHERE document_id = ?').run(a.docId);
+    ins.run(a.docId, 'electric', 1);   // présent → photo attendue
+    ins.run(a.docId, 'gas', 0);        // absent → impossible à photographier
+    ins.run(a.docId, 'thermal', null); // non renseigné
+    expect(db.bacsAuditChecklist.photoCoverage(a.docId).meters.total).toBe(1);
+  });
+
+  it('pas de photo GTB exigée sans GTB déclarée présente', () => {
+    const a = seedAudit(['Cellule']);
+    db.db.prepare('UPDATE bacs_audit_bms SET present = 0 WHERE document_id = ?').run(a.docId);
+    expect(db.bacsAuditChecklist.photoCoverage(a.docId).bms.total).toBe(0);
+    db.db.prepare('UPDATE bacs_audit_bms SET present = 1 WHERE document_id = ?').run(a.docId);
+    expect(db.bacsAuditChecklist.photoCoverage(a.docId).bms.total).toBe(1);
+  });
+
+  it('la check-list est la seule étape non bloquante', () => {
+    const { NON_BLOCKING_STEPS } = require('../src/lib/bacs-audit-step-completion');
+    expect([...NON_BLOCKING_STEPS]).toEqual(['docs-checklist']);
+  });
+});
+
 describe('étape Inspections — verrou serveur', () => {
   it('Sénas : réponse « Non » (rien à tracer) → étape validable', () => {
     const a = seedAudit(['Cellule']);

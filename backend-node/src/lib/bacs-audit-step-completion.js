@@ -108,4 +108,11 @@ function isStepComplete(documentId, stepKey) {
   }
 }
 
-module.exports = { isStepComplete };
+// Étapes NON bloquantes : l'auditeur peut les valider même incomplètes
+// (le front liste ce qui reste et demande confirmation). La check-list
+// documentaire dépend souvent de documents / photos que le client fournira
+// plus tard — elle ne doit pas empêcher d'avancer. Miroir de
+// STEP_DEFINITIONS[].blocking = false côté front.
+const NON_BLOCKING_STEPS = new Set(['docs-checklist']);
+
+module.exports = { isStepComplete, NON_BLOCKING_STEPS };

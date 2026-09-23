@@ -38,6 +38,17 @@ const COOL_CATEGORIES = new Set(['cooling']);
 // alors sur power_calculation_type / power_kw_cooling pour trancher.
 const MIXED_CATEGORIES = new Set(['ventilation']);
 
+// Colonne SQL `shared_to_heating` : l'équipement dessert AUSSI un chauffage
+// via partage (mig 143). Un équipement rattaché au froid et partagé vers un
+// chauffage est RÉVERSIBLE — contrat de la fiche équipement (DeviceEditModal
+// hasHeating/hasCooling) : power_kw = chaud, power_kw_cooling = froid. À
+// ajouter au SELECT de tout appelant de computeAutoPower (alias `d` requis).
+const SHARED_TO_HEATING_SQL = `EXISTS (
+    SELECT 1 FROM bacs_audit_device_shared_systems ss_h
+    JOIN bacs_audit_systems s_h ON s_h.id = ss_h.system_id
+    WHERE ss_h.device_id = d.id AND s_h.system_category = 'heating'
+  ) AS shared_to_heating`;
+
 /**
  * Infère le type de calcul de puissance d'un device quand il n'est pas
  * explicitement renseigné. Heuristique conservatrice.
@@ -133,6 +144,14 @@ function devicePowerContribution(device) {
   const qty = Number(device.quantity) || 1;
   const pHeat = (Number(device.power_kw) || 0) * qty;
   const pCool = (Number(device.power_kw_cooling) || 0) * qty;
+  // Rattaché au froid mais partagé vers un chauffage = réversible : FAQ n°11,
+  // chaud au cumul chaud, froid au cumul froid (audit Sénas : DRV rattaché
+  // au froid → « chaud cumulé 0 kW » alors que la puissance chaud était saisie).
+  const reversibleFromCooling = COOL_CATEGORIES.has(device.system_category)
+    && (device.shared_to_heating === 1 || device.shared_to_heating === true);
+  if (type !== 'out_of_scope' && reversibleFromCooling) {
+    return { heat: pHeat, cool: pCool || pHeat, type, inScope: true };
+  }
 
   if (type === 'out_of_scope') {
     return { heat: 0, cool: 0, type, inScope: false, reason: 'excluded_type' };
@@ -308,7 +327,8 @@ function recomputeAndPersistAuditPower(db, documentId) {
     SELECT d.id, d.power_kw, d.power_kw_cooling, d.power_calculation_type,
            d.energy_source, d.is_backup, d.out_of_service,
            d.device_role, d.quantity,
-           s.system_category, t.slug AS equipment_template_slug
+           s.system_category, t.slug AS equipment_template_slug,
+           ${SHARED_TO_HEATING_SQL}
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
@@ -386,6 +406,7 @@ function computeBacsApplicabilityFromPower(powerKw, buildingPermitDate, incomple
 }
 
 module.exports = {
+  SHARED_TO_HEATING_SQL,
   POWER_CALC_TYPE_LABEL,
   POWER_EXCLUSION_REASON_LABEL,
   inferPowerCalculationType,

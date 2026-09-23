@@ -423,9 +423,10 @@ async function routes(fastify) {
       // Compte les équipements thermiques sans puissance saisie pour la
       // règle protective d'assujettissement (incident audit Communay :
       // total faible parce que des power_kw manquent → on présume subject).
-      const { computeAutoPower } = require('../lib/bacs-audit-power');
+      const { computeAutoPower, SHARED_TO_HEATING_SQL } = require('../lib/bacs-audit-power');
       const devices = db.db.prepare(`
-        SELECT d.*, s.system_category, t.slug AS equipment_template_slug
+        SELECT d.*, s.system_category, t.slug AS equipment_template_slug,
+               ${SHARED_TO_HEATING_SQL}
         FROM bacs_audit_system_devices d
         JOIN bacs_audit_systems s ON s.id = d.system_id
         LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id

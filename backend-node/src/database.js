@@ -10690,12 +10690,15 @@ const bacsAuditChecklist = {
         name: `${s.system_category} — ${zoneNameById.get(s.zone_id) || `Zone #${s.zone_id}`}`,
       }));
 
-    // Compteurs (avec zone pour navigation + identification PWA)
+    // Compteurs (avec zone pour navigation + identification PWA). Seuls les
+    // compteurs constatés PRÉSENTS sont à photographier : un compteur absent
+    // (ou dont la présence n'est pas encore renseignée) ne peut pas l'être —
+    // le compter rendait la check-list invalidable (audit Sénas #61).
     const metersAll = db.prepare(`
       SELECT m.id, m.usage, m.meter_type, m.zone_id, z.name AS zone_name
       FROM bacs_audit_meters m
       LEFT JOIN zones z ON z.id = m.zone_id
-      WHERE m.document_id = ?
+      WHERE m.document_id = ? AND m.present_actual = 1
     `).all(documentId);
     const meterIds = metersAll.map(m => m.id);
     const metersWithPhotos = meterIds.length === 0 ? [] :
@@ -10718,7 +10721,11 @@ const bacsAuditChecklist = {
     // BMS / GTB : table bacs_audit_bms a document_id comme PK (1 ligne par
     // audit). La FK site_documents.bacs_audit_bms_document_id pointe vers
     // ce document_id.
-    const bmsRow = db.prepare('SELECT document_id FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
+    // Photo GTB exigée seulement si une GTB est déclarée présente (« Pas de
+    // GTB » ou non répondu = rien à photographier).
+    const bmsRow = db.prepare(
+      'SELECT document_id FROM bacs_audit_bms WHERE document_id = ? AND present = 1'
+    ).get(documentId);
     let bmsFiles = 0;
     if (bmsRow) {
       bmsFiles = db.prepare(
