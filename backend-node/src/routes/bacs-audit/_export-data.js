@@ -273,14 +273,38 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }
     return min;
   }
-  for (const [, devs] of devicesBySystem) {
-    devs.sort((a, b) => {
-      const pa = rolePriorityPdf(a);
-      const pb = rolePriorityPdf(b);
-      if (pa !== pb) return pa - pb;
-      return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
-    });
+  const byRoleThenName = (a, b) => {
+    const pa = rolePriorityPdf(a);
+    const pb = rolePriorityPdf(b);
+    if (pa !== pb) return pa - pb;
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
+  };
+  for (const [, devs] of devicesBySystem) devs.sort(byRoleThenName);
+
+  // Mig 143 — équipements PARTAGÉS : chaque système cible reçoit une copie
+  // légère des devices partagés vers lui (ex. VC 4 tubes primaire en froid,
+  // partagé en chauffage). Affichés au chap. 3 et en synthèse A3, pris en
+  // compte dans le verdict R175-3 du système desservi. La puissance reste
+  // comptée UNE seule fois, dans le système d'origine : jamais dans
+  // total_power_kw / computeAutoPower / powerByUsage (double comptage).
+  const systemById = new Map(systems.map(s => [s.id, s]));
+  const systemShortLabel = (sid) => {
+    const s = systemById.get(sid);
+    if (!s) return null;
+    const cat = s.is_bacs === 0 ? (s.custom_label || 'Usage') : (SYSTEM_LABEL[s.system_category] || s.system_category);
+    return s.zone_name ? `${s.zone_name} · ${cat}` : cat;
+  };
+  const sharedDevicesBySystem = new Map();
+  for (const d of devices) {
+    if (!d.extra_system_ids.length) continue;
+    d.sharedWithLabel = d.extra_system_ids.map(systemShortLabel).filter(Boolean).join(', ');
+    const sharedFromLabel = systemShortLabel(d.system_id);
+    for (const sid of d.extra_system_ids) {
+      if (!sharedDevicesBySystem.has(sid)) sharedDevicesBySystem.set(sid, []);
+      sharedDevicesBySystem.get(sid).push({ ...d, is_shared_here: true, sharedFromLabel });
+    }
   }
+  for (const [, devs] of sharedDevicesBySystem) devs.sort(byRoleThenName);
 
   // Refactor 2026-05-26 — Dérivation des flags d'assujettissement E/F
   // depuis les devices au lieu d'une saisie système :
@@ -417,6 +441,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   const enrichedSystems = systems.map(s => {
     const devs = devicesBySystem.get(s.id) || [];
+    const sharedDevs = sharedDevicesBySystem.get(s.id) || [];
     const totalKw = Math.round(devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0) * 100) / 100;
     const derivedSubstation = (substationTplId
       ? devs.some(d => d.equipment_template_id === substationTplId)
@@ -459,9 +484,13 @@ async function buildBacsAuditExportData(af, opts = {}) {
       negativeLabel: SYSTEM_NEGATIVE_LABEL[s.system_category] || `Pas de ${(SYSTEM_LABEL[s.system_category] || s.system_category).toLowerCase()}`,
       commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
       devices: devs,
-      device_count: devs.length,
+      shared_devices: sharedDevs,
+      shared_device_count: sharedDevs.length,
+      device_count: devs.length + sharedDevs.length,
+      // Puissance des seuls équipements propres (les partagés sont comptés
+      // dans leur système d'origine).
       total_power_kw: totalKw,
-      compliance: computeSystemCompliance(s, devs),
+      compliance: computeSystemCompliance(s, [...devs, ...sharedDevs]),
     };
   });
   // Group systems par zone
@@ -1351,6 +1380,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
       zone_name: d.zone_name,
       category: d.system_category,
       categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
+      // Partage (mig 143) : mentionné, jamais re-compté.
+      sharedWithLabel: d.sharedWithLabel || null,
     }));
   const heatingCoolingTotal = heatingCoolingBreakdown.reduce(
     (s, d) => s + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0);
@@ -1633,7 +1664,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // d'utiliser systemsByZone (qui montre aussi les systèmes non
     // présents / non concernés pour expliquer le hors-champ).
     systemsByZoneForSynthesis: systemsByZone
-      .map(g => ({ ...g, items: g.items.filter(s => s.present === 1 && (s.devices?.length || 0) > 0) }))
+      .map(g => ({ ...g, items: g.items.filter(s => s.present === 1 && (s.device_count || 0) > 0) }))
       .filter(g => g.items.length),
     // Zones fonctionnelles sans système thermique présent (hors R175-2).
     zonesOutOfBacsScope,

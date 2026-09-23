@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.263",
+      "date": "2026-09-23",
+      "title": "Rapport PDF : les équipements partagés apparaissent dans chaque système qu'ils desservent",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Un équipement partagé figure dans tous les systèmes qu'il dessert",
+          "what": "Un équipement partagé entre plusieurs systèmes (ventilo-convecteur chaud et froid, chaudière centrale desservant plusieurs zones, VMC commune…) n'apparaissait dans le rapport que dans son système d'origine. Un système desservi uniquement par un équipement partagé affichait « 0 équipement », disparaissait du tableau de synthèse et recevait « Aucun équipement actif inventorié » au lieu d'un vrai verdict R175-3. Désormais, l'équipement est listé dans chaque système desservi, avec la mention « Partagé depuis … ». Le verdict R175-3 du système en tient compte. Sa puissance reste comptée une seule fois, dans le système d'origine : la puissance retenue R175-2 ne change pas.",
+          "where": "Rapport PDF d'audit BACS (chapitre Systèmes, tableau « Équipements et leur intégration à la GTB », détail de puissance) et tableaux de synthèse A3.",
+          "how_to_test": "Dans un audit, partager un ventilo-convecteur du Refroidissement vers le Chauffage de la même zone, puis cliquer « Aperçu » : la fiche Chauffage liste le ventilo-convecteur « Partagé depuis … · Refroidissement », et la fiche d'origine indique « Dessert aussi : … · Chauffage »."
+        }
+      ]
+    },
+    {
       "version": "0.1.262",
       "date": "2026-09-23",
       "title": "Fix : validation des inspections, compteurs hors service, compteurs des ventilo-convecteurs",

@@ -361,6 +361,9 @@ table.syn td.col-bool { text-align: center; }
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
+/* Badge nominatif + ligne d'un équipement partagé vers ce système (mig 143). */
+.shared-badge.shared-badge-wrap { white-space: normal; }
+tr.row-shared td { background: #f0fdf4; }
 /* Item 7f — badge « Partagé entre N zones » sur équipement multi-zones */
 .shared-badge {
   display: inline-block;

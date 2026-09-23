@@ -2636,6 +2636,13 @@ h2.zone-heading {
   border-radius: 2mm;
   vertical-align: middle;
 }
+/* Badge nominatif (« Dessert aussi : Zone · Usage, … ») : peut passer à la ligne. */
+.shared-badge-wrap { white-space: normal; }
+/* Fiche abrégée d'un équipement partagé vers ce système (mig 143). */
+.device-card-shared {
+  background: #f0fdf4;
+  border-left-color: #6ee7b7;
+}
 
 /* Item 15 — tableau de conformité stockage & accès aux données GTB */
 .storage-access-table {

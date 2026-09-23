@@ -482,7 +482,7 @@
           <tr>
             <td>{{name}}</td>
             <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
-            <td>{{categoryLabel}}</td>
+            <td>{{categoryLabel}}{{#if sharedWithLabel}}<br><span class="muted" style="font-size:6.5pt">dessert aussi : {{sharedWithLabel}}</span>{{/if}}</td>
             <td>{{zone_name}}</td>
             <td style="text-align:right">{{#if has_multiple}}{{total_power_kw}}{{else}}{{power_kw}}{{/if}} kW{{#if has_multiple}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{/if}}</td>
             <td style="text-align:right">
@@ -677,7 +677,7 @@
         {{#if total_power_kw}}
           <span class="system-card-power">{{total_power_kw}} kW</span>
         {{/if}}
-        <span class="system-card-count">{{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}}</span>
+        <span class="system-card-count">{{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}}{{#if shared_device_count}} dont {{shared_device_count}} partagé{{#unless (eq shared_device_count 1)}}s{{/unless}}{{/if}}</span>
         {{#if serves_multiple_buildings}}<span class="system-card-flag" title="Système desservant plusieurs bâtiments du site — cas F d'assujettissement (R175-2 §I)">Multi-bâtiments</span>{{/if}}
         {{#if is_district_heating_substation}}<span class="system-card-flag" title="Sous-station de réseau de chaleur urbain — cas E d'assujettissement (R175-2 §I)">Sous-station RDU</span>{{/if}}
         {{#if managed_by_bms}}<span class="system-card-flag system-card-flag-bms" title="Système géré par la GTB">Géré par GTB</span>{{/if}}
@@ -727,7 +727,7 @@
           </div>
         </div>
         {{/if}}{{/if}}
-        {{#if devices.length}}
+        {{#if device_count}}
           {{!--
             Refonte v2.x : passage du tableau dense (qui wrap mal en
             colonnes étroites) à une série de cards par équipement.
@@ -747,8 +747,8 @@
                     {{#if is_backup}}<span class="device-card-backup" title="Équipement de secours — puissance exclue du cumul BACS">Secours</span>{{/if}}
                     {{#if validation_forced}}<span class="device-card-forced" title="L'auditeur a validé cet équipement malgré des champs de conformité non renseignés.">Validation forcée</span>{{/if}}
                     {{#if bms_integration_out_of_service}}<span class="device-card-bms-hs" title="L'intégration GTB de cet équipement est hors service.">Intégration GTB HS</span>{{/if}}
-                    {{#if shared_zone_count}}
-                      <span class="shared-badge" title="Équipement partagé">↔ {{add shared_zone_count 1}} zones</span>
+                    {{#if sharedWithLabel}}
+                      <span class="shared-badge shared-badge-wrap" title="Équipement partagé avec d'autres systèmes">↔ Dessert aussi : {{sharedWithLabel}}</span>
                     {{/if}}
                   </div>
                   {{#if ../is_bacs}}
@@ -844,6 +844,50 @@
                   {{/if}}
                 </div>
                 {{/if}}
+              </div>
+            {{/each}}
+            {{!-- Équipements partagés vers ce système (mig 143) : fiche
+                 abrégée — la fiche complète, les photos et la puissance
+                 restent dans le système d'origine (pas de double comptage). --}}
+            {{#each shared_devices}}
+              <div class="device-card device-card-shared" {{#if out_of_service}}style="opacity:0.55"{{/if}}>
+                <div class="device-card-head">
+                  <div class="device-card-title">
+                    <strong>{{name}}</strong>
+                    {{#if brand}}<span class="device-card-ref"> · {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}
+                    {{#if out_of_service}}<span class="device-card-hs">HS</span>{{/if}}
+                    <span class="shared-badge shared-badge-wrap" title="Équipement inventorié dans un autre système : sa fiche complète y figure.">↔ Partagé depuis {{sharedFromLabel}}</span>
+                  </div>
+                  {{#if ../is_bacs}}
+                  <div class="device-card-r175">
+                    <span class="r175-3-pill {{triCls is_communicating 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
+                      {{triSym is_communicating}} Communicant
+                    </span>
+                    <span class="r175-3-pill {{triCls meets_r175_3_p4 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
+                      {{triSym meets_r175_3_p4}} Arrêt manuel
+                    </span>
+                    <span class="r175-3-pill {{triCls meets_r175_3_p4_autonomous 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
+                      {{triSym meets_r175_3_p4_autonomous}} Autonome
+                    </span>
+                  </div>
+                  {{/if}}
+                </div>
+                <div class="device-card-attrs">
+                  <div class="device-attr">
+                    <span class="device-attr-label">Fonction(s)</span>
+                    <span class="device-attr-value device-attr-roles">
+                      {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}}{{/each}}{{else}}<span class="bool-na">—</span>{{/if}}
+                    </span>
+                  </div>
+                  <div class="device-attr">
+                    <span class="device-attr-label">Communication</span>
+                    <span class="device-attr-value">{{commLabel}}</span>
+                  </div>
+                  <div class="device-attr">
+                    <span class="device-attr-label">Puissance</span>
+                    <span class="device-attr-value muted">Comptée dans {{sharedFromLabel}}</span>
+                  </div>
+                </div>
               </div>
             {{/each}}
           </div>
@@ -1610,7 +1654,7 @@
         <tr class="bms-zone-row"><td colspan="3">{{zone_name}}</td></tr>
         {{#each devices}}
         <tr>
-          <td class="bms-col-name"><strong>{{name}}</strong>{{#if brand}} <span class="muted">· {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}</td>
+          <td class="bms-col-name"><strong>{{name}}</strong>{{#if brand}} <span class="muted">· {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}{{#if sharedWithLabel}}<br><span class="muted">Dessert aussi : {{sharedWithLabel}}</span>{{/if}}</td>
           <td class="bms-col-usage">{{{systemCategoryPill system_category "sm"}}}</td>
           <td class="bms-col-int">{{{boolPill managed_by_bms "sm"}}}</td>
         </tr>

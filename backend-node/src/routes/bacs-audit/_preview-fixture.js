@@ -730,11 +730,30 @@ async function buildFixturePreviewData({ user = null } = {}) {
     if (!devicesBySystem.has(d.system_id)) devicesBySystem.set(d.system_id, []);
     devicesBySystem.get(d.system_id).push(d);
   }
+  // Miroir _export-data.js : équipements partagés vers chaque système.
+  const fixtureSystemShortLabel = (sid) => {
+    const s = SYSTEMS_RAW.find(x => x.id === sid);
+    if (!s) return null;
+    const zn = ZONES_RAW.find(zz => zz.zone_id === s.zone_id)?.name;
+    const cat = SYSTEM_LABEL[s.system_category] || s.system_category;
+    return zn ? `${zn} · ${cat}` : cat;
+  };
+  const sharedDevicesBySystem = new Map();
+  for (const d of devices) {
+    if (!d.extra_system_ids.length) continue;
+    d.sharedWithLabel = d.extra_system_ids.map(fixtureSystemShortLabel).filter(Boolean).join(', ');
+    const sharedFromLabel = fixtureSystemShortLabel(d.system_id);
+    for (const sid of d.extra_system_ids) {
+      if (!sharedDevicesBySystem.has(sid)) sharedDevicesBySystem.set(sid, []);
+      sharedDevicesBySystem.get(sid).push({ ...d, is_shared_here: true, sharedFromLabel });
+    }
+  }
 
   // Systems : enrichissements + injection devices
   const enrichedSystems = SYSTEMS_RAW.map(s => {
     const z = ZONES_RAW.find(zz => zz.zone_id === s.zone_id);
     const devs = devicesBySystem.get(s.id) || [];
+    const sharedDevs = sharedDevicesBySystem.get(s.id) || [];
     const totalKw = Math.round(devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0), 0) * 100) / 100; // 2 décimales
     return {
       ...s,
@@ -744,7 +763,9 @@ async function buildFixturePreviewData({ user = null } = {}) {
       negativeLabel: SYSTEM_NEGATIVE_LABEL[s.system_category] || `Pas de ${(SYSTEM_LABEL[s.system_category] || s.system_category).toLowerCase()}`,
       commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
       devices: devs,
-      device_count: devs.length,
+      shared_devices: sharedDevs,
+      shared_device_count: sharedDevs.length,
+      device_count: devs.length + sharedDevs.length,
       total_power_kw: totalKw,
       photos: [],
     };

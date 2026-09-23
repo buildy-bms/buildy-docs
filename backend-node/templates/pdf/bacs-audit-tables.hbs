@@ -236,7 +236,7 @@
           {{!-- systemsByZoneForSynthesis a déjà filtré les items en amont
                (present + devices.length). L'info d'assujetti R175-2 est
                sur la couverture du PDF — pas répétée à chaque sous-section. --}}
-          {{#if present}}{{#if devices.length}}
+          {{#if present}}{{#if device_count}}
             {{#each devices}}
               <tr {{#if out_of_service}}class="row-hs"{{/if}}>
                 <td class="col-ref">{{ref}}</td>
@@ -244,7 +244,7 @@
                 <td class="col-name">
                   <strong>{{name}}</strong>
                   {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
-                  {{#if shared_zone_count}}<span class="shared-badge">↔ Partagé {{add shared_zone_count 1}} zones</span>{{/if}}
+                  {{#if sharedWithLabel}}<span class="shared-badge shared-badge-wrap">↔ Dessert aussi : {{sharedWithLabel}}</span>{{/if}}
                 </td>
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
@@ -257,6 +257,32 @@
                     {{#if power_kw}}<span class="pwr-main">{{power_kw}}</span>{{else}}<span class="muted">—</span>{{/if}}
                   {{/if}}
                 </td>
+                <td class="col-role">
+                  {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="muted">—</span>{{/if}}
+                </td>
+                <td class="col-comm">{{{commPill communication_protocol "sm"}}}</td>
+                <td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-bool">{{{boolPill meets_r175_3_p3 "sm"}}}</td>
+                <td class="col-bool">{{{boolPill meets_r175_3_p4 "sm"}}}</td>
+                <td class="col-bool">{{{boolPill meets_r175_3_p4_autonomous "sm"}}}</td>
+                <td class="col-bool">{{{boolPill managed_by_bms "sm"}}}</td>
+              </tr>
+            {{/each}}
+            {{!-- Équipements partagés vers ce système (mig 143) : puissance
+                 renvoyée au système d'origine (pas de double comptage). --}}
+            {{#each shared_devices}}
+              <tr class="row-shared{{#if out_of_service}} row-hs{{/if}}">
+                <td class="col-ref"></td>
+                <td class="col-usage">{{{systemCategoryPill ../system_category "sm"}}}</td>
+                <td class="col-name">
+                  <strong>{{name}}</strong>
+                  {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
+                  <span class="shared-badge shared-badge-wrap">↔ Partagé depuis {{sharedFromLabel}}</span>
+                </td>
+                <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-energy">{{#if energy_source}}{{{energyPill energy_source "sm"}}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-power"><span class="muted">cf. origine</span></td>
                 <td class="col-role">
                   {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="muted">—</span>{{/if}}
                 </td>
