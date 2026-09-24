@@ -85,10 +85,19 @@ async function routes(fastify) {
     // Enrichit avec auteur display_name (batch IN pour eviter le N+1)
     const userIds = items.flatMap(a => [a.created_by, a.updated_by]);
     const usersById = db.users.getByIds(userIds);
+    // Présence d'une GTB (audits BACS) : sans GTB, l'étape « Inspections »
+    // sort de la progression affichée dans la liste, comme dans le stepper.
+    const auditIds = items.filter(a => a.kind === 'bacs_audit').map(a => a.id);
+    const bmsPresentByDoc = new Map(auditIds.length
+      ? db.db.prepare(`SELECT document_id, present FROM bacs_audit_bms
+          WHERE document_id IN (${auditIds.map(() => '?').join(',')})`).all(...auditIds)
+        .map(r => [r.document_id, r.present])
+      : []);
     return items.map(a => ({
       ...a,
       created_by_name: usersById.get(a.created_by)?.display_name || null,
       updated_by_name: usersById.get(a.updated_by)?.display_name || null,
+      ...(a.kind === 'bacs_audit' ? { bms_present: bmsPresentByDoc.get(a.id) ?? null } : {}),
     }));
   });
 

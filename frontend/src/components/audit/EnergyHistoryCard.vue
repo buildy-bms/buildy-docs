@@ -16,8 +16,9 @@ import { useNotification } from '@/composables/useNotification'
 import {
   getSiteEnergyHistory, createSiteEnergyHistory, importSiteEnergyHistory,
   updateSiteEnergyHistory, deleteSiteEnergyHistory,
-  uploadSiteDocument, getSiteDocumentDownloadUrl,
+  uploadSiteDocument, getSiteDocumentDownloadUrl, getSiteDocumentViewUrl,
 } from '@/api'
+import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { ENERGY_HISTORY_TYPES, MONTH_LABELS } from '@/lib/audit-options'
 
 // `flush` : rendu en sous-section (sans chrome de card) quand imbriquée.
@@ -247,6 +248,21 @@ function onInvoiceDrop(row, e) {
 function downloadUrl(id) {
   return getSiteDocumentDownloadUrl(id)
 }
+// Aperçu de la facture (PDF ou image) dans une fenêtre de l'appli ; le type
+// est déduit du nom de fichier (la ligne n'a pas le type MIME).
+const viewerDoc = ref(null)
+function invoiceDoc(r) {
+  const name = r.invoice_name || 'Facture'
+  const mime = /\.pdf$/i.test(name) ? 'application/pdf'
+    : (/\.(jpe?g|png|webp|gif|heic)$/i.test(name) ? 'image/jpeg' : '')
+  return { id: r.invoice_attachment_id, title: name, original_name: name, mime_type: mime }
+}
+function openInvoice(e, r) {
+  const d = invoiceDoc(r)
+  if (!d.mime_type) return
+  e.preventDefault()
+  viewerDoc.value = d
+}
 
 // Génère et télécharge un modèle CSV vide (en-tête + lignes d'exemple)
 // dans le format exact attendu par parsePastedRows() : séparateur « ; ».
@@ -355,7 +371,8 @@ function downloadCsvTemplate() {
                 </td>
                 <td class="px-3 py-1.5">
                   <a v-if="r.invoice_attachment_id"
-                     :href="downloadUrl(r.invoice_attachment_id)" target="_blank"
+                     :href="invoiceDoc(r).mime_type ? getSiteDocumentViewUrl(r.invoice_attachment_id) : downloadUrl(r.invoice_attachment_id)" target="_blank"
+                     @click.exact="e => openInvoice(e, r)"
                      class="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1">
                     <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="w-3 h-3 shrink-0" />
                     {{ r.invoice_name || 'Facture' }}
@@ -510,5 +527,6 @@ function downloadCsvTemplate() {
         </div>
       </div>
     </div>
+    <DocumentViewerModal :doc="viewerDoc" @close="viewerDoc = null" />
   </div>
 </template>

@@ -20,7 +20,8 @@ import '@/lib/equipment-icons'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { listSiteDocuments, uploadSiteDocument, deleteSiteDocument, getSiteDocumentDownloadUrl } from '@/api'
+import { listSiteDocuments, uploadSiteDocument, deleteSiteDocument, getSiteDocumentDownloadUrl, getSiteDocumentViewUrl } from '@/api'
+import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 
 const props = defineProps({
   inspectionId: { type: Number, required: true },
@@ -32,6 +33,19 @@ const { success, error } = useNotification()
 const { confirm } = useConfirm()
 
 const docs = ref([])
+
+// Aperçu d'un PDF ou d'une image dans une fenêtre de l'appli ; Cmd-clic
+// ouvre toujours un nouvel onglet (PDF affiché, pas téléchargé).
+const viewerDoc = ref(null)
+function isPreviewable(f) {
+  return f?.mime_type === 'application/pdf' || /\.pdf$/i.test(f?.original_name || f?.title || '')
+    || String(f?.mime_type || '').startsWith('image/')
+}
+function openViewer(e, f) {
+  if (!isPreviewable(f)) return
+  e.preventDefault()
+  viewerDoc.value = f
+}
 const loading = ref(false)
 const uploading = ref(false)
 const dragOver = ref(false)
@@ -135,7 +149,8 @@ function fmtDate(iso) {
         <FontAwesomeIcon :icon="['fas', isPdf(d) ? 'file-pdf' : 'file']"
                          :class="isPdf(d) ? 'text-red-500' : 'text-gray-400'"
                          class="w-4 h-4 shrink-0" />
-        <a :href="getSiteDocumentDownloadUrl(d.id)" target="_blank" rel="noopener"
+        <a :href="isPreviewable(d) ? getSiteDocumentViewUrl(d.id) : getSiteDocumentDownloadUrl(d.id)" target="_blank" rel="noopener"
+           @click.exact="e => openViewer(e, d)"
            class="flex-1 truncate text-indigo-700 hover:text-indigo-900 hover:underline">
           {{ d.original_name || d.title }}
         </a>
@@ -179,5 +194,6 @@ function fmtDate(iso) {
              class="hidden"
              @change="onInput" />
     </button>
+    <DocumentViewerModal :doc="viewerDoc" @close="viewerDoc = null" />
   </div>
 </template>

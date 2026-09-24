@@ -166,7 +166,6 @@ function openEdit(item) {
   draft.value = {
     status: item.status || 'open',
     estimated_effort: item.estimated_effort || null,
-    commercial_notes: item.commercial_notes || '',
     alternative_solutions_html: item.alternative_solutions_html || '',
   }
 }
@@ -182,7 +181,6 @@ async function saveEdit() {
     const payload = {
       status: draft.value.status,
       estimated_effort: draft.value.estimated_effort || null,
-      commercial_notes: draft.value.commercial_notes || null,
       alternative_solutions_html: draft.value.alternative_solutions_html || null,
     }
     await updateBacsActionItem(editing.value.id, payload)
@@ -260,7 +258,7 @@ async function saveEdit() {
          class="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
       <FontAwesomeIcon :icon="['fas', 'circle-info']" class="w-4 h-4 shrink-0 text-indigo-500 mt-0.5" />
       <div class="text-[11px] leading-relaxed text-indigo-900/90">
-        <p><strong class="font-semibold">Sources d'aide à l'interprétation (non opposables).</strong> Les actions reposent sur le décret R175 (seule source opposable), complété par : Guide d'application ministère (janvier 2026) ; Guide PROFEEL (novembre 2025) ; norme NF EN ISO 52120-1.</p>
+        <p><strong class="font-semibold">Sources d'aide à l'interprétation (non opposables).</strong> Les actions reposent sur le décret BACS (articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l'habitation, et arrêté du 7 avril 2023 : seuls textes juridiquement opposables), complété par : Guide d'application ministère (janvier 2026) ; Guide PROFEEL (novembre 2025) ; norme NF EN ISO 52120-1.</p>
       </div>
     </div>
 

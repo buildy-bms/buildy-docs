@@ -16,6 +16,9 @@ const gitLib = require('../../lib/git');
 const { assertBacsAuditExists } = require('./_shared');
 const { isTrue, isUnanswered } = require('./_ternary');
 const { systemInteropStatus } = require('./_interop');
+const { deviceOutOfGtbScope } = require('../../lib/bacs-gtb-scope');
+const { isReserveAction, isInfoAction } = require('./_compliance-summary');
+const { effectiveBuildyBms } = require('../../lib/buildy-cloud-preset');
 // Sérialisation ternaire pour le dump Claude : ne JAMAIS collapser null en
 // false (incident Communay) — Claude doit voir « unanswered » pour pouvoir
 // signaler les questions restées sans réponse dans sa synthèse.
@@ -60,7 +63,20 @@ async function routes(fastify) {
         log.warn(`Audit BACS #${documentId} livré en FORCE par user #${userId} malgré ${precheck.blocking.length} blockings.`);
       }
     } catch (e) {
-      log.warn(`Pré-check livraison #${documentId} a échoué : ${e.message} — livraison autorisée sans pré-check.`);
+      // Vérification impossible (erreur technique) : on ne livre pas un
+      // rapport non contrôlé. L'auditeur peut forcer explicitement, tracé.
+      log.warn(`Pré-check livraison #${documentId} a échoué : ${e.message}`);
+      if (!force) {
+        return reply.code(409).send({
+          detail: 'La vérification avant livraison a échoué (erreur technique). Livraison suspendue.',
+          precheck_failed: true,
+        });
+      }
+      db.auditLog.add({
+        afId: documentId, userId, action: 'bacs_audit.deliver.forced',
+        payload: { precheck_error: e.message },
+      });
+      log.warn(`Audit BACS #${documentId} livré en FORCE par user #${userId} sans pré-check (erreur : ${e.message}).`);
     }
 
     // 1. Genere le PDF final via l'endpoint export-pdf interne (re-utilise la
@@ -96,10 +112,10 @@ async function routes(fastify) {
       SELECT MAX(effective_from) AS dt FROM bacs_knowledge
       WHERE source = 'decree' AND effective_until IS NULL AND code LIKE 'R175-%'
     `).get();
-    let decreeVersionLabel = 'R175 — version en vigueur';
+    let decreeVersionLabel = 'Articles R175-1 à R175-6 — version en vigueur';
     if (decreeRow?.dt) {
       const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(decreeRow.dt);
-      decreeVersionLabel = m ? `R175 version applicable au ${m[3]}/${m[2]}/${m[1]}` : `R175 version du ${decreeRow.dt}`;
+      decreeVersionLabel = m ? `Articles R175-1 à R175-6, version du ${new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).replace(/^1 /, '1er ')}` : `Articles R175-1 à R175-6, version du ${decreeRow.dt}`;
     }
 
     db.afs.update(documentId, {
@@ -268,8 +284,11 @@ async function routes(fastify) {
       return reply.code(503).send({ detail: 'Assistant Claude non configure (ANTHROPIC_API_KEY manquant)' });
     }
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, request, reply);
-    if (!af) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
+    // Plan d'actions et puissance à jour AVANT le dump : la note doit
+    // décrire le même plan que le PDF (qui régénère aussi à l'export).
+    try { regenerateActionItems(documentId); } catch (e) { log.warn(`Synthèse #${documentId} : régénération KO (${e.message})`); }
+    const af = db.afs.getById(documentId);
     const site = af.site_id ? db.sites.getByIdInternal?.(af.site_id) || db.sites.getById(af.site_id) : null;
     const zones = site ? db.zones.listBySite(site.site_id) : [];
     const systems = db.db.prepare(`
@@ -290,7 +309,9 @@ async function routes(fastify) {
       LEFT JOIN zones z ON z.id = m.zone_id
       WHERE m.document_id = ?
     `).all(documentId);
-    const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
+    // Fiche GTB « effective » (supervision Buildy : champs du niveau d'offre),
+    // comme le générateur d'actions et le PDF.
+    const bms = effectiveBuildyBms(db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null);
     const thermal = db.db.prepare(`
       SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.id = t.zone_id
@@ -320,7 +341,7 @@ async function routes(fastify) {
       // proprietaire, dont le rapport se conserve 10 ans). Ne jamais affirmer
       // dans la synthese que l'obligation d'inspection est remplie.
       regulatory_frame: {
-        decree: 'R175 (Decret BACS, modifie par decret 2023-259)',
+        decree: 'Decret BACS : articles R175-1 a R175-6 du code de la construction et de l\'habitation (decret n° 2020-887, modifie en dernier lieu par le decret n° 2025-1343 du 26 decembre 2025)',
         report_type: 'Audit de conformite prealable — distinct de l\'inspection periodique R175-5-1',
         note: 'Cet audit ne constitue pas l\'inspection R175-5-1 et ne remplace pas l\'obligation d\'inspection a l\'initiative du proprietaire.',
       },
@@ -354,12 +375,19 @@ async function routes(fastify) {
         // mig 42) et renvoyaient toujours « unanswered » — elles trompaient
         // la synthèse. La qualification réelle par équipement est dans le
         // bloc `devices` ci-dessous.
+        // Même règle que le plan d'actions et le chapitre 3 : générateurs,
+        // site sans GTB, usages que la GTB ne traite pas.
         const sysDevs = (devices || []).filter(d => d.system_id === s.id
-          && !isTrue(d.out_of_service) && !isTrue(d.is_backup));
+          && !isTrue(d.out_of_service));
+        const interopOpts = {
+          noGtb: !!bms && bms.present === 0,
+          category: s.system_category,
+          outOfScope: (d) => deviceOutOfGtbScope(bms, d, s.system_category),
+        };
         return {
           category: s.system_category, zone: s.zone_name,
           present: tri(s.present),
-          interop_r175_3_3: systemInteropStatus(sysDevs).verdict, // ok | fail | pending | na
+          interop_r175_3_3: systemInteropStatus(sysDevs, interopOpts).verdict, // ok | fail | pending | na
           managed_by_bms: tri(s.managed_by_bms),
           notes: stripHtml(s.notes_html) || s.notes,
         };
@@ -429,7 +457,12 @@ async function routes(fastify) {
         // (production). On les expose via l'enrichissement amont si dispo.
         notes: t.notes,
       })),
+      // kind : 'action' (écart à corriger), 'reserve' (obligation à respecter
+      // qui ne remet pas en cause la conformité : maintenance R175-4, export
+      // des données en Buildy Essentials), 'information' (exemption 5 %,
+      // point de vigilance — ni écart ni action).
       action_items_open: actionItems.map(a => ({
+        kind: isInfoAction(a) ? 'information' : isReserveAction(a) ? 'reserve' : 'action',
         severity: a.severity, article: a.r175_article,
         title: a.title, description: a.description,
         zone: a.zone_name, estimated_effort: a.estimated_effort,
@@ -446,9 +479,11 @@ async function routes(fastify) {
         meters_required: meters.filter(m => isTrue(m.required)).length,
         meters_present: meters.filter(m => isTrue(m.present_actual)).length,
         meters_presence_unanswered: meters.filter(m => isUnanswered(m.present_actual)).length,
-        actions_blocking: actionItems.filter(a => a.severity === 'blocking').length,
-        actions_major: actionItems.filter(a => a.severity === 'major').length,
-        actions_minor: actionItems.filter(a => a.severity === 'minor').length,
+        actions_blocking: actionItems.filter(a => !isInfoAction(a) && !isReserveAction(a) && a.severity === 'blocking').length,
+        actions_major: actionItems.filter(a => !isInfoAction(a) && !isReserveAction(a) && a.severity === 'major').length,
+        actions_minor: actionItems.filter(a => !isInfoAction(a) && !isReserveAction(a) && a.severity === 'minor').length,
+        reserves: actionItems.filter(a => isReserveAction(a)).length,
+        informations: actionItems.filter(a => isInfoAction(a)).length,
       },
     };
 

@@ -120,6 +120,13 @@ function forceNotOperationalWhenOutOfService(body, row) {
   if (hs && managed) body.bms_integration_out_of_service = true;
 }
 
+// Nom court d'un audit pour les noms de fichiers et l'objet des e-mails :
+// « Audit BACS — Sénas » → « Sénas » (le type est déjà dans le libellé).
+function auditShortName(af) {
+  const raw = String(af?.project_name || af?.slug || '').trim();
+  return raw.replace(/^\s*audit\s+(bacs|gtb)\s*[—–:-]\s*/i, '').trim() || raw;
+}
+
 module.exports = {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
   METER_USAGES, METER_TYPES, RECOMMENDATIONS,
@@ -128,4 +135,5 @@ module.exports = {
   assertBacsAuditExists,
   logBacsAudit,
   forceNotOperationalWhenOutOfService,
+  auditShortName,
 };

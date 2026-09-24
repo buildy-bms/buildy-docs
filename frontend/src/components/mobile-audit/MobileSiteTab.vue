@@ -215,7 +215,7 @@ const generatorWorksDone = computed({
 
           <MobileField
             label="Date du permis de construire"
-            hint="Date délivrance PC. Si postérieur au 8 avril 2024, le bâtiment est soumis BACS dès la livraison sans seuil de puissance."
+            hint="Date de dépôt du permis de construire. Un bâtiment neuf est soumis dès sa livraison si son permis a été déposé après le 21 juillet 2021 et que sa puissance dépasse 290 kW, ou après le 8 avril 2024 et que sa puissance dépasse 70 kW."
           >
             <input
               type="date"

@@ -29,6 +29,8 @@
   --verdict-warn: #d97706;
   --verdict-bad: #dc2626;
   --verdict-na: #9ca3af;
+  --verdict-reserve: #1b2842;   /* réserve : contour navy, fond blanc */
+  --verdict-unknown: #475569;   /* non déterminé : ardoise */
 }
 
 @page {
@@ -46,7 +48,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 8.5pt;
   color: #1f2937;
   line-height: 1.45;
@@ -55,8 +57,10 @@ html, body {
 }
 
 a { color: inherit; text-decoration: none; }
+sup { line-height: 0; }
+sup.ord { font-size: 0.72em; vertical-align: super; }
 code {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
   font-size: 8.5pt;
   background: #f1f3f6;
   padding: 0.2mm 1mm;
@@ -64,7 +68,7 @@ code {
 }
 
 h1, h2, h3, h4, h5 {
-  font-family: 'Poppins', -apple-system, sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-weight: 600;
 }
 
@@ -112,8 +116,11 @@ h1, h2, h3, h4, h5 {
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* Titre + client + verdict forment un seul bloc, centré optiquement entre
+   le logo et le pied de page (relecture PDF 2026-09-24 : le verdict calé
+   en bas laissait ~10 cm de vide sous l'adresse). */
 .cover-main {
-  margin-top: 12mm;
+  margin-top: auto;
   flex: 0 0 auto;
 }
 .cover-title {
@@ -143,8 +150,8 @@ h1, h2, h3, h4, h5 {
 
 /* Bandeau verdict — l'élément qui parle au client en 3 secondes */
 .cover-verdict {
-  margin-top: auto;
-  margin-bottom: 14mm;
+  margin-top: 12mm;
+  margin-bottom: 30mm;
   padding: 8mm 10mm;
   background: rgba(255, 255, 255, 0.06);
   border-left: 3pt solid var(--buildy-green);
@@ -174,7 +181,7 @@ h1, h2, h3, h4, h5 {
 }
 .cover-verdict-eyebrow {
   grid-row: 1; grid-column: 2;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -205,6 +212,7 @@ h1, h2, h3, h4, h5 {
 
 /* Footer cover : date / auditeur / version en 3 colonnes discrètes */
 .cover-footer {
+  margin-top: auto;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 0 14mm;
@@ -224,13 +232,13 @@ h1, h2, h3, h4, h5 {
   color: rgba(255, 255, 255, 0.45);
 }
 .cover-footer-value {
-  font-size: 9pt;
+  font-size: 9.5pt;
   color: white;
   font-weight: 500;
 }
 .cover-footer-version {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   background: var(--buildy-green);
   color: var(--buildy-navy);
   padding: 0.8mm 2.2mm;
@@ -244,7 +252,7 @@ h1, h2, h3, h4, h5 {
    phares. C'est la page que le client ouvre et qui circule. */
 .essential {
   page-break-after: always;
-  padding: 4mm 0;
+  padding: 0;
 }
 /* Encart pont décret tertiaire (item 12) — placé en pied de la page
    « L'essentiel ». page-break-inside: avoid (hérité de .callout) le
@@ -255,6 +263,26 @@ h1, h2, h3, h4, h5 {
 .essential-ownership {
   margin-top: 6mm;
 }
+/* Notes de contexte (structure juridique, décret tertiaire) : côte à côte
+   quand les deux sont présentes, pleine largeur sinon. */
+.essential-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70mm, 1fr));
+  gap: 4mm;
+  margin-top: 4mm;
+  page-break-inside: avoid;
+}
+.essential-notes .callout {
+  margin: 0;
+  font-size: 7.5pt;
+  line-height: 1.45;
+}
+/* Même corps pour tous les encadrés du bas de L'essentiel. */
+.callout.essential-to-qualify { font-size: 7.5pt; line-height: 1.45; }
+.callout.essential-to-qualify .essential-reserves { font-size: 7.5pt; }
+/* Trois chiffres (pas de réserve) : le dernier, seul sur sa ligne, occupe
+   toute la largeur au lieu de laisser une case vide. */
+.stats-grid:not(.stats-grid-4) > .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
 /* Bandeau « Consommations de référence » (item 13) — en pied de la page
    « L'essentiel ». Cartes de total par énergie + graphe mensuel. */
 .energy-reference {
@@ -277,7 +305,7 @@ h1, h2, h3, h4, h5 {
 }
 .energy-ref-card-label {
   font-family: 'Inter', sans-serif;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -286,13 +314,13 @@ h1, h2, h3, h4, h5 {
 }
 .energy-ref-card-value {
   font-family: 'Poppins', sans-serif;
-  font-size: 12pt;
+  font-size: 13pt;
   font-weight: 700;
   color: var(--buildy-navy);
   line-height: 1.1;
 }
 .energy-ref-card-unit {
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 600;
   color: var(--neutral-700);
 }
@@ -317,12 +345,12 @@ h1, h2, h3, h4, h5 {
   margin: 2mm 0 0;
 }
 .essential-header {
-  margin-bottom: 8mm;
+  margin-bottom: 6mm;
 }
 .essential-eyebrow {
   display: block;
   font-family: 'Inter', sans-serif;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -343,9 +371,9 @@ h1, h2, h3, h4, h5 {
   display: flex;
   align-items: center;
   gap: 6mm;
-  padding: 6mm 8mm;
+  padding: 4.5mm 7mm;
   border-radius: 2mm;
-  margin-bottom: 8mm;
+  margin-bottom: 6mm;
   page-break-inside: avoid;
 }
 .essential-verdict-banner.essential-verdict-compliant     { background: #ecfdf5; border-left: 3pt solid var(--verdict-ok); }
@@ -358,7 +386,7 @@ h1, h2, h3, h4, h5 {
   display: flex; align-items: center; justify-content: center;
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 14pt;
+  font-size: 13pt;
   color: white;
   line-height: 1;
 }
@@ -369,7 +397,7 @@ h1, h2, h3, h4, h5 {
 .essential-verdict-label {
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 12pt;
+  font-size: 13pt;
   color: var(--buildy-navy);
   letter-spacing: -0.01em;
 }
@@ -380,11 +408,13 @@ h1, h2, h3, h4, h5 {
 }
 
 /* Grille principal : assujettissement à gauche, chiffres à droite */
+/* minmax(0, …) : le contenu minimal des tuiles n'écrase plus la colonne du
+   calcul d'assujettissement. */
 .essential-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 6mm;
-  margin-bottom: 8mm;
+  margin-bottom: 5mm;
 }
 .essential-caveat {
   display: flex;
@@ -395,7 +425,7 @@ h1, h2, h3, h4, h5 {
   background: #f8fafc;
   border: 0.4pt solid #e2e8f0;
   border-radius: 2mm;
-  font-size: 8pt;
+  font-size: 8.5pt;
   line-height: 1.45;
   color: #475569;
 }
@@ -427,7 +457,7 @@ h1, h2, h3, h4, h5 {
   background: var(--neutral-50);
   border: 0.4pt solid var(--neutral-200);
   border-radius: 2.5mm;
-  padding: 5mm 6mm;
+  padding: 4mm 5mm;
   page-break-inside: avoid;
 }
 .applicability-steps {
@@ -452,7 +482,7 @@ h1, h2, h3, h4, h5 {
   display: flex; align-items: center; justify-content: center;
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 8pt;
+  font-size: 8.5pt;
   line-height: 1;
 }
 .applicability-steps .step-body {
@@ -479,16 +509,19 @@ h1, h2, h3, h4, h5 {
   margin-top: 0.5mm;
 }
 
+/* Tuiles 2 × 2, sans cadre (charte « mise en valeur sans cadre ») : seul
+   le chiffre porte la couleur du niveau ; un zéro reste gris. */
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 3mm;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5mm;
 }
 .stat {
   text-align: center;
-  padding: 4mm 2mm;
-  border-radius: 2.5mm;
-  border: 0.6pt solid;
+  padding: 3mm 2mm;
+  border-radius: 2mm;
+  border: none;
+  background: #ffffff;
 }
 .stat-num {
   font-family: 'Poppins', sans-serif;
@@ -499,70 +532,89 @@ h1, h2, h3, h4, h5 {
   letter-spacing: -0.02em;
 }
 .stat-label {
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
-.stat-blocking { background: #fef2f2; border-color: #fecaca; }
 .stat-blocking .stat-num   { color: var(--sev-blocking); }
-.stat-blocking .stat-label { color: #991b1b; }
-.stat-major    { background: #fff7ed; border-color: #fed7aa; }
 .stat-major    .stat-num   { color: var(--sev-major); }
-.stat-major    .stat-label { color: #9a3412; }
-.stat-minor    { background: #fffbeb; border-color: #fde68a; }
 .stat-minor    .stat-num   { color: var(--sev-minor); }
-.stat-minor    .stat-label { color: #92400e; }
+.stat .stat-label          { color: var(--neutral-700); }
+.stat.stat-zero .stat-num,
+.stat.stat-zero .stat-label { color: var(--neutral-400); }
 
-.essential-headlines { padding: 5mm 6mm; }
+.essential-headlines { padding: 3.5mm 5mm 2mm; margin: 0 0 5mm; }
+/* Titre de bloc + renvoi au plan complet sur la même ligne. */
+.essential-block-title-split {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4mm;
+}
+.essential-block-aside {
+  font-family: 'Inter', sans-serif;
+  font-size: 7.5pt;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--neutral-500);
+}
+/* Une ligne par action : numéro · intitulé · niveau et article. */
 .headlines-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3mm;
 }
 .headline {
-  display: flex;
-  gap: 4mm;
-  align-items: flex-start;
-  padding: 3mm 4mm;
-  background: white;
-  border: 0.4pt solid var(--neutral-200);
-  border-left: 2.5pt solid var(--sev-blocking);
-  border-radius: 2mm;
+  display: grid;
+  /* Colonnes fixes : numéros, pastilles de niveau et articles alignés d'une
+     ligne à l'autre (relecture PDF 2026-09-24). */
+  grid-template-columns: 17mm minmax(0, 1fr) 44mm;
+  gap: 3.5mm;
+  align-items: center;
+  padding: 1.8mm 0;
+  border-bottom: 0.4pt solid var(--neutral-200);
   page-break-inside: avoid;
 }
+.headline:last-child { border-bottom: none; }
 .headline-num {
-  flex: 0 0 auto;
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 9pt;
+  justify-self: start;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 7.5pt;
   font-weight: 700;
   background: var(--buildy-navy);
   color: white;
-  padding: 1mm 2.5mm;
+  padding: 0.7mm 2mm;
   border-radius: 2mm;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  margin-top: 0.5mm;
 }
-.headline-body { flex: 1; display: flex; flex-direction: column; gap: 1.5mm; }
 .headline-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
+  font-size: 8.5pt;
   font-weight: 600;
   color: var(--buildy-navy);
-  line-height: 1.35;
+  line-height: 1.3;
 }
 .headline-meta {
   display: flex;
-  gap: 2mm;
   flex-wrap: wrap;
+  gap: 1mm 1.5mm;
   align-items: center;
+  justify-content: flex-start;
 }
+.headline-meta .sev {
+  font-size: 6.5pt;
+  padding: 0.5mm 1.8mm;
+  min-width: 17mm;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+}
+.headline-meta .r175-tag { white-space: nowrap; }
 .headline-meta .r175-tag {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
   font-size: 7.5pt;
   color: var(--neutral-600);
   background: var(--neutral-100);
@@ -589,13 +641,13 @@ h1, h2, h3, h4, h5 {
    pour aller directement au chapitre qui l'intéresse. */
 .r175-dashboard {
   page-break-after: always;
-  padding: 4mm 0;
+  padding: 0;
 }
-.dashboard-header { margin-bottom: 8mm; }
+.dashboard-header { margin-bottom: 4mm; }
 .dashboard-eyebrow {
   display: block;
   font-family: 'Inter', sans-serif;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -607,32 +659,60 @@ h1, h2, h3, h4, h5 {
   font-size: 16pt;
   font-weight: 700;
   color: var(--buildy-navy);
-  margin: 0 0 3mm;
+  margin: 0 0 2mm;
   letter-spacing: -0.015em;
   line-height: 1.15;
 }
 .dashboard-intro {
   font-size: 8.5pt;
   color: var(--neutral-600);
-  line-height: 1.55;
-  max-width: 150mm;
+  line-height: 1.5;
   margin: 0;
 }
 
+/* Constat commun à plusieurs exigences (site sans GTB…), imprimé une fois. */
+.dashboard-common-note {
+  margin: 0 0 3mm;
+  padding: 2mm 3.5mm;
+  background: var(--neutral-50);
+  border: 0.4pt solid var(--neutral-200);
+  border-left: 2.5pt solid var(--buildy-navy);
+  border-radius: 2mm;
+  font-size: 8.5pt;
+  line-height: 1.45;
+  color: var(--neutral-700);
+}
+.dashboard-common-note strong { color: var(--buildy-navy); font-weight: 600; }
+
+/* Têtière unique des colonnes (remplace le sur-titre répété par ligne). */
+.r175-rows-head {
+  display: grid;
+  grid-template-columns: 19mm minmax(0, 1fr) 33mm;
+  gap: 3.5mm;
+  padding: 0 3.5mm 1.2mm 4.4mm;
+  font-size: 6.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+}
+.r175-rows-head span:first-child,
+.r175-rows-head span:last-child { text-align: center; }
 .r175-rows {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 2mm;
+  gap: 1.2mm;
 }
+/* Lignes resserrées : le tableau de bord tient sur une page. */
 .r175-row {
   display: grid;
-  grid-template-columns: 24mm minmax(0, 1fr) 38mm 18mm;
+  grid-template-columns: 19mm minmax(0, 1fr) 33mm;
   align-items: center;
-  gap: 7mm;
-  padding: 3mm 4mm;
+  gap: 3.5mm;
+  padding: 1.6mm 3.5mm;
   background: white;
   border: 0.4pt solid var(--neutral-200);
   border-left: 2.5pt solid var(--neutral-300);
@@ -646,7 +726,8 @@ h1, h2, h3, h4, h5 {
 .r175-row-info          { border-left-color: var(--buildy-navy); }
 
 .r175-row-code {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
   font-size: 7.5pt;
   font-weight: 700;
   background: var(--buildy-navy);
@@ -655,76 +736,102 @@ h1, h2, h3, h4, h5 {
   border-radius: 2mm;
   text-align: center;
   letter-spacing: 0.02em;
-  white-space: nowrap;
+  /* « R175-3 dernier alinéa » passe sur deux lignes au lieu d'être coupé ;
+     la référence elle-même reste insécable (typographie des nœuds texte). */
+  white-space: normal;
+  line-height: 1.25;
 }
-.r175-row-content { display: flex; flex-direction: column; gap: 0.6mm; }
+.r175-row-content { display: flex; flex-direction: column; gap: 0.3mm; }
 .r175-row-label {
   font-family: 'Poppins', sans-serif;
-  font-size: 9pt;
+  font-size: 9.5pt;
   font-weight: 600;
   color: var(--buildy-navy);
+  line-height: 1.3;
 }
 .r175-row-summary {
-  font-size: 7.8pt;
+  font-size: 7.5pt;
   color: var(--neutral-600);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 /* Intitulé « Ce que le décret exige » avant le résumé : évite qu'un lecteur
    non-technique lise l'exigence (phrase affirmative) comme un constat sur son
    site, alors qu'un verdict rouge/orange peut la contredire juste à droite. */
 .r175-row-req-eyebrow {
   display: block;
-  font-size: 5.6pt;
+  font-size: 6.5pt;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--neutral-400, #9ca3af);
   margin-bottom: 0.3mm;
 }
+/* Constat propre au site (non applicable, à qualifier…) : séparé de
+   l'exigence pour ne pas être lu comme « ce que le décret exige ». */
+.r175-row-note { margin-top: 0.8mm; color: var(--neutral-700, #374151); }
 /* Lien vers le texte officiel de l'article (Légifrance) — chaque exigence du
    tableau de bord renvoie au décret. Discret, sans souligné. */
 .r175-row-legifrance {
-  display: inline-block;
-  margin-top: 0.4mm;
-  font-size: 6.6pt;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8mm;
+  margin-left: 2.5mm;
+  font-family: 'Inter', sans-serif;
+  font-size: 6.5pt;
+  font-weight: 500;
   color: #4f628c;
   text-decoration: none;
+  vertical-align: 0.4mm;
+}
+/* Verdict et nombre d'actions empilés dans une seule colonne. */
+.r175-row-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1mm;
 }
 .r175-row-verdict {
   display: inline-flex;
   align-items: center;
-  gap: 1.8mm;
-  padding: 1.4mm 4mm;
+  gap: 1.2mm;
+  padding: 1.1mm 2.5mm;
   border-radius: 2mm;
   font-family: 'Poppins', sans-serif;
-  font-size: 8pt;
+  font-size: 7.5pt;
   font-weight: 600;
-  white-space: nowrap;
+  line-height: 1.2;
+  /* « Partiellement conforme » passe sur deux lignes plutôt que de déborder
+     de sa colonne. */
+  white-space: normal;
+  text-align: center;
+  max-width: 100%;
+  box-sizing: border-box;
   justify-content: center;
   justify-self: center;
 }
 .r175-row-verdict-icon {
   font-weight: 700;
-  font-size: 9pt;
+  font-size: 9.5pt;
   line-height: 1;
 }
 .r175-row-verdict-compliant     { background: #ecfdf5; color: var(--verdict-ok); }
 .r175-row-verdict-partial       { background: #fff7ed; color: #9a3412; }
 .r175-row-verdict-non_compliant { background: #fef2f2; color: #991b1b; }
 .r175-row-verdict-na            { background: var(--neutral-100); color: var(--neutral-500); }
-.r175-row-verdict-info          { background: #eef2ff; color: var(--buildy-navy); }
+.r175-row-verdict-info          { background: #f1f5f9; color: var(--buildy-navy); }
 .r175-row-actions {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
   font-size: 7.5pt;
   font-weight: 600;
   color: var(--neutral-700);
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 .r175-row-actions-empty { color: var(--neutral-400); font-weight: 400; }
 .dashboard-footnote {
-  margin-top: 6mm;
-  font-size: 8pt;
+  margin-top: 3mm;
+  font-size: 8.5pt;
   color: var(--neutral-500);
   font-style: italic;
 }
@@ -758,7 +865,7 @@ h1.chapter::before {
 }
 h2 {
   font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
+  font-size: 11pt;
   font-weight: 600;
   color: #1b2842;
   margin: 5mm 0 2mm;
@@ -772,14 +879,20 @@ h3 {
 }
 
 p { margin: 0 0 2.5mm 0; font-size: 8.5pt; }
-.muted { color: #6b7280; font-size: 8pt; }
+/* Pas de mot seul en dernière ligne de paragraphe ; titres et accroches
+   courtes équilibrés sur leurs lignes (« 290 kW) » seul sur la 2e ligne du
+   verdict de la page de garde — relecture PDF 2026-09-24). */
+p, li, .callout-body, .acd-body, .kv-explainer, .r175-row-summary, .justif-desc { text-wrap: pretty; }
+.cover-title, .cover-verdict-applicability, .cover-address, .chapter-text,
+.essential-verdict-label, .closing-title, .headline-title { text-wrap: balance; }
+.muted { color: #6b7280; font-size: 8.5pt; }
 
 /* ── Tables ──────────────────────────────────────────────────────── */
 table {
   width: 100%;
   border-collapse: collapse;
   margin: 2.5mm 0 4mm 0;
-  font-size: 8pt;
+  font-size: 8.5pt;
   table-layout: auto;
 }
 table th {
@@ -796,6 +909,18 @@ table th {
   word-break: keep-all;
   overflow-wrap: normal;
 }
+/* En-têtes de colonnes toujours centrés (règle Buildy, UI comme PDF —
+   relecture 2026-09-24). Les libellés de ligne des fiches clé / valeur
+   (meta-table, hors <thead>) restent alignés à gauche. */
+table thead th { text-align: center !important; }
+.nowrap { white-space: nowrap; }
+/* Tableau du calcul de puissance R175-2 : largeurs fixées par <colgroup>. */
+table.power-calc-table { table-layout: fixed; }
+table.power-calc-table th { white-space: normal; }
+/* Tableau dense : 7,5 pt partout (« .muted » passait à 8,5 pt). */
+table.power-calc-table td,
+table.power-calc-table td .muted { font-size: 7.5pt; }
+
 /* Aucune troncature dans les cellules : le texte wrappe naturellement
    sur les espaces. On NE casse PAS les mots (sauf cas explicite via .wrap-anywhere). */
 table td {
@@ -805,7 +930,7 @@ table td {
   white-space: normal;
   word-break: normal;
   overflow-wrap: break-word;
-  font-size: 8pt;
+  font-size: 8.5pt;
 }
 /* Pour les valeurs vraiment longues sans espaces (URL, refs longues),
    ajouter la classe .wrap-anywhere via le contenu pour forcer le break.
@@ -815,6 +940,8 @@ table td.wrap-anywhere {
   overflow-wrap: anywhere;
 }
 table tr:nth-child(even) td { background: #fafafa; }
+/* Un tableau coupé entre deux pages n'y laisse jamais sa seule dernière ligne. */
+table tbody tr:last-child { break-before: avoid; page-break-before: avoid; }
 
 /* ── Meta-table (key / value épurée pour fiche identification) ────
    Pas d'alternance grise (mauvais pour des fiches), labels en
@@ -827,7 +954,7 @@ table.meta-table tr:nth-child(even) td { background: transparent; }
 table.meta-table th {
   background: transparent;
   text-transform: uppercase;
-  font-size: 7pt;
+  font-size: 7.5pt;
   letter-spacing: 0.06em;
   color: #6b7280;
   font-weight: 600;
@@ -838,7 +965,7 @@ table.meta-table th {
 }
 table.meta-table td {
   padding: 2mm 0;
-  font-size: 9pt;
+  font-size: 9.5pt;
   color: #111827;
   border-bottom: 1px solid #f3f4f6;
 }
@@ -850,7 +977,7 @@ table.meta-table tr:last-child td { border-bottom: none; }
 .bool-yes, .bool-no, .bool-na {
   display: inline-block;
   font-weight: 700;
-  font-size: 10pt;
+  font-size: 9.5pt;
   line-height: 1;
 }
 .bool-yes { color: #059669; }
@@ -865,7 +992,7 @@ table td.bool-cell { text-align: center; }
 .bool-pill {
   display: inline-block;
   padding: 0.6mm 2.2mm;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   line-height: 1.15;
   border-radius: 3mm;
@@ -873,14 +1000,14 @@ table td.bool-cell { text-align: center; }
 }
 .bool-pill-sm {
   padding: 0.3mm 1.6mm;
-  font-size: 6.4pt;
+  font-size: 6.5pt;
   border-radius: 2.6mm;
 }
 
 /* ── Total row pour les tables additionnelles (chauffage+clim) ───── */
 table .total-row td {
   background: #f3f4f6;
-  font-size: 9pt;
+  font-size: 9.5pt;
   color: #1b2842;
   border-top: 2px solid #1b2842;
 }
@@ -906,7 +1033,7 @@ table .total-row td {
 .kv-label-block { flex: 1; display: flex; flex-direction: column; gap: 0.8mm; }
 .kv-label-block .kv-label { font-weight: 600; }
 .kv-explainer {
-  font-size: 7.4pt;
+  font-size: 7.5pt;
   line-height: 1.4;
   color: #6b7280;
 }
@@ -920,40 +1047,48 @@ table .total-row td {
   gap: 1.5mm;
   padding: 0.6mm 2.2mm;
   border-radius: 2mm;
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 600;
   white-space: nowrap;
 }
 .kv-yes { background: #d1fae5; color: #065f46; }
 .kv-no  { background: #fee2e2; color: #991b1b; }
 .kv-na  { background: #e5e7eb; color: #6b7280; }
-.kv-ico { font-weight: 700; font-size: 9pt; line-height: 1; }
+.kv-reserve { background: #ffffff; color: var(--verdict-reserve); border: 0.6pt solid var(--verdict-reserve); }
+.kv-ico { font-weight: 700; font-size: 9.5pt; line-height: 1; }
 /* Sous-détails saisis par l'auditeur (format, fréquence, périodicité,
    formateur…) qui complètent une réponse Oui/Non. Affichés en bloc compact
    sous la liste kv, indentés visuellement par un filet bleu. */
 .bms-sub-detail {
   margin: 2.5mm -4mm -3mm;
   padding: 2.5mm 4mm;
-  background: #f0f9ff;
-  border-top: 0.4pt solid #bae6fd;
+  /* Neutre (le bleu ciel était hors charte — relecture PDF 2026-09-24). */
+  background: #f8fafc;
+  border-top: 0.4pt solid #e2e8f0;
   border-radius: 0 0 2mm 2mm;
   display: flex;
   flex-wrap: wrap;
   gap: 1mm 4mm;
   align-items: baseline;
-  font-size: 7.6pt;
-  color: #075985;
+  font-size: 7.5pt;
+  color: #475569;
 }
 .bms-sub-label {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 6.6pt;
-  color: #0369a1;
+  font-size: 6.5pt;
+  color: #1b2842;
 }
 .bms-sub-item { line-height: 1.4; }
 .bms-sub-item strong { font-weight: 600; }
 .bms-sub-item.rich-notes { width: 100%; }
+/* Le bandeau de détail reste avec la ligne qu'il complète. */
+.bms-sub-detail { break-before: avoid; page-break-before: avoid; }
+/* Même corps que le reste du bloc (le <p> saisi passait à 8,5 pt). */
+.bms-sub-detail .rich-notes,
+.bms-sub-detail .rich-notes p,
+.bms-sub-detail .rich-notes li { font-size: 7.5pt; }
 /* Table des composants matériels GTB (serveurs, contrôleurs, passerelles…). */
 .bms-components-table {
   width: 100%;
@@ -975,16 +1110,16 @@ table .total-row td {
   letter-spacing: 0.04em;
 }
 .bms-components-table code {
-  font-family: 'Inter', 'Manrope', monospace;
-  font-size: 7pt;
-  color: #4338ca;
-  background: #eef2ff;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 7.5pt;
+  color: #1b2842;
+  background: #f1f5f9;
   padding: 0.3mm 1.2mm;
   border-radius: 1mm;
 }
 .bms-component-notes-row td {
   background: #fafafa;
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: #4b5563;
   font-style: italic;
   padding: 1mm 2mm;
@@ -1007,8 +1142,8 @@ table .total-row td {
 .compact-list .row strong { color: #1b2842; min-width: 38mm; flex-shrink: 0; }
 .compact-list .row .meta { color: #6b7280; flex: 1; }
 .compact-list .row .pwr {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   color: #1f2937;
   font-weight: 600;
   white-space: nowrap;
@@ -1024,7 +1159,7 @@ table .total-row td {
   padding: 3mm 4mm;
   margin: 3mm 0;
   border-radius: 2mm;
-  font-size: 8.2pt;
+  font-size: 8.5pt;
   line-height: 1.5;
   page-break-inside: avoid;
 }
@@ -1036,7 +1171,7 @@ table .total-row td {
 }
 .callout-body { flex: 1; }
 .callout-body strong { font-weight: 600; }
-.callout-body p { margin: 0 0 1.5mm; font-size: 8.2pt; }
+.callout-body p { margin: 0 0 1.5mm; font-size: 8.5pt; }
 .callout-body p:last-child { margin-bottom: 0; }
 /* Pédagogie : 3 paragraphes successifs dans un callout (« Ce qu'impose le
    décret », « Ce que nous avons vérifié », « Point de vigilance ») —
@@ -1046,7 +1181,7 @@ table .total-row td {
 .callout-body .explainer-rule,
 .callout-body .explainer-check,
 .callout-body .explainer-watch {
-  font-size: 7.8pt;
+  font-size: 7.5pt;
   line-height: 1.45;
   color: inherit;
 }
@@ -1065,17 +1200,36 @@ table .total-row td {
 .callout-warn {
   background: #fff7ed;
   border-left: 2pt solid #ea580c;
-  color: #7c2d12;
+  color: #374151;
 }
+/* Avertissement sanitaire (ECS bouclée) : même rendu que .callout-warn. */
+.callout-warning {
+  background: #fff7ed;
+  border-left: 2pt solid #ea580c;
+  color: #374151;
+}
+.callout-body ul, .callout-body ol { padding-left: 4.5mm; margin: 1mm 0 0; }
 .callout-reco {
   background: #ecfdf5;
   border-left: 2pt solid #00cd92;
-  color: #065f46;
+  color: #374151;
 }
 .callout-r175 {
   background: #f1f5f9;
   border-left: 2pt solid #1b2842;
   color: #1b2842;
+}
+/* Encadré des sources du plan et encadré « réserve » (obligations du
+   propriétaire) : neutres, filet navy. */
+.callout-sources {
+  background: #f3f4f6;
+  border-left: 2pt solid #1b2842;
+  color: #374151;
+}
+.callout-reserve {
+  background: #f8fafc;
+  border-left: 2pt solid var(--verdict-reserve);
+  color: #374151;
 }
 
 /* ── Pills d'usage GTB — alignées sur SystemCategoryIcon UI ────────
@@ -1095,11 +1249,13 @@ table .total-row td {
 /* L'helper categoryIcon ajoute margin-right:2mm en inline — on le neutralise
    dans les pills (l'espace est gere par gap du flex). */
 .usage-pill svg { margin-right: 0 !important; }
-.usage-pill-heating     { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-.usage-pill-cooling     { background: #ecfeff; color: #155e75; border-color: #a5f3fc; }
-.usage-pill-ventilation { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
-.usage-pill-dhw         { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
-.usage-pill-lighting    { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+/* Usages traités par la GTB : pastilles neutres, l'icône porte la
+   couleur de la catégorie (charte : rouge / vert réservés aux verdicts). */
+.usage-pill-heating     { background: #f8fafc; color: #374151; border-color: #cbd5e1; }
+.usage-pill-cooling     { background: #f8fafc; color: #374151; border-color: #cbd5e1; }
+.usage-pill-ventilation { background: #f8fafc; color: #374151; border-color: #cbd5e1; }
+.usage-pill-dhw         { background: #f8fafc; color: #374151; border-color: #cbd5e1; }
+.usage-pill-lighting    { background: #f8fafc; color: #374151; border-color: #cbd5e1; }
 /* Variante "non couvert par la GTB" : pastille discrete, icone desaturee */
 .usage-pill-off {
   background: var(--neutral-100);
@@ -1110,6 +1266,10 @@ table .total-row td {
   text-decoration-thickness: 0.4pt;
 }
 .usage-pill-off svg { opacity: 0.45; }
+/* « Non traité » lisible sans la couleur : libellé barré, contour en
+   tirets (la ventilation, grise par nature, se confondait avec « non
+   traité » — relecture PDF 2026-09-24). */
+.usage-pill-off { text-decoration: line-through; border-style: dashed; opacity: 0.75; }
 
 /* ── Pills compteur (type / usage) — alignées sur MeterTypePill /
    MeterUsagePill UI. Le helper meterTypePill / meterUsagePill emet le
@@ -1120,7 +1280,7 @@ table .total-row td {
   align-items: center;
   padding: 0.8mm 2.2mm;
   border-radius: 999px;
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 600;
   white-space: nowrap;
   line-height: 1.2;
@@ -1133,8 +1293,9 @@ table .total-row td {
   line-height: 1.15;
 }
 .role-pill-sm {
-  padding: 0.3mm 1.2mm;
-  font-size: 6.4pt;
+  /* Texte recentré verticalement (Inter : plus d'air sous la ligne de base). */
+  padding: 0.45mm 1.2mm 0.2mm;
+  font-size: 6.5pt;
   line-height: 1.15;
   border-radius: 3mm;
 }
@@ -1243,6 +1404,13 @@ table .total-row td {
 /* Colonne Protocole(s) reste à gauche (texte multi-mots). */
 .energy-section-table thead th.meter-protocols-cell,
 .energy-section-table tbody td.meter-protocols-cell { text-align: left; }
+/* Compteur non présent : une seule cellule explicite (au lieu de 4 « — »). */
+.energy-section-table tbody td.meter-absent-cell {
+  text-align: center;
+  font-size: 7.5pt;
+  font-style: normal;
+  color: var(--neutral-500);
+}
 
 .bms-components-table thead th:not(:first-child),
 .bms-components-table tbody td:not(:first-child) { text-align: center; }
@@ -1263,7 +1431,7 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   color: #1b2842;
   border: 1px solid #cbd5e1;
   border-radius: 2mm;
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 500;
 }
 
@@ -1302,12 +1470,28 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   padding: 0;
   margin: 0;
 }
+/* Titres d'annexe : même ouverture que les chapitres (13 pt, filet vert),
+   au lieu d'un 16 pt nu plus gros que les chapitres. */
 .annex h1 {
+  font-family: 'Poppins', sans-serif;
   color: #1b2842;
-  font-size: 16pt;
-  margin-top: 0;
+  font-size: 13pt;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 5mm 0;
   border-bottom: none;
-  padding: 0;
+  padding: 0.5mm 0 0.5mm 3.5mm;
+  position: relative;
+}
+.annex h1::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5mm;
+  bottom: 0.5mm;
+  width: 1.2mm;
+  background: #00cd92;
+  border-radius: 0.6mm;
 }
 .disclaimer-list {
   counter-reset: disc;
@@ -1319,7 +1503,7 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   padding-left: 8mm;
   position: relative;
   margin-bottom: 3mm;
-  font-size: 9pt;
+  font-size: 9.5pt;
   line-height: 1.5;
 }
 .disclaimer-list li::before {
@@ -1337,15 +1521,22 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   background: #fafbfc;
   border-left: 2.5pt solid #1b2842;
   border-radius: 2mm;
-  page-break-inside: avoid;
+  /* Un bloc avec beaucoup de photos se poursuit sur la page suivante,
+     entre deux rangées de vignettes (repoussé entier, il laissait les deux
+     tiers d'une page vides — relecture PDF 2026-09-24). Le titre de la
+     zone reste avec sa première rangée. */
+  break-inside: auto;
 }
+.entity-block > h3, .entity-block > h4 { break-after: avoid; page-break-after: avoid; }
+.entity-block > p, .entity-block > .rich-notes { break-inside: avoid; page-break-inside: avoid; }
+h3.subheading-3 { break-after: avoid; page-break-after: avoid; }
 .entity-block h3 {
   margin: 0 0 1.5mm;
-  font-size: 9pt;
+  font-size: 9.5pt;
   color: #1b2842;
 }
 .rich-notes {
-  font-size: 8pt;
+  font-size: 8.5pt;
   color: #374151;
   line-height: 1.4;
 }
@@ -1356,20 +1547,30 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
 .rich-notes li { margin: 0.5mm 0; }
 .rich-notes a { color: #1b2842; text-decoration: underline; }
 
+/* Trois vignettes égales par ligne, quelle que soit la largeur du bloc
+   (la largeur fixe de 52 mm n'en laissait tenir que 2 dans une fiche
+   équipement, un tiers vide). Une grande série peut se poursuivre sur la
+   page suivante, entre deux rangées (relecture PDF 2026-09-24). */
 .photo-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2mm;
   margin-top: 3mm;
-  page-break-inside: avoid;
+  break-inside: auto;
 }
-.photo-grid img {
-  width: 52mm;
-  height: 39mm;
+.photo-grid img,
+.device-notes .photo-grid img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  box-sizing: border-box;
   object-fit: cover;
   border-radius: 2.5mm;
   border: 0.3pt solid #d1d5db;
   background: #f3f4f6;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .device-notes {
@@ -1378,9 +1579,9 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   border-left: 1.5pt solid #cbd5e1;
   page-break-inside: avoid;
 }
-.device-notes > strong { font-size: 9pt; }
-.device-notes .rich-notes { margin-top: 1mm; font-size: 9pt; }
-.device-notes .photo-grid img { width: 42mm; height: 32mm; }
+.device-notes > strong { font-size: 9.5pt; }
+.device-notes .rich-notes { margin-top: 1mm; font-size: 9.5pt; }
+/* (vignettes des notes d'équipement : même grille à 3 colonnes) */
 
 /* ── Note de synthese (chapitre 0, redigee par auditeur + Claude) ──
    Charte PDF Buildy : encart neutre navy/gris, pas de violet/indigo.
@@ -1416,13 +1617,13 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   background: #f8fafc;
   border-left: 1.5pt solid #1b2842;
   border-radius: 2.5mm;
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   color: #1b2842;
   page-break-inside: avoid;
   line-height: 1.55;
 }
 .alt-solutions-label {
-  font-size: 6pt;
+  font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
@@ -1430,19 +1631,19 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   color: #475569;
 }
 .alt-solutions h1, .alt-solutions h2, .alt-solutions h3, .alt-solutions h4 {
-  font-size: 7pt; margin: 1.5mm 0 0.6mm; padding: 0; border: none;
+  font-size: 7.5pt; margin: 1.5mm 0 0.6mm; padding: 0; border: none;
   page-break-before: auto; color: #1b2842; font-weight: 600;
 }
-.alt-solutions ul, .alt-solutions ol { padding-left: 4.5mm; margin: 0.8mm 0 1.2mm; font-size: 6.8pt; }
+.alt-solutions ul, .alt-solutions ol { padding-left: 4.5mm; margin: 0.8mm 0 1.2mm; font-size: 6.5pt; }
 .alt-solutions li { margin: 0.5mm 0; line-height: 1.55; }
-.alt-solutions p { margin: 0 0 1mm; font-size: 6.8pt; line-height: 1.55; }
+.alt-solutions p { margin: 0 0 1mm; font-size: 6.5pt; line-height: 1.55; }
 .alt-solutions strong { font-weight: 600; }
 
 /* ── Numero d'action (BACS-001) pour reference devis integrateur ── */
 .action-num {
   display: inline-block;
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   font-weight: 700;
   background: #1f2937;
   color: white;
@@ -1459,7 +1660,7 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   background: #fef2f2;
   border-left: 1.5pt solid #dc2626;
   border-radius: 2.5mm;
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   color: #991b1b;
   page-break-inside: avoid;
   line-height: 1.5;
@@ -1519,7 +1720,7 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
 .conformity-body { display: flex; flex-direction: column; gap: 1mm; }
 .conformity-label {
   text-transform: uppercase;
-  font-size: 7pt;
+  font-size: 7.5pt;
   letter-spacing: 0.08em;
   color: #6b7280;
   font-weight: 600;
@@ -1550,9 +1751,13 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   background: #fff;
   border: 0.5pt solid #e5e7eb;
   border-radius: 2mm;
-  page-break-inside: avoid;
+  /* Un long article (R175-6) se poursuit sur la page suivante au lieu de
+     laisser une demi-page blanche ; le titre reste avec le début du texte. */
+  break-inside: auto;
   overflow: hidden;
 }
+.article-card-head { break-after: avoid; page-break-after: avoid; }
+.article-body p, .article-body li { orphans: 2; widows: 2; }
 .article-card-head {
   display: flex;
   align-items: center;
@@ -1562,7 +1767,7 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   border-bottom: 0.5pt solid #e5e7eb;
 }
 .article-code {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
   font-size: 8.5pt;
   font-weight: 700;
   background: #1b2842;
@@ -1589,16 +1794,40 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
 .article-body strong { color: #1b2842; font-weight: 600; }
 .article-body ul, .article-body ol { padding-left: 6mm; margin: 1.5mm 0; }
 .article-body li { margin: 0.5mm 0; }
+/* Repère de lecture Buildy sous le texte officiel : fond gris + filet gris
+   pour ne jamais être confondu avec le décret (non opposable). */
+.article-reading-note {
+  margin: 0 4mm 2.5mm;
+  padding: 2mm 3mm;
+  background: #f3f4f6;
+  border-left: 0.6mm solid #9ca3af;
+  border-radius: 1mm;
+  font-size: 7.5pt;
+  color: #4b5563;
+  line-height: 1.45;
+}
+.article-reading-note-label {
+  display: block;
+  margin-bottom: 0.8mm;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
 /* Traçabilite : version du decret + lien Legifrance imprime en toutes lettres
    (lisible sur papier, cliquable a l'ecran). */
+/* Source Légifrance : un peu d'air sous le filet, et l'URL ne se coupe plus
+   au milieu d'un nombre (break-all) — seulement là où il le faut. */
 .article-source {
-  margin: 2.5mm 0 0;
-  padding-top: 1.5mm;
+  /* Même retrait que le texte de l'article (le pied collait au cadre). */
+  margin: 2.5mm 4mm 0;
+  padding: 2.5mm 0 3mm;
   border-top: 0.3mm solid #e5e7eb;
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: #6b7280;
   line-height: 1.35;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .article-source a { color: #4f628c; text-decoration: none; }
 
@@ -1644,8 +1873,17 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
   border: 0.5pt solid #e5e7eb;
   border-left: 2.5pt solid #1b2842;
   border-radius: 2mm;
-  page-break-inside: avoid;
+  /* Une longue fiche se poursuit sur la page suivante (titre, article et
+     origine gardés ensemble) : fini la fiche seule sur une page à moitié
+     vide (relecture PDF 2026-09-24). */
+  break-inside: auto;
 }
+.justif-card > h3 { break-after: avoid; page-break-after: avoid; }
+/* Fiche courte (isShort, _action-cards.js) : d'un seul tenant. */
+.justif-card.justif-card-short { break-inside: avoid; page-break-inside: avoid; }
+.justif-card table.meta-table tr:not(:last-child) { break-inside: avoid; break-after: avoid; }
+/* Colonne des libellés identique d'une fiche à l'autre (simple ou regroupée). */
+.justif-card table.meta-table { table-layout: fixed; }
 .justif-card h3 {
   margin: 0 0 2mm 0;
   font-size: 9.5pt;
@@ -1654,11 +1892,34 @@ table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: 
 .justif-card table.meta-table {
   margin: 0;
 }
-.justif-card table.meta-table th {
-  width: 35mm;
+/* Cellules de la fiche seulement (enfants directs) : ces règles ne doivent
+   pas toucher le tableau imbriqué des actions regroupées (« BACS-011Installer »
+   collés). Le libellé de ligne se replie sur plusieurs lignes au lieu de
+   déborder sur la valeur (relecture PDF 2026-09-24). */
+.justif-card table.meta-table > tbody > tr > th {
+  width: 38mm;
   padding: 1.2mm 3mm 1.2mm 0;
+  box-sizing: border-box;
+  white-space: normal;
 }
-.justif-card table.meta-table td { padding: 1.2mm 0; font-size: 8.5pt; }
+.justif-card table.meta-table > tbody > tr > td { padding: 1.2mm 0; font-size: 8.5pt; }
+.justif-card table.meta-table td.justif-desc p { orphans: 2; widows: 2; }
+/* Annexe C : justifications identiques regroupées (texte commun une fois,
+   puis la liste des actions, une ligne par action jamais coupée). */
+table.justif-items { width: 100%; margin: 0; border: none; border-collapse: collapse; }
+table.justif-items tr { page-break-inside: avoid; }
+table.justif-items tr:nth-child(even) td { background: transparent; }
+table.justif-items td {
+  padding: 0.8mm 2mm 0.8mm 0;
+  font-size: 7.5pt;
+  color: #374151;
+  border-bottom: 0.4pt solid #f3f4f6;
+  vertical-align: top;
+  white-space: normal;
+}
+table.justif-items tr:last-child td { border-bottom: none; }
+table.justif-items td.ji-num { width: 16mm; font-weight: 600; color: #1b2842; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.justif-items td.ji-src { width: 40mm; color: #6b7280; }
 
 /* ── Titre des zones fonctionnelles de suivi (ch.2 sub) ──────────
    Icone categorie alignee verticalement avec le texte du titre. */
@@ -1691,16 +1952,20 @@ h3.fz-heading svg { flex-shrink: 0; }
 }
 .device-card-head {
   display: flex;
+  /* Les pastilles R175-3 passent sous le titre plutôt que de l'écraser
+     (« DE / DIETRICH » coupé — relecture PDF 2026-09-24). */
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 3mm;
+  gap: 1.2mm 3mm;
   margin-bottom: 1.5mm;
   padding-bottom: 1.5mm;
   border-bottom: 0.3pt solid #f3f4f6;
 }
 .device-card-title {
-  flex: 1;
-  font-size: 9pt;
+  flex: 1 1 70mm;
+  min-width: 60mm;
+  font-size: 9.5pt;
   line-height: 1.3;
   color: #111827;
 }
@@ -1729,9 +1994,9 @@ h3.fz-heading svg { flex-shrink: 0; }
   display: inline-block;
   margin-left: 1.5mm;
   font-size: 6.5pt;
-  color: #b45309;
-  background: #fef3c7;
-  border: 0.3pt solid #fcd34d;
+  color: #1b2842;
+  background: #f1f5f9;
+  border: 0.3pt solid #cbd5e1;
   border-radius: 1.5mm;
   padding: 0.2mm 1.4mm;
   font-weight: 600;
@@ -1742,9 +2007,9 @@ h3.fz-heading svg { flex-shrink: 0; }
   display: inline-block;
   margin-left: 1.5mm;
   font-size: 6.5pt;
-  color: #92400e;
-  background: #fef3c7;
-  border: 0.3pt solid #f59e0b;
+  color: #1b2842;
+  background: #f1f5f9;
+  border: 0.3pt solid #cbd5e1;
   border-radius: 1.5mm;
   padding: 0.2mm 1.4mm;
   font-weight: 600;
@@ -1755,9 +2020,9 @@ h3.fz-heading svg { flex-shrink: 0; }
   display: inline-block;
   margin-left: 1.5mm;
   font-size: 6.5pt;
-  color: #4338ca;
-  background: #e0e7ff;
-  border: 0.3pt solid #a5b4fc;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 0.3pt solid #fed7aa;
   border-radius: 1.5mm;
   padding: 0.2mm 1.4mm;
   font-weight: 600;
@@ -1769,11 +2034,11 @@ h3.fz-heading svg { flex-shrink: 0; }
 .device-card-regulator {
   margin: 1.5mm 0 0;
   padding: 1.5mm 2mm;
-  background: #faf5ff;
-  border-left: 1.5pt solid #7c3aed;
-  border-radius: 0 1mm 1mm 0;
-  font-size: 7.6pt;
-  color: #4c1d95;
+  background: #f8fafc;
+  border: 0.4pt solid #e2e8f0;
+  border-radius: 1mm;
+  font-size: 7.5pt;
+  color: #374151;
   display: flex;
   flex-wrap: wrap;
   gap: 1mm 3mm;
@@ -1783,41 +2048,44 @@ h3.fz-heading svg { flex-shrink: 0; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-size: 6.6pt;
-  color: #7c3aed;
+  font-size: 6.5pt;
+  color: #1b2842;
 }
 .device-card-regulator-item em {
-  font-style: italic;
-  color: #6d28d9;
-  font-weight: 500;
+  font-style: normal;
+  color: #475569;
+  font-weight: 600;
 }
 .device-card-r175 {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 1.2mm;
-  flex-shrink: 0;
+  margin-left: auto;
   white-space: nowrap;
 }
+/* Grille de 4 colonnes : les champs s'alignent d'une fiche à l'autre. */
 .device-card-attrs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3.5mm 6mm;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3mm 5mm;
 }
 .device-attr {
   display: flex;
   flex-direction: column;
   gap: 0.4mm;
-  min-width: 24mm;
+  min-width: 0;
 }
 .device-attr-label {
-  font-size: 5.8pt;
+  font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #6b7280;
   font-weight: 600;
 }
 .device-attr-value {
-  font-size: 8pt;
+  font-size: 8.5pt;
   color: #1f2937;
   line-height: 1.35;
 }
@@ -1842,7 +2110,7 @@ h3.fz-heading svg { flex-shrink: 0; }
    in flight). Reduit a son strict minimum, ne sert plus dans le ch.3.
    A supprimer apres validation visuelle de la refonte device-cards. */
 table.device-table {
-  font-size: 7pt;
+  font-size: 7.5pt;
   margin: 2mm 0 4mm;
   table-layout: fixed;
   width: 100%;
@@ -1850,7 +2118,7 @@ table.device-table {
 table.device-table th {
   background: #f9fafb;
   color: #374151;
-  font-size: 6pt;
+  font-size: 6.5pt;
   padding: 1.3mm 1.5mm;
   border-bottom: 1px solid #e5e7eb;
   text-transform: uppercase;
@@ -1859,7 +2127,7 @@ table.device-table th {
 table.device-table td {
   padding: 1.4mm 1.5mm;
   border-bottom: none;
-  font-size: 7pt;
+  font-size: 7.5pt;
   vertical-align: top;
   overflow-wrap: break-word;
 }
@@ -1876,8 +2144,8 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   padding-bottom: 1.4mm !important;
 }
 .r175-3-label {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 6pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 6.5pt;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1912,22 +2180,24 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   page-break-inside: auto;
 }
 .theme-section + .theme-section { margin-top: 9mm; }
+/* Bandeau de thème : neutre (charte « catégories sobres » gris / navy),
+   sans filet ni couleur d'accent, 4 coins arrondis. Titre en 11 pt :
+   sous le titre de chapitre (13 pt), au-dessus des sous-thèmes (10 pt). */
 .theme-head {
   display: flex;
   align-items: center;
   gap: 3mm;
   margin: 0 0 4mm;
-  padding: 3mm 4mm;
-  background: #ecfdf5;            /* emerald-50, plus saillant que slate */
-  border-left: 4pt solid var(--buildy-green);
-  border-radius: 0 2mm 2mm 0;
+  padding: 2.4mm 4mm;
+  background: #f1f5f9;            /* slate-100 */
+  border-radius: 2mm;
   page-break-after: avoid;
 }
 .theme-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 13pt;                /* +2pt — la carte est le repere visuel principal */
+  font-size: 11pt;
   font-weight: 700;
-  color: #064e3b;                 /* emerald-900 */
+  color: #1b2842;
   margin: 0;
   flex: 1;
   letter-spacing: -0.01em;
@@ -1936,7 +2206,7 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   font-family: 'Inter', sans-serif;
   font-size: 8.5pt;
   font-weight: 500;
-  color: #047857;                 /* emerald-700 */
+  color: #4b5563;
   display: inline-flex;
   align-items: center;
   gap: 1.5mm;
@@ -1960,20 +2230,20 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
    carte > items ». */
 .theme-sub-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
+  font-size: 9.5pt;
   font-weight: 600;
   color: #334155;                  /* slate-700 */
   margin: 4mm 0 2.5mm 4mm;
   padding: 1.6mm 3mm;
-  background: #f1f5f9;             /* slate-100 */
-  border-left: 3pt solid #94a3b8;  /* slate-400 */
-  border-radius: 0 1.5mm 1.5mm 0;
+  background: #f8fafc;             /* slate-50 */
+  border: 0.4pt solid #e2e8f0;     /* slate-200 */
+  border-radius: 1.5mm;
   page-break-after: avoid;
 }
 .theme-sub-title:first-of-type { margin-top: 0; }
 .theme-sub-meta {
   font-family: 'Inter', sans-serif;
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 500;
   color: #64748b;                  /* slate-500 */
   margin-left: 1mm;
@@ -1985,62 +2255,70 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   margin-left: 4mm;
 }
 
+/* Carte d'action : filet navy pour tous les niveaux (la pastille porte le
+   niveau ; la couleur n'est pas un second code). Texte en 8 pt : c'est le
+   contenu le plus lu du rapport. */
 .action-card {
-  page-break-inside: avoid;
+  /* Une carte longue peut se poursuivre sur la page suivante, mais
+     seulement entre ses rubriques (Constat, Exigence, Obligation…), jamais
+     au milieu d'une rubrique ; en-tête et titre restent avec la première.
+     Évite le tiers de page blanc laissé par une carte repoussée entière
+     (relecture PDF 2026-09-24). */
+  break-inside: auto;
   margin: 0 0 3mm;
   padding: 2.5mm 3.5mm 3mm;
   background: #fff;
   border: 0.4pt solid #e5e7eb;
   border-left: 2.5pt solid #1b2842;
   border-radius: 2mm;
-  font-size: 6.5pt;
+  font-size: 8.5pt;
   line-height: 1.5;
 }
-.action-card.action-card-minor { border-left-color: #fcd34d; }
 .action-card-head {
   display: flex;
   align-items: center;
   gap: 2mm;
   flex-wrap: wrap;
   margin-bottom: 1.6mm;
-  font-size: 6pt;
+  font-size: 6.5pt;
 }
 .action-card-article {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 5.8pt;
-  color: #6b7280;
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 6.5pt;
+  font-weight: 500;
+  color: #4b5563;
 }
 .action-card-zone {
-  font-size: 5.8pt;
+  font-size: 6.5pt;
   color: #4b5563;
   background: #f3f4f6;
   padding: 0.3mm 1.4mm;
   border-radius: 2.5mm;
 }
 .action-card-title {
-  font-size: 7pt;
+  font-family: 'Poppins', sans-serif;
+  font-size: 9.5pt;
   color: #111827;
-  margin: 0.4mm 0 0.8mm;
-  line-height: 1.4;
+  margin: 0.4mm 0 2mm;
+  line-height: 1.35;
   font-weight: 600;
-  letter-spacing: 0.01em;
 }
 /* Justification légale partagée d'une carte groupée (le POURQUOI du décret),
    affichée au-dessus du tableau des N actions — parité avec le Constat des
    cartes individuelles. Encadré discret pour se distinguer du tableau. */
 .action-group-justif {
-  font-size: 6.4pt;
-  color: #3f4a5a;
+  font-size: 8.5pt;
+  color: #374151;
   line-height: 1.55;
   margin: 0 0 1.8mm;
-  padding: 1.6mm 2mm;
+  padding: 1.6mm 2.4mm;
   background: #f8fafc;
-  border-left: 1.2pt solid #cbd5e1;
-  border-radius: 0 1mm 1mm 0;
+  border-radius: 1mm;
 }
 .action-card-desc {
-  font-size: 6.3pt;
-  color: #4b5563;
+  font-size: 8.5pt;
+  color: #374151;
   margin: 0 0 1.2mm;
   line-height: 1.55;
   /* Preserve les sauts de ligne (\n) et les paragraphes (\n\n) injectes
@@ -2049,18 +2327,39 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   white-space: pre-line;
 }
 /* Sections « Titre\nContenu » dans la description : sous-titres uppercase
-   distinctifs, contenu en paragraphe sous-jacent. */
-.action-card-desc .acd-section { margin: 0 0 1.6mm; }
-.action-card-desc .acd-title {
+   distinctifs, contenu en paragraphe sous-jacent. Même rendu dans l'annexe C
+   (`.justif-desc`), qui reprend les mêmes descriptions. */
+.action-card-desc .acd-section,
+.justif-desc .acd-section { margin: 0 0 1.6mm; }
+.action-card-desc .acd-title,
+.justif-desc .acd-title {
   font-family: 'Inter', sans-serif;
-  font-size: 5.6pt;
+  font-size: 6.5pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: #1b2842;
   margin: 0 0 0.4mm;
 }
-.action-card-desc .acd-body { white-space: pre-line; }
+.action-card-desc .acd-body,
+.justif-desc .acd-body { white-space: pre-line; }
+/* Paragraphe sans intertitre : même espacement qu'une section, sinon
+   l'intertitre suivant colle au texte (« PORTÉE À CONFIRMER »). */
+.action-card-desc > .acd-body,
+.justif-desc > .acd-body { margin: 0 0 1.6mm; }
+.action-card-desc > :last-child,
+.justif-desc > :last-child { margin-bottom: 0; }
+/* Ligne à puce saisie dans le texte : retrait suspendu. */
+.acd-li {
+  display: block;
+  position: relative;
+  padding-left: 3.5mm;
+}
+.acd-li::before {
+  content: '•';
+  position: absolute;
+  left: 0.8mm;
+}
 
 /* Pilules inline injectees a la place des balises {{zone:N}}, {{system:N}},
    {{device:N}} par le helper resolveTagAsPill (cf. _export-data.js).
@@ -2072,7 +2371,8 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   gap: 1.2mm;
   padding: 0.2mm 1.6mm;
   margin: 0 0.3mm;
-  font-size: 6pt;
+  /* Relatif au texte porteur (titre 9,5 pt, description 8 pt). */
+  font-size: 0.88em;
   font-weight: 600;
   border-radius: 5mm;
   border: 0.3pt solid var(--neutral-200);
@@ -2081,7 +2381,8 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   line-height: 1.2;
 }
 .tag-pill svg { vertical-align: middle; }
-.tag-pill-zone   { background: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
+.tag-pill-zone   { background: #f8fafc; color: #374151; border-color: #e2e8f0; }
+.tag-pill-system { background: #f8fafc; color: #374151; border-color: #e2e8f0; }
 .tag-pill-device { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
 /* Volontairement vide : la zone hérite du font-weight 500 de .tag-pill,
    au même poids que le nom du système, comme la pilule équipement. */
@@ -2090,9 +2391,22 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
 .action-card-grouped {
   border-left-width: 3pt;
 }
+.action-card-head,
+.action-card-title { break-after: avoid; page-break-after: avoid; }
+/* La dernière rubrique d'une carte ou d'une fiche ne part jamais seule en
+   haut de la page suivante. */
+.action-card-desc > :last-child:not(:first-child),
+.justif-desc > :last-child:not(:first-child) { break-before: avoid; page-break-before: avoid; }
+/* Jamais une ou deux lignes seules de part et d'autre d'une coupure. */
+.action-card-desc, .justif-desc, .acd-body { orphans: 3; widows: 3; }
+.action-card-desc > .acd-section,
+.action-card-desc > .acd-body,
+.action-group-justif,
+.alt-solutions,
+table.action-group-table tr { break-inside: avoid; page-break-inside: avoid; }
 .action-num-range {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 5.5pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 6.5pt;
   font-weight: 600;
   padding: 0.3mm 1.4mm;
   background: #1b2842;
@@ -2109,7 +2423,7 @@ table.action-group-table {
 table.action-group-table th {
   background: #f9fafb;
   color: #374151;
-  font-size: 5.8pt;
+  font-size: 6.5pt;
   font-weight: 600;
   padding: 1mm 1.5mm;
   text-transform: uppercase;
@@ -2119,7 +2433,9 @@ table.action-group-table th {
 }
 table.action-group-table td {
   padding: 1mm 1.5mm;
-  font-size: 6.5pt;
+  /* Même corps que les autres tableaux denses (6,5 pt était ~25 % plus
+     petit que le texte de la carte au-dessus). */
+  font-size: 7.5pt;
   border-bottom: 0.3pt solid #f3f4f6;
   vertical-align: top;
 }
@@ -2130,8 +2446,8 @@ table.action-group-table td.agt-num {
   white-space: nowrap;
 }
 .agt-bacs-num {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 5.8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 6.5pt;
   font-weight: 600;
   color: #1b2842;
   background: #f3f4f6;
@@ -2146,17 +2462,17 @@ table.action-group-table td.agt-num {
 .action-card h2,
 .action-card h3,
 .action-card h4 {
-  font-size: 7.2pt;
+  font-size: 7.5pt;
   margin: 1.5mm 0 0.6mm;
   padding: 0;
   border: none;
   page-break-before: auto;
   color: #1b2842;
 }
-.action-card p { font-size: 7pt; margin: 0 0 1.2mm; line-height: 1.5; }
-.action-card ul, .action-card ol { font-size: 7pt; padding-left: 4.5mm; margin: 0.8mm 0 1.2mm; }
+.action-card p { font-size: 7.5pt; margin: 0 0 1.2mm; line-height: 1.5; }
+.action-card ul, .action-card ol { font-size: 7.5pt; padding-left: 4.5mm; margin: 0.8mm 0 1.2mm; }
 .action-card li { margin: 0.5mm 0; line-height: 1.5; }
-.action-card .sev { font-size: 6.2pt; padding: 0.4mm 1.4mm; }
+.action-card .sev { font-size: 6.5pt; padding: 0.4mm 1.4mm; }
 .action-card .action-num { font-size: 6.5pt; padding: 0.4mm 1.4mm; }
 /* Les blocs preconisations dans une action-card prennent toute la
    largeur (parent en bordure flush), pas confines a une cellule. */
@@ -2188,6 +2504,9 @@ table.action-group-table td.agt-num {
   letter-spacing: -0.01em;
 }
 .toc-list { list-style: none; padding: 0; margin: 0; }
+.toc-glossary { margin-top: 8mm; padding-top: 3mm; border-top: 0.4pt solid var(--neutral-200); font-size: 7.5pt; line-height: 1.55; color: var(--neutral-600); }
+.toc-glossary-title { display: block; font-weight: 600; color: var(--neutral-700); margin-bottom: 1mm; }
+.toc-glossary p { margin: 0; }
 .toc-row {
   padding: 0;
   font-size: 9.5pt;
@@ -2209,7 +2528,7 @@ table.action-group-table td.agt-num {
   padding-top: 1.5mm;
   padding-bottom: 1.2mm;
   border-bottom: 1px solid #e5e7eb;
-  font-size: 10pt;
+  font-size: 9.5pt;
 }
 .toc-row.lvl-1:first-child { margin-top: 0; }
 .toc-num {
@@ -2224,8 +2543,8 @@ table.action-group-table td.agt-num {
   flex-shrink: 0;
 }
 .toc-ref {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   color: #6b7280;
   font-weight: 400;
   margin-left: 1.5mm;
@@ -2240,7 +2559,7 @@ table.action-group-table td.agt-num {
 }
 .toc-page {
   font-family: 'Poppins', sans-serif;
-  font-size: 9pt;
+  font-size: 9.5pt;
   color: #1b2842;
   font-weight: 600;
   flex-shrink: 0;
@@ -2258,13 +2577,19 @@ table.action-group-table td.agt-num {
 /* ── Cartes "Identification du site" (chapitre 1) ──────────────────
    Remplace la meta-table monolithe par une grille de cards aérées :
    une info par card, alignement à la baseline, étiquette uppercase. */
+/* Deux cartes par ligne ; une carte seule en fin de série s'étire sur
+   toute la largeur (flex-grow) au lieu de laisser un trou à droite
+   (relecture PDF 2026-09-24 : « Permis de construire » seul). */
 .info-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 3mm;
   margin: 3mm 0 6mm;
 }
 .info-card {
+  flex: 1 1 calc(50% - 1.5mm);
+  min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 1mm;
@@ -2274,20 +2599,20 @@ table.action-group-table td.agt-num {
   border-radius: 2mm;
   page-break-inside: avoid;
 }
-.info-card-wide { grid-column: 1 / -1; }
+.info-card-wide { flex-basis: 100%; }
 .info-card-accent {
   background: #f1f5f9;
   border-left: 2.5pt solid #1b2842;
 }
 /* Glose d'ouverture de chapitre (définition d'un acronyme pour non-techniciens). */
 .chapter-intro {
-  font-size: 8pt;
+  font-size: 8.5pt;
   line-height: 1.5;
   color: #4b5563;
   margin: 0 0 3mm;
 }
 .info-card-label {
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -2300,7 +2625,7 @@ table.action-group-table td.agt-num {
   color: #9ca3af;
 }
 .info-card-value {
-  font-size: 10pt;
+  font-size: 9.5pt;
   color: #111827;
   font-weight: 500;
   line-height: 1.35;
@@ -2313,11 +2638,12 @@ table.action-group-table td.agt-num {
   letter-spacing: -0.01em;
 }
 .info-card-value-warn {
-  color: #9a3412;
+  /* Constat (document non remis), pas un niveau de gravité : ardoise. */
+  color: #475569;
   font-weight: 600;
 }
 .info-card-note {
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: #6b7280;
   font-style: italic;
 }
@@ -2331,9 +2657,17 @@ table.action-group-table td.agt-num {
   background: #fff;
   border: 0.4pt solid #e5e7eb;
   border-radius: 2mm;
-  page-break-inside: avoid;
+  /* Un long panneau (calcul de puissance, blocs R175 du chapitre GTB) se
+     poursuit sur la page suivante au lieu d'être repoussé entier ; le titre
+     reste avec la première ligne, aucune ligne n'est coupée. */
+  break-inside: auto;
   overflow: hidden;
 }
+.panel-head { break-after: avoid; page-break-after: avoid; }
+.panel .kv-row,
+.panel .bms-sub-detail,
+.panel .panel-inline-note,
+.panel table tr { break-inside: avoid; page-break-inside: avoid; }
 .panel-head {
   background: #f9fafb;
   border-bottom: 0.4pt solid #e5e7eb;
@@ -2348,7 +2682,7 @@ table.action-group-table td.agt-num {
 }
 .panel-subtitle {
   margin: 1mm 0 0;
-  font-size: 7.8pt;
+  font-size: 7.5pt;
   color: #6b7280;
   line-height: 1.4;
 }
@@ -2371,8 +2705,10 @@ table.action-group-table td.agt-num {
   padding: 2mm 3mm;
   background: #f1f5f9;
   border-left: 1.5pt solid #1b2842;
-  border-radius: 2.5mm;
-  font-size: 8pt;
+  /* Rayon faible : sur une note d'une ligne, un grand rayon courbait le
+     filet gauche en parenthèse « ( ». */
+  border-radius: 1mm;
+  font-size: 8.5pt;
   color: #1f2937;
   line-height: 1.5;
 }
@@ -2413,22 +2749,31 @@ table.action-group-table td.agt-num {
    pastilles. */
 .map-figure {
   margin: 3mm 0 5mm;
+  /* L'image et sa légende restent sur la même page (R2 m22). */
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 .map-figure-full {
   display: block;
   text-align: center;
 }
+/* Hauteur plafonnée (proportions conservées) : la carte ne repousse plus
+   tout le chapitre sur la page suivante. */
 .map-figure-full img {
   display: block;
-  width: 100%;
-  max-width: 180mm;
+  width: auto;
+  max-width: 100%;
+  /* Bordure comprise dans les 100 % : un débordement, même de 0,5 mm,
+     fait réduire tout le document à l'impression. */
+  box-sizing: border-box;
+  max-height: 100mm;
   margin: 0 auto;
   border: 0.3pt solid #e2e8f0;
   border-radius: 1.5mm;
 }
 .map-figure-caption {
   margin: 1.5mm 0 0;
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: #6b7280;
   font-style: italic;
   text-align: center;
@@ -2456,7 +2801,7 @@ table.action-group-table td.agt-num {
   height: 4.5mm;
   border-radius: 50%;
   color: #ffffff;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 700;
   letter-spacing: 0;
   box-shadow: 0 0.3pt 1pt rgba(0,0,0,0.25);
@@ -2472,7 +2817,7 @@ table.action-group-table td.agt-num {
 .map-legend-pin-inline {
   width: 3.8mm;
   height: 3.8mm;
-  font-size: 6.4pt;
+  font-size: 6.5pt;
 }
 /* Pills colorées « rôle » dans les cards équipement (Production / Distribution
    / Émission / Régulation / Autre). Reproduit le visuel desktop (card 04). */
@@ -2488,7 +2833,7 @@ table.action-group-table td.agt-num {
   gap: 0.5mm;
   padding: 0.4mm 1.4mm;
   border-radius: 4mm;
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.1;
@@ -2502,7 +2847,7 @@ table.action-group-table td.agt-num {
    catégorie. Lisibilité forte, pas de heading nu qui flotte. */
 h2.zone-heading {
   font-family: 'Poppins', sans-serif;
-  font-size: 12pt;
+  font-size: 11pt;
   font-weight: 600;
   color: #1b2842;
   margin: 7mm 0 3mm;
@@ -2516,20 +2861,21 @@ h2.zone-heading {
   border: 0.4pt solid #e5e7eb;
   border-left: 2.5pt solid #94a3b8;
   border-radius: 2mm;
-  page-break-inside: avoid;
+  page-break-inside: auto;
   overflow: hidden;
 }
-.system-card-heating { border-left-color: #dc2626; }
-.system-card-cooling { border-left-color: #0891b2; }
-.system-card-ventilation { border-left-color: #64748b; }
-.system-card-dhw { border-left-color: #0284c7; }
-.system-card-lighting_indoor { border-left-color: #f59e0b; }
-.system-card-lighting_outdoor { border-left-color: #f59e0b; }
-.system-card-electricity_production { border-left-color: #16a34a; }
+.system-card-heating { border-left-color: #94a3b8; }
+.system-card-cooling { border-left-color: #94a3b8; }
+.system-card-ventilation { border-left-color: #94a3b8; }
+.system-card-dhw { border-left-color: #94a3b8; }
+.system-card-lighting_indoor { border-left-color: #94a3b8; }
+.system-card-lighting_outdoor { border-left-color: #94a3b8; }
+.system-card-electricity_production { border-left-color: #94a3b8; }
 .system-card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 2mm;
+  gap: 1mm 2mm;
   padding: 2.2mm 3.5mm;
   background: #f9fafb;
   border-bottom: 0.4pt solid #e5e7eb;
@@ -2541,20 +2887,23 @@ h2.zone-heading {
   color: #1b2842;
 }
 .system-card-power {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   font-weight: 600;
-  background: #ecfdf5;
-  color: #065f46;
+  /* Valeur, pas un verdict : pastille neutre (le vert se lisait « conforme »). */
+  background: #f1f5f9;
+  color: #1b2842;
   padding: 0.5mm 2mm;
   border-radius: 2mm;
-  border: 0.3pt solid #6ee7b7;
+  border: 0.3pt solid #cbd5e1;
+  white-space: nowrap;
 }
 .system-card-count {
   margin-left: auto;
   font-size: 7.5pt;
   color: #6b7280;
   font-weight: 500;
+  white-space: nowrap;
 }
 /* Pills caractérisant le système : multi-bâtiments, sous-station RDU,
    géré par GTB, ECS bouclée. Sobre, sans concurrencer le titre. */
@@ -2565,15 +2914,17 @@ h2.zone-heading {
   letter-spacing: 0.04em;
   padding: 0.5mm 1.8mm;
   border-radius: 1.5mm;
-  background: #fef3c7;
-  color: #92400e;
-  border: 0.3pt solid #fcd34d;
+  /* Caractéristique du système, pas un écart : neutre (ni ambre ni orange). */
+  background: #f1f5f9;
+  color: #1b2842;
+  border: 0.3pt solid #cbd5e1;
   vertical-align: middle;
+  white-space: nowrap;
 }
 .system-card-flag-bms {
-  background: #e0e7ff;
-  color: #4338ca;
-  border-color: #a5b4fc;
+  background: #f1f5f9;
+  color: #1b2842;
+  border-color: #cbd5e1;
 }
 .system-card-flag-muted {
   background: #f3f4f6;
@@ -2593,6 +2944,15 @@ h2.zone-heading {
 .system-callout {
   margin: 0 0 2.5mm 0;
 }
+/* Règle des 5 % : note sans cadre sous le verdict du système. */
+.system-rule-note {
+  margin: -0.5mm 0 2.5mm;
+  padding: 0 1mm;
+  font-size: 7.5pt;
+  line-height: 1.45;
+  color: #475569;
+}
+.system-rule-note strong { color: #1b2842; font-weight: 600; }
 /* Item 4d — ligne « Assujetti : … » dans une carte système */
 .system-liability {
   display: flex;
@@ -2608,27 +2968,27 @@ h2.zone-heading {
   line-height: 1.45;
   color: var(--neutral-700);
 }
-.system-liability-icon { font-size: 8pt; flex-shrink: 0; }
+.system-liability-icon { font-size: 8.5pt; flex-shrink: 0; }
 .system-liability-body strong { color: #1b2842; }
 /* Item 8 — type de calcul de puissance retenu (tracabilite).
    Affiche dans la colonne Puissance, sous la valeur. Compact pour
    ne pas pousser la cellule sur 2-3 lignes (cf. PDF Communay v2). */
 .device-power-calc {
   display: block;
-  font-size: 5.8pt;
+  font-size: 6.5pt;
   color: var(--neutral-600);
-  font-style: italic;
+  font-style: normal;
   margin-top: 0.2mm;
   line-height: 1.2;
 }
-.device-power-calc-out { color: #b45309; }
+.device-power-calc-out { color: #475569; }
 
 /* Item 7f — badge « Partage N zones » sur un equipement multi-zones */
 .shared-badge {
   display: inline-block;
   margin-left: 1mm;
   padding: 0.2mm 1.2mm;
-  font-size: 5.8pt;
+  font-size: 6.5pt;
   font-weight: 600;
   white-space: nowrap;
   color: #047857;
@@ -2640,9 +3000,54 @@ h2.zone-heading {
 .shared-badge-wrap { white-space: normal; }
 /* Fiche abrégée d'un équipement partagé vers ce système (mig 143). */
 .device-card-shared {
-  background: #f0fdf4;
-  border-left-color: #6ee7b7;
+  background: #f8fafc;
+  border-left-color: #cbd5e1;
+  padding-top: 1.8mm;
+  padding-bottom: 1.8mm;
 }
+/* Équipement partagé : fonctions, communication et renvoi de puissance sur
+   une seule ligne, sous l'en-tête. */
+.device-card-shared-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1mm 2mm;
+  margin-top: 1mm;
+  font-size: 7.5pt;
+  color: #374151;
+}
+.system-card-head { page-break-after: avoid; }
+/* Un titre sur plusieurs lignes n'est jamais coupé entre deux pages
+   (« BACS-027 — … (contrat de maintenance ou » / « personnel interne… »). */
+h1, h2, h3, h4, .action-card-title, .panel-head, .energy-section-head,
+.theme-head, .article-card-head { break-inside: avoid; page-break-inside: avoid; }
+/* En-têtes repliés sur deux lignes : jamais coupés entre deux pages. */
+.system-card-head, .device-card-head { break-inside: avoid; page-break-inside: avoid; }
+/* Usages non présents d'une zone : une ligne sous le titre de zone. */
+.zone-absent-line {
+  /* Reste avec la première carte de la zone (jamais seule en bas de page). */
+  break-after: avoid;
+  page-break-after: avoid;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 5mm;
+  margin: -1mm 0 3mm;
+  font-size: 7.5pt;
+  line-height: 1.5;
+  color: #6b7280;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.zone-absent-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5mm 2.5mm; }
+.zone-absent-label { font-weight: 600; color: #475569; }
+.zone-absent-item { display: inline-flex; align-items: center; white-space: nowrap; }
+/* Pas de titre seul en bas de page : le titre de zone reste avec ce qui
+   suit, l'en-tête d'une carte système avec son verdict (relecture PDF
+   2026-09-24). Rien de plus : des blocs insécables plus longs ajoutaient
+   des pages blanches à moitié. */
+h2.zone-heading, h2.subheading { break-after: avoid; page-break-after: avoid; }
+.system-card-body > :first-child { break-inside: avoid; }
+table.justif-items tr:first-child { break-after: avoid; }
 
 /* Item 15 — tableau de conformité stockage & accès aux données GTB */
 .storage-access-table {
@@ -2653,18 +3058,21 @@ h2.zone-heading {
 .storage-access-table th,
 .storage-access-table td {
   padding: 1.6mm 2.5mm;
-  font-size: 8pt;
+  font-size: 8.5pt;
   text-align: left;
   border-bottom: 0.4pt solid #e5e7eb;
 }
 .storage-access-table th {
-  font-size: 7pt;
+  font-size: 7.5pt;
   text-transform: uppercase;
   letter-spacing: 0.4pt;
   color: var(--neutral-600);
   background: #f8fafc;
 }
-.storage-access-table td:last-child { width: 34%; white-space: nowrap; }
+/* Deux colonnes équilibrées ; la valeur peut passer à la ligne (plus de
+   première colonne écrasée sur 7 lignes). */
+.storage-access-table td:first-child { width: 50%; }
+.storage-access-table td:last-child { width: 50%; white-space: normal; }
 .sa-state { font-weight: 600; }
 .sa-yes { color: #047857; }
 .sa-no { color: #b91c1c; }
@@ -2705,7 +3113,7 @@ h2.zone-heading {
 /* Sous-titre standard (section 4 notes terrain, etc.) */
 h3.subheading {
   font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
+  font-size: 9.5pt;
   font-weight: 600;
   color: #1b2842;
   margin: 6mm 0 1mm;
@@ -2717,7 +3125,7 @@ h3.subheading {
    terrain par zone sous l'inventaire. */
 h3.subheading-3 {
   font-family: 'Poppins', sans-serif;
-  font-size: 9pt;
+  font-size: 9.5pt;
   font-weight: 600;
   color: #475569;
   text-transform: uppercase;
@@ -2758,41 +3166,6 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 }
 .detail-card-body { padding: 2.5mm 3mm; }
 .detail-card-body p:last-child { margin-bottom: 0; }
-
-/* Catégorie marquée non présent / non concerné — visible avec icône */
-.system-absent {
-  display: flex;
-  align-items: center;
-  gap: 2mm;
-  margin: 2mm 0;
-  padding: 2mm 3mm;
-  background: #f9fafb;
-  border: 0.4pt dashed #d1d5db;
-  border-radius: 2mm;
-  font-size: 8.5pt;
-  page-break-inside: avoid;
-}
-/* Garder l'icône en couleur pleine — la catégorie reste reconnaissable
-   au coup d'œil même quand le système est absent. Le bandeau gris + la
-   pastille "PAS DE ..." signalent l'absence. */
-.system-absent svg { opacity: 1; }
-.system-absent-label {
-  color: #6b7280;
-  font-weight: 500;
-  font-family: 'Poppins', sans-serif;
-}
-.system-absent-status {
-  margin-left: auto;
-  font-size: 7.5pt;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #b91c1c;
-  background: #fef2f2;
-  border: 0.3pt solid #fecaca;
-  border-radius: 2mm;
-  padding: 0.5mm 2mm;
-}
 
 /* Inline usage cell (icône + label) pour les tables thermiques */
 .usage-inline {
@@ -2847,7 +3220,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   padding: 2.5mm 4mm;
   background: #ecfdf5;
   border-bottom: 0.4pt solid #d1fae5;
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 600;
   color: #065f46;
 }
@@ -2877,8 +3250,8 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   flex: 1;
 }
 .bms-section-count {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   font-weight: 700;
   background: white;
   color: var(--verdict-ok);
@@ -2894,10 +3267,10 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 /* Ligne "à intégrer" : fond legerement orangé pour rappeler le gap */
 .bms-row-gap { background: #fffbf5; }
 .bms-row-gap:nth-child(even) { background: #fff7ed; }
-.bms-row-meta { color: #6b7280; flex: 1; font-size: 8pt; }
+.bms-row-meta { color: #6b7280; flex: 1; font-size: 8.5pt; }
 .bms-row-pwr {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 8.5pt;
   color: #1f2937;
   font-weight: 600;
   white-space: nowrap;
@@ -2905,8 +3278,8 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 
 /* ── Pilules R175-3 §3/§4 par equipement ── */
 .r175-3-label {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 7pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 7.5pt;
   color: #6b7280;
   margin-right: 1.5mm;
   text-transform: uppercase;
@@ -2916,7 +3289,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   display: inline-block;
   padding: 0.3mm 1.5mm;
   border-radius: 2mm;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 500;
   margin-right: 1.5mm;
   white-space: nowrap;
@@ -2961,11 +3334,11 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 }
 .thermal-usage-label { font-weight: 500; }
 .thermal-system-label {
-  font-size: 8pt;
+  font-size: 8.5pt;
   font-weight: 600;
-  color: #4338ca;
-  background: #eef2ff;
-  border: 0.2mm solid #c7d2fe;
+  color: #1b2842;
+  background: #f1f5f9;
+  border: 0.2mm solid #cbd5e1;
   border-radius: 1mm;
   padding: 0.3mm 1.5mm;
 }
@@ -2973,58 +3346,65 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   display: flex;
   flex-wrap: wrap;
   gap: 4mm;
-  font-size: 8pt;
+  font-size: 8.5pt;
   color: #4b5563;
 }
 .thermal-meta-item { display: inline-flex; align-items: center; gap: 1mm; }
 .thermal-meta-label { color: #6b7280; }
-.thermal-notes-global { margin-top: 1.8mm; font-size: 8pt; color: #374151; }
+.thermal-notes-global { margin-top: 1.8mm; font-size: 8.5pt; color: #374151; }
 /* Chaîne thermique en 3 sous-cards distinctes (Production → Distribution →
    Émission), chacune avec un accent coloré et un badge de niveau, pour qu'un
    lecteur non-technicien distingue nettement les 3 étages. */
+/* Un niveau = une ligne : badge à gauche, champs sur 4 colonnes (la carte
+   passe d'environ 130 mm à environ 70 mm : 3 cartes par page). */
 .thermal-levels {
   display: flex;
   flex-direction: column;
-  gap: 2mm;
-  padding: 2.5mm 3mm 3mm;
+  gap: 1.5mm;
+  padding: 2mm 3mm 2.5mm;
 }
 .thermal-level {
-  padding: 2mm 2.5mm;
+  display: grid;
+  grid-template-columns: 24mm minmax(0, 1fr);
+  align-items: start;
+  gap: 3mm;
+  padding: 1.6mm 2.5mm;
   border: 0.3pt solid #e5e7eb;
   border-left-width: 1.4pt;
   border-radius: 1.5mm;
   background: #fcfcfd;
 }
-.thermal-level-head { margin-bottom: 1.4mm; }
+.thermal-level-head { margin-bottom: 0; }
 .thermal-level-badge {
   display: inline-block;
-  font-size: 6.6pt;
+  font-size: 6.5pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5pt;
   padding: 0.6mm 2mm;
   border-radius: 1mm;
 }
-/* Accents par niveau : Production (amber) → Distribution (sky) → Émission (violet). */
-.thermal-level-production   { border-left-color: #d97706; }
-.thermal-level-production   .thermal-level-badge { background: #fef3c7; color: #92400e; }
-.thermal-level-distribution { border-left-color: #0284c7; }
-.thermal-level-distribution .thermal-level-badge { background: #e0f2fe; color: #075985; }
-.thermal-level-emission     { border-left-color: #7c3aed; }
-.thermal-level-emission     .thermal-level-badge { background: #ede9fe; color: #5b21b6; }
+/* Niveaux Production → Distribution → Émission : même accent neutre (la
+   couleur reste aux verdicts ; l'ordre et le libellé portent le sens). */
+.thermal-level-production,
+.thermal-level-distribution,
+.thermal-level-emission     { border-left-color: #94a3b8; }
+.thermal-level-production   .thermal-level-badge,
+.thermal-level-distribution .thermal-level-badge,
+.thermal-level-emission     .thermal-level-badge { background: #f1f5f9; color: #1b2842; }
 .thermal-level-body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4mm 8mm;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5mm 4mm;
 }
 .thermal-level-field {
   display: flex;
   flex-direction: column;
   gap: 0.4mm;
-  min-width: 50mm;
+  min-width: 0;
 }
 .thermal-field-label {
-  font-size: 7pt;
+  font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 0.3pt;
   color: #9ca3af;
@@ -3034,7 +3414,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   margin-top: 1.5mm;
   padding-top: 1.5mm;
   border-top: 0.3pt dashed #e5e7eb;
-  font-size: 8pt;
+  font-size: 8.5pt;
   color: #374151;
 }
 
@@ -3089,11 +3469,11 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 }
 .closing-main {
   margin-top: 16mm;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
 }
 .closing-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 19pt;
+  font-size: 18pt;
   font-weight: 700;
   line-height: 1.18;
   letter-spacing: -0.015em;
@@ -3120,7 +3500,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .closing-points li {
   position: relative;
   padding-left: 7mm;
-  font-size: 9pt;
+  font-size: 9.5pt;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.82);
 }
@@ -3133,7 +3513,9 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   background: var(--buildy-green);
 }
 .closing-cta {
-  margin-top: 14mm;
+  /* Coordonnées calées en bas de page ; le bouton suit l'argumentaire
+     (plus de grand vide au-dessus du bouton — relecture PDF 2026-09-24). */
+  margin-top: auto;
   padding: 9mm 10mm;
   background: rgba(255, 255, 255, 0.06);
   border-left: 3pt solid var(--buildy-green);
@@ -3141,7 +3523,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 }
 .closing-cta-label {
   display: block;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -3173,15 +3555,15 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   margin-top: 6mm;
   padding-top: 5mm;
   border-top: 0.4pt solid rgba(255, 255, 255, 0.14);
-  font-size: 9pt;
+  font-size: 9.5pt;
   color: rgba(255, 255, 255, 0.78);
 }
 
 /* Bouton CTA principal vert centre : invitation a demander le devis. */
 .closing-cta-button-wrap {
-  margin-top: 12mm;
+  margin: 10mm 0 14mm;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 .closing-cta-button {
   display: inline-block;
@@ -3189,12 +3571,14 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   background: var(--buildy-green);
   color: var(--buildy-navy);
   font-family: 'Poppins', sans-serif;
-  font-size: 12pt;
+  font-size: 11pt;
   font-weight: 700;
   border-radius: 3mm;
   letter-spacing: -0.005em;
   text-align: center;
-  box-shadow: 0 2pt 6pt rgba(0, 205, 146, 0.25);
+  /* Pas d'ombre floue (Safari / Aperçu la rendent en bloc opaque décalé) :
+     bordure pleine plus foncée pour la profondeur. */
+  border: 0.6pt solid #00a877;
 }
 
 /* ─── Plan de comptage — matrice de couverture (ch.4) ──────────────── */
@@ -3251,7 +3635,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   display: inline-flex;
   align-items: center;
   gap: 1mm;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   color: #374151;
 }
@@ -3307,9 +3691,13 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .coverage-dot-hs { background: #111827; }
 .coverage-dot-unanswered { background: #f5c259; }
 .coverage-dot-neutral { display: none; }
+.coverage-dot-covered { background: #94a3b8; }
+/* Légende « icône seule » : pastille vide cerclée. */
+.coverage-dot-lg.coverage-dot-none { background: #ffffff; box-shadow: 0 0 0 0.4pt #9ca3af; }
 .coverage-legend {
   display: flex;
-  gap: 4mm;
+  flex-wrap: wrap;
+  gap: 1mm 4mm;
   padding: 1.5mm 3mm;
   border-top: 0.3pt solid #f3f4f6;
   background: rgba(249, 250, 251, 0.6);
@@ -3320,6 +3708,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   display: inline-flex;
   align-items: center;
   gap: 1mm;
+  white-space: nowrap;
 }
 .coverage-dot-lg {
   display: inline-block;
@@ -3336,8 +3725,14 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   border-radius: 2mm;
   overflow: hidden;
   margin: 0 0 3mm 0;
-  page-break-inside: avoid;
+  /* Un long tableau se poursuit sur la page suivante (en-tête de colonnes
+     répété) au lieu de laisser une demi-page blanche ; le titre de
+     l'énergie et le titre de zone restent avec la ligne qui suit. */
+  break-inside: auto;
 }
+.energy-section-head { break-after: avoid; page-break-after: avoid; }
+.energy-section-table tr { break-inside: avoid; }
+.energy-section-table tr.energy-subheader { break-after: avoid; page-break-after: avoid; }
 .energy-section-head {
   display: flex;
   align-items: center;
@@ -3360,16 +3755,21 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   color: #1f2937;
 }
 .energy-section-stats {
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: #6b7280;
   margin-left: auto;
 }
 .energy-sep { color: #d1d5db; margin: 0 1mm; }
 .energy-stat-present { color: #047857; font-weight: 600; }
+/* « aucun compteur en service » : constat neutre, pas en vert. */
+.energy-stat-none { color: #6b7280; font-weight: 600; }
 .energy-stat-missing { color: #b91c1c; font-weight: 600; }
-.energy-stat-unanswered { color: #b45309; font-weight: 600; }
+.energy-stat-unanswered { color: #475569; font-weight: 600; }
 .meter-col-legend {
-  font-size: 6.6pt;
+  /* La légende des colonnes reste avec le premier tableau qu'elle décrit. */
+  break-after: avoid;
+  page-break-after: avoid;
+  font-size: 6.5pt;
   line-height: 1.5;
   color: #6b7280;
   background: #f9fafb;
@@ -3398,7 +3798,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .energy-section-table td { font-size: 7.5pt; }
 .energy-section-table td .bool-na { font-size: 7.5pt; font-weight: 400; }
 .energy-section-table .meter-protocols-cell,
-.energy-section-table .meter-protocols-cell .muted { font-size: 7.5pt; }
+.energy-section-table .muted { font-size: 7.5pt; }
 .energy-section-table tbody tr:last-child td { border-bottom: none; }
 .energy-section-table thead th {
   background: #fafafa;
@@ -3417,15 +3817,20 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .energy-section-table thead th.bool-cell { text-align: center; }
 /* Cellule protocoles : libellés FR séparés par " / " (BACnet IP / Modbus TCP). */
 .meter-protocols-cell {
-  font-size: 7pt;
+  font-size: 7.5pt;
   white-space: nowrap;
 }
 /* Ligne « recommandation auditeur » sous le compteur — visible si saisie. */
+/* Ligne d'explication (zone regroupée, non requis…) : jamais séparée de la
+   ligne du compteur qu'elle commente. */
+.meter-row-recommendation { break-before: avoid; page-break-before: avoid; }
 .meter-row-recommendation td {
-  background: #fffbeb;
-  border-bottom: 0.3pt solid #fde68a;
-  color: #92400e;
-  font-size: 7pt;
+  /* Information, pas un écart : gris ardoise (charte : l'orange est réservé
+     à la gravité). */
+  background: #f8fafc;
+  border-bottom: 0.3pt solid #e2e8f0;
+  color: #475569;
+  font-size: 7.5pt;
   padding: 1mm 2mm;
 }
 .meter-recommendation-label {
@@ -3434,11 +3839,11 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   letter-spacing: 0.04em;
   font-size: 6.5pt;
   margin-right: 1.5mm;
-  color: #b45309;
+  color: #1b2842;
 }
 .energy-subheader td {
   background: #f3f4f6;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   color: #4b5563;
   text-transform: uppercase;
@@ -3476,7 +3881,7 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   border-radius: 1.5mm;
   border-left: 0.8mm solid #cbd5e1;
   background: #f8fafc;
-  font-size: 8pt;
+  font-size: 8.5pt;
   line-height: 1.35;
 }
 .system-compliance-badge {
@@ -3506,13 +3911,188 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 }
 .system-compliance-non_compliant .system-compliance-badge { color: #991b1b; }
 .system-compliance-pending {
-  border-left-color: #6366f1;
-  background: #eef2ff;
+  border-left-color: var(--verdict-unknown);
+  background: #f1f5f9;
 }
-.system-compliance-pending .system-compliance-badge { color: #3730a3; }
+.system-compliance-pending .system-compliance-badge { color: #334155; }
 .system-compliance-exempt {
   border-left-color: #64748b;
   background: #f1f5f9;
 }
 .system-compliance-exempt .system-compliance-badge { color: #334155; }
 .system-compliance-na { display: none; }
+/* Bâtiment existant, raccordement exigé sous condition de TRI (R175-2 II) :
+   recommandations, ni vert ni rouge. */
+.system-compliance-conditional {
+  background: #f8fafc;
+  border-left-color: #94a3b8;
+}
+.system-compliance-conditional .system-compliance-badge { color: #334155; }
+/* Système dont tous les équipements sont partagés depuis un autre système :
+   évalué avec son système d'origine (neutre). */
+.system-compliance-shared {
+  background: #f8fafc;
+  border-left-color: #cbd5e1;
+}
+.system-compliance-shared .system-compliance-badge { color: #475569; }
+
+/* ── Réserves et « à qualifier » (doctrine 2026-09-23) ───────────────
+   Réserve = obligation à respecter (contrat de maintenance, export des
+   données) qui ne dégrade pas le verdict : « Conforme sous réserves ».
+   Ton indigo, distinct des sévérités rouge / orange / jaune. */
+.cover-verdict-compliant_reserves { border-left-color: var(--verdict-ok); }
+.cover-verdict-compliant_reserves .cover-verdict-icon { background: var(--verdict-ok); color: white; }
+.cover-verdict-unknown { border-left-color: var(--verdict-unknown); }
+.cover-verdict-unknown .cover-verdict-icon { background: var(--verdict-unknown); color: white; }
+.essential-verdict-banner.essential-verdict-compliant_reserves { background: #ecfdf5; border-left: 3pt solid var(--verdict-ok); }
+.essential-verdict-compliant_reserves .essential-verdict-icon { background: var(--verdict-ok); }
+.essential-verdict-banner.essential-verdict-unknown { background: #f1f5f9; border-left: 3pt solid var(--verdict-unknown); }
+.essential-verdict-unknown .essential-verdict-icon { background: var(--verdict-unknown); }
+/* Bâtiment non assujetti : ni vert ni rouge — neutre. */
+.cover-verdict-not_subject { border-left-color: var(--verdict-na); }
+.cover-verdict-not_subject .cover-verdict-icon { background: var(--verdict-na); color: white; }
+.essential-verdict-banner.essential-verdict-not_subject { background: var(--neutral-100); border-left: 3pt solid var(--verdict-na); }
+.essential-verdict-not_subject .essential-verdict-icon { background: var(--verdict-na); }
+.essential-reserves { margin: 1.5mm 0 0; padding-left: 5mm; font-size: 8.5pt; color: var(--neutral-700); line-height: 1.5; }
+.synthesis-date { font-size: 8.5pt; color: var(--neutral-500); margin: -1mm 0 2mm; }
+.essential-reserves-lead { display: block; margin-top: 1.5mm; font-weight: 600; color: var(--neutral-700); }
+.essential-reserves li { margin: 0.6mm 0; }
+.stats-grid.stats-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stat-reserve { background: #ffffff; border: none; }
+.stat-reserve .stat-num { color: var(--verdict-reserve); }
+.stat-reserve .stat-label { color: var(--verdict-reserve); }
+.r175-row-reserve { border-left-color: var(--verdict-reserve); }
+.r175-row-verdict-reserve { background: #ffffff; color: var(--verdict-reserve); border: 0.6pt solid var(--verdict-reserve); }
+.r175-row-unknown { border-left-color: var(--verdict-unknown); }
+.r175-row-verdict-unknown { background: #f1f5f9; color: #334155; }
+.sev-reserve { background: #ffffff; color: var(--verdict-reserve); border: 1px solid var(--verdict-reserve); }
+/* Chapitre « Plan de mise en conformité » : légende des niveaux, sous
+   l'encart des sources (bordure pleine, pas d'ombre — Safari/Preview). */
+.plan-legend {
+  margin: 0 0 5mm;
+  padding: 2.5mm 4mm;
+  border: 1px solid #e5e7eb;
+  border-radius: 2mm;
+  background: #f9fafb;
+  page-break-inside: avoid;
+}
+.plan-legend-title {
+  margin: 0 0 1.5mm;
+  font-size: 7.5pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.plan-legend ul { list-style: none; margin: 0; padding: 0; }
+.plan-legend li {
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+  margin: 1mm 0;
+  font-size: 8.5pt;
+  line-height: 1.45;
+  color: #374151;
+}
+.plan-legend .sev {
+  flex: 0 0 22mm;
+  text-align: center;
+  font-size: 7.5pt;
+  padding: 0.4mm 1.5mm;
+}
+.theme-meta .sev-dot-reserve { background: var(--verdict-reserve); }
+/* Réserve : même filet navy que les autres cartes, la pastille porte le niveau. */
+.plan-exemptions ul { margin: 1.5mm 0 0; padding-left: 5mm; }
+.plan-exemptions li { margin: 0.4mm 0; }
+/* Chapitre 5 : ligne de refroidissement présentée pour information —
+   R175-6 ne vise que la régulation du chauffage. */
+.thermal-out-of-scope {
+  display: inline-block;
+  margin-left: 2mm;
+  padding: 0.3mm 1.8mm;
+  border-radius: 1.5mm;
+  background: var(--neutral-100, #f3f4f6);
+  color: var(--neutral-600, #4b5563);
+  font-size: 6.5pt;
+  font-weight: 600;
+}
+
+/* Cumul calculé avec des puissances manquantes : la puissance retenue est
+   un minimum (relecture clarté R2 M5). */
+.power-incomplete-note {
+  margin: 1.5mm 0 0;
+  font-size: 7.5pt;
+  color: #9a3412;
+}
+
+/* Critère 1° déclaré satisfait mais conservation sur 5 ans non établie
+   (relecture clarté R2 M13). */
+.kv-explainer.kv-caveat {
+  color: #9a3412;
+  font-weight: 500;
+}
+/* Réserve (obligation du propriétaire) : navy, comme toutes les réserves. */
+.kv-explainer.kv-reserve-note {
+  color: var(--verdict-reserve);
+  font-weight: 500;
+}
+
+/* Unités dans des en-têtes en capitales : « (m²) », « (kW) » gardent leur
+   casse (relecture clarté R2 m4). */
+.unit-nocase { text-transform: none; }
+
+/* ── Annexe E — Documents joints ─────────────────────────────────
+   Liste des documents cochés « Inclure dans le rapport », transcriptions
+   des notes vocales, images en vignettes (2 par ligne). */
+table.attachments-table { table-layout: fixed; }
+table.attachments-table td { font-size: 7.5pt; }
+table.attachments-table td .muted { font-size: 7.5pt; }
+table.attachments-table td.att-ref { font-weight: 700; color: #1b2842; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.attachments-table td.att-title { overflow-wrap: anywhere; }
+table.attachments-table td.att-date,
+table.attachments-table td.att-size { white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.attachments-table td.att-size { text-align: right; }
+.att-note { display: block; margin-top: 0.4mm; font-size: 6.5pt; color: #6b7280; }
+.att-format { color: #6b7280; white-space: nowrap; }
+.attachment-transcript {
+  margin: 0 0 3mm;
+  padding: 2.5mm 3.5mm;
+  background: #f8fafc;
+  border: 0.4pt solid #e2e8f0;
+  border-left: 1.5pt solid #1b2842;
+  border-radius: 1mm;
+  font-size: 8.5pt;
+  line-height: 1.5;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.attachment-transcript p { margin: 1mm 0 0; white-space: pre-line; }
+.att-ref-inline { font-weight: 700; color: #1b2842; font-variant-numeric: tabular-nums; }
+.attachment-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5mm;
+}
+.attachment-figure {
+  margin: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.attachment-figure img {
+  display: block;
+  width: 100%;
+  max-height: 95mm;
+  object-fit: contain;
+  box-sizing: border-box;
+  border: 0.4pt solid #e2e8f0;
+  border-radius: 1.5mm;
+  background: #f8fafc;
+}
+.attachment-figure figcaption {
+  margin-top: 1.2mm;
+  font-size: 7.5pt;
+  line-height: 1.4;
+  color: #374151;
+}
+.attachment-figure figcaption .muted,
+.attachment-transcript-head .muted { font-size: inherit; }

@@ -14,8 +14,12 @@
 import { CheckIcon } from '@heroicons/vue/24/solid'
 
 defineProps({
-  steps: { type: Array, required: true }, // [{ label, done, hint? }]
+  steps: { type: Array, required: true }, // [{ label, done, hint?, anchor? }]
+  // Sommaire cliquable : chaque étape émet `select(index, step)` (ex. saut
+  // vers le bloc correspondant de la carte GTB).
+  clickable: { type: Boolean, default: false },
 })
+const emit = defineEmits(['select'])
 </script>
 
 <template>
@@ -38,7 +42,15 @@ defineProps({
         :class="s.done ? 'bg-emerald-300' : 'bg-gray-200'"
         aria-hidden="true"
       ></span>
-      <div class="pt-0.5 min-w-0 flex-1">
+      <button v-if="clickable" type="button"
+              class="pt-0.5 min-w-0 flex-1 text-left rounded-md -mx-1 px-1 -my-0.5 py-0.5 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 transition"
+              @click="emit('select', i, s)">
+        <p :class="['text-xs font-medium leading-tight', s.done ? 'text-emerald-700' : 'text-gray-700']">
+          {{ s.label }}
+        </p>
+        <p v-if="s.hint" class="text-[10px] text-gray-400 mt-0.5">{{ s.hint }}</p>
+      </button>
+      <div v-else class="pt-0.5 min-w-0 flex-1">
         <p :class="['text-xs font-medium leading-tight', s.done ? 'text-emerald-700' : 'text-gray-700']">
           {{ s.label }}
         </p>

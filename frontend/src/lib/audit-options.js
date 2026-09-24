@@ -456,8 +456,8 @@ export const ZONE_NATURES = [
 // rester synchro avec ZONE_OCCUPANCY_PROFILES dans backend zones.js.
 export const ZONE_OCCUPANCY_PROFILES = [
   { value: 'continu',       label: 'Activité continue (24/7)',           icon: 'fa-infinity',       color: '#dc2626' },
-  { value: '3x8',           label: 'Activité en 3×8 (24h/24, 3 équipes)', icon: 'fa-clock',          color: '#b91c1c' },
-  { value: '2x8',           label: 'Activité en 2×8 (16h/24, 2 équipes)', icon: 'fa-clock',          color: '#ea580c' },
+  { value: '3x8',           label: 'Activité en 3×8 (24 h/24, 3 équipes)', icon: 'fa-clock',          color: '#b91c1c' },
+  { value: '2x8',           label: 'Activité en 2×8 (16 h/24, 2 équipes)', icon: 'fa-clock',          color: '#ea580c' },
   { value: 'heures_bureau', label: 'Heures de bureau',                   icon: 'fa-briefcase',      color: '#1e40af' },
   { value: 'scolaire',      label: 'Rythme scolaire',                    icon: 'fa-graduation-cap', color: '#a855f7' },
   { value: 'intermittent',  label: 'Activité intermittente',             icon: 'fa-arrows-to-dot',  color: '#f59e0b' },

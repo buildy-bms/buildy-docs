@@ -14,12 +14,12 @@
     <div class="doc-header-meta">
       <div class="doc-header-eyebrow">Audit BACS — Tableaux de synthèse</div>
       <div class="doc-header-title">{{document.project_name}}</div>
-      <div class="doc-header-sub">{{document.client_name}} · {{site.address}}</div>
+      <div class="doc-header-sub">{{document.client_name}}{{#if site.address}} · {{site.address}}{{/if}}</div>
     </div>
   </div>
   <div class="doc-header-right">
     <span class="doc-header-tag">{{exportDate}}</span>
-    <span class="doc-header-tag doc-header-tag-version">{{version}}</span>
+    <span class="doc-header-tag doc-header-tag-version">{{#if versionLabel}}{{versionLabel}}{{else}}{{version}}{{/if}}</span>
   </div>
 </header>
 
@@ -28,8 +28,8 @@
   {{#if isBacs}}
   <div class="tile">
     <span class="tile-label">Puissance R175-2</span>
-    <span class="tile-value">{{document.bacs_total_power_kw}} <span class="tile-unit">kW</span></span>
-    <span class="tile-sub">{{applicabilityLabel}}</span>
+    <span class="tile-value">{{#if powerSummary}}{{frNum powerSummary.effectiveKw}}{{else}}{{frNum document.bacs_total_power_kw}}{{/if}} <span class="tile-unit">kW</span></span>
+    <span class="tile-sub"><span>{{applicabilityLabel}}</span></span>
   </div>
   {{else}}
   <div class="tile">
@@ -40,33 +40,42 @@
   {{/if}}
   <div class="tile">
     <span class="tile-label">Équipements</span>
-    <span class="tile-value">{{recapStats.devicesPresent}}<span class="tile-of"> / {{recapStats.devicesTotal}}</span></span>
-    <span class="tile-sub">{{recapStats.devicesIntegrated}} intégrés GTB{{#if recapStats.devicesIntegratedUnanswered}} · {{recapStats.devicesIntegratedUnanswered}} non répondu{{/if}} · {{recapStats.devicesHs}} HS</span>
+    <span class="tile-value">{{recapStats.devicesTotal}}<span class="tile-of"> équipement{{#unless (eq recapStats.devicesTotal 1)}}s{{/unless}}</span></span>
+    <span class="tile-sub"><span>{{#if (eq bms.present 1)}}{{bmsManagedDevices.length}} intégré{{#unless (eq bmsManagedDevices.length 1)}}s{{/unless}} GTB · {{bmsUnmanagedDevices.length}} à intégrer{{#if bmsUnansweredDevices.length}} · {{bmsUnansweredDevices.length}} non renseigné{{#unless (eq bmsUnansweredDevices.length 1)}}s{{/unless}}{{/if}}{{#if bmsNotTargetedDevices.length}} · {{bmsNotTargetedDevices.length}} non visé{{#unless (eq bmsNotTargetedDevices.length 1)}}s{{/unless}}{{/if}} · {{/if}}{{recapStats.devicesHs}}&nbsp;hors&nbsp;service</span></span>
   </div>
   <div class="tile">
     <span class="tile-label">Compteurs</span>
-    <span class="tile-value">{{recapStats.metersPresent}}<span class="tile-of"> / {{recapStats.metersRequired}}</span></span>
-    <span class="tile-sub">{{recapStats.metersIntegrated}} intégrés GTB{{#if recapStats.metersIntegratedUnanswered}} · {{recapStats.metersIntegratedUnanswered}} non répondu{{/if}} · {{recapStats.metersMissing}} à installer</span>
+    <span class="tile-value">{{recapStats.metersRequiredPresent}}<span class="tile-of"> / {{recapStats.metersRequiredEffective}} requis présents</span></span>
+    <span class="tile-sub"><span>{{recapStats.metersToInstall}} à installer{{#if recapStats.metersToInstallConditional}} (dont {{recapStats.metersToInstallConditional}} sous condition de TRI){{/if}}{{#if recapStats.metersCoveredByGroup}} · {{recapStats.metersCoveredByGroup}} couvert{{#unless (eq recapStats.metersCoveredByGroup 1)}}s{{/unless}} par une zone regroupée{{/if}}{{#if recapStats.metersPresenceUnanswered}} · {{recapStats.metersPresenceUnanswered}} présence non vérifiée{{/if}}{{#if (eq bms.present 1)}} · {{bmsManagedMeters.length}} intégré{{#unless (eq bmsManagedMeters.length 1)}}s{{/unless}} GTB{{#if bmsBrokenLinkMeters.length}} · {{bmsBrokenLinkMeters.length}} liaison{{#unless (eq bmsBrokenLinkMeters.length 1)}}s{{/unless}} interrompue{{#unless (eq bmsBrokenLinkMeters.length 1)}}s{{/unless}}{{/if}}{{/if}}</span></span>
   </div>
   <div class="tile">
     <span class="tile-label">{{#if isBacs}}Plan d'action{{else}}Préconisations Buildy{{/if}}</span>
     <span class="tile-value">{{compliance.stats.total}}</span>
     <span class="tile-sub">
-      <span class="sev-dot sev-dot-blocking"></span>{{compliance.stats.blocking}} {{#if isBacs}}bloq.{{else}}essent.{{/if}}
-      <span class="sev-dot sev-dot-major"></span>{{compliance.stats.major}} {{#if isBacs}}maj.{{else}}recom.{{/if}}
-      <span class="sev-dot sev-dot-minor"></span>{{compliance.stats.minor}} {{#if isBacs}}min.{{else}}option{{/if}}
+      <span class="sev-dot sev-dot-blocking"></span>{{compliance.stats.blocking}} {{#if isBacs}}bloquante{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}}{{else}}essentielle{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}}{{/if}}
+      <span class="sev-dot sev-dot-major"></span>{{compliance.stats.major}} {{#if isBacs}}majeure{{#unless (eq compliance.stats.major 1)}}s{{/unless}}{{else}}recommandée{{#unless (eq compliance.stats.major 1)}}s{{/unless}}{{/if}}
+      <span class="sev-dot sev-dot-minor"></span>{{compliance.stats.minor}} {{#if isBacs}}mineure{{#unless (eq compliance.stats.minor 1)}}s{{/unless}}{{else}}option{{#unless (eq compliance.stats.minor 1)}}s{{/unless}}{{/if}}
+      {{#if compliance.stats.reserves}}<span class="sev-dot sev-dot-reserve"></span>{{compliance.stats.reserves}} réserve{{#unless (eq compliance.stats.reserves 1)}}s{{/unless}}{{/if}}
     </span>
   </div>
 </section>
 
 {{!-- ═══════════ Bandeau GTB existante en synthèse ═══════════ --}}
-{{#if bms}}
+{{#if (eq bms.present 0)}}
+<section class="gtb-summary gtb-summary-none">
+  <div class="gtb-summary-head">
+    <span class="gtb-summary-eyebrow">GTB</span>
+    <span class="gtb-summary-name">Aucune GTB sur le site</span>
+  </div>
+</section>
+{{/if}}
+{{#if (eq bms.present 1)}}
 <section class="gtb-summary">
   <div class="gtb-summary-head">
     <span class="gtb-summary-eyebrow">GTB existante</span>
-    <span class="gtb-summary-name">{{bms.existing_solution}}</span>
-    {{#if bms.existing_solution_brand}}<span class="gtb-summary-brand">{{bms.existing_solution_brand}}</span>{{/if}}
-    {{#if bms.model_reference}}<span class="gtb-summary-model">· {{bms.model_reference}}</span>{{/if}}
+    <span class="gtb-summary-name">{{gtbBanner.name}}</span>
+    {{#if gtbBanner.brand}}<span class="gtb-summary-brand">{{gtbBanner.brand}}</span>{{/if}}
+    {{#if gtbBanner.model}}<span class="gtb-summary-model">· {{gtbBanner.model}}</span>{{/if}}
   </div>
   <div class="gtb-summary-body">
     <div class="gtb-summary-cell">
@@ -78,25 +87,26 @@
         <span class="usage-pill {{#if bms.manages_dhw}}usage-pill-dhw{{else}}usage-pill-off{{/if}}">{{{categoryIcon "dhw" "10"}}}ECS</span>
         <span class="usage-pill {{#if bms.manages_lighting}}usage-pill-lighting{{else}}usage-pill-off{{/if}}">{{{categoryIcon "lighting_indoor" "10"}}}Éclair.</span>
       </div>
+      <span class="gtb-cell-legend">Barré : usage non déclaré comme traité par la GTB (à raccorder selon le décret).</span>
     </div>
     <div class="gtb-summary-cell">
       <span class="gtb-cell-label">R175-3 supervision</span>
       <div class="gtb-cell-value gtb-checks">
-        <span class="check {{triCls bms.meets_r175_3_p1 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.meets_r175_3_p1}} P1 horaire 5 ans</span>
-        <span class="check {{triCls bms.meets_r175_3_p2 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.meets_r175_3_p2}} P2 anomalies</span>
+        <span class="check {{triCls bms.meets_r175_3_p1 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.meets_r175_3_p1}} 1° suivi horaire, 5 ans</span>
+        <span class="check {{triCls bms.meets_r175_3_p2 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.meets_r175_3_p2}} 2° pertes d'efficacité</span>
       </div>
     </div>
     <div class="gtb-summary-cell">
-      <span class="gtb-cell-label">R175-3 mise à dispo</span>
+      <span class="gtb-cell-label">R175-3 données</span>
       <div class="gtb-cell-value gtb-checks">
         <span class="check {{triCls bms.data_provision_to_manager 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.data_provision_to_manager}} Gestionnaire</span>
         <span class="check {{triCls bms.data_provision_to_operators 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.data_provision_to_operators}} Exploitants</span>
       </div>
     </div>
     <div class="gtb-summary-cell">
-      <span class="gtb-cell-label">R175-4 maintenance</span>
+      <span class="gtb-cell-label">R175-4 vérifications</span>
       <div class="gtb-cell-value gtb-checks">
-        <span class="check {{triCls bms.has_maintenance_procedures 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.has_maintenance_procedures}} Procédure</span>
+        {{#if maintenanceReserveNumber}}<span class="check check-reserve">Maintenance à mettre en place (réserve {{maintenanceReserveNumber}})</span>{{else}}<span class="check {{triCls bms.has_maintenance_procedures 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.has_maintenance_procedures}} Maintenance organisée</span>{{/if}}
         {{#if bms.maintenance_periodicity}}<span class="gtb-meta">{{bms.maintenance_periodicity}}</span>{{/if}}
       </div>
     </div>
@@ -104,7 +114,7 @@
       <span class="gtb-cell-label">R175-5 formation</span>
       <div class="gtb-cell-value gtb-checks">
         <span class="check {{triCls bms.operator_trained 'check-ok' 'check-ko' 'check-na'}}">{{triSym bms.operator_trained}} Exploitant formé</span>
-        {{#if bms.operator_training_date}}<span class="gtb-meta">{{bms.operator_training_date}}</span>{{/if}}
+        {{#if bms.operator_training_date}}<span class="gtb-meta">{{frDate bms.operator_training_date}}</span>{{/if}}
       </div>
     </div>
   </div>
@@ -115,29 +125,27 @@
 {{#if zonesFunctional.length}}
 <section class="table-section">
   <header class="section-head">
-    <span class="section-eyebrow">Référence</span>
+    <span class="section-eyebrow">Inventaire</span>
     <h2 class="section-title">Zones fonctionnelles (R175-1 6°)</h2>
   </header>
   <table class="syn syn-zones">
     <thead>
       <tr>
-        <th class="col-ref">Référence</th>
         <th class="col-name">Nom</th>
         <th class="col-nature">Nature</th>
         <th class="col-nature">Régime d'activité</th>
-        <th class="col-surface">Surface (m²)</th>
-        <th class="col-notes">Notes</th>
+        <th class="col-surface">Surface <span class="unit-nocase">(m²)</span></th>
+        {{#if (anyOf zonesFunctional "notes" "notes_html")}}<th class="col-notes">Notes</th>{{/if}}
       </tr>
     </thead>
     <tbody>
       {{#each zonesFunctional}}
         <tr>
-          <td class="col-ref">{{ref}}</td>
           <td class="col-name"><strong>{{name}}</strong></td>
           <td class="col-nature">{{natureLabel}}</td>
           <td class="col-nature">{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-surface">{{surface_m2}}</td>
-          <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
+          <td class="col-surface">{{#if surface_m2}}{{frNum surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td>
+          {{#if (anyOf ../zonesFunctional "notes" "notes_html")}}<td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>{{/if}}
         </tr>
       {{/each}}
     </tbody>
@@ -145,29 +153,27 @@
 
   {{#if zonesTechnical.length}}
   <header class="section-head" style="margin-top:6mm">
-    <h2 class="section-title">Zones techniques</h2>
-    <p class="section-intro">Locaux abritant les équipements techniques (chaufferies, locaux GTC, locaux onduleurs PV…). Hors champ R175-1 6° mais conservés pour situer les équipements.</p>
+    <h2 class="section-title">Locaux techniques</h2>
+    <p class="section-intro">Locaux abritant les équipements techniques (chaufferies, locaux GTB, locaux des onduleurs photovoltaïques…). Ils ne sont pas retenus comme zones fonctionnelles dans cet audit (méthode Buildy) ; les équipements qu'ils abritent restent dans le champ du décret.</p>
   </header>
   <table class="syn syn-zones">
     <thead>
       <tr>
-        <th class="col-ref">Référence</th>
         <th class="col-name">Nom</th>
         <th class="col-nature">Nature</th>
-        <th class="col-nature">Régime d'activité</th>
-        <th class="col-surface">Surface (m²)</th>
-        <th class="col-notes">Notes</th>
+        {{#if (anyOf zonesTechnical "occupancyLabel")}}<th class="col-nature">Régime d'activité</th>{{/if}}
+        {{#if (anyOf zonesTechnical "surface_m2")}}<th class="col-surface">Surface <span class="unit-nocase">(m²)</span></th>{{/if}}
+        {{#if (anyOf zonesTechnical "notes" "notes_html")}}<th class="col-notes">Notes</th>{{/if}}
       </tr>
     </thead>
     <tbody>
       {{#each zonesTechnical}}
         <tr>
-          <td class="col-ref">{{ref}}</td>
           <td class="col-name"><strong>{{name}}</strong></td>
           <td class="col-nature">{{natureLabel}}</td>
-          <td class="col-nature">{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-surface">{{surface_m2}}</td>
-          <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
+          {{#if (anyOf ../zonesTechnical "occupancyLabel")}}<td class="col-nature">{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
+          {{#if (anyOf ../zonesTechnical "surface_m2")}}<td class="col-surface">{{#if surface_m2}}{{frNum surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
+          {{#if (anyOf ../zonesTechnical "notes" "notes_html")}}<td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>{{/if}}
         </tr>
       {{/each}}
     </tbody>
@@ -176,7 +182,8 @@
 
   {{!-- Item 7d/7e — zones fonctionnelles de suivi --}}
   {{#if functionalZones.mergedCount}}
-  <table class="syn syn-zones" style="margin-top:4mm">
+  <h3 class="syn-subtitle">Zones regroupées pour le suivi des consommations</h3>
+  <table class="syn syn-zones syn-merged">
     <thead>
       <tr>
         <th class="col-nature">Usage</th>
@@ -186,13 +193,13 @@
     </thead>
     <tbody>
       {{#each functionalZones.byCategory}}
-        {{#each groups}}
+        {{#each groups}}{{#if merged}}
           <tr>
             <td class="col-nature">{{../categoryLabel}}</td>
             <td class="col-name"><strong>{{label}}</strong></td>
-            <td class="col-notes">{{#if merged}}{{justification}}{{else}}<span class="muted">Zone d'usage homogène — pas de regroupement.</span>{{/if}}</td>
+            <td class="col-notes">{{justification}}</td>
           </tr>
-        {{/each}}
+        {{/if}}{{/each}}
       {{/each}}
     </tbody>
   </table>
@@ -206,32 +213,30 @@
     <span class="section-eyebrow">Tableau 1 / 4</span>
     <h2 class="section-title">Systèmes techniques par zone fonctionnelle</h2>
     <p class="section-intro">
-      Inventaire complet des équipements présents sur le site, regroupés par zone fonctionnelle puis par catégorie d'usage. Conformité R175-3 (interopérabilité + arrêt manuel + autonome) évaluée par équipement.
+      Inventaire complet des équipements présents sur le site, regroupés par zone fonctionnelle puis par catégorie d'usage. Arrêt manuel depuis la GTB et gestion autonome relevés par équipement (sans objet pour un équipement relié à aucune GTB) ; l'interopérabilité (R175-3 3°) est appréciée par système, dans le rapport principal (chapitre 3).
     </p>
   </header>
 
   <table class="syn syn-systems">
     <thead>
       <tr>
-        <th class="col-ref">Référence</th>
         <th class="col-usage">Usage</th>
         <th class="col-name">Équipement</th>
         <th class="col-brand">Marque</th>
         <th class="col-model">Modèle / réf.</th>
         <th class="col-energy">Énergie</th>
-        <th class="col-power">Puissance (kW)</th>
+        <th class="col-power">Puissance <span class="unit-nocase">(kW)</span></th>
         <th class="col-role">Fonction(s)</th>
         <th class="col-comm">Communication</th>
-        <th class="col-loc">Localisation</th>
-        <th class="col-bool">Interopérable</th>
+        {{#if synthesisShowLocation}}<th class="col-loc">Localisation</th>{{/if}}
         <th class="col-bool">Arrêt manuel</th>
         <th class="col-bool">Autonome</th>
-        <th class="col-bool">GTB</th>
+        {{#if synthesisShowGtb}}<th class="col-bool">GTB</th>{{/if}}
       </tr>
     </thead>
-    <tbody>
       {{#each systemsByZoneForSynthesis}}
-        <tr class="zone-row"><th colspan="14">{{zone_name}}</th></tr>
+      <tbody>
+        <tr class="zone-row"><th colspan="{{@root.synthesisSystemsColspan}}">{{zone_name}}</th></tr>
         {{#each items}}
           {{!-- systemsByZoneForSynthesis a déjà filtré les items en amont
                (present + devices.length). L'info d'assujetti R175-2 est
@@ -239,65 +244,72 @@
           {{#if present}}{{#if device_count}}
             {{#each devices}}
               <tr {{#if out_of_service}}class="row-hs"{{/if}}>
-                <td class="col-ref">{{ref}}</td>
                 <td class="col-usage">{{{systemCategoryPill ../system_category "sm"}}}</td>
                 <td class="col-name">
                   <strong>{{name}}</strong>
                   {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
-                  {{#if sharedWithLabel}}<span class="shared-badge shared-badge-wrap">↔ Dessert aussi : {{sharedWithLabel}}</span>{{/if}}
+                  {{#if sharedWithLabel}}<span class="shared-badge shared-badge-wrap">{{{faIcon "arrow-right-arrow-left" "currentColor" "7"}}} Dessert aussi : {{sharedWithLabel}}</span>{{/if}}
                 </td>
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-energy">{{#if energy_source}}{{{energyPill energy_source "sm"}}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-power">
-                  {{#if has_multiple}}
-                    <span class="pwr-main">{{total_power_kw}}</span>
-                    <span class="pwr-detail">{{quantity}}&times;{{power_kw}}</span>
-                  {{else}}
-                    {{#if power_kw}}<span class="pwr-main">{{power_kw}}</span>{{else}}<span class="muted">—</span>{{/if}}
-                  {{/if}}
+                  {{#if power_kw}}
+                    {{#if has_multiple}}
+                      <span class="pwr-main">{{frNum total_power_kw}}</span>
+                      <span class="pwr-detail">{{quantity}} × {{frNum power_kw}}</span>
+                    {{else}}
+                      <span class="pwr-main">{{frNum power_kw}}</span>
+                    {{/if}}
+                    {{#if is_backup}}<span class="pwr-detail">secours, hors cumul</span>{{else if powerCalc}}{{#unless powerCalc.inScope}}<span class="pwr-detail">hors cumul</span>{{/unless}}{{/if}}
+                  {{else}}<span class="muted">Non renseignée{{#if has_multiple}} ({{quantity}} unités){{/if}}</span>{{/if}}
                 </td>
                 <td class="col-role">
                   {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="muted">—</span>{{/if}}
                 </td>
-                <td class="col-comm">{{{commPill communication_protocol "sm"}}}</td>
-                <td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
-                <td class="col-bool">{{{boolPill meets_r175_3_p3 "sm"}}}</td>
+                <td class="col-comm">{{{commStatePill commState "sm"}}}</td>
+                {{#if @root.synthesisShowLocation}}<td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
+                {{#if p4NotApplicable}}
+                <td class="col-bool" colspan="2"><span class="muted" title="Équipement relié à aucune GTB">Sans objet (non relié)</span></td>
+                {{else}}
                 <td class="col-bool">{{{boolPill meets_r175_3_p4 "sm"}}}</td>
                 <td class="col-bool">{{{boolPill meets_r175_3_p4_autonomous "sm"}}}</td>
-                <td class="col-bool">{{{boolPill managed_by_bms "sm"}}}</td>
+                {{/if}}
+                {{#if @root.synthesisShowGtb}}<td class="col-bool">{{{boolPill managed_by_bms "sm" "" "dash"}}}</td>{{/if}}
               </tr>
             {{/each}}
             {{!-- Équipements partagés vers ce système (mig 143) : puissance
                  renvoyée au système d'origine (pas de double comptage). --}}
             {{#each shared_devices}}
               <tr class="row-shared{{#if out_of_service}} row-hs{{/if}}">
-                <td class="col-ref"></td>
                 <td class="col-usage">{{{systemCategoryPill ../system_category "sm"}}}</td>
                 <td class="col-name">
                   <strong>{{name}}</strong>
                   {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
-                  <span class="shared-badge shared-badge-wrap">↔ Partagé depuis {{sharedFromLabel}}</span>
+                  <span class="shared-badge shared-badge-wrap">{{{faIcon "arrow-right-arrow-left" "currentColor" "7"}}} Partagé depuis {{sharedFromLabel}}</span>
                 </td>
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-energy">{{#if energy_source}}{{{energyPill energy_source "sm"}}}{{else}}<span class="muted">—</span>{{/if}}</td>
-                <td class="col-power"><span class="muted">cf. origine</span></td>
+                <td class="col-power"><span class="muted">voir {{sharedFromLabel}}</span></td>
                 <td class="col-role">
                   {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="muted">—</span>{{/if}}
                 </td>
-                <td class="col-comm">{{{commPill communication_protocol "sm"}}}</td>
-                <td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
-                <td class="col-bool">{{{boolPill meets_r175_3_p3 "sm"}}}</td>
+                <td class="col-comm">{{{commStatePill commState "sm"}}}</td>
+                {{#if @root.synthesisShowLocation}}<td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
+                {{#if p4NotApplicable}}
+                <td class="col-bool" colspan="2"><span class="muted" title="Équipement relié à aucune GTB">Sans objet (non relié)</span></td>
+                {{else}}
                 <td class="col-bool">{{{boolPill meets_r175_3_p4 "sm"}}}</td>
                 <td class="col-bool">{{{boolPill meets_r175_3_p4_autonomous "sm"}}}</td>
-                <td class="col-bool">{{{boolPill managed_by_bms "sm"}}}</td>
+                {{/if}}
+                {{#if @root.synthesisShowGtb}}<td class="col-bool">{{{boolPill managed_by_bms "sm" "" "dash"}}}</td>{{/if}}
               </tr>
             {{/each}}
           {{/if}}{{/if}}
         {{/each}}
+      </tbody>
       {{/each}}
-    </tbody>
   </table>
 </section>
 
@@ -307,45 +319,44 @@
     <span class="section-eyebrow">Tableau 2 / 4</span>
     <h2 class="section-title">Compteurs et mesurage par zone fonctionnelle</h2>
     <p class="section-intro">
-      Compteurs requis sur le site (R175-3 §1° — suivi continu pas horaire des consommations par usage et par zone). Les compteurs requis mais non présents constituent autant d'actions de mise en conformité.{{#if functionalZones.mergedCount}} Lorsque des zones sont regroupées en une zone fonctionnelle de suivi (cf. tableau ci-dessus), un comptage unique suffit pour la zone regroupée.{{/if}}
+      Compteurs prévus par le plan de comptage que Buildy préconise pour répondre au R175-3 1° (suivi des consommations par zone fonctionnelle, au pas horaire). Un compteur requis et absent donne lieu à une action du plan ; pour un bâtiment existant, c'est une recommandation lorsque les systèmes mesurés ne sont à relier à la GTB que sous condition.{{#if functionalZones.mergedCount}} Lorsque des zones sont regroupées en une zone fonctionnelle de suivi (cf. tableau ci-dessus), un comptage unique suffit pour la zone regroupée.{{/if}}
     </p>
   </header>
 
   <table class="syn syn-meters">
     <thead>
       <tr>
-        <th class="col-ref">Référence</th>
         <th class="col-type">Type</th>
         <th class="col-usage">Usage</th>
         <th class="col-bool">Requis</th>
         <th class="col-bool">Présent</th>
         <th class="col-bool">Communicant</th>
         <th class="col-bool">Intégré GTB</th>
-        <th class="col-bool">Statut</th>
-        <th class="col-notes">Notes terrain</th>
+        {{#if (anyItemTrue metersByZone "out_of_service")}}<th class="col-bool">Statut</th>{{/if}}
+        {{#if (anyItemOf metersByZone "notes" "notes_html")}}<th class="col-notes">Notes terrain</th>{{/if}}
       </tr>
     </thead>
-    <tbody>
       {{#each metersByZone}}
-        <tr class="zone-row"><th colspan="9">{{zone_name}}</th></tr>
+      <tbody>
+        <tr class="zone-row"><th colspan="{{#if (anyItemTrue @root.metersByZone "out_of_service")}}{{#if (anyItemOf @root.metersByZone "notes" "notes_html")}}8{{else}}7{{/if}}{{else}}{{#if (anyItemOf @root.metersByZone "notes" "notes_html")}}7{{else}}6{{/if}}{{/if}}">{{zone_name}}</th></tr>
         {{#each items}}
-          <tr class="{{#if out_of_service}}row-hs{{else}}{{#unless present_actual}}row-missing{{/unless}}{{/if}}">
-            <td class="col-ref">{{ref}}</td>
+          <tr class="{{#if out_of_service}}row-hs{{else}}{{#if (or coveredByGroup notRequiredReason)}}{{else}}{{#if (and required (eq present_actual 0))}}row-missing{{/if}}{{/if}}{{/if}}">
             <td class="col-type">{{{meterTypePill meter_type "sm"}}}</td>
             <td class="col-usage">{{{meterUsagePill usage "sm"}}}</td>
-            <td class="col-bool">{{{boolPill required "sm"}}}</td>
+            <td class="col-bool">{{#if notRequiredReason}}<span class="muted">Non requis</span>{{else if coveredByGroup}}<span class="muted">Commun</span>{{else}}{{{boolPill required "sm" "neutral"}}}{{/if}}</td>
             <td class="col-bool">
-              {{{boolPill present_actual "sm"}}}
-              {{#unless present_actual}}{{#if required}}<div class="missing-tag">à installer</div>{{/if}}{{/unless}}
+              {{{boolPill present_actual "sm" "" "À vérifier"}}}
+              {{#if notRequiredReason}}<div class="muted">{{notRequiredReason}}</div>{{else if coveredByGroup}}{{#unless isPresent}}<div class="muted">comptage commun : {{coveredByGroup}}</div>{{/unless}}{{else}}{{#if required}}{{#if (eq present_actual 0)}}<div class="missing-tag">à installer</div>{{else}}{{#unless present_actual}}<div class="muted">présence non vérifiée</div>{{/unless}}{{/if}}{{/if}}{{/if}}
+              {{#if mergedLeadGroup}}<div class="muted">compteur unique : {{mergedLeadGroup}}</div>{{/if}}
             </td>
-            <td class="col-bool">{{{boolPill communicating "sm"}}}</td>
-            <td class="col-bool">{{{boolPill managed_by_bms "sm"}}}</td>
-            <td class="col-bool">{{#if out_of_service}}<span class="hs-tag">HS</span>{{else}}<span class="bool-na">—</span>{{/if}}</td>
-            <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
+            <td class="col-bool">{{#if isPresent}}{{{boolPill communicating "sm"}}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="col-bool">{{#if isPresent}}{{#if bms_integration_out_of_service}}<span class="hs-tag" title="Liaison avec la GTB hors service">Liaison HS</span>{{else}}{{{boolPill managed_by_bms "sm"}}}{{/if}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            {{#if (anyItemTrue @root.metersByZone "out_of_service")}}<td class="col-bool">{{#if out_of_service}}<span class="hs-tag">HS</span>{{else}}<span class="bool-na">—</span>{{/if}}</td>{{/if}}
+            {{#if (anyItemOf @root.metersByZone "notes" "notes_html")}}<td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>{{/if}}
           </tr>
         {{/each}}
+      </tbody>
       {{/each}}
-    </tbody>
   </table>
 </section>
 
@@ -354,49 +365,41 @@
 <section class="table-section table-section-break">
   <header class="section-head">
     <span class="section-eyebrow">Tableau 3 / 4</span>
-    <h2 class="section-title">Régulation thermique automatique{{#if isBacs}} (R175-6){{/if}}</h2>
+    <h2 class="section-title">{{#if isBacs}}Régulation automatique du chauffage (R175-6){{else}}Régulation automatique de la température{{/if}}</h2>
     <p class="section-intro">
-      Évaluation de la régulation thermique automatique par zone fonctionnelle pour le chauffage et le refroidissement.{{#if isBacs}} Le R175-6 exige une régulation différenciée (par pièce ou zone) selon l'usage.{{else}} Information utile pour dimensionner les actions de zoning et de pilotage thermique du devis.{{/if}}
+      Régulation automatique de la température des systèmes de chauffage et de refroidissement présents.{{#if isBacs}} L'article R175-6 ne vise que le chauffage : régulation automatique par pièce ou, si cela est justifié, par zone chauffée, dans les bâtiments dont le permis de construire a été déposé à partir du 22 juillet 2021 ou lors de l'installation ou du remplacement d'un générateur de chaleur. Les lignes de refroidissement sont données à titre d'information.{{#if r175_6_applicable.undetermined}} Applicabilité de l'article R175-6 à confirmer (rapport principal, chapitre 5).{{else}}{{#unless r175_6_applicable.applies}} À la date de l'audit, l'article R175-6 n'est pas applicable à ce bâtiment (rapport principal, chapitre 5).{{/unless}}{{/if}}{{else}} Information utile pour dimensionner les actions de zonage et de pilotage thermique du devis.{{/if}}
     </p>
   </header>
 
   <table class="syn syn-thermal">
     <thead>
       <tr>
-        <th class="col-ref">Référence</th>
         <th class="col-zone">Zone</th>
         <th class="col-usage">Usage</th>
-        <th class="col-bool">Régul. auto</th>
-        <th class="col-type">Type régulation</th>
-        <th class="col-gen">Type générateur</th>
-        <th class="col-age">Âge</th>
-        <th class="col-bool">Exempté bois</th>
-        <th class="col-sensor">Sonde</th>
-        <th class="col-thermo">Thermostat</th>
-        <th class="col-bool">Robinets th.</th>
-        <th class="col-notes">Notes</th>
+        <th class="col-bool">Régulation automatique</th>
+        <th class="col-type">Type de régulation</th>
+        <th class="col-gen">Type de générateur</th>
+        {{#if (anyTrue thermal "generator_age_years")}}<th class="col-age">Âge</th>{{/if}}
+        {{#if (anyTrue thermal "generator_exempt_wood")}}<th class="col-bool">Appareil indépendant au bois</th>{{/if}}
+        {{#if (anyOf thermal "notes")}}<th class="col-notes">Notes</th>{{/if}}
       </tr>
     </thead>
     <tbody>
       {{#each thermal}}
         <tr>
-          <td class="col-ref">{{ref}}</td>
           <td class="col-zone">{{zone_name}}{{#if displayLabel}}<div class="thermal-row-label">{{displayLabel}}</div>{{/if}}</td>
           <td class="col-usage">{{{categoryIcon category "11"}}}<span class="cat-label">{{categoryLabel}}</span></td>
-          <td class="col-bool">{{{boolPill has_automatic_regulation "sm"}}}</td>
+          <td class="col-bool">{{#if (eq autoRegState "yes")}}{{{boolPill 1 "sm"}}}{{else}}{{#if (eq autoRegState "no")}}{{{boolPill 0 "sm"}}}{{else}}{{{boolPill null "sm" "" "À qualifier"}}}{{/if}}{{/if}}{{#if outOfR175_6}}<div class="muted">hors R175-6</div>{{/if}}</td>
           <td class="col-type">
-            {{regulationLabel}}
-            {{#if productionRegulationType}}<div class="thermal-row-label">P : {{productionRegulationType}}</div>{{/if}}
-            {{#if distributionRegulationType}}<div class="thermal-row-label">D : {{distributionRegulationType}}</div>{{/if}}
-            {{#if emissionRegulationType}}<div class="thermal-row-label">É : {{emissionRegulationType}}</div>{{/if}}
+            {{#if has_automatic_regulation}}{{regulationLabel}}{{else}}<span class="muted">—</span>{{/if}}
+            {{#if productionRegulationType}}<div class="thermal-row-label">Production : {{productionRegulationType}}</div>{{/if}}
+            {{#if distributionRegulationType}}<div class="thermal-row-label">Distribution : {{distributionRegulationType}}</div>{{/if}}
+            {{#if emissionRegulationType}}<div class="thermal-row-label">Émission : {{emissionRegulationType}}</div>{{/if}}
           </td>
           <td class="col-gen">{{generatorLabel}}</td>
-          <td class="col-age">{{#if generator_age_years}}{{generator_age_years}} ans{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-bool">{{{boolPill generator_exempt_wood "sm"}}}</td>
-          <td class="col-sensor">{{#if sensor_position}}{{sensor_position}}{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-thermo">{{#if thermostat_type}}{{thermostat_type}}{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-bool">{{{boolPill has_thermostatic_valves "sm"}}}</td>
-          <td class="col-notes">{{notes}}</td>
+          {{#if (anyTrue @root.thermal "generator_age_years")}}<td class="col-age">{{#if generator_age_years}}{{generator_age_years}} an{{#unless (eq generator_age_years 1)}}s{{/unless}}{{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
+          {{#if (anyTrue @root.thermal "generator_exempt_wood")}}<td class="col-bool">{{#if generator_exempt_wood}}Oui (exempté R175-6){{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
+          {{#if (anyOf ../thermal "notes")}}<td class="col-notes">{{notes}}</td>{{/if}}
         </tr>
       {{/each}}
     </tbody>
@@ -411,42 +414,38 @@
     <span class="section-eyebrow">Tableau 4 / 4</span>
     <h2 class="section-title">{{#if isBacs}}Plan d'action récapitulatif{{else}}Préconisations Buildy récapitulatives{{/if}}</h2>
     <p class="section-intro">
-      Vue scannable des {{actionItemsRaw.length}} {{#if isBacs}}actions correctives{{else}}préconisations{{/if}} identifiées, regroupées par sévérité. Chaque ligne référence l'item d'inventaire concerné (E-XXX équipement, M-XXX compteur). Détail et {{#if isBacs}}préconisations Buildy{{else}}plan détaillé{{/if}} : voir le rapport principal.
+      Vue d'ensemble des {{actionItemsRaw.length}} {{#if isBacs}}actions et réserves{{else}}préconisations{{/if}} identifiées, regroupées par partie de l'audit, avec leur numéro dans le rapport principal. Détail et {{#if isBacs}}préconisations Buildy{{else}}plan détaillé{{/if}} : voir le rapport principal.
     </p>
   </header>
 
+  {{!-- Colonne Zone seulement si au moins une action porte une zone (sinon
+       une colonne de « — » — relecture PDF 2026-09-24). --}}
   <table class="syn syn-actions">
     <thead>
       <tr>
-        <th class="col-ref">Référence</th>
+        <th class="col-ref">N°</th>
         <th class="col-sev">Sévérité</th>
-        <th class="col-r175">R175</th>
-        <th class="col-zone">Zone</th>
+        <th class="col-r175">Article</th>
+        {{#if (anyOf actionItemsRaw "zone_name")}}<th class="col-zone">Zone</th>{{/if}}
         <th class="col-title">Titre de l'action</th>
-        <th class="col-source">Item source</th>
+        <th class="col-source">Origine du constat</th>
       </tr>
     </thead>
     <tbody>
       {{#each actionItemsByCard}}
-        <tr class="theme-row"><th colspan="6">{{label}} <span class="theme-row-meta">({{count}} action{{#unless (eq count 1)}}s{{/unless}})</span></th></tr>
+        <tr class="theme-row"><th colspan="{{#if (anyOf @root.actionItemsRaw "zone_name")}}6{{else}}5{{/if}}">{{label}} <span class="theme-row-meta">({{#if (gt (minus count reserves) 0)}}{{minus count reserves}} action{{#unless (eq (minus count reserves) 1)}}s{{/unless}}{{#if reserves}}, {{/if}}{{/if}}{{#if reserves}}{{reserves}} réserve{{#unless (eq reserves 1)}}s{{/unless}}{{/if}})</span></th></tr>
         {{#each subsections}}
           {{#if (gt ../subsections.length 1)}}
-            <tr class="theme-sub-row"><th colspan="6">{{label}} <span class="theme-row-meta">· {{count}}</span></th></tr>
+            <tr class="theme-sub-row"><th colspan="{{#if (anyOf @root.actionItemsRaw "zone_name")}}6{{else}}5{{/if}}">{{label}} <span class="theme-row-meta">· {{count}}</span></th></tr>
           {{/if}}
           {{#each items}}
-            <tr class="action-row action-row-{{severity}}">
+            <tr class="action-row action-row-{{severity}}{{#if is_reserve}} action-row-reserve{{/if}}">
               <td class="col-ref">{{display_number}}</td>
-              <td class="col-sev"><span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else}}{{#if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}{{/if}}</span></td>
+              <td class="col-sev">{{#if is_reserve}}<span class="sev sev-reserve">Réserve</span>{{else}}<span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else}}{{#if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}{{/if}}</span>{{/if}}</td>
               <td class="col-r175">{{r175_article}}</td>
-              <td class="col-zone">{{#if zone_name}}{{zone_name}}{{else}}<span class="muted">—</span>{{/if}}</td>
+              {{#if (anyOf @root.actionItemsRaw "zone_name")}}<td class="col-zone">{{#if zone_name}}{{zone_name}}{{else}}<span class="muted">—</span>{{/if}}</td>{{/if}}
               <td class="col-title">{{title_plain}}</td>
-              <td class="col-source">
-                {{#if source_table}}
-                  {{#if (eq source_table "bacs_audit_system_devices")}}E-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_meters")}}M-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_thermal_regulation")}}T-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_bms")}}GTB{{else}}<span class="muted">—</span>{{/if}}{{/if}}{{/if}}{{/if}}
-                {{else}}
-                  <span class="muted">—</span>
-                {{/if}}
-              </td>
+              <td class="col-source">{{#if source_label}}{{source_label}}{{else}}<span class="muted">—</span>{{/if}}</td>
             </tr>
           {{/each}}
         {{/each}}

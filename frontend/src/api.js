@@ -514,6 +514,10 @@ export const getBacsActionItemsCsvUrl = (docId) =>
   `/api/bacs-audit/${docId}/action-items/export.csv`
 export const exportBacsPdf = (docId) => api.post(`/bacs-audit/${docId}/export-pdf`)
 export const exportBacsTablesPdf = (docId) => api.post(`/bacs-audit/${docId}/exports/tables`)
+// Dossier complet (ZIP) : rapport + tableaux A3 + documents cochés
+// « Inclure dans le rapport ». Réponse binaire (blob).
+export const exportBacsDossier = (docId) =>
+  api.post(`/bacs-audit/${docId}/exports/dossier`, null, { responseType: 'blob' })
 export const exportBacsChecklistPdf = (docId) =>
   api.post(`/bacs-audit/${docId}/exports/checklist`, null, { responseType: 'blob' })
 
@@ -526,8 +530,13 @@ export const uploadBacsTranscript = (docId, file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+// Opérations longues (PDF, Claude, resynchronisation) : jamais mises en file
+// hors-ligne (cf. offline-queue.js). Délai large pour ne pas couper un rendu
+// ou une génération en cours, sans laisser la requête pendre indéfiniment.
+const LONG_OPERATION = { timeout: 180000 }
+
 export const generateBacsSuggestions = (transcriptId) =>
-  api.post(`/bacs-audit/transcripts/${transcriptId}/suggestions`)
+  api.post(`/bacs-audit/transcripts/${transcriptId}/suggestions`, undefined, LONG_OPERATION)
 export const listBacsSuggestions = (docId, params) =>
   api.get(`/bacs-audit/${docId}/suggestions`, { params })
 export const applyBacsSuggestion = (id) =>
@@ -544,8 +553,11 @@ export const bulkUploadSitePhotos = (siteUuid, files, onProgress) => {
     onUploadProgress: onProgress,
   })
 }
-export const deliverBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/deliver`)
-export const resyncBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/resync`)
+// `force` : livrer malgré une vérification impossible (erreur technique du
+// pré-contrôle) — tracé dans le journal d'activité.
+export const deliverBacsAudit = (docId, { force = false } = {}) =>
+  api.post(`/bacs-audit/${docId}/deliver${force ? '?force=1' : ''}`, undefined, LONG_OPERATION)
+export const resyncBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/resync`, undefined, LONG_OPERATION)
 
 // ── Audit BACS — devices (multi-systèmes par catégorie x zone) ──
 export const getBacsDevices = (docId) => api.get(`/bacs-audit/${docId}/devices`)
@@ -564,14 +576,16 @@ export const reorderBacsMeters = (docId, ids) =>
 export const reorderBacsThermal = (docId, ids) =>
   api.post(`/bacs-audit/${docId}/thermal-regulation/reorder`, { ids })
 export const getBacsPowerSummary = (docId) => api.get(`/bacs-audit/${docId}/power-summary`)
+// Statut des compteurs au regard du plan (zone regroupée, usage exempté ou exclu).
+export const getBacsMeterPlanStatus = (docId) => api.get(`/bacs-audit/${docId}/meters/plan-status`)
 export const validateBacsAuditStep = (docId, step, validated, reason = null) =>
   api.post(`/bacs-audit/${docId}/validate-step`, { step, validated, reason })
 export const updateBacsAuditSynthesis = (docId, html) =>
   api.put(`/bacs-audit/${docId}/synthesis`, { html })
 export const generateBacsAuditSynthesis = (docId) =>
-  api.post(`/bacs-audit/${docId}/generate-synthesis`)
+  api.post(`/bacs-audit/${docId}/generate-synthesis`, undefined, LONG_OPERATION)
 export const generateActionAlternatives = (actionId) =>
-  api.post(`/bacs-audit/action-items/${actionId}/generate-alternatives`)
+  api.post(`/bacs-audit/action-items/${actionId}/generate-alternatives`, undefined, LONG_OPERATION)
 export const seedBacsFixture = () => api.post('/bacs-audit/seed-fixture')
 export const duplicateZone = (id) => api.post(`/site-zones/${id}/duplicate`)
 export const duplicateBacsMeter = (id) => api.post(`/bacs-audit/meters/${id}/duplicate`)
@@ -588,6 +602,8 @@ export const uploadSiteDocument = (siteUuid, formData, params) =>
 export const updateSiteDocument = (id, data) => api.patch(`/site-documents/${id}`, data)
 export const deleteSiteDocument = (id) => api.delete(`/site-documents/${id}`)
 export const getSiteDocumentDownloadUrl = (id) => `/api/site-documents/${id}/download`
+// Aperçu d'un PDF dans l'appli (servi inline, sans téléchargement).
+export const getSiteDocumentViewUrl = (id) => `/api/site-documents/${id}/download?inline=1`
 // Notes vocales : transcription a la demande (OpenAI Whisper / gpt-4o-transcribe)
 export const transcribeSiteDocument = (id) => api.post(`/site-documents/${id}/transcribe`)
 // Exporte la transcription vers les notes de l'element rattache

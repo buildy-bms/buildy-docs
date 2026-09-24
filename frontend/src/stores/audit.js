@@ -10,7 +10,7 @@ import { defineStore } from 'pinia'
 import {
   getAf, getBacsSystems, getBacsMeters, getBacsBms, getBacsThermal,
   createBacsThermal, deleteBacsThermal,
-  getBacsActionItems, getBacsDevices, getBacsPowerSummary,
+  getBacsActionItems, getBacsDevices, getBacsPowerSummary, getBacsMeterPlanStatus,
   getBacsInspections, getBacsPhotoCounts, listZones,
   updateBacsBms, updateBacsActionItem, regenerateBacsActionItems,
   createBacsInspection, updateBacsInspection, deleteBacsInspection,
@@ -26,6 +26,10 @@ export const useAuditStore = defineStore('audit', {
     zones: [],
     systems: [],
     meters: [],
+    // Statut des compteurs au regard du plan, calculé par le serveur (zone
+    // regroupée, usage exempté ou exclu) : { [meterId]: { status, group?, reason? } }.
+    // Lu via lib/meter-plan-state.js pour rester aligné sur le plan et le PDF.
+    meterPlanStatus: {},
     bms: {},
     thermal: [],
     devices: [],
@@ -121,7 +125,7 @@ export const useAuditStore = defineStore('audit', {
             this.site = s.data
           } catch { this.site = null }
         }
-        const [dev, ps, ins, pc, gtb, parties] = await Promise.all([
+        const [dev, ps, ins, pc, gtb, parties, mps] = await Promise.all([
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
           getBacsInspections(docId),
@@ -130,9 +134,11 @@ export const useAuditStore = defineStore('audit', {
           d.data.site_uuid
             ? getSiteParties(d.data.site_uuid).catch(() => ({ data: { parties: [], suggestion: null } }))
             : Promise.resolve({ data: { parties: [], suggestion: null } }),
+          getBacsMeterPlanStatus(docId).catch(() => ({ data: {} })),
         ])
         this.devices = dev.data
         this.powerSummary = ps.data
+        this.meterPlanStatus = mps.data || {}
         this.inspections = ins.data
         this.photoCounts = pc.data
         this.gtbTopicNotes = gtb.data
@@ -146,12 +152,16 @@ export const useAuditStore = defineStore('audit', {
     async refreshActionItems() {
       // On rafraîchit aussi le cumul de puissance : une édition système /
       // device peut faire bouger la puissance retenue (items 5 & 8).
-      const [a, ps] = await Promise.all([
+      // Idem pour le statut des compteurs (zone regroupée, usage exempté…),
+      // qui suit le plan.
+      const [a, ps, mps] = await Promise.all([
         getBacsActionItems(this.docId),
         getBacsPowerSummary(this.docId).catch(() => null),
+        getBacsMeterPlanStatus(this.docId).catch(() => null),
       ])
       this.actionItems = a.data
       if (ps) this.powerSummary = ps.data
+      if (mps) this.meterPlanStatus = mps.data || {}
     },
 
     /**
@@ -211,11 +221,12 @@ export const useAuditStore = defineStore('audit', {
     },
 
     async refreshAuditCore() {
-      const [s, t, a, dev, ps, m, pc] = await Promise.all([
+      const [s, t, a, dev, ps, m, pc, mps] = await Promise.all([
         getBacsSystems(this.docId), getBacsThermal(this.docId),
         getBacsActionItems(this.docId), getBacsDevices(this.docId),
         getBacsPowerSummary(this.docId), getBacsMeters(this.docId),
         getBacsPhotoCounts(this.docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0, site: 0 } })),
+        getBacsMeterPlanStatus(this.docId).catch(() => null),
       ])
       this.systems = s.data
       this.thermal = t.data
@@ -224,6 +235,7 @@ export const useAuditStore = defineStore('audit', {
       this.powerSummary = ps.data
       this.meters = m.data
       this.photoCounts = pc.data
+      if (mps) this.meterPlanStatus = mps.data || {}
     },
 
     /**

@@ -11,10 +11,11 @@
 // layout racine) pour rester actif sur toute l'app PWA, pas seulement
 // pendant qu'un audit est ouvert.
 
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { pendingCount, drain, onQueueChange } from '@/lib/offline-queue'
 import { useNotification } from '@/composables/useNotification'
 import api from '@/api'
+import { currentUser } from '@/router'
 
 export function useOfflineQueue() {
   const count = ref(pendingCount())
@@ -40,6 +41,9 @@ export function useOfflineQueue() {
       if (stats.replayed > 0) {
         success(`${stats.replayed} modification${stats.replayed > 1 ? 's' : ''} synchronisée${stats.replayed > 1 ? 's' : ''} après reconnexion`)
       }
+      if (stats.dropped > 0) {
+        console.info(`[offline-queue] ${stats.dropped} opération(s) longue(s) retirée(s) de la file sans être rejouée(s)`)
+      }
     } finally {
       draining.value = false
       refreshCount()
@@ -59,6 +63,12 @@ export function useOfflineQueue() {
     // Premier essai au boot : au cas où on a quitté l'app avec des
     // mutations pending et qu'on revient online sans event `online`.
     tryDrain()
+  })
+
+  // Session expirée pendant un drain : les mutations restent en file
+  // (cf. drain, 401) et repartent dès que l'utilisateur est reconnecté.
+  watch(currentUser, (user, previous) => {
+    if (user && !previous) tryDrain()
   })
 
   onBeforeUnmount(() => {

@@ -97,7 +97,7 @@ const SERVICE_LEVELS = {
     label: 'Retention historique des donnees mensuelles',
     E: '12 mois', S: '5 ans', P: '10 ans',
     bacs_link: 'R175-3 1° (5 ans requis)',
-    note: 'Seul le niveau Premium [P] satisfait l\'exigence reglementaire R175-3 1° (5 ans). Smart la couvre exactement, Essentials non.',
+    note: 'Smart [S] (5 ans) et Premium [P] (10 ans) couvrent la conservation mensuelle de 5 ans exigee par le R175-3 1°. En Essentials [E] (12 mois), elle passe par des exports reguliers du client (reserve au rapport d\'audit).',
   },
 
   // ── Notifications & dashboards ──

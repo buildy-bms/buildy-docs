@@ -22,7 +22,7 @@ const SYSTEM_NEGATIVE_LABEL = {
   heating: 'Pas de chauffage',
   cooling: 'Pas de refroidissement',
   ventilation: 'Pas de ventilation',
-  dhw: 'Pas d\'ECS',
+  dhw: 'Pas d\'eau chaude sanitaire',
   lighting_indoor: 'Pas d\'éclairage intérieur',
   lighting_outdoor: 'Pas d\'éclairage extérieur',
   electricity_production: 'Pas de production photovoltaïque',
@@ -78,8 +78,8 @@ const METER_USAGE_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
   ventilation: 'Ventilation',
-  dhw: 'ECS',
-  pv: 'Production PV',
+  dhw: 'Eau chaude sanitaire',
+  pv: 'Production photovoltaïque',
   lighting: 'Éclairage',
   other: 'Général',
 };
@@ -95,16 +95,26 @@ const GENERATOR_LABEL = {
   gas: 'Gaz',
   electric: 'Effet Joule',
   heat_pump: 'Pompe à chaleur',
-  wood_appliance: 'Appareil bois (exempté R175-6)',
+  wood_appliance: 'Appareil indépendant de chauffage au bois (exempté R175-6)',
   district_heating: 'Réseau de chaleur',
   other: 'Autre',
 };
 
+// Échéance R175-2 II par statut (le déclencheur « renouvellement » du 4°
+// figure en tête : c'est lui qui déclenche l'obligation avant 2030).
 const APPLICABILITY_LABEL = {
-  subject_immediate: 'Dès la mise en service (bâtiment neuf, tous systèmes reliés)',
-  subject_2025: '1er janvier 2025 (puissance > 290 kW, existant)',
-  subject_2030: '1er janvier 2030 (puissance > 70 kW, au renouvellement)',
-  not_subject: 'Non assujetti (puissance ≤ 70 kW)',
+  subject_immediate: 'Dès la construction (bâtiment neuf, tous les systèmes techniques reliés)',
+  subject_2025: 'Depuis le 1er janvier 2025 (bâtiment existant, plus de 290 kW)',
+  subject_2030: 'Au renouvellement du système de chauffage ou de climatisation, et au plus tard le 1er janvier 2030 (bâtiment existant, plus de 70 kW)',
+  not_subject: 'Non assujetti (puissance de 70 kW ou moins)',
+};
+// Fin de la phrase de clôture « Ce rapport identifie N actions à engager… ».
+// Page de clôture : échéance d'ÉQUIPEMENT du bâtiment (R175-2), distincte de
+// celle de l'inspection de la GTB (R175-5-1) — relecture juridique R1 m13.
+const CLOSING_DEADLINE_PHRASE = {
+  subject_immediate: 'Échéance d\'équipement du bâtiment (R175-2) : dès sa construction.',
+  subject_2025: 'Échéance d\'équipement du bâtiment (R175-2) : 1er janvier 2025, date dépassée.',
+  subject_2030: 'Échéance d\'équipement du bâtiment (R175-2) : au renouvellement du système de chauffage ou de climatisation, et au plus tard le 1er janvier 2030.',
 };
 
 const COMPLIANCE_LABEL = {
@@ -162,8 +172,8 @@ const TECHNICAL_ZONE_NATURES = new Set([
 // (frontend/src/lib/audit-options.js) et le CHECK constraint migration 158.
 const OCCUPANCY_PROFILE_LABEL = {
   'continu': 'Activité continue (24/7)',
-  '3x8': 'Activité en 3×8 (24h/24, 3 équipes)',
-  '2x8': 'Activité en 2×8 (16h/24, 2 équipes)',
+  '3x8': 'Activité en 3×8 (24 h/24, 3 équipes)',
+  '2x8': 'Activité en 2×8 (16 h/24, 2 équipes)',
   'heures_bureau': 'Heures de bureau',
   'scolaire': 'Rythme scolaire',
   'intermittent': 'Activité intermittente',
@@ -247,28 +257,30 @@ const ACTION_CATEGORY_LABEL = {
 
 // Sévérités du plan d'action — synchro avec
 // bacs_audit_action_items.severity CHECK ('blocking','major','minor').
+// Libellés identiques à l'écran (vue commerciale) : une « action » bloquante.
 const ACTION_SEVERITY_LABEL = {
-  blocking: 'Bloquant',
-  major: 'Majeur',
-  minor: 'Mineur',
+  blocking: 'Bloquante',
+  major: 'Majeure',
+  minor: 'Mineure',
 };
 
 // Statuts du plan d'action — synchro avec bacs_audit_action_items.status
-// CHECK ('open','quoted','in_progress','done','declined').
+// CHECK ('open','quoted','in_progress','done','declined'). Mêmes libellés
+// que l'écran (BacsAuditActionItemsView.vue, STATUS_OPTS).
 const ACTION_STATUS_LABEL = {
-  open: 'Ouvert',
-  quoted: 'Chiffré (devis envoyé)',
+  open: 'Ouverte',
+  quoted: 'Chiffrée',
   in_progress: 'En cours',
-  done: 'Terminé',
-  declined: 'Décliné',
+  done: 'Terminée',
+  declined: 'Non retenue',
 };
 
 // Effort estimé — synchro avec bacs_audit_action_items.estimated_effort
-// CHECK ('low','medium','high').
+// CHECK ('low','medium','high'). Mêmes libellés que l'écran (EFFORT_OPTS).
 const ACTION_EFFORT_LABEL = {
   low: 'Faible',
-  medium: 'Modéré',
-  high: 'Important',
+  medium: 'Moyen',
+  high: 'Élevé',
 };
 
 // Bouclage ECS (system_category = 'dhw'). Synchro avec
@@ -303,6 +315,7 @@ module.exports = {
   REGULATION_LABEL,
   GENERATOR_LABEL,
   APPLICABILITY_LABEL,
+  CLOSING_DEADLINE_PHRASE,
   COMPLIANCE_LABEL,
   ZONE_NATURE_LABEL,
   TECHNICAL_ZONE_NATURES,

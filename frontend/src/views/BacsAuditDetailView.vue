@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent, provide, readonly } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -9,7 +9,7 @@ import {
   DocumentDuplicateIcon,
   ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
   ClockIcon, EyeIcon, TableCellsIcon, EllipsisHorizontalIcon,
-  ShieldCheckIcon,
+  ShieldCheckIcon, ArchiveBoxArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -19,6 +19,7 @@ import {
   getBacsThermal, updateBacsThermal,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
   getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsTablesPdf, exportBacsChecklistPdf, deliverBacsAudit,
+  exportBacsDossier,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone, setZoneParties,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice,
@@ -34,7 +35,13 @@ import R175Tooltip from '@/components/R175Tooltip.vue'
 import NotesEditorModal from '@/components/NotesEditorModal.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
-import BacsAuditStepperHorizontal from '@/components/BacsAuditStepperHorizontal.vue'
+// Navigation par onglets d'étapes (une étape affichée à la fois) + guide.
+import AuditStepTabs from '@/components/audit/AuditStepTabs.vue'
+import AuditStepGuide from '@/components/audit/AuditStepGuide.vue'
+import AuditStepFooter from '@/components/audit/AuditStepFooter.vue'
+import { AUDIT_STEP_MODE_KEY, phaseForStep, stepObjective } from '@/lib/audit-steps-ui'
+import { requestAuditReveal, AUDIT_REVEAL_EVENT, waitForElement, nextFrame, flashAuditTarget } from '@/lib/audit-reveal'
+import { useAuditStepNav } from '@/composables/useAuditStepNav'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -151,7 +158,7 @@ import { useClaudeUsage, formatUsageTooltip } from '@/composables/useClaudeUsage
 
 const router = useRouter()
 const route = useRoute()
-const { success, error } = useNotification()
+const { success, error, info } = useNotification()
 const { confirm } = useConfirm()
 const { usage: claudeUsage, refresh: refreshClaudeUsage } = useClaudeUsage()
 
@@ -350,9 +357,13 @@ function toggleSystemCollapsed(systemId) {
 }
 
 const itemsBySeverity = computed(() => {
-  const out = { blocking: [], major: [], minor: [] }
+  // Réserves (obligations à respecter) et informations (exemption 5 %,
+  // vigilance) comptées à part, comme dans le PDF (flags posés par l'API).
+  const out = { blocking: [], major: [], minor: [], reserves: [] }
   for (const it of actionItems.value) {
     if (it.status === 'done' || it.status === 'declined') continue
+    if (it.is_info) continue
+    if (it.is_reserve) { out.reserves.push(it); continue }
     out[it.severity]?.push(it)
   }
   return out
@@ -474,22 +485,28 @@ const bmsSteps = computed(() => {
   if (bms.value?.out_of_service) {
     return [{ label: isBacs.value ? 'GTB déclarée hors-service' : 'Supervision déclarée hors-service',
               done: true,
+              anchor: 'bms-block-out-of-service',
               hint: isBacs.value ? 'Plan d\'action ignore les exigences GTB' : 'Sections supervision masquées' }]
   }
   const common = [
     { label: isBacs.value ? 'Identification de la GTB' : 'Identification de la supervision',
       done: !!bms.value?.existing_solution,
+      anchor: 'bms-block-identification',
       hint: 'Solution + marque + localisation' },
     { label: 'Protocoles de mise à disposition',
+      anchor: 'bms-block-protocols',
       done: !!(bms.value?.provided_protocols && JSON.parse(bms.value.provided_protocols || '[]').length) },
     { label: isBacs.value ? 'Analyse fonctionnelle GTB' : 'Documents existants (AF, plans…)',
+      anchor: 'bms-block-af',
       done: !!(document.value?.audit_existing_af_status === 'absent'
               || (siteDocCounts.value?.doe || 0) > 0) },
     { label: isBacs.value ? 'Usages traités cochés' : 'Usages supervisés cochés',
+      anchor: 'bms-block-usages',
       done: !!(bms.value?.manages_heating || bms.value?.manages_cooling
               || bms.value?.manages_ventilation || bms.value?.manages_dhw
               || bms.value?.manages_lighting) },
     { label: 'Équipements / compteurs intégrés',
+      anchor: 'bms-block-integrated',
       done: !!(devices.value.some(d => d.managed_by_bms) || meters.value.some(m => m.managed_by_bms)),
       hint: 'Au moins un système ou compteur lié à la supervision' },
   ]
@@ -497,10 +514,13 @@ const bmsSteps = computed(() => {
   return [
     ...common,
     { label: 'Capacités R175-3 (P1 + P2)',
+      anchor: 'bms-block-r175-3',
       done: !!(bms.value?.meets_r175_3_p1 && bms.value?.meets_r175_3_p2) },
     { label: 'Mise à disposition des données',
+      anchor: 'bms-block-data-provision',
       done: !!(bms.value?.data_provision_to_manager && bms.value?.data_provision_to_operators) },
     { label: 'R175-4 maintenance + R175-5 formation',
+      anchor: 'bms-block-r175-4-5',
       done: !!(bms.value?.has_maintenance_procedures && bms.value?.operator_trained) },
   ]
 })
@@ -725,7 +745,7 @@ const STEP_DEFINITIONS = [
     label: 'GTB',
     description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
     incomplete: () => {
-      if (bms.value?.present == null) return ["indiquez d'abord si une GTB est présente sur le site"]
+      if (bms.value?.present == null) return ["la présence d'une GTB sur le site n'est pas indiquée"]
       if (bms.value?.present === 1 && !bms.value?.existing_solution) {
         return ['la solution GTB en place n\'est pas renseignée']
       }
@@ -733,13 +753,13 @@ const STEP_DEFINITIONS = [
     } },
   { key: 'inspections',
     label: 'Inspections',
-    description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
+    description: 'R175-5-1 : inspection périodique de la GTB, à l\'initiative du propriétaire (rapport conservé 10 ans).',
     incomplete: () => {
       // Mig 187 — case « Aucune inspection à déclarer » bypass la validation.
       const na = document.value?.inspection_not_applicable
       if (na === 1 || na === true) return []
       return (inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
-        ? [] : ["la date de la dernière inspection périodique R175-5-1 n'est pas renseignée OU coche « Aucune inspection à déclarer » si le site n'y est pas soumis"]
+        ? [] : ["la date de la dernière inspection n'est pas renseignée — ou réponds Non si aucune inspection n'est à tracer"]
     } },
   { key: 'docs-checklist',
     label: 'Check-list',
@@ -760,12 +780,12 @@ const STEP_DEFINITIONS = [
     incomplete: () => (siteDocCounts.value.doe > 0
       ? [] : ["aucun document (plan, schéma, datasheet, manuel) n'a été déposé"]) },
   { key: 'credentials',
-    label: 'Credentials',
-    description: 'Acces web/SSH/VPN aux GTB et systemes renseignes.',
+    label: 'Accès',
+    description: 'Accès web, SSH et VPN à la GTB et aux systèmes renseignés.',
     incomplete: () => (siteCredCount.value > 0
       ? [] : ["aucun accès (web, SSH, VPN) n'a été renseigné"]) },
   { key: 'review',
-    label: 'Plan',
+    label: 'Plan d\'actions',
     description: 'Plan de mise en conformite relu et annote commercialement.',
     // Le plan n'a plus de champ par action à renseigner : sign-off manuel.
     incomplete: () => [] },
@@ -800,33 +820,20 @@ async function refreshChecklistStatus() {
 }
 onMounted(refreshChecklistStatus)
 
-// Navigation depuis le bloc « Couverture photo » : scroller vers la zone
-// concernée (les autres entités sont enfouies dans la card systèmes,
-// donc on scroll juste vers la card racine pour l'instant).
-function gotoChecklistZone(zoneId) {
-  const el = document.querySelector(`[data-zone-id="${zoneId}"]`) || document.getElementById('zones')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-function gotoChecklistSystem(systemId) {
-  const el = document.querySelector(`[data-system-id="${systemId}"]`) || document.getElementById('systems')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-function gotoChecklistMeter(meterId) {
-  const el = document.querySelector(`[data-meter-id="${meterId}"]`) || document.getElementById('meters')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-function gotoChecklistBms() {
-  const el = document.getElementById('bms')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
+// Navigation depuis le bloc « Couverture photo » : ouvre l'étape de l'entité
+// (et sa zone / son énergie), fait défiler jusqu'à elle et la met en
+// surbrillance. Passe par l'événement `audit:reveal` (cf. revealInAudit).
+// NB : `document` est ici la ref Pinia du document, pas window.document.
+function gotoChecklistZone(zoneId) { requestAuditReveal({ kind: 'zone', id: zoneId }) }
+function gotoChecklistSystem(systemId) { requestAuditReveal({ kind: 'system', id: systemId }) }
+function gotoChecklistMeter(meterId) { requestAuditReveal({ kind: 'meter', id: meterId }) }
+function gotoChecklistBms() { requestAuditReveal({ kind: 'bms' }) }
 
 // Steps cachés en mode site_audit (purement R175) : régulation thermique
 // (R175-6) et plan de mise en conformité (R175 entier).
 const STEPS_BACS_ONLY = new Set(['thermal', 'inspections', 'review'])
-const stepperSteps = computed(() => STEP_DEFINITIONS
+const allSteps = computed(() => STEP_DEFINITIONS
   .filter(def => isBacs.value || !STEPS_BACS_ONLY.has(def.key))
-  // Sans GTB sur site, l'inspection périodique R175-5-1 n'a pas lieu d'être.
-  .filter(def => !(def.key === 'inspections' && bms.value?.present === 0))
   .map(def => {
     const p = auditProgress.value?.[def.key] || {}
     const reasons = def.incomplete ? def.incomplete() : []
@@ -840,9 +847,30 @@ const stepperSteps = computed(() => STEP_DEFINITIONS
       validated: !!p.validated,
       validated_at: p.validated_at || null,
       validated_by_name: p.validated_by_name || null,
+      // Validée alors qu'incomplète (étape non bloquante, cf. lifecycle.js).
+      with_pending: !!p.with_pending,
     }
   }))
+// Sans GTB sur site, l'inspection périodique R175-5-1 n'a pas lieu d'être :
+// l'étape sort de la progression (validation, stepFor)…
+const stepperSteps = computed(() => allSteps.value
+  .filter(s => !(s.key === 'inspections' && bms.value?.present === 0)))
+// …mais reste visible, grisée « sans objet », dans les onglets (règle
+// « non concerné = grisé, pas caché »). Numéro = position de l'onglet.
+const tabSteps = computed(() => allSteps.value.map((s, i) => {
+  const disabled = s.key === 'inspections' && bms.value?.present === 0
+  return {
+    ...s,
+    number: i + 1,
+    disabled,
+    objective: stepObjective(s.key, isBacs.value),
+    disabledReason: disabled
+      ? "Sans objet : aucune GTB sur le site, donc pas d'inspection périodique R175-5-1 à tracer."
+      : null,
+  }
+}))
 
+// Renvoie true si l'étape est validée (utilisé par « Valider et continuer »).
 async function validateStep(stepKey) {
   // Garde : on ne valide pas une étape dont les infos essentielles manquent.
   // On affiche précisément ce qui bloque (raisons portées par chaque étape).
@@ -855,20 +883,22 @@ async function validateStep(stepKey) {
         message: `Il reste des éléments en attente : ${reasons.join(' ; ')}. Cette étape n'est pas bloquante : tu peux la valider quand même et compléter plus tard.`,
         confirmLabel: 'Valider quand même',
       })
-      if (!ok) return
+      if (!ok) return false
     } else {
       error(reasons.length
-        ? `Étape « ${step.label} » non validable — ${reasons.join(' ; ')}`
-        : 'Complétez l\'étape avant de la valider.')
-      return
+        ? `Étape « ${step?.label || stepKey} » non validable — ${reasons.join(' ; ')}`
+        : 'Complète l\'étape avant de la valider.')
+      return false
     }
   }
   try {
     const { data } = await validateBacsAuditStep(docId, stepKey, true)
     auditProgress.value = data.audit_progress || {}
-    success(`Etape "${STEP_DEFINITIONS.find(s => s.key === stepKey)?.label}" validee`)
+    success(`Étape « ${STEP_DEFINITIONS.find(s => s.key === stepKey)?.label} » validée`)
+    return true
   } catch (e) {
     error(e.response?.data?.detail || 'Validation impossible')
+    return false
   }
 }
 
@@ -885,99 +915,122 @@ async function invalidateStep(stepKey) {
   }
 }
 
-// Mapping bidirectionnel step ↔ id DOM, utilise par onStepClick (click
-// stepper -> scroll) et par le scroll-spy (scroll page -> highlight stepper).
-const STEP_TO_SECTION_ID = {
-  identification: 'section-identification',
-  zones: 'section-zones',
-  systems: 'section-systems',
-  meters: 'section-meters',
-  thermal: 'section-thermal',
-  bms: 'section-bms',
-  inspections: 'section-inspections',
-  'docs-checklist': 'section-docs-checklist',
-  documents: 'section-documents',
-  credentials: 'section-credentials',
-  review: 'section-review',
-  synthesis: 'section-synthesis',
-}
-const SECTION_ID_TO_STEP = Object.fromEntries(
-  Object.entries(STEP_TO_SECTION_ID).map(([k, v]) => [v, k])
-)
+// ── Navigation par onglets d'étapes ──
+// Une seule étape affichée ; chaque étape est montée à sa 1re ouverture puis
+// conservée (v-show). Étape mémorisée par audit + lien direct `?step=<clé>`.
+const { visitedSteps, activeTab, prevTab, nextTab, isEnabled, goToStep, initActiveStep } =
+  useAuditStepNav({ docId, steps: tabSteps, activeStepKey, route, router })
 
-// Scroll JS animé : durée fixe ~280 ms avec easing easeOutCubic. Plus
-// réactif que le `behavior: 'smooth'` natif qui peut prendre 1-2 s sur
-// les longues distances (audit BACS = ~10 sections sur ~30 écrans).
-function fastScrollTo(targetY) {
-  const startY = window.scrollY
-  const dist = targetY - startY
-  if (Math.abs(dist) < 4) { window.scrollTo(0, targetY); return }
-  const duration = Math.min(450, Math.max(200, Math.abs(dist) * 0.35))
-  const t0 = performance.now()
-  function step(now) {
-    const t = Math.min(1, (now - t0) / duration)
-    const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
-    window.scrollTo(0, startY + dist * eased)
-    if (t < 1) requestAnimationFrame(step)
+// Contrat conservé pour MobileAuditNav (barre basse, < 1024 px).
+function onStepClick(key) { goToStep(key) }
+
+// Mode étape pour CollapsibleSection / SectionHeader (toujours ouverts,
+// couleur de phase, validation portée par le bandeau guide).
+provide(AUDIT_STEP_MODE_KEY, {
+  enabled: true,
+  activeStepKey: readonly(activeStepKey),
+  phaseFor: phaseForStep,
+  goToStep,
+  numberFor: (key) => tabSteps.value.find(s => s.key === key)?.number ?? null,
+})
+
+async function validateAndContinue() {
+  const key = activeStepKey.value
+  if (!key) return
+  const ok = await validateStep(key)
+  if (ok && nextTab.value) goToStep(nextTab.value.key)
+}
+
+// ── « Révéler » une entité : bascule d'étape → sous-onglet → défilement →
+// surbrillance. Déclenché par l'événement `audit:reveal` (plan d'actions,
+// régulation, check-list…). Sections Systèmes / Compteurs : `prepareReveal`
+// choisit la bonne zone / énergie avant le défilement.
+const systemsSectionRef = ref(null)
+const metersSectionRef = ref(null)
+const thermalSectionRef = ref(null)
+const REVEAL_TARGETS = {
+  zone: { step: 'zones', selector: id => `[data-zone-id="${id}"]` },
+  system: { step: 'systems', selector: id => `[data-system-id="${id}"]` },
+  device: { step: 'systems', selector: id => `[data-device-id="${id}"]` },
+  meter: { step: 'meters', selector: id => `[data-meter-id="${id}"]` },
+  // 1re ligne du bloc (la surbrillance s'applique mal à un <tbody>).
+  thermal: { step: 'thermal', selector: id => `[data-thermal-id="${id}"] > tr` },
+}
+async function revealInAudit(step, selector, { block = 'center', prepare = null } = {}) {
+  const already = activeStepKey.value === step
+  if (!goToStep(step, { scroll: false })) return false
+  await nextTick()
+  if (prepare) { await prepare(); await nextTick() }
+  // window.document : `document` est la ref Pinia dans cette vue.
+  const panel = window.document.getElementById(`audit-step-panel-${step}`)
+  // 1re occurrence VISIBLE : un équipement partagé apparaît dans plusieurs
+  // zones, dont certaines masquées (onglet de zone inactif).
+  const visibleMatch = () => [...(panel?.querySelectorAll(selector) || [])]
+    .find(el => el.offsetParent !== null || el.getClientRects().length > 0)
+  const el = await waitForElement(visibleMatch, 2500)
+  if (!el) { if (!already) window.scrollTo({ top: 0 }); return false }
+  await nextFrame()
+  el.scrollIntoView({ behavior: already ? 'smooth' : 'auto', block })
+  flashAuditTarget(el)
+  return true
+}
+function onAuditReveal(e) {
+  const d = e.detail || {}
+  if (d.kind === 'bms') {
+    if (isEnabled('bms')) { d.handled = true; goToStep('bms') }
+    return
   }
-  requestAnimationFrame(step)
-}
-
-function onStepClick(key) {
-  activeStepKey.value = key
-  const targetId = STEP_TO_SECTION_ID[key]
-  if (!targetId) return
-  const el = window.document.getElementById(targetId)
-  if (!el) return
-  // Compense la hauteur du header sticky pour que le titre de la section
-  // n'apparaisse pas masqué dessous. On lit la hauteur courante du wrapper
-  // (peut être plein ou compact selon le scroll actuel).
-  const header = window.document.querySelector('.audit-sticky-header')
-  const headerH = header ? header.getBoundingClientRect().height : 0
-  const y = el.getBoundingClientRect().top + window.scrollY - headerH - 12
-  fastScrollTo(y)
-}
-
-// Scroll-spy : promote la section dont le titre se trouve juste sous le
-// header sticky comme step actif. On observe l'ensemble des sections puis
-// on choisit, à chaque tick, celle dont le `top` est positif et le plus
-// proche du bas du header (= la section "en cours de lecture"). Si aucune
-// n'est sous le header, on prend la dernière section dont le top est
-// négatif (celle qui couvre encore l'écran).
-let _spyObserver = null
-function pickActiveSection() {
-  const header = window.document.querySelector('.audit-sticky-header')
-  const headerH = header ? header.getBoundingClientRect().height : 0
-  const sections = Object.values(STEP_TO_SECTION_ID)
-    .map(id => ({ id, el: window.document.getElementById(id) }))
-    .filter(s => s.el)
-  if (!sections.length) return
-  const measured = sections.map(s => ({ id: s.id, top: s.el.getBoundingClientRect().top }))
-  // Sections qui ont leur titre sous le header (top >= headerH - quelques px)
-  // = candidates principales, on prend la plus haute.
-  const belowHeader = measured.filter(s => s.top >= headerH - 8)
-  let chosen = null
-  if (belowHeader.length) {
-    chosen = belowHeader.sort((a, b) => a.top - b.top)[0]
-  } else {
-    // Toutes les sections ont leur top au-dessus du header (= on est dans
-    // la dernière). On prend celle dont le top négatif est le plus proche
-    // de 0 = la plus récente que l'on a dépassée.
-    chosen = measured.sort((a, b) => b.top - a.top)[0]
+  // Étape seule, ou bloc d'une étape (`selector`, ex. « #ident-parties ») :
+  // bouton « Voir » de la vérification avant livraison.
+  if (d.kind === 'step') {
+    if (!d.step || !isEnabled(d.step)) return
+    d.handled = true
+    if (d.selector) revealInAudit(d.step, d.selector, { block: d.block || 'start' })
+    else goToStep(d.step)
+    return
   }
-  if (chosen) activeStepKey.value = SECTION_ID_TO_STEP[chosen.id] || activeStepKey.value
+  const t = REVEAL_TARGETS[d.kind]
+  if (!t || d.id == null || !isEnabled(t.step)) return
+  d.handled = true // synchrone : l'émetteur le lit au retour de dispatchEvent
+  const prepare = t.step === 'systems'
+    ? () => systemsSectionRef.value?.prepareReveal?.(d)
+    : t.step === 'meters'
+      ? () => metersSectionRef.value?.prepareReveal?.(d)
+      : t.step === 'thermal'
+        ? () => thermalSectionRef.value?.prepareReveal?.(d)
+        : null
+  revealInAudit(t.step, t.selector(d.id), { block: d.block || 'center', prepare })
 }
-function setupScrollSpy() {
-  if (_spyObserver) _spyObserver.disconnect()
-  const sections = Object.values(STEP_TO_SECTION_ID)
-    .map(id => window.document.getElementById(id))
-    .filter(Boolean)
-  if (!sections.length) return
-  _spyObserver = new IntersectionObserver(pickActiveSection, {
-    rootMargin: '0px 0px -60% 0px',
-    threshold: [0, 0.1, 0.5, 1],
+// Anciens émetteurs de `bacs-collapse:open` (ex. « ouvrir la card Systèmes ») :
+// les storage-key des sections sont exactement les clés d'étapes.
+function onCollapseOpenRequest(e) {
+  const key = e.detail?.storageKey
+  if (key && isEnabled(key)) goToStep(key, { scroll: false })
+}
+// `audit-ui` sur <html> : les fenêtres ouvertes depuis l'audit (téléportées
+// hors de .audit-page) reprennent le style « champ rempli » (main.css).
+onMounted(() => {
+  window.addEventListener(AUDIT_REVEAL_EVENT, onAuditReveal)
+  window.addEventListener('bacs-collapse:open', onCollapseOpenRequest)
+  window.document.documentElement.classList.add('audit-ui')
+})
+onBeforeUnmount(() => {
+  window.removeEventListener(AUDIT_REVEAL_EVENT, onAuditReveal)
+  window.removeEventListener('bacs-collapse:open', onCollapseOpenRequest)
+  window.document.documentElement.classList.remove('audit-ui')
+})
+
+// Précharge les sections asynchrones pendant un temps mort : le 1er clic sur
+// leur onglet est instantané.
+function prefetchStepChunks() {
+  const idle = window.requestIdleCallback || (cb => setTimeout(cb, 1500))
+  idle(() => {
+    import('@/components/audit/BmsSection.vue')
+    import('@/components/audit/ChecklistSection.vue')
+    import('@/components/audit/InspectionsSection.vue')
+    import('@/components/audit/CompliancePlanSection.vue')
+    import('@/components/audit/SynthesisSection.vue')
   })
-  sections.forEach(s => _spyObserver.observe(s))
 }
 
 // ── Note de synthese (etape 12, redaction assistee Claude) ──
@@ -1009,14 +1062,21 @@ async function generateSynthesis() {
         document.value.audit_synthesis_html = data.html
         document.value.audit_synthesis_generated_at = data.generated_at
       }
-      success('Note de synthese generee par Claude')
+      success('Note de synthèse générée par Claude')
       refreshClaudeUsage()
     }
   } catch (e) {
-    error(e.response?.data?.detail || 'Echec generation Claude')
+    error(e.response?.data?.detail || 'Échec de la génération par Claude')
   } finally {
     synthesisGenerating.value = false
   }
+}
+
+// Note relue (et corrigée si besoin) par l'auditeur après une évolution du
+// plan : datée du jour, elle est de nouveau imprimée (règle SYN-001).
+function confirmSynthesisCurrent() {
+  saveDocDebounced({ audit_synthesis_generated_at: new Date().toISOString() })
+  success('Note de synthèse confirmée : elle sera imprimée dans le rapport')
 }
 
 // ── Preconisations Buildy par action ──
@@ -1264,6 +1324,39 @@ async function exportTablesPdf() {
   }
 }
 
+// Dossier complet (ZIP) : rapport A4 + tableaux A3 + documents cochés
+// « Inclure dans le rapport » (nommés comme l'annexe E : « PJ 02 – … »).
+// Réponse binaire téléchargée telle quelle.
+const exportingDossier = ref(false)
+async function exportDossier() {
+  if (exportingDossier.value) return
+  exportingDossier.value = true
+  info('Préparation du dossier complet (rapport, tableaux et pièces jointes)…')
+  try {
+    const res = await exportBacsDossier(docId)
+    const cd = res.headers?.['content-disposition'] || ''
+    const m = cd.match(/filename\*=UTF-8''([^;]+)/i)
+    const name = m ? decodeURIComponent(m[1]) : `dossier-audit-${docId}.zip`
+    const url = URL.createObjectURL(res.data)
+    const a = window.document.createElement('a')
+    a.href = url
+    a.download = name
+    window.document.body.appendChild(a)
+    a.click()
+    window.document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    success(`Dossier complet téléchargé (${(res.data.size / 1024 / 1024).toFixed(1).replace('.', ',')} Mo)`)
+  } catch (e) {
+    let detail = null
+    if (e.response?.data instanceof Blob) {
+      try { detail = JSON.parse(await e.response.data.text()).detail } catch { /* réponse non JSON */ }
+    }
+    error(detail || 'Échec de l\'export du dossier complet')
+  } finally {
+    exportingDossier.value = false
+  }
+}
+
 // Aperçu HTML in-browser (sans Puppeteer) — permet de valider visuellement
 // le contenu avant de declencher l'export PDF qui prend ~3-5s.
 const previewOpen = ref(false)
@@ -1309,21 +1402,43 @@ async function deliver() {
     confirmLabel: 'Livrer',
   })
   if (!ok) return
+  const result = await attemptDelivery(false)
+  if (result === 'precheck_failed') {
+    // La vérification elle-même a planté (erreur technique) : livrer sans
+    // elle reste possible, mais seulement sur choix explicite (tracé).
+    const forceOk = await confirm({
+      title: 'Vérification impossible',
+      message: 'La vérification automatique avant livraison a rencontré une erreur technique. Tu peux livrer sans cette vérification : ce sera noté dans l\'activité de l\'audit.',
+      confirmLabel: 'Livrer sans vérification',
+      danger: true,
+    })
+    if (forceOk) await attemptDelivery(true)
+  }
+}
+
+async function attemptDelivery(force) {
   delivering.value = true
   try {
-    const { data } = await deliverBacsAudit(docId)
+    const { data } = await deliverBacsAudit(docId, { force })
     success(`Audit livré — tag Git ${data.delivered_git_tag}`)
     refresh()
+    return 'ok'
   } catch (e) {
+    if (e.response?.status === 409 && e.response?.data?.precheck_failed) return 'precheck_failed'
     // Lot 3 — si le backend refuse la livraison à cause d'incohérences
     // bloquantes (409), on ouvre la modale Précheck pour aider l'auditeur
     // à corriger sans qu'il ait à chercher où.
     if (e.response?.status === 409 && e.response?.data?.precheck) {
       showPrecheck.value = true
       error('Livraison refusée : corrige les incohérences bloquantes listées ci-dessus avant de réessayer.')
+    } else if (e.code === 'ECONNABORTED') {
+      error('La livraison prend plus de 3 minutes. Vérifie dans Plus → Activité si elle a abouti avant de relancer.')
+    } else if (!e.response) {
+      error('Pas de réseau : la livraison n\'est pas partie. Réessaie avec une connexion.')
     } else {
       error(e.response?.data?.detail || 'Échec de la livraison')
     }
+    return 'error'
   } finally {
     delivering.value = false
   }
@@ -1354,12 +1469,13 @@ let _stickyOffsetObserver = null
 
 import { onBeforeUnmount, nextTick } from 'vue'
 
-// Active le scroll-spy une fois que les sections sont rendues dans
-// le DOM (apres loadAudit qui passe loading=false).
+// Choisit l'étape affichée une fois l'audit chargé (loading=false) : lien
+// direct, sinon dernière étape consultée, sinon 1re étape non validée.
 watch(loading, async (isLoading) => {
   if (!isLoading) {
     await nextTick()
-    setupScrollSpy()
+    if (!activeStepKey.value) initActiveStep()
+    prefetchStepChunks()
     // Re-bind l'observer de la hauteur du header sticky une fois que le
     // DOM est monté (sinon querySelector peut renvoyer null au 1er mount).
     setupStickyOffsetObserver()
@@ -1400,7 +1516,6 @@ function setupStickyOffsetObserver() {
 let _stickyOffsetScrollHandler = null
 
 onBeforeUnmount(() => {
-  if (_spyObserver) { _spyObserver.disconnect(); _spyObserver = null }
   if (_stickyOffsetObserver) { _stickyOffsetObserver.disconnect(); _stickyOffsetObserver = null }
   if (_stickyOffsetScrollHandler) { window.removeEventListener('scroll', _stickyOffsetScrollHandler, { passive: true }); _stickyOffsetScrollHandler = null }
   window.document.documentElement.style.removeProperty('--audit-sticky-offset')
@@ -1446,11 +1561,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="w-full mx-auto px-3 pb-12" :style="isNarrow ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1rem)' } : null">
-    <!-- Bloc sticky desktop : breadcrumb + titre + actions + stepper.
+  <!-- Fond gris soutenu pleine largeur (annule le padding lg:px-6 lg:py-5 du
+       <main> d'AppLayout) : les cartes blanches se détachent nettement. -->
+  <div class="audit-page w-full mx-auto px-3 pb-12 lg:w-auto lg:-mx-6 lg:-my-5 lg:px-6 lg:pb-16 lg:min-h-screen lg:bg-slate-200/80"
+       :style="isNarrow ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1rem)' } : null">
+    <!-- Bloc sticky desktop : breadcrumb + titre + actions + onglets d'étapes.
          Reste visible en haut tout au long du scroll de l'audit. -->
-    <div :class="['audit-sticky-header lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-3 lg:px-3 lg:border-b lg:border-gray-100 lg:mb-6 lg:transition-[padding] lg:duration-150',
-                  isScrolledDown ? 'lg:pt-1.5 lg:pb-2 audit-topbar-compact' : 'lg:pt-3 lg:pb-3']">
+    <div :class="['audit-sticky-header lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-6 lg:px-6 lg:border-b lg:border-slate-200 lg:shadow-sm lg:mb-5 lg:transition-[padding] lg:duration-150',
+                  isScrolledDown ? 'lg:pt-1.5 lg:pb-0 audit-topbar-compact' : 'lg:pt-3 lg:pb-0']">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
@@ -1468,6 +1586,7 @@ onBeforeUnmount(() => {
             ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
         </div>
+        <div class="flex items-center gap-3 min-w-0 flex-wrap">
         <h1 class="audit-title text-lg font-semibold text-gray-800 flex items-center gap-2 min-w-0">
           <FireIcon v-if="isBacs" class="w-5 h-5 text-orange-500 shrink-0" />
           <BuildingOffice2Icon v-else class="w-5 h-5 text-emerald-600 shrink-0" />
@@ -1481,6 +1600,23 @@ onBeforeUnmount(() => {
           />
           <span class="audit-subtitle text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
         </h1>
+        <!-- Actions ouvertes du plan de mise en conformité, par sévérité
+             (remplace les 3 tuiles). Clic → onglet « Plan d'actions ». -->
+        <div v-if="isBacs && !loading" class="flex items-center gap-1.5 shrink-0">
+          <button
+            v-for="sev in ['blocking','major','minor']"
+            :key="sev"
+            type="button"
+            @click="goToStep('review')"
+            :class="['inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-medium transition hover:brightness-95',
+                     SEVERITY_LABEL[sev].cls, itemsBySeverity[sev].length ? '' : 'opacity-50']"
+            v-tooltip="{ text: `${itemsBySeverity[sev].length} action${itemsBySeverity[sev].length > 1 ? 's' : ''} ${SEVERITY_LABEL[sev].label.toLowerCase()}${itemsBySeverity[sev].length > 1 ? 's' : ''} ouverte${itemsBySeverity[sev].length > 1 ? 's' : ''} — voir le plan de mise en conformité`, placement: 'bottom' }"
+          >
+            <span>{{ itemsBySeverity[sev].length }}</span>
+            <span>{{ SEVERITY_LABEL[sev].label.toLowerCase() }}{{ itemsBySeverity[sev].length > 1 ? 's' : '' }}</span>
+          </button>
+        </div>
+        </div>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
         <!-- Indicateur global de sauvegarde : agrégé depuis l'interceptor
@@ -1579,6 +1715,12 @@ onBeforeUnmount(() => {
               <SparklesIcon class="w-4 h-4 text-gray-400 shrink-0" />
               Transcript IA (Plaud Pro)
             </button>
+            <button @click="showSettingsMenu = false; exportDossier()" :disabled="exportingDossier"
+              v-tooltip="{ text: 'Rapport PDF, tableaux de synthèse et documents cochés « Inclure dans le rapport », dans un seul fichier ZIP', placement: 'left' }"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              <ArchiveBoxArrowDownIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              {{ exportingDossier ? 'Préparation du dossier…' : 'Dossier complet (ZIP)' }}
+            </button>
             <div class="border-t border-gray-100 my-1"></div>
             <button @click="showSettingsMenu = false; deleteAudit()"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
@@ -1590,13 +1732,13 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Stepper horizontal (à l'intérieur du bloc sticky : reste collé sous le header). -->
-    <BacsAuditStepperHorizontal
+    <!-- Onglets d'étapes groupés par phase (à l'intérieur du bloc sticky). -->
+    <AuditStepTabs
       v-if="!loading"
-      :steps="stepperSteps"
-      :active-step-key="activeStepKey"
-      @step-click="onStepClick"
-      class="hidden lg:block"
+      :steps="tabSteps"
+      :active-key="activeStepKey"
+      @select="goToStep"
+      class="mt-1"
     />
     </div>
     <!-- /Fin du wrapper sticky desktop -->
@@ -1604,22 +1746,23 @@ onBeforeUnmount(() => {
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
     <div v-else>
-      <!-- Colonne principale : contenu de l'audit pleine largeur -->
-      <div class="space-y-6 min-w-0">
-      <!-- Synthese severities (compactee) — hors site_audit (pas de plan d'actions) -->
-      <div v-if="isBacs" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div v-for="sev in ['blocking','major','minor']" :key="sev"
-             :class="['rounded-lg border px-3 py-2 flex items-center gap-3', SEVERITY_LABEL[sev].cls]">
-          <div class="text-2xl font-semibold leading-none">{{ itemsBySeverity[sev].length }}</div>
-          <div class="text-xs leading-tight">
-            <div class="font-medium uppercase tracking-wider opacity-70">{{ SEVERITY_LABEL[sev].label }}</div>
-            <div class="opacity-70">action{{ itemsBySeverity[sev].length > 1 ? 's' : '' }} ouverte{{ itemsBySeverity[sev].length > 1 ? 's' : '' }}</div>
-          </div>
-        </div>
-      </div>
+      <!-- Colonne principale : une seule étape affichée à la fois (onglets).
+           Chaque panneau existe toujours (aria-controls) ; sa section est
+           montée à la 1re ouverture de l'onglet puis conservée (v-show). -->
+      <div class="space-y-4 min-w-0">
+      <AuditStepGuide
+        v-if="activeTab"
+        :step="activeTab"
+        :total="tabSteps.length"
+        @validate="validateStep"
+        @invalidate="invalidateStep"
+      />
 
       <!-- 1. Identification + Applicabilité R175-2 -->
+      <div id="audit-step-panel-identification" role="tabpanel" aria-labelledby="audit-step-tab-identification"
+           v-show="activeStepKey === 'identification'">
       <IdentificationSection
+        v-if="visitedSteps.has('identification')"
         :active="activeStepKey === 'identification'"
         :step="stepFor('identification')"
         :applicability-labels="APPLICABILITY_LABEL"
@@ -1629,12 +1772,16 @@ onBeforeUnmount(() => {
         @invalidate-step="invalidateStep"
         @open-notes="openNotesModal"
       />
+      </div>
 
       <!-- 2. Zones (R175-1 6° + locaux techniques) — section unifiée :
            map satellite + un seul tableau avec colonne « Type » qui permet
            de basculer chaque ligne entre fonctionnelle et technique.
            Le PDF garde un rendu séparé (zonesFunctional / zonesTechnical). -->
+      <div id="audit-step-panel-zones" role="tabpanel" aria-labelledby="audit-step-tab-zones"
+           v-show="activeStepKey === 'zones'">
       <ZonesSection
+        v-if="visitedSteps.has('zones')"
         unified
         :active="activeStepKey === 'zones'"
         :zone-natures="ZONE_NATURES"
@@ -1644,9 +1791,14 @@ onBeforeUnmount(() => {
         @invalidate-step="invalidateStep"
         @add-zone="onAddZoneRequest"
       />
+      </div>
 
-      <!-- 4. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
+      <!-- 3. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
+      <div id="audit-step-panel-systems" role="tabpanel" aria-labelledby="audit-step-tab-systems"
+           v-show="activeStepKey === 'systems'">
       <SystemsSection
+        v-if="visitedSteps.has('systems')"
+        ref="systemsSectionRef"
         :active="activeStepKey === 'systems'"
         :systems-by-zone="systemsByZone"
         :devices-by-system="devicesBySystem"
@@ -1665,10 +1817,14 @@ onBeforeUnmount(() => {
         @toggle-system-collapsed="toggleSystemCollapsed"
         @add-device="sys => addDeviceSystem = sys"
       />
+      </div>
 
       <!-- 4. Régulation thermique automatique (R175-6) -->
+      <div id="audit-step-panel-thermal" role="tabpanel" aria-labelledby="audit-step-tab-thermal"
+           v-show="activeStepKey === 'thermal'">
       <ThermalSection
-        v-if="isBacs"
+        v-if="visitedSteps.has('thermal') && isBacs"
+        ref="thermalSectionRef"
         :active="activeStepKey === 'thermal'"
         :thermal-filtered="thermalFiltered"
         :regulation-options="REGULATION_OPTIONS"
@@ -1679,9 +1835,14 @@ onBeforeUnmount(() => {
         @invalidate-step="invalidateStep"
         @open-notes="openNotesModal"
       />
+      </div>
 
       <!-- 5. Compteurs et mesurage (R175-3 1°) -->
+      <div id="audit-step-panel-meters" role="tabpanel" aria-labelledby="audit-step-tab-meters"
+           v-show="activeStepKey === 'meters'">
       <MetersSection
+        v-if="visitedSteps.has('meters')"
+        ref="metersSectionRef"
         :active="activeStepKey === 'meters'"
         :meter-usages="METER_USAGES"
         :protocol-options="PROTOCOL_OPTIONS"
@@ -1691,9 +1852,13 @@ onBeforeUnmount(() => {
         @invalidate-step="invalidateStep"
         @add-meter="openMeterAddModal"
       />
+      </div>
 
-      <!-- 7. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
+      <!-- 6. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
+      <div id="audit-step-panel-bms" role="tabpanel" aria-labelledby="audit-step-tab-bms"
+           v-show="activeStepKey === 'bms'">
       <BmsSection
+        v-if="visitedSteps.has('bms')"
         :active="activeStepKey === 'bms'"
         :bms-steps="bmsSteps"
         :devices-with-meta="devicesWithMeta"
@@ -1708,18 +1873,25 @@ onBeforeUnmount(() => {
         @refresh-audit-data="refreshAuditData"
         @credentials-changed="onCredentialsChanged"
       />
+      </div>
 
-      <!-- 8. Inspection périodique par un tiers (R175-5-1).
-           Masquée sans GTB sur site : rien à faire inspecter. -->
-      <InspectionsSection v-if="isBacs && bms?.present !== 0"
+      <!-- 7. Inspection périodique par un tiers (R175-5-1).
+           Sans GTB sur site : onglet grisé « sans objet », section non rendue. -->
+      <div id="audit-step-panel-inspections" role="tabpanel" aria-labelledby="audit-step-tab-inspections"
+           v-show="activeStepKey === 'inspections'">
+      <InspectionsSection v-if="visitedSteps.has('inspections') && isBacs && bms?.present !== 0"
                           :active="activeStepKey === 'inspections'"
                           :step="stepFor('inspections')"
                           @validate-step="validateStep"
                           @invalidate-step="invalidateStep"
                           @save-doc="saveDocDebounced" />
+      </div>
 
-      <!-- 9. Check-list documentaire (mig 100) -->
+      <!-- 8. Check-list documentaire (mig 100) -->
+      <div id="audit-step-panel-docs-checklist" role="tabpanel" aria-labelledby="audit-step-tab-docs-checklist"
+           v-show="activeStepKey === 'docs-checklist'">
       <ChecklistSection
+        v-if="visitedSteps.has('docs-checklist')"
         :doc-id="docId"
         :active="activeStepKey === 'docs-checklist'"
         :step="stepFor('docs-checklist')"
@@ -1730,18 +1902,26 @@ onBeforeUnmount(() => {
         @goto-meter="gotoChecklistMeter"
         @goto-bms="gotoChecklistBms"
       />
+      </div>
 
-      <!-- 10. Documents du site (DOE) -->
+      <!-- 9. Documents du site (DOE) -->
+      <div id="audit-step-panel-documents" role="tabpanel" aria-labelledby="audit-step-tab-documents"
+           v-show="activeStepKey === 'documents'">
       <DocumentsSection
+        v-if="visitedSteps.has('documents')"
         :active="activeStepKey === 'documents'"
         :site-doc-counts="siteDocCounts"
         :step="stepFor('documents')"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
       />
+      </div>
 
-      <!-- 11. Credentials du site (accès) -->
+      <!-- 10. Accès du site (identifiants chiffrés) -->
+      <div id="audit-step-panel-credentials" role="tabpanel" aria-labelledby="audit-step-tab-credentials"
+           v-show="activeStepKey === 'credentials'">
       <CredentialsSection
+        v-if="visitedSteps.has('credentials')"
         :active="activeStepKey === 'credentials'"
         :site-cred-count="siteCredCount"
         :refresh-key="credentialsRefreshKey"
@@ -1749,10 +1929,13 @@ onBeforeUnmount(() => {
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
       />
+      </div>
 
-      <!-- Plan de mise en conformité — masqué en mode site_audit -->
+      <!-- 11. Plan de mise en conformité — masqué en mode site_audit -->
+      <div id="audit-step-panel-review" role="tabpanel" aria-labelledby="audit-step-tab-review"
+           v-show="activeStepKey === 'review'">
       <CompliancePlanSection
-        v-if="isBacs"
+        v-if="visitedSteps.has('review') && isBacs"
         :active="activeStepKey === 'review'"
         :visible-action-items="visibleActionItems"
         :items-by-severity="itemsBySeverity"
@@ -1769,9 +1952,13 @@ onBeforeUnmount(() => {
         @patch-item="({ item, patch }) => patchActionItem(item, patch)"
         @open-alternatives="openAlternativesEditor"
       />
+      </div>
 
-      <!-- 13. Note de synthèse (Claude) -->
+      <!-- 12. Note de synthèse (Claude) -->
+      <div id="audit-step-panel-synthesis" role="tabpanel" aria-labelledby="audit-step-tab-synthesis"
+           v-show="activeStepKey === 'synthesis'">
       <SynthesisSection
+        v-if="visitedSteps.has('synthesis')"
         :active="activeStepKey === 'synthesis'"
         :synthesis-html="synthesisHtml"
         :synthesis-generating="synthesisGenerating"
@@ -1780,9 +1967,20 @@ onBeforeUnmount(() => {
         :step="stepFor('synthesis')"
         :usage-tooltip="formatUsageTooltip(claudeUsage)"
         @generate="generateSynthesis"
+        @confirm-current="confirmSynthesisCurrent"
         @update:synthesis-html="onSynthesisInput"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
+      />
+      </div>
+
+      <AuditStepFooter
+        v-if="activeTab"
+        :step="activeTab"
+        :prev="prevTab"
+        :next="nextTab"
+        @go="goToStep"
+        @validate-and-continue="validateAndContinue"
       />
       </div><!-- /colonne principale -->
     </div>
@@ -1918,7 +2116,9 @@ onBeforeUnmount(() => {
 @media (min-width: 1024px) {
   :deep(.audit-breadcrumb),
   :deep(.audit-subtitle),
-  :deep(.stepper-progress) {
+  :deep(.stepper-progress),
+  :deep(.audit-tabs-phase-label),
+  :deep(.audit-tabs-progress) {
     max-height: 4rem;
     opacity: 1;
     overflow: hidden;
@@ -1926,7 +2126,9 @@ onBeforeUnmount(() => {
   }
   .audit-topbar-compact :deep(.audit-breadcrumb),
   .audit-topbar-compact :deep(.audit-subtitle),
-  .audit-topbar-compact :deep(.stepper-progress) {
+  .audit-topbar-compact :deep(.stepper-progress),
+  .audit-topbar-compact :deep(.audit-tabs-phase-label),
+  .audit-topbar-compact :deep(.audit-tabs-progress) {
     max-height: 0;
     opacity: 0;
     margin: 0;

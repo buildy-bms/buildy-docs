@@ -32,7 +32,7 @@ const { METER_USAGE_TO_SYSTEM_CATS } = require('./_shared');
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
 const { isTrue, isFalse } = require('./_ternary');
-const { sortActions, groupByCard, cardOfAction } = require('./_action-cards');
+const { sortActions, groupByCard, cardOfAction, groupJustifications } = require('./_action-cards');
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
@@ -439,6 +439,9 @@ const THERMAL_RAW = [
 
 const BMS = {
   document_id: DOCUMENT.document_id,
+  // GTB présente (sinon le tableau de bord concluait « GTB non renseignée »
+  // alors que le chapitre 6 la décrit — relecture clarté R2 F-C1).
+  present: 1,
   existing_solution: 'Schneider EcoStruxure Building Operation',
   existing_solution_brand: 'Schneider Electric',
   model_reference: '1× AS-P 8000 + 6× AS-B (version 3.2)',
@@ -781,6 +784,14 @@ async function buildFixturePreviewData({ user = null } = {}) {
     systemsByZoneMap.get(k).items.push(s);
   }
   const systemsByZone = [...systemsByZoneMap.values()];
+  // Même annotation que _export-data.js (ligne « usages absents » par zone).
+  for (const g of systemsByZone) {
+    const notPresent = g.items.filter(x => !isTrue(x.present));
+    g.absentLabels = notPresent.filter(x => isTrue(x.not_concerned) || x.present === 0)
+      .map(x => ({ system_category: x.system_category, categoryLabel: x.categoryLabel }));
+    g.unansweredLabels = notPresent.filter(x => !(isTrue(x.not_concerned) || x.present === 0))
+      .map(x => ({ system_category: x.system_category, categoryLabel: x.categoryLabel }));
+  }
 
   // Meters : enrichissements
   const fixtureMeterSystemLabel = (m) => {
@@ -943,19 +954,23 @@ async function buildFixturePreviewData({ user = null } = {}) {
 
   // Justifications (Annexe C). Cf. _export-data.js : derive le label
   // depuis la FK non-NULL (apres mig 125).
+  // Libellés lisibles, sans identifiant interne (même présentation que les
+  // rapports clients, relecture clarté R2 F-M2).
   function actionSourceLabel(a) {
-    if (a.source_system_id)        return `système (#${a.source_system_id})`;
-    if (a.source_meter_id)         return `compteur (#${a.source_meter_id})`;
-    if (a.source_thermal_id)       return `régulation thermique (#${a.source_thermal_id})`;
-    if (a.source_device_id)        return `équipement (#${a.source_device_id})`;
-    if (a.source_inspection_id)    return `inspection (#${a.source_inspection_id})`;
-    if (a.source_bms_document_id)  return `GTB (${a.source_subtype || ''})`;
-    return 'Item manuel';
+    if (a.source_system_id)        return 'Système technique';
+    if (a.source_meter_id)         return 'Compteur';
+    if (a.source_thermal_id)       return 'Régulation thermique';
+    if (a.source_device_id)        return 'Équipement';
+    if (a.source_inspection_id)    return 'Inspection périodique';
+    if (a.source_bms_document_id)  return 'Système de supervision (GTB)';
+    return 'Action ajoutée par l\'auditeur';
   }
   const justifications = numberedItems.map(a => ({
+    number: a.display_number,
     title: a.title,
     article: a.r175_article || '—',
     source: actionSourceLabel(a),
+    manual: a.auto_generated === 0,
     description: a.description || a.title,
   }));
 
@@ -1139,6 +1154,13 @@ async function buildFixturePreviewData({ user = null } = {}) {
     hasLiabilityData: true,
     compliance,
     meters: enrichedMeters,
+    // Même filtre que _export-data.js (sinon « Aucun compteur n'a été relevé »
+    // s'affichait sous huit compteurs — R2 F-M4).
+    metersForPdf: enrichedMeters.filter(m => m.required || m.present_actual || m.out_of_service),
+    // Numéro du chapitre « Plan » (8 avec le chapitre Inspections) — R2 F-M1.
+    showInspectionsChapter: true,
+    planChapterNumber: 8,
+    gtbBanner: { name: BMS.existing_solution, brand: null, model: BMS.model_reference },
     metersWithDetails,
     thermal,
     bms,
@@ -1180,6 +1202,23 @@ async function buildFixturePreviewData({ user = null } = {}) {
     methodology,
     disclaimers,
     justifications,
+    justificationGroups: groupJustifications(justifications),
+    // Annexe E « Documents joints » (documents cochés « Inclure dans le
+    // rapport ») : un plan, une note vocale transcrite, une photo.
+    ...(() => {
+      const photo = photoItem('pj-3', 'P-004.png');
+      const items = [
+        { id: 'pj-1', ref: 'PJ 1', title: 'Plan des armoires électriques — bâtiment B', typeLabel: 'Plan', formatLabel: 'PDF', attachedTo: 'Site', date: '2026-04-17', sizeLabel: '779 Ko', isImage: false, shownInChapter: null },
+        { id: 'pj-2', ref: 'PJ 2', title: 'Note vocale — Local chaufferie', typeLabel: 'Note vocale', formatLabel: 'Audio', attachedTo: 'Zone : Bureaux', date: '2026-04-17', sizeLabel: '116 Ko', isImage: false, shownInChapter: null,
+          transcript: 'Chaufferie au sous-sol : deux chaudières gaz en cascade, régulation par loi d\'eau. Le régulateur n\'est pas raccordé à la GTB.' },
+        { id: 'pj-3', ref: 'PJ 3', title: 'Façade nord — entrée des bureaux', typeLabel: 'Photo', formatLabel: 'Image', attachedTo: 'Site', date: '2026-04-17', sizeLabel: '246 Ko', isImage: true, shownInChapter: null, dataUrl: photo ? photo.dataUrl : null },
+      ];
+      return {
+        reportAttachments: items,
+        reportAttachmentImages: items.filter(a => a.dataUrl),
+        reportAttachmentTranscripts: items.filter(a => a.transcript),
+      };
+    })(),
     authorName: user?.display_name || 'Auditeur Buildy (fixture)',
     exportDate,
     version: 'bacs-vAPERCU',

@@ -96,7 +96,7 @@ async function setNegligible(v) {
     if (v === true) {
       const existing = (props.system.negligible_justification || '').trim()
       const text = window.prompt(
-        'Justifie l\'exemption R175-2 §5 (FAQ ministère juin 2025) — ex : « petits ballons ECS individuels », « groupe de secours ».\n\nLa justification est obligatoire pour un poste négligeable.',
+        'Justifie l\'exemption par la règle des 5 % (FAQ ministérielle n° 16) — ex : « petits ballons ECS individuels », « groupe de secours ». La part s\'apprécie sur tous les équipements de même fonction du bâtiment.\n\nLa justification est obligatoire pour un système négligeable.',
         existing,
       )
       if (text == null) return  // annulation
@@ -196,7 +196,7 @@ async function setJustification(text) {
         </h4>
         <div class="qa-grid">
           <div class="qa-question">
-            Ce poste est-il négligeable (moins de 5 % de la consommation totale) ?
+            Ce poste est-il négligeable (consommations effectives et induites inférieures à 5 % de la consommation totale) ?
             <span class="qa-desc">
               <template v-if="systemWeightPct != null">
                 Poids estimé ~<span :class="['font-mono', systemWeightPct > 10 ? 'text-amber-600 font-semibold' : 'text-gray-500']">{{ systemWeightPct }} %</span>

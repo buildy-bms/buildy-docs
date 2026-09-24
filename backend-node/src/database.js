@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 205;
+const TARGET_VERSION = 212;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7765,8 +7765,119 @@ function runMigrations() {
     db.pragma('user_version = 205');
   }
 
+  if (current < 206) {
+    // Question préalable de la carte GTB : « La GTB en place est-elle une
+    // supervision Buildy ? » (ternaire : NULL = non répondu, 1 = oui, 0 = non).
+    // Le choix du niveau d'offre Buildy Cloud (mig 205) n'est proposé que si
+    // la réponse est oui. Rattrapage : un niveau déjà choisi vaut « oui ».
+    // Idempotente : rejouable si user_version a été rabaissé (tests de migration).
+    const hasCol = db.prepare('PRAGMA table_info(bacs_audit_bms)').all()
+      .some(c => c.name === 'is_buildy_supervision');
+    if (!hasCol) {
+      db.exec(`
+        ALTER TABLE bacs_audit_bms ADD COLUMN is_buildy_supervision INTEGER
+          CHECK (is_buildy_supervision IS NULL OR is_buildy_supervision IN (0, 1));
+      `);
+    }
+    const n = db.prepare(`
+      UPDATE bacs_audit_bms SET is_buildy_supervision = 1
+      WHERE buildy_offer_level IS NOT NULL AND is_buildy_supervision IS NULL
+    `).run().changes;
+    log.info(`Migration 206 appliquee : bacs_audit_bms.is_buildy_supervision (${n} GTB Buildy rattrapee(s))`);
+    db.pragma('user_version = 206');
+  }
+
+  if (current < 207) {
+    // Revue de conformite BACS (2026-09-24) : les textes standards des
+    // annexes B (methodologie) et D (mentions) du rapport d'audit sont
+    // realignes sur le decret, la FAQ et le guide du ministere (inspection a
+    // l'initiative du proprietaire, tiers seulement recommande ; chaud et
+    // froid non cumules ; echeances selon la date de depot du permis ;
+    // interoperabilite par API ou passerelle admise ; formation attestee ;
+    // TRI selon l'arrete du 7 avril 2023...). Le PDF lit la table, pas les
+    // fichiers lib/ : mise a jour ciblee par (kind, position) des SEULES
+    // fiches jamais editees depuis l'admin (created_at = updated_at).
+    // updated_at n'est pas modifie : la fiche reste « non editee ». Les
+    // editions utilisateur sont conservees et comptees dans le journal.
+    reseedUneditedBacsBoilerplate(db, 207);
+    db.pragma('user_version = 207');
+  }
+
+  if (current < 208) {
+    // Relectures finales (2026-09-24) : interoperabilite par generateur
+    // (PROFEEL), perimetre GTB qui ne reduit pas celui du decret, tiers
+    // independant (FAQ n° 30 « peut etre pertinent »), regle des 5 %
+    // (consommations effectives et induites), zones fonctionnelles (R175-1
+    // 6°, FAQ n° 25), R175-6 (dates), glossaire... Meme mise a jour ciblee
+    // que la 207 (fiches jamais editees seulement).
+    reseedUneditedBacsBoilerplate(db, 208);
+    db.pragma('user_version = 208');
+  }
+
+  if (current < 209) {
+    // Suite des relectures finales (2026-09-24) : definitions des verdicts,
+    // regle des 5 % dans « Severite des actions », mention d'inspection
+    // allegee (annexe D). Meme mise a jour ciblee (fiches jamais editees).
+    reseedUneditedBacsBoilerplate(db, 209);
+    db.pragma('user_version = 209');
+  }
+
+  if (current < 210) {
+    // Annexe B : equipement declare non concerne par l'integration a la GTB
+    // (decision de l'auditeur) distingue d'un usage non traite par la GTB.
+    reseedUneditedBacsBoilerplate(db, 210);
+    db.pragma('user_version = 210');
+  }
+
+  if (current < 211) {
+    // Relecture de verification R3 : exceptions a la regle des 5 % dans
+    // l'annexe B (systemes sous condition, equipements non concernes) ;
+    // inspection periodique presentee en reserve.
+    reseedUneditedBacsBoilerplate(db, 211);
+    db.pragma('user_version = 211');
+  }
+
+  if (current < 212) {
+    // Migration 212 — Case « Inclure dans le rapport » par document du site
+    // (demande Kévin 2026-09-24) : les documents cochés (plans, schémas,
+    // photos non rattachées…) sont listés dans l'annexe « Documents joints »
+    // du rapport d'audit. Décochée par défaut : rien n'est publié sans
+    // décision de l'auditeur.
+    try { db.exec(`ALTER TABLE site_documents ADD COLUMN include_in_report INTEGER NOT NULL DEFAULT 0`); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    log.info('Migration 212 appliquee : site_documents.include_in_report');
+    db.pragma('user_version = 212');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
+  }
+}
+
+// Textes standards des annexes B (methodologie) et D (mentions) du rapport
+// d'audit BACS : reecrit depuis lib/ les SEULES fiches jamais editees depuis
+// l'admin (created_at = updated_at), par (kind, position). updated_at n'est
+// pas modifie : la fiche reste « non editee ». Migrations 207, 208.
+function reseedUneditedBacsBoilerplate(db, version) {
+  try {
+    const methodology = require('./lib/bacs-audit-methodology');
+    const disclaimers = require('./lib/bacs-audit-disclaimers');
+    const upd = db.prepare(`
+      UPDATE pdf_boilerplate SET title = ?, body_html = ?
+      WHERE kind = ? AND position = ? AND created_at = updated_at
+    `);
+    let n = 0;
+    db.transaction(() => {
+      methodology.forEach((m, i) => { n += upd.run(m.title, m.body, 'methodology', i).changes; });
+      disclaimers.forEach((d, i) => { n += upd.run(null, d, 'disclaimer', i).changes; });
+    })();
+    const kept = db.prepare(`
+      SELECT COUNT(*) AS c FROM pdf_boilerplate
+      WHERE kind IN ('methodology', 'disclaimer') AND created_at <> updated_at
+    `).get().c;
+    log.info(`Migration ${version} appliquee : ${n} texte(s) standard(s) BACS mis a jour, ${kept} edite(s) conserve(s) tel(s) quel(s)`);
+  } catch (err) {
+    log.warn(`Migration ${version} (textes standards BACS) KO : ${err.message}`);
   }
 }
 

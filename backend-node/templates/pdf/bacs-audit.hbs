@@ -11,7 +11,7 @@
 <section class="cover">
   <header class="cover-top">
     <img class="cover-logo" src="{{logoWhiteDataUrl}}" alt="Buildy" />
-    <span class="cover-eyebrow">{{#if isBacs}}Audit de conformité BACS · Décret R175{{else}}Audit GTB · Préparation devis Buildy{{/if}}</span>
+    <span class="cover-eyebrow">{{#if isBacs}}Audit de conformité au décret BACS{{else}}Audit GTB · Préparation devis Buildy{{/if}}</span>
   </header>
 
   <main class="cover-main">
@@ -23,7 +23,7 @@
   {{#if compliance.verdict}}
   <div class="cover-verdict cover-verdict-{{compliance.verdict}}">
     <span class="cover-verdict-eyebrow">{{#if isBacs}}État de conformité{{else}}Couverture GTB existante{{/if}}</span>
-    <span class="cover-verdict-icon">{{compliance.verdictIcon}}</span>
+    <span class="cover-verdict-icon">{{{glyph compliance.verdictIcon "14"}}}</span>
     <span class="cover-verdict-value">{{compliance.verdictLabel}}</span>
     {{#if isBacs}}
       {{#if applicabilityLabel}}
@@ -39,7 +39,7 @@
 
   <footer class="cover-footer">
     <div class="cover-footer-cell">
-      <span class="cover-footer-label">Date d'audit</span>
+      <span class="cover-footer-label">Date du rapport</span>
       <span class="cover-footer-value">{{exportDate}}</span>
     </div>
     <div class="cover-footer-cell">
@@ -48,7 +48,7 @@
     </div>
     <div class="cover-footer-cell">
       <span class="cover-footer-label">Version</span>
-      <span class="cover-footer-value cover-footer-version">{{version}}</span>
+      <span class="cover-footer-value cover-footer-version">{{#if versionLabel}}{{versionLabel}}{{else}}{{version}}{{/if}}</span>
     </div>
   </footer>
 </section>
@@ -64,7 +64,7 @@
     {{#if synthesisHtml}}
     <li class="toc-row lvl-1" data-toc-link="synthesis">
       <a href="#synthesis" class="toc-link">
-        <span class="toc-num">00</span>
+        <span class="toc-num"></span>
         <span class="toc-title">Note de synthèse</span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
@@ -107,7 +107,7 @@
     <li class="toc-row lvl-1" data-toc-link="thermal">
       <a href="#thermal" class="toc-link">
         <span class="toc-num">5</span>
-        <span class="toc-title">Régulation thermique automatique <span class="toc-ref">R175-6</span></span>
+        <span class="toc-title">Régulation automatique du chauffage <span class="toc-ref">R175-6</span></span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
       </a>
@@ -116,12 +116,13 @@
     <li class="toc-row lvl-1" data-toc-link="bms">
       <a href="#bms" class="toc-link">
         <span class="toc-num">{{#if isBacs}}6{{else}}5{{/if}}</span>
-        <span class="toc-title">{{#if isBacs}}Solution GTB / GTC <span class="toc-ref">R175-3, R175-4, R175-5</span>{{else}}Solution de supervision en place{{/if}}</span>
+        <span class="toc-title">{{#if isBacs}}Solution GTB <span class="toc-ref">R175-3, R175-4, R175-5</span>{{else}}Solution de supervision en place{{/if}}</span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
       </a>
     </li>
-    {{#if isBacs}}{{#if inspections}}{{#if (or inspections.last_inspection_date inspections.last_inspection_inspector inspections.last_inspection_anomalies_html inspections.last_inspection_recommendations_html inspections.next_inspection_due_date inspections.notes)}}
+    {{#if isBacs}}
+    {{#if showInspectionsChapter}}
     <li class="toc-row lvl-1" data-toc-link="inspections">
       <a href="#inspections" class="toc-link">
         <span class="toc-num">7</span>
@@ -130,34 +131,65 @@
         <span class="toc-page">···</span>
       </a>
     </li>
+    {{/if}}
     <li class="toc-row lvl-1" data-toc-link="plan">
       <a href="#plan" class="toc-link">
-        <span class="toc-num">8</span>
+        <span class="toc-num">{{planChapterNumber}}</span>
         <span class="toc-title">Plan de mise en conformité</span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
       </a>
     </li>
-    {{else}}
-    <li class="toc-row lvl-1" data-toc-link="plan">
-      <a href="#plan" class="toc-link">
-        <span class="toc-num">7</span>
-        <span class="toc-title">Plan de mise en conformité</span>
+    {{!-- Annexes (relecture clarté R2 m2) --}}
+    <li class="toc-row lvl-1" data-toc-link="annex-a">
+      <a href="#annex-a" class="toc-link">
+        <span class="toc-num">A</span>
+        <span class="toc-title">Annexe A — Décret BACS (R175-1 à R175-6)</span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
       </a>
     </li>
-    {{/if}}{{else}}
-    <li class="toc-row lvl-1" data-toc-link="plan">
-      <a href="#plan" class="toc-link">
-        <span class="toc-num">7</span>
-        <span class="toc-title">Plan de mise en conformité</span>
+    <li class="toc-row lvl-1" data-toc-link="annex-b">
+      <a href="#annex-b" class="toc-link">
+        <span class="toc-num">B</span>
+        <span class="toc-title">Annexe B — Méthodologie et hypothèses</span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
       </a>
     </li>
-    {{/if}}{{/if}}
+    <li class="toc-row lvl-1" data-toc-link="annex-c">
+      <a href="#annex-c" class="toc-link">
+        <span class="toc-num">C</span>
+        <span class="toc-title">Annexe C — Justification des préconisations</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="annex-d">
+      <a href="#annex-d" class="toc-link">
+        <span class="toc-num">D</span>
+        <span class="toc-title">Annexe D — Mentions légales et avertissements</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{#if reportAttachments.length}}
+    <li class="toc-row lvl-1" data-toc-link="annex-e">
+      <a href="#annex-e" class="toc-link">
+        <span class="toc-num">E</span>
+        <span class="toc-title">Annexe E — Documents joints</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{/if}}
+    {{/if}}
   </ul>
+  {{!-- Sigles employés dans le rapport (D-45) : lecteur non technicien. --}}
+  <div class="toc-glossary">
+    <span class="toc-glossary-title">Sigles utilisés</span>
+    <p>{{#if isBacs}}<strong>BACS</strong> : système d'automatisation et de contrôle du bâtiment, au sens du décret · {{/if}}<strong>GTB</strong> : gestion technique du bâtiment{{#if isBacs}}, désigne ici le BACS du site{{/if}} · <strong>ECS</strong> : eau chaude sanitaire · <strong>CTA</strong> : centrale de traitement d'air · <strong>DRV</strong> : climatisation à débit de réfrigérant variable · <strong>PAC</strong> : pompe à chaleur · <strong>TRI</strong> : temps de retour sur investissement · <strong>CEE</strong> : certificats d'économies d'énergie · <strong>VMC</strong> : ventilation mécanique contrôlée · <strong>TGBT</strong> : tableau général basse tension · <strong>TD</strong> : tableau divisionnaire · <strong>FCU</strong> : ventilo-convecteur · <strong>HS</strong> : hors service.</p>
+  </div>
 </section>
 
 {{!-- ═══════════ Page L'essentiel — synthèse en 1 page (page 3) ═══════════ --}}
@@ -168,12 +200,16 @@
   </header>
 
   <div class="essential-verdict-banner essential-verdict-{{compliance.verdict}}">
-    <span class="essential-verdict-icon">{{compliance.verdictIcon}}</span>
+    <span class="essential-verdict-icon">{{{glyph compliance.verdictIcon "11"}}}</span>
     <div class="essential-verdict-body">
-      <span class="essential-verdict-label">{{compliance.verdictLabel}}{{#if isBacs}} au décret BACS{{else}} de la GTB existante{{/if}}</span>
+      <span class="essential-verdict-label">{{#if isBacs}}{{#if compliance.verdictHeadline}}{{compliance.verdictHeadline}}{{else}}{{compliance.verdictLabel}} au décret BACS{{/if}}{{else}}{{compliance.verdictLabel}} de la GTB existante{{/if}}</span>
       <span class="essential-verdict-detail">
         {{#if isBacs}}
-          {{#if (eq compliance.verdict "non_compliant")}}{{compliance.stats.blocking}} action{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}} bloquante{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}} empêchent la conformité au décret. Plan de mise en conformité estimé à 6-12 mois selon les arbitrages.{{else}}{{#if (eq compliance.verdict "partial")}}{{compliance.stats.major}} action{{#unless (eq compliance.stats.major 1)}}s{{/unless}} majeure{{#unless (eq compliance.stats.major 1)}}s{{/unless}} restante{{#unless (eq compliance.stats.major 1)}}s{{/unless}} pour atteindre la conformité complète.{{else}}{{#if (eq compliance.verdict "compliant")}}Aucune action bloquante ni majeure identifiée — site conforme au décret BACS.{{else}}Conformité non statuée : la GTB existante doit d'abord être qualifiée pour pouvoir conclure sur la conformité au décret.{{/if}}{{/if}}{{/if}}
+          {{compliance.verdictDetail}}
+          {{#if compliance.reservesList.length}}
+          {{#unless (eq compliance.verdict "compliant_reserves")}}<span class="essential-reserves-lead">Obligations à respecter en outre :</span>{{/unless}}
+          <ul class="essential-reserves">{{#each compliance.reservesList}}<li><strong>{{title}}</strong>{{#if article}} ({{article}}){{/if}}</li>{{/each}}</ul>
+          {{/if}}
         {{else}}
           {{compliance.coverage.integrated}} équipement{{#unless (eq compliance.coverage.integrated 1)}}s{{/unless}} intégré{{#unless (eq compliance.coverage.integrated 1)}}s{{/unless}} sur {{compliance.coverage.present}} présent{{#unless (eq compliance.coverage.present 1)}}s{{/unless}} ({{compliance.coverage.ratio}} %). {{compliance.stats.total}} préconisations Buildy pour étendre la couverture de la GTB.
         {{/if}}
@@ -184,7 +220,7 @@
   {{#if isBacs}}{{#unless compliance.assujettissement.determined}}
   <div class="essential-caveat">
     <span class="essential-caveat-icon">i</span>
-    <span>Assujettissement au décret non statué — puissance ou date de permis non renseignées. Le verdict porte sur les non-conformités constatées et sera confirmé une fois l'assujettissement déterminé.</span>
+    <span>Assujettissement au décret non déterminé : le statut du bâtiment n'a pas pu être établi (puissance ou date de dépôt du permis de construire à confirmer). Le verdict porte sur les écarts constatés et sera confirmé une fois l'assujettissement déterminé.</span>
   </div>
   {{/unless}}{{/if}}
 
@@ -196,14 +232,17 @@
         <li>
           <span class="step-num">1</span>
           <span class="step-body">
-            Puissance retenue (max chaud / froid) : <strong>{{compliance.assujettissement.powerKw}} kW</strong>
+            Puissance retenue (max chaud / froid) : <strong>{{frNum compliance.assujettissement.powerKw}} kW</strong>
             {{#if powerSummary}}
             <span class="power-breakdown">
-              chaud cumulé {{powerSummary.heatKw}} kW · froid cumulé {{powerSummary.coolKw}} kW
-              {{#if (eq powerSummary.source "auto")}} · calcul automatique{{else}} · valeur saisie manuellement{{/if}}
+              chaud cumulé {{frNum powerSummary.heatKw}} kW · froid cumulé {{frNum powerSummary.coolKw}} kW
+              {{#if (eq powerSummary.source "auto")}} · calcul automatique{{else}} · valeur déclarée{{/if}}
             </span>
             {{#if powerSummary.discrepancy}}
-            <span class="power-discrepancy">{{{faIcon "triangle-exclamation" "#ea580c" "9"}}} Écart de {{powerSummary.discrepancyPct}} % entre la valeur saisie ({{powerSummary.manualKw}} kW) et le cumul calculé ({{powerSummary.autoKw}} kW) — à vérifier.</span>
+            <span class="power-discrepancy">{{{faIcon "triangle-exclamation" "#ea580c" "9"}}} La valeur déclarée ({{frNum powerSummary.manualKw}} kW) est retenue ; elle s'écarte de {{powerSummary.discrepancyPct}} % du cumul calculé à partir des équipements relevés ({{frNum powerSummary.autoKw}} kW).</span>
+            {{/if}}
+            {{#if powerSummary.incompletePowerNote}}
+            <span class="power-discrepancy">{{{faIcon "triangle-exclamation" "#ea580c" "9"}}} {{powerSummary.incompletePowerNote}}</span>
             {{/if}}
             {{/if}}
           </span>
@@ -216,7 +255,7 @@
         {{/if}}
         <li>
           <span class="step-num">{{#if compliance.assujettissement.pcDateLabel}}3{{else}}2{{/if}}</span>
-          <span class="step-body">Seuil applicable : <strong>{{compliance.assujettissement.thresholdLabel}}</strong> → {{compliance.assujettissement.conclusion}}</span>
+          <span class="step-body">Seuil applicable : <strong>{{compliance.assujettissement.thresholdLabel}}</strong> {{{glyph "→" "10"}}} {{compliance.assujettissement.conclusion}}</span>
         </li>
       </ol>
     </div>
@@ -242,30 +281,72 @@
 
     <div class="essential-stats">
       <h3 class="essential-block-title">{{#if isBacs}}Plan d'action en chiffres{{else}}Préconisations Buildy{{/if}}</h3>
-      <div class="stats-grid">
-        <div class="stat stat-blocking">
+      <div class="stats-grid{{#if compliance.stats.reserves}} stats-grid-4{{/if}}">
+        <div class="stat stat-blocking{{#unless compliance.stats.blocking}} stat-zero{{/unless}}">
           <div class="stat-num">{{compliance.stats.blocking}}</div>
           <div class="stat-label">{{#if isBacs}}Bloquante{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}}{{else}}Essentielle{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}}{{/if}}</div>
         </div>
-        <div class="stat stat-major">
+        <div class="stat stat-major{{#unless compliance.stats.major}} stat-zero{{/unless}}">
           <div class="stat-num">{{compliance.stats.major}}</div>
           <div class="stat-label">{{#if isBacs}}Majeure{{#unless (eq compliance.stats.major 1)}}s{{/unless}}{{else}}Recommandée{{#unless (eq compliance.stats.major 1)}}s{{/unless}}{{/if}}</div>
         </div>
-        <div class="stat stat-minor">
+        <div class="stat stat-minor{{#unless compliance.stats.minor}} stat-zero{{/unless}}">
           <div class="stat-num">{{compliance.stats.minor}}</div>
           <div class="stat-label">{{#if isBacs}}Mineure{{#unless (eq compliance.stats.minor 1)}}s{{/unless}}{{else}}Optimisation{{#unless (eq compliance.stats.minor 1)}}s{{/unless}}{{/if}}</div>
         </div>
+        {{#if compliance.stats.reserves}}
+        <div class="stat stat-reserve">
+          <div class="stat-num">{{compliance.stats.reserves}}</div>
+          <div class="stat-label">Réserve{{#unless (eq compliance.stats.reserves 1)}}s{{/unless}}</div>
+        </div>
+        {{/if}}
       </div>
     </div>
   </div>
 
+  {{!-- Actions prioritaires : les 3 premières actions du plan (bloquantes,
+       puis majeures, puis mineures), nommées dès la page 3 (charte : « actions
+       phares ») — relecture PDF 2026-09-24. --}}
+  {{#if isBacs}}{{#if compliance.headlineActions.length}}
+  {{!-- Une ligne par action (numéro · intitulé · niveau · article) : la
+       page « L'essentiel » doit tenir sur une seule page. --}}
+  <div class="essential-headlines">
+    <h3 class="essential-block-title essential-block-title-split">Actions prioritaires<span class="essential-block-aside">Plan complet au chapitre {{planChapterNumber}}</span></h3>
+    <ol class="headlines-list">
+      {{#each compliance.headlineActions}}
+      <li class="headline">
+        <span class="headline-num">{{display_number}}</span>
+        <span class="headline-title">{{#if title_plain}}{{title_plain}}{{else}}{{{title}}}{{/if}}</span>
+        <span class="headline-meta"><span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}</span>{{#if r175_article}}<span class="r175-tag">{{r175_article}}</span>{{/if}}</span>
+      </li>
+      {{/each}}
+    </ol>
+  </div>
+  {{/if}}{{/if}}
+
+  {{!-- Points à qualifier : informations manquantes qui conditionnent le
+       verdict (relecture clarté R2 m31). --}}
+  {{#if isBacs}}{{#if pointsToQualify.length}}
+  <div class="callout callout-info essential-to-qualify">
+    <span class="callout-icon">{{{faIcon "circle-question" "#1b2842" "14"}}}</span>
+    <div class="callout-body">
+      <strong>Points à qualifier.</strong> Ces informations n'ont pas été communiquées lors de l'audit ; elles peuvent modifier le verdict des exigences concernées.
+      <ul class="essential-reserves">{{#each pointsToQualify}}<li>{{this}}</li>{{/each}}</ul>
+    </div>
+  </div>
+  {{/if}}{{/if}}
+
+  {{!-- Notes de contexte (structure juridique, décret tertiaire) : côte à
+       côte quand les deux sont présentes, pour tenir sur la page. --}}
+  {{#if (or ownershipStructureLabel tertiaryDecreeApplies)}}
+  <div class="essential-notes">
   {{!-- Item 4a — Structure juridique du site (assujettissement) --}}
   {{#if ownershipStructureLabel}}
   <div class="callout callout-info essential-ownership">
     <span class="callout-icon">{{{faIcon "scale-balanced" "#6b7280" "14"}}}</span>
     <div class="callout-body">
       <strong>Structure juridique : {{ownershipStructureLabel}}.</strong>
-      L'assujetti au décret BACS est déterminé système par système selon cette structure (cf. chapitre 3).
+      La personne assujettie au décret BACS (propriétaire du système de chauffage ou de climatisation) est déterminée système par système selon cette structure (chapitre 3).
       {{#if ownershipNotes}} {{ownershipNotes}}{{/if}}
     </div>
   </div>
@@ -276,8 +357,10 @@
   <div class="callout callout-info essential-tertiary">
     <span class="callout-icon">{{{faIcon "link" "#6b7280" "14"}}}</span>
     <div class="callout-body">
-      <strong>Ce site relève également du décret tertiaire</strong> (surface supérieure à 1 000 m²). Les comptages et le suivi énergétique mis en place dans le cadre du décret BACS peuvent alimenter directement vos déclarations sur la plateforme OPERAT.
+      <strong>Décret tertiaire.</strong> La surface déclarée dépasse 1 000 m² : le site relève probablement aussi du dispositif Éco Énergie Tertiaire, à confirmer selon la surface consacrée aux activités tertiaires. Les comptages et le suivi énergétique mis en place au titre du décret BACS peuvent alors alimenter les déclarations sur la plateforme OPERAT.
     </div>
+  </div>
+  {{/if}}
   </div>
   {{/if}}
 
@@ -315,36 +398,47 @@
 <section class="r175-dashboard">
   <header class="dashboard-header">
     <span class="dashboard-eyebrow">Tableau de bord</span>
-    <h1 class="dashboard-title">Conformité par exigence du décret R175</h1>
+    <h1 class="dashboard-title">Conformité par exigence du décret BACS</h1>
     <p class="dashboard-intro">
-      Pour chaque exigence du décret : <strong>ce que la loi demande</strong> (au centre)
-      et <strong>où en est votre site</strong> (verdict à droite). Chaque ligne renvoie au
-      chapitre où l'évaluation est détaillée et justifiée.
+      Pour chaque exigence du décret : <strong>ce que le décret exige</strong> (au centre)
+      et <strong>la situation constatée sur le site</strong> (verdict à droite).
     </p>
   </header>
 
+  {{!-- Têtière unique (au lieu d'un sur-titre répété sur chaque ligne) :
+       le tableau de bord tient sur une page (relecture PDF 2026-09-24). --}}
+  {{#if r175DashboardCommonNote}}
+  <p class="dashboard-common-note"><strong>Constat sur le site pour les exigences {{r175DashboardCommonNote.codes}} :</strong> {{r175DashboardCommonNote.text}}</p>
+  {{/if}}
+  <div class="r175-rows-head">
+    <span>Article</span>
+    <span>Ce que le décret exige</span>
+    <span>Situation constatée</span>
+  </div>
   <ul class="r175-rows">
     {{#each compliance.r175Dashboard}}
     <li class="r175-row r175-row-{{verdict}}">
-      <span class="r175-row-code">{{code}}</span>
+      <span class="r175-row-code">{{#if displayCode}}{{displayCode}}{{else}}{{code}}{{/if}}</span>
       <div class="r175-row-content">
-        <div class="r175-row-label">{{label}}</div>
-        <div class="r175-row-summary"><span class="r175-row-req-eyebrow">Ce que le décret exige</span>{{summary}}</div>
-        {{#if source_url}}<a class="r175-row-legifrance" href="{{source_url}}">Texte officiel · Légifrance ↗</a>{{/if}}
+        <div class="r175-row-label">{{label}}{{#if source_url}}<a class="r175-row-legifrance" href="{{source_url}}">Légifrance {{{faIcon "arrow-up-right-from-square" "#4f628c" "7"}}}</a>{{/if}}</div>
+        <div class="r175-row-summary">{{summary}}</div>
+        {{#if note}}{{#unless noteShared}}<div class="r175-row-summary r175-row-note"><strong>Constat sur le site :</strong> {{note}}</div>{{/unless}}{{/if}}
       </div>
-      <span class="r175-row-verdict r175-row-verdict-{{verdict}}">
-        <span class="r175-row-verdict-icon">{{verdictIcon}}</span>
-        {{verdictLabel}}
-      </span>
-      <span class="r175-row-actions{{#unless actionsCount}} r175-row-actions-empty{{/unless}}">
-        {{#if actionsCount}}{{actionsCount}} action{{#unless (eq actionsCount 1)}}s{{/unless}}{{else}}—{{/if}}
-      </span>
+      <div class="r175-row-status">
+        <span class="r175-row-verdict r175-row-verdict-{{verdict}}">
+          <span class="r175-row-verdict-icon">{{{glyph verdictIcon "9"}}}</span>
+          {{verdictLabel}}
+        </span>
+        <span class="r175-row-actions{{#unless actionsCount}} r175-row-actions-empty{{/unless}}">
+          {{#if actionsCount}}{{#if (eq actionsReserves actionsCount)}}{{actionsCount}} réserve{{#unless (eq actionsCount 1)}}s{{/unless}}{{else}}{{actionsCount}} action{{#unless (eq actionsCount 1)}}s{{/unless}}{{/if}}{{else if seeActionNumber}}voir {{seeActionNumber}}{{else}}—{{/if}}
+        </span>
+      </div>
     </li>
     {{/each}}
   </ul>
 
   <p class="dashboard-footnote">
-    Détail des actions correctives et préconisations Buildy : chapitre 7 « Plan de mise en conformité ».
+    Détail des actions correctives et préconisations Buildy : chapitre {{planChapterNumber}} « Plan de mise en conformité ».
   </p>
 </section>
 {{/if}}
@@ -353,7 +447,8 @@
 
 {{#if synthesisHtml}}
 {{!-- ═══════════ Synthèse executive ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="synthesis">{{{faIcon "sparkles" "#1b2842" "16"}}} Note de synthèse</h1>
+<h1 class="chapter" data-toc-anchor="synthesis">{{{faIcon "sparkles" "#1b2842" "16"}}} <span class="chapter-text">Note de synthèse</span></h1>
+{{#if synthesisDateFr}}<p class="synthesis-date">Note rédigée le {{synthesisDateFr}}.</p>{{/if}}
 <div class="synthesis-block">{{{synthesisHtml}}}</div>
 {{/if}}
 
@@ -362,7 +457,7 @@
      bord conformité R175 placés AVANT .sections (cf. en-tête du document). --}}
 
 {{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#1b2842" "16"}}} 1. Identification du site</h1>
+<h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#1b2842" "16"}}} <span class="chapter-text">1. Identification du site</span></h1>
 
 <div class="info-cards">
   <div class="info-card">
@@ -389,20 +484,20 @@
     {{#if document.bacs_total_power_kw}}
     <div class="info-card info-card-accent">
       <span class="info-card-label">Puissance retenue R175-2 <span class="info-card-label-hint">(max. chaud / froid)</span></span>
-      <span class="info-card-value info-card-value-strong">{{document.bacs_total_power_kw}} kW</span>
+      <span class="info-card-value info-card-value-strong">{{#if powerSummary}}{{frNum powerSummary.effectiveKw}}{{else}}{{frNum document.bacs_total_power_kw}}{{/if}} kW</span>
     </div>
     {{/if}}
     {{#if document.bacs_district_heating_substation_kw}}
     <div class="info-card info-card-accent">
       <span class="info-card-label">Station d'échange (réseau urbain)</span>
-      <span class="info-card-value info-card-value-strong">{{document.bacs_district_heating_substation_kw}} kW</span>
+      <span class="info-card-value info-card-value-strong">{{frNum document.bacs_district_heating_substation_kw}} kW</span>
       <span class="info-card-note">Référence R175-2</span>
     </div>
     {{/if}}
     {{#if document.bacs_building_permit_date}}
     <div class="info-card">
       <span class="info-card-label">Permis de construire</span>
-      <span class="info-card-value">{{document.bacs_building_permit_date}}</span>
+      <span class="info-card-value">{{frDate document.bacs_building_permit_date}}</span>
     </div>
     {{/if}}
     {{#if applicabilityLabel}}
@@ -418,9 +513,9 @@
 {{#if siteParties.length}}
 <div class="panel">
   <div class="panel-head">
-    <h3 class="panel-title">Structure juridique &amp; parties prenantes</h3>
+    <h3 class="panel-title">Structure juridique et parties prenantes</h3>
     {{#if ownershipStructureLabel}}
-    <p class="panel-subtitle">Structure de propriété / occupation : <strong>{{ownershipStructureLabel}}</strong>. L'assujetti au décret BACS est déterminé système par système (cf. chapitre 3).</p>
+    <p class="panel-subtitle">Structure de propriété / occupation : <strong>{{ownershipStructureLabel}}</strong>. La personne assujettie au décret BACS (propriétaire du système de chauffage ou de climatisation) est déterminée système par système (chapitre 3).</p>
     {{/if}}
   </div>
   <div class="panel-body">
@@ -443,52 +538,64 @@
 </div>
 {{/if}}
 
-{{#if siteMapDataUrl}}
+{{!-- Vue satellite du site : seulement sans carte des zones (chapitre 2),
+     qui montre le même site avec les repères de zones (pas deux vues du
+     même site à deux pages d'intervalle). --}}
+{{#if siteMapDataUrl}}{{#unless zonesMap}}
 <div class="map-figure map-figure-full">
   <img src="{{siteMapDataUrl}}" alt="Vue satellite du site" />
-  <p class="map-figure-caption">Vue satellite du site — pin du bâtiment principal.</p>
+  <p class="map-figure-caption">Vue satellite du site — repère du bâtiment principal.</p>
 </div>
-{{/if}}
+{{/unless}}{{/if}}
 
 {{#if isBacs}}{{#if heatingCoolingBreakdown.length}}
 <div class="panel">
   <div class="panel-head">
     <h3 class="panel-title">Détail du calcul automatique de la puissance R175-2</h3>
     <p class="panel-subtitle">
-      Cumul des puissances nominales utiles chaud et froid déclarées dans le chapitre 3.
-      Certains équipements sont saisis mais <strong>hors cumul R175-2</strong> — la raison
+      Cumul des puissances nominales utiles chaud et froid des équipements relevés au chapitre 3.
+      Certains équipements relevés sont <strong>hors cumul R175-2</strong> — la raison
       est indiquée sur leur ligne « Pris en compte ». Cas courant : un <strong>émetteur</strong>
-      (aérotherme, radiateur, ventilo-convecteur) dont la puissance est déjà comptée sur son
-      équipement de <strong>production</strong> amont — l'additionner ferait un double comptage.
-      Sont aussi exclus les équipements de secours, de process et l'aval d'un réseau de chaleur.
+      alimenté en eau chaude ou glacée (radiateur à eau, aérotherme à eau, ventilo-convecteur)
+      dont la puissance est déjà comptée sur son <strong>générateur</strong> — l'additionner ferait
+      un double comptage ; les radiateurs électriques et les aérothermes à gaz, qui produisent
+      eux-mêmes la chaleur, sont comptés. Sont aussi exclus les équipements de secours (FAQ BACS
+      n° 8), les usages autres que le chauffage et la climatisation, et l'aval d'un réseau de chaleur.
       La puissance retenue est le <strong>maximum</strong> entre le cumul chaud et le cumul froid
-      (jamais leur somme).
+      (jamais leur somme, FAQ BACS n° 11).
     </p>
   </div>
   <div class="panel-body">
-    <table>
+    {{!-- Largeurs fixes : les colonnes Zone et Équipement ne sont plus
+         écrasées par la colonne des puissances (relecture PDF 2026-09-24). --}}
+    <table class="power-calc-table">
+      <colgroup>
+        <col style="width:19%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:17%"><col style="width:18%">
+      </colgroup>
       <thead>
         <tr>
           <th>Équipement</th>
           <th>Marque / référence</th>
           <th>Catégorie</th>
           <th>Zone</th>
-          <th style="text-align:right">Puissance nominale</th>
-          <th style="text-align:right">Pris en compte</th>
+          <th>Puissance nominale</th>
+          <th>Pris en compte</th>
         </tr>
       </thead>
       <tbody>
         {{#each heatingCoolingBreakdown}}
           <tr>
             <td>{{name}}</td>
-            <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
+            <td class="wrap-anywhere">{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
             <td>{{categoryLabel}}{{#if sharedWithLabel}}<br><span class="muted" style="font-size:6.5pt">dessert aussi : {{sharedWithLabel}}</span>{{/if}}</td>
             <td>{{zone_name}}</td>
-            <td style="text-align:right">{{#if has_multiple}}{{total_power_kw}}{{else}}{{power_kw}}{{/if}} kW{{#if has_multiple}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{/if}}</td>
+            <td style="text-align:right">{{#if power_kw}}<span class="nowrap">{{#if has_multiple}}{{frNum total_power_kw}}{{else}}{{frNum power_kw}}{{/if}} kW{{#if power_kw_cooling}} chaud{{/if}}</span>{{#if has_multiple}} <span class="muted nowrap">({{quantity}} × {{frNum power_kw}} kW)</span>{{/if}}{{/if}}{{#if power_kw_cooling}}{{#if power_kw}}<br>{{/if}}<span class="nowrap">{{#if has_multiple}}{{frNum total_power_kw_cooling}}{{else}}{{frNum power_kw_cooling}}{{/if}} kW froid</span>{{#if has_multiple}} <span class="muted nowrap">({{quantity}} × {{frNum power_kw_cooling}} kW)</span>{{/if}}{{/if}}{{#if power_missing}}Non renseignée{{#if has_multiple}} <span class="muted nowrap">({{quantity}} unités)</span>{{/if}}{{/if}}</td>
             <td style="text-align:right">
-              {{#if in_scope}}
-                {{#if heat_contrib}}<strong>+{{heat_contrib}} kW</strong> chaud{{/if}}
-                {{#if cool_contrib}}{{#if heat_contrib}}<br>{{/if}}<strong>+{{cool_contrib}} kW</strong> froid{{/if}}
+              {{#if power_missing}}
+                <span class="muted">Non comptée</span><br><span class="muted" style="font-size:6.5pt">puissance à relever</span>
+              {{else if in_scope}}
+                {{#if heat_contrib}}<span class="nowrap"><strong>+{{frNum heat_contrib}} kW</strong> chaud</span>{{/if}}
+                {{#if cool_contrib}}{{#if heat_contrib}}<br>{{/if}}<span class="nowrap"><strong>+{{frNum cool_contrib}} kW</strong> froid</span>{{/if}}
                 {{#unless heat_contrib}}{{#unless cool_contrib}}<span class="muted">0 kW</span>{{/unless}}{{/unless}}
               {{else}}
                 <span class="muted">Hors cumul</span>{{#if exclusion_reason_label}}<br><span class="muted" style="font-size:6.5pt">{{exclusion_reason_label}}</span>{{/if}}
@@ -498,35 +605,31 @@
         {{/each}}
         <tr class="total-row">
           <td colspan="5" style="text-align:right"><strong>Cumul chaud retenu</strong></td>
-          <td style="text-align:right"><strong>{{powerRecap.heatRetained}} kW</strong></td>
+          <td style="text-align:right"><strong>{{frNum powerRecap.heatRetained}} kW</strong></td>
         </tr>
         <tr class="total-row">
           <td colspan="5" style="text-align:right"><strong>Cumul froid retenu</strong></td>
-          <td style="text-align:right"><strong>{{powerRecap.coolRetained}} kW</strong></td>
+          <td style="text-align:right"><strong>{{frNum powerRecap.coolRetained}} kW</strong></td>
         </tr>
-        <tr class="total-row" style="background:#eef2ff">
+        <tr class="total-row" style="background:#f1f5f9">
           <td colspan="5" style="text-align:right"><strong>Puissance retenue R175-2 (max chaud / froid)</strong></td>
-          <td style="text-align:right"><strong style="color:#1b2842">{{powerRecap.retained}} kW</strong></td>
+          <td style="text-align:right"><strong style="color:#1b2842">{{frNum powerRecap.retained}} kW</strong></td>
         </tr>
       </tbody>
     </table>
+    {{#if powerSummary.incompletePowerNote}}
+    <p class="power-incomplete-note">{{powerSummary.incompletePowerNote}}</p>
+    {{/if}}
   </div>
 </div>
 {{/if}}{{/if}}
 
-{{#if barUsagePowerDataUrl}}
-<div class="panel">
-  <div class="panel-head">
-    <h3 class="panel-title">Répartition de la puissance par usage</h3>
-  </div>
-  <div class="panel-body panel-body-center">
-    <img src="{{barUsagePowerDataUrl}}" alt="Puissance par usage GTB" style="max-width: 140mm;" />
-  </div>
-</div>
-{{/if}}
+{{!-- Graphique « Répartition de la puissance par usage » retiré (relecture
+     PDF 2026-09-24) : puissances brutes, en contradiction avec la puissance
+     retenue du tableau ci-dessus. --}}
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} <span class="chapter-text">2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</span></h1>
 
 {{!-- Vue satellite annotée avec les pins de zones — affichée uniquement
      si au moins une zone fonctionnelle a des coordonnées GPS. --}}
@@ -541,7 +644,7 @@
       </span>
     {{/each}}
   </div>
-  <p class="map-figure-caption">Vue satellite des zones fonctionnelles — chaque pin renvoie à une zone listée ci-dessous.</p>
+  <p class="map-figure-caption">Vue satellite des zones fonctionnelles — chaque repère renvoie à une zone listée ci-dessous.</p>
 </div>
 {{/if}}
 
@@ -551,10 +654,10 @@
 {{#if zonesFunctional.length}}
 <h2 class="subheading">Inventaire des zones fonctionnelles</h2>
 <table>
-  <thead><tr><th>Zone</th><th>Nature</th><th>Régime d'activité</th><th>Surface (m²)</th></tr></thead>
+  <thead><tr><th>Zone</th><th>Nature</th><th>Régime d'activité</th><th>Surface <span class="unit-nocase">(m²)</span></th></tr></thead>
   <tbody>
     {{#each zonesFunctional}}
-      <tr><td><span class="zone-name-cell">{{#if mapInitial}}<span class="map-legend-pin map-legend-pin-inline" style="background:{{mapColor}}">{{mapInitial}}</span>{{/if}}<span>{{name}}</span></span></td><td>{{natureLabel}}</td><td>{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td><td>{{#if surface_m2}}{{surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td></tr>
+      <tr><td><span class="zone-name-cell">{{#if mapInitial}}<span class="map-legend-pin map-legend-pin-inline" style="background:{{mapColor}}">{{mapInitial}}</span>{{/if}}<span>{{name}}</span></span></td><td>{{natureLabel}}</td><td>{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td><td>{{#if surface_m2}}{{frNum surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td></tr>
     {{/each}}
   </tbody>
 </table>
@@ -590,13 +693,13 @@
 <h2 class="subheading">Locaux techniques</h2>
 <div class="callout callout-info">
   <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
-  <div class="callout-body">Les locaux techniques (tableaux électriques, locaux compteurs, locaux techniques) ne sont <strong>pas des zones fonctionnelles au sens du décret BACS</strong>. Ils sont listés ici à titre d'inventaire pour rattacher les compteurs et organes de coupure à un emplacement physique.</div>
+  <div class="callout-body">Les locaux techniques (tableaux électriques, locaux de comptage, chaufferies…) ne sont <strong>pas retenus comme zones fonctionnelles dans cet audit</strong> (méthode Buildy, annexe B). Ils sont listés ici pour situer les compteurs et les organes de coupure ; les équipements qu'ils abritent restent dans le champ du décret.</div>
 </div>
 <table>
-  <thead><tr><th>Local</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
+  <thead><tr><th>Local</th><th>Nature</th><th>Surface <span class="unit-nocase">(m²)</span></th></tr></thead>
   <tbody>
     {{#each zonesTechnical}}
-      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{#if surface_m2}}{{surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td></tr>
+      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{#if surface_m2}}{{frNum surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td></tr>
     {{/each}}
   </tbody>
 </table>
@@ -626,17 +729,17 @@
 <h2 class="subheading">Regroupement par usage technique</h2>
 <div class="callout callout-info">
   <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
-  <div class="callout-body">Au sens du décret (R175-1 6°), une zone fonctionnelle est une <strong>unité de suivi énergétique</strong>. Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones sont regroupées en une seule zone fonctionnelle de suivi. Le découpage peut donc différer selon le système technique concerné.</div>
+  <div class="callout-body">Le décret définit la zone fonctionnelle comme « toute zone dans laquelle les usages sont homogènes » (R175-1 6°). Lorsque des espaces sont desservis par un même équipement sans comptage séparable, ils sont regroupés en une seule zone de suivi ; le découpage peut varier selon le système technique (FAQ BACS n° 25).</div>
 </div>
 {{#each functionalZones.byCategory}}
   {{#if (gt functional_zone_count 0)}}
   <div class="entity-block">
-    <h3 class="fz-heading">{{{categoryIcon category "14"}}} <span>{{categoryLabel}} — {{physical_zone_count}} zone{{#unless (eq physical_zone_count 1)}}s{{/unless}} d'usage → {{functional_zone_count}} zone{{#unless (eq functional_zone_count 1)}}s{{/unless}} fonctionnelle{{#unless (eq functional_zone_count 1)}}s{{/unless}} de suivi</span></h3>
+    <h3 class="fz-heading">{{{categoryIcon category "14"}}} <span>{{categoryLabel}} — {{physical_zone_count}} zone{{#unless (eq physical_zone_count 1)}}s{{/unless}} d'usage {{{glyph "→" "12"}}} {{functional_zone_count}} zone{{#unless (eq functional_zone_count 1)}}s{{/unless}} fonctionnelle{{#unless (eq functional_zone_count 1)}}s{{/unless}} de suivi</span></h3>
     <ul class="method-list">
       {{#each groups}}
         <li>
           <strong>{{label}}</strong>
-          {{#if merged}} — {{justification}}{{/if}}
+          {{#if merged}} — {{justification}}{{#if separateMetersPresent}} Des compteurs séparés sont toutefois présents dans plusieurs de ces zones : regroupement à confirmer.{{/if}}{{/if}}
         </li>
       {{/each}}
     </ul>
@@ -649,40 +752,72 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#1b2842" "16"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#1b2842" "16"}}} <span class="chapter-text">3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</span></h1>
 {{!-- Zones fonctionnelles sans système thermique présent : hors
      périmètre R175-2 (pas de chauffage / climatisation / ECS). Listées
      ici pour clarifier pourquoi elles n'apparaissent pas dans
      l'inventaire ci-dessous. --}}
+{{#if isBacs}}{{#if hasLiabilityData}}{{#if defaultLiability}}
+{{!-- Même gabarit que les autres encadrés d'ouverture du chapitre (taille,
+     retrait) ; icône propre (personne assujettie ≠ balance du TRI). --}}
+<div class="callout callout-info">
+  <span class="callout-icon">{{{faIcon "user-tie" "#1b2842" "14"}}}</span>
+  <div class="callout-body">
+    <strong>Sauf mention contraire sur un système — {{defaultLiability.label}}.</strong>{{#if defaultLiability.generalExplanation}} {{defaultLiability.generalExplanation}}{{/if}}
+  </div>
+</div>
+{{/if}}{{/if}}{{/if}}
+{{#if hasConditionalSystems}}
+<div class="callout callout-info">
+  <span class="callout-icon">{{{faIcon "scale-balanced" "#1b2842" "14"}}}</span>
+  <div class="callout-body">
+    <strong>Systèmes raccordés sous condition.</strong> Dans un bâtiment existant, le raccordement à la GTB de certains systèmes n'est exigé que s'il est réalisable avec un temps de retour sur investissement inférieur à dix ans, déduction faite des aides financières publiques (R175-2 II). Ces systèmes sont signalés ci-dessous ; leurs écarts figurent au plan d'actions en actions mineures, avec cette condition d'application.
+  </div>
+</div>
+{{/if}}
 {{#if zonesOutOfBacsScope.length}}
 <div class="callout callout-info">
   <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
   <div class="callout-body">
-    <strong>Zones sans système technique concerné :</strong> aucun système de
-    chauffage, climatisation, ECS, ventilation, éclairage ou production
-    d'énergie n'est présent dans
+    <strong>Zones sans système technique relevé :</strong> aucun système de
+    chauffage, de climatisation, d'eau chaude sanitaire, de ventilation, d'éclairage
+    ou de production d'énergie n'a été relevé dans
     {{#each zonesOutOfBacsScope}}<strong>{{name}}</strong>{{#unless @last}}, {{/unless}}{{/each}}.
-    Ces zones n'apparaissent donc pas dans l'inventaire ci-dessous.
   </div>
 </div>
 {{/if}}
 {{#each systemsByZone}}
+{{!-- Zone dont tous les usages sont déclarés absents : déjà citée dans
+     l'encadré ci-dessus, pas de liste « Absent » répétée (R2 M6). --}}
+{{#unless allAbsent}}
 <h2 class="zone-heading">{{zone_name}}</h2>
+{{!-- Usages non présents : une seule ligne sous le titre de zone (plus de
+     boîte « Absent » par usage — relecture PDF 2026-09-24). --}}
+{{#if (or absentLabels.length unansweredLabels.length)}}
+<p class="zone-absent-line">
+  {{#if absentLabels.length}}<span class="zone-absent-group"><span class="zone-absent-label">Usage{{#unless (eq absentLabels.length 1)}}s{{/unless}} absent{{#unless (eq absentLabels.length 1)}}s{{/unless}} :</span>{{#each absentLabels}}<span class="zone-absent-item">{{{categoryIcon system_category "10"}}}&nbsp;{{categoryLabel}}</span>{{/each}}</span>{{/if}}
+  {{#if unansweredLabels.length}}<span class="zone-absent-group"><span class="zone-absent-label">Présence non renseignée :</span>{{#each unansweredLabels}}<span class="zone-absent-item">{{{categoryIcon system_category "10"}}}&nbsp;{{categoryLabel}}</span>{{/each}}</span>{{/if}}
+</p>
+{{/if}}
 {{#each items}}
   {{#if present}}
     <div class="system-card system-card-{{system_category}}">
       <div class="system-card-head">
         {{{categoryIcon system_category "16"}}}
         <span class="system-card-label">{{displayLabel}}</span>
-        {{#if total_power_kw}}
-          <span class="system-card-power">{{total_power_kw}} kW</span>
+        {{#if power_differs}}
+          <span class="system-card-power">{{#if retained_power_kw}}{{frNum retained_power_kw}} kW retenus{{else}}Hors cumul{{/if}} <span class="muted">({{frNum total_power_kw}} kW installés)</span></span>
+        {{else if display_power_kw}}
+          <span class="system-card-power">{{frNum display_power_kw}} kW</span>
         {{/if}}
-        <span class="system-card-count">{{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}}{{#if shared_device_count}} dont {{shared_device_count}} partagé{{#unless (eq shared_device_count 1)}}s{{/unless}}{{/if}}</span>
         {{#if serves_multiple_buildings}}<span class="system-card-flag" title="Système desservant plusieurs bâtiments du site — cas F d'assujettissement (R175-2 §I)">Multi-bâtiments</span>{{/if}}
         {{#if is_district_heating_substation}}<span class="system-card-flag" title="Sous-station de réseau de chaleur urbain — cas E d'assujettissement (R175-2 §I)">Sous-station RDU</span>{{/if}}
         {{#if managed_by_bms}}<span class="system-card-flag system-card-flag-bms" title="Système géré par la GTB">Géré par GTB</span>{{/if}}
-        {{#if (eq is_looped "looped")}}<span class="system-card-flag" title="Boucle d'ECS — arrêt interdit (légionelles)">Bouclée</span>{{/if}}
+        {{#if (eq is_looped "looped")}}<span class="system-card-flag" title="Boucle d'eau chaude sanitaire — point de vigilance sanitaire (légionelles)">Bouclée</span>{{/if}}
         {{#if (eq is_looped "not_looped")}}<span class="system-card-flag system-card-flag-muted" title="Production ECS sans boucle">Sans boucle</span>{{/if}}
+        {{!-- Nombre d'équipements en dernier, calé à droite : en cas de
+             repli sur deux lignes, les pastilles suivent le titre. --}}
+        <span class="system-card-count">{{#if device_count}}{{device_count}} équipement{{#unless (eq device_count 1)}}s{{/unless}}{{#if shared_device_count}} dont {{shared_device_count}} partagé{{#unless (eq shared_device_count 1)}}s{{/unless}}{{/if}}{{else}}Équipements non détaillés{{/if}}</span>
       </div>
       <div class="system-card-body">
         {{!-- Verdict de conformité R175-3 par système : permet au lecteur
@@ -704,21 +839,22 @@
         <div class="callout callout-warning system-callout">
           <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
           <div class="callout-body">
-            <strong>Eau chaude sanitaire bouclée — arrêt interdit.</strong> Conformément à l'arrêté du 30 novembre 2005, une boucle d'eau chaude sanitaire ne peut pas être arrêtée ni mise en veille (risque de prolifération des légionelles). Le pilotage BACS ne doit pas couper ce poste : il assure la surveillance de la température de bouclage (≥ 50 °C en tout point).
+            <strong>Eau chaude sanitaire bouclée — point de vigilance sanitaire.</strong> En période d'occupation, et dans les 24 heures qui précèdent l'utilisation, les températures de production et de distribution fixées par l'arrêté du 30 novembre 2005 doivent être respectées (risque lié aux légionelles). Un arrêt n'est envisageable que pendant une inoccupation de plusieurs semaines, suivi d'une remise en service selon les recommandations sanitaires. Les commandes d'arrêt ou de réduction pilotées par la GTB en tiennent compte (guide PROFEEL, non opposable).
           </div>
         </div>
         {{/if}}
         {{!-- Item 1 — Encart d'exemption pour un poste marqué négligeable (< 5 %) --}}
         {{#if marked_negligible_under_5pct}}
-        <div class="callout callout-info system-callout">
-          <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
-          <div class="callout-body">
-            <strong>Poste exempté en application de la règle des 5 %</strong> (FAQ ministère, juin 2025). Un poste représentant moins de 5 % de la consommation totale du bâtiment peut être écarté du raccordement et du comptage.{{#if negligible_justification}} {{negligible_justification}}{{/if}}
+        {{!-- Note sans cadre : le verdict du système (encadré au-dessus) dit
+             déjà l'exemption ; ici, la règle (relecture PDF 2026-09-24). --}}
+        <div class="system-rule-note">
+          <div>
+            <strong>Règle des 5 %.</strong> Le raccordement à la GTB n'est pas exigé lorsque les consommations d'énergie effectives et induites (par exemple, les pertes thermiques par extraction pour la ventilation) de l'ensemble des équipements régulés par la même fonction représentent moins de 5 % de la consommation d'énergie totale du bâtiment. Cette part s'apprécie sur tous les équipements concernés du bâtiment, et non système par système (FAQ ministérielle n° 16, non opposable).
           </div>
         </div>
         {{/if}}
         {{!-- Item 4d — Assujetti calculé pour ce système --}}
-        {{#if liability}}{{#if ../../hasLiabilityData}}
+        {{#if liability}}{{#if ../../hasLiabilityData}}{{#unless liabilityIsDefault}}
         <div class="system-liability">
           <span class="system-liability-icon">{{{faIcon "scale-balanced" "#1b2842" "10"}}}</span>
           <div class="system-liability-body">
@@ -726,7 +862,7 @@
             {{#if liability.explanation}}<span class="muted"> {{liability.explanation}}</span>{{/if}}
           </div>
         </div>
-        {{/if}}{{/if}}
+        {{/unless}}{{/if}}{{/if}}
         {{#if device_count}}
           {{!--
             Refonte v2.x : passage du tableau dense (qui wrap mal en
@@ -745,28 +881,33 @@
                     {{#if brand}}<span class="device-card-ref"> · {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}
                     {{#if out_of_service}}<span class="device-card-hs">HS</span>{{/if}}
                     {{#if is_backup}}<span class="device-card-backup" title="Équipement de secours — puissance exclue du cumul BACS">Secours</span>{{/if}}
-                    {{#if validation_forced}}<span class="device-card-forced" title="L'auditeur a validé cet équipement malgré des champs de conformité non renseignés.">Validation forcée</span>{{/if}}
-                    {{#if bms_integration_out_of_service}}<span class="device-card-bms-hs" title="L'intégration GTB de cet équipement est hors service.">Intégration GTB HS</span>{{/if}}
+                    {{#if bms_integration_out_of_service}}<span class="device-card-bms-hs" title="La liaison entre cet équipement et la GTB est hors service.">Liaison GTB hors service</span>{{/if}}
                     {{#if sharedWithLabel}}
-                      <span class="shared-badge shared-badge-wrap" title="Équipement partagé avec d'autres systèmes">↔ Dessert aussi : {{sharedWithLabel}}</span>
+                      <span class="shared-badge shared-badge-wrap" title="Équipement partagé avec d'autres systèmes">{{{faIcon "arrow-right-arrow-left" "currentColor" "7"}}} Dessert aussi : {{sharedWithLabel}}</span>
                     {{/if}}
                   </div>
                   {{#if ../is_bacs}}
                   <div class="device-card-r175">
-                    <span class="r175-3-pill {{triCls is_communicating 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
-                      {{triSym is_communicating}} Communicant
+                    {{!-- Système exempté (règle des 5 %) : la communication
+                         n'est pas exigée, pastille neutre (pas de rouge). --}}
+                    <span class="r175-3-pill {{#if ../marked_negligible_under_5pct}}r175-3-na{{else}}{{triCls commTri 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}{{/if}}">
+                      {{triSym commTri}} Communicant
                     </span>
                     {{!-- Pas de pastille « Interopérable » au niveau équipement :
                          l'interopérabilité (R175-3 3°) est une propriété SYSTÈME
                          (verdict systemInteropStatus, affiché sur la fiche système),
                          le champ n'existe pas par équipement (mig 42). L'afficher
                          donnait un « — » systématique contredisant le verdict. --}}
+                    {{#if p4NotApplicable}}
+                    <span class="r175-3-pill r175-3-na" title="Équipement relié à aucune GTB : l'arrêt manuel depuis la GTB et la gestion autonome sont sans objet.">Arrêt manuel et autonomie : sans objet (non relié à la GTB)</span>
+                    {{else}}
                     <span class="r175-3-pill {{triCls meets_r175_3_p4 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
                       {{triSym meets_r175_3_p4}} Arrêt manuel
                     </span>
                     <span class="r175-3-pill {{triCls meets_r175_3_p4_autonomous 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
                       {{triSym meets_r175_3_p4_autonomous}} Autonome
                     </span>
+                    {{/if}}
                   </div>
                   {{/if}}
                 </div>
@@ -778,16 +919,12 @@
                   <div class="device-attr">
                     <span class="device-attr-label">Puissance</span>
                     <span class="device-attr-value">
-                      {{#if has_multiple}}{{total_power_kw}} kW <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}} kW{{else}}—{{/if}}{{/if}}{{#if power_kw_cooling}} <span class="muted">· froid {{power_kw_cooling}} kW</span>{{/if}}
-                      {{#if powerCalc}}{{#if powerCalc.inScope}}<span class="device-power-calc">{{powerCalc.typeLabel}}</span>{{else}}<span class="device-power-calc device-power-calc-out">hors cumul{{#if powerCalc.reasonLabel}} · {{powerCalc.reasonLabel}}{{/if}}</span>{{/if}}{{/if}}
+                      {{!-- Chaud et froid : une ligne chacun, libellée (même format
+                           que le tableau du calcul de puissance). --}}
+                      {{#if power_kw}}{{#if power_kw_cooling}}<span class="muted">chaud</span> {{/if}}<span class="nowrap">{{#if has_multiple}}{{frNum total_power_kw}}{{else}}{{frNum power_kw}}{{/if}} kW</span>{{#if has_multiple}} <span class="muted nowrap">({{quantity}} × {{frNum power_kw}} kW)</span>{{/if}}{{/if}}{{#if power_kw_cooling}}{{#if power_kw}}<br>{{/if}}<span class="muted">froid</span> <span class="nowrap">{{#if has_multiple}}{{frNum total_power_kw_cooling}}{{else}}{{frNum power_kw_cooling}}{{/if}} kW</span>{{#if has_multiple}} <span class="muted nowrap">({{quantity}} × {{frNum power_kw_cooling}} kW)</span>{{/if}}{{/if}}{{#unless power_kw}}{{#unless power_kw_cooling}}Non renseignée{{#if has_multiple}} <span class="muted">({{quantity}} unités)</span>{{/if}}{{/unless}}{{/unless}}
+                      {{#if powerCalc}}{{#if powerCalc.inScope}}{{#if power_kw}}<span class="device-power-calc">{{powerCalc.typeLabel}}</span>{{else if power_kw_cooling}}<span class="device-power-calc">{{powerCalc.typeLabel}}</span>{{else}}<span class="device-power-calc device-power-calc-out">non comptée tant que la puissance n'est pas relevée</span>{{/if}}{{else}}<span class="device-power-calc device-power-calc-out">hors cumul{{#if powerCalc.reasonLabel}} · {{powerCalc.reasonLabel}}{{/if}}</span>{{/if}}{{/if}}
                     </span>
                   </div>
-                  {{#if age_years}}
-                  <div class="device-attr">
-                    <span class="device-attr-label">Âge</span>
-                    <span class="device-attr-value">{{age_years}} an{{#unless (eq age_years 1)}}s{{/unless}}</span>
-                  </div>
-                  {{/if}}
                   <div class="device-attr">
                     <span class="device-attr-label">Fonction(s)</span>
                     <span class="device-attr-value device-attr-roles">
@@ -796,25 +933,34 @@
                   </div>
                   <div class="device-attr">
                     <span class="device-attr-label">Communication</span>
-                    <span class="device-attr-value">{{commLabel}}{{#if is_communicating}}{{#if (eq wired 1)}} <span class="muted">· filaire</span>{{else if (eq wired 0)}} <span class="muted">· sans fil</span>{{/if}}{{/if}}</span>
+                    <span class="device-attr-value">{{commLabel}}{{#if is_communicating}}{{#if (eq wired 1)}}&nbsp;<span class="muted">·&nbsp;filaire</span>{{else if (eq wired 0)}}&nbsp;<span class="muted">·&nbsp;sans fil</span>{{/if}}{{/if}}</span>
                   </div>
                   <div class="device-attr">
                     <span class="device-attr-label">Localisation</span>
                     <span class="device-attr-value">{{#if location}}{{location}}{{else}}—{{/if}}</span>
                   </div>
-                  {{#if (or (eq metering_separable 1) (eq metering_separable 0) (eq metering_separable 'yes') (eq metering_separable 'no'))}}
-                  <div class="device-attr">
-                    <span class="device-attr-label">Mesurage séparable</span>
-                    <span class="device-attr-value">
-                      {{#if (or (eq metering_separable 1) (eq metering_separable 'yes'))}}Oui{{else}}Non{{/if}}{{#if metering_separable_note}} <span class="muted">— {{metering_separable_note}}</span>{{/if}}
-                    </span>
-                  </div>
-                  {{/if}}
                   {{#if (or has_regulation regulation_integrated regulator_brand regulator_model_reference regulator_location_production regulator_location_distribution regulator_location_emission)}}
                   <div class="device-attr">
                     <span class="device-attr-label">Régulation</span>
                     <span class="device-attr-value">
                       {{#if (eq regulation_integrated 1)}}Intégrée à l'équipement{{else if (eq regulation_integrated 0)}}Déportée{{else}}—{{/if}}
+                    </span>
+                  </div>
+                  {{/if}}
+                  {{!-- Champs facultatifs en fin de fiche : la 1re ligne (Énergie,
+                       Puissance, Fonctions, Communication) reste alignée d'une
+                       fiche à l'autre (relecture PDF 2026-09-24). --}}
+                  {{#if age_years}}
+                  <div class="device-attr">
+                    <span class="device-attr-label">Âge</span>
+                    <span class="device-attr-value">{{age_years}} an{{#unless (eq age_years 1)}}s{{/unless}}</span>
+                  </div>
+                  {{/if}}
+                  {{#if (or (eq metering_separable 1) (eq metering_separable 0) (eq metering_separable 'yes') (eq metering_separable 'no'))}}
+                  <div class="device-attr">
+                    <span class="device-attr-label">Mesurage séparable</span>
+                    <span class="device-attr-value">
+                      {{#if (or (eq metering_separable 1) (eq metering_separable 'yes'))}}Oui{{else}}Non{{/if}}{{#if metering_separable_note}} <span class="muted">— {{metering_separable_note}}</span>{{/if}}
                     </span>
                   </div>
                   {{/if}}
@@ -834,9 +980,9 @@
                 {{/if}}
                 {{!-- Notes et photos du device, integrees dans la card pour eviter
                      le bloc separe avec titre dupliqué. --}}
-                {{#if (or notes_html photos.length)}}
+                {{#if (or notes_html notes photos.length)}}
                 <div class="device-card-notes">
-                  {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}
+                  {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{else if notes}}<div class="rich-notes">{{notes}}</div>{{/if}}
                   {{#if photos.length}}
                     <div class="photo-grid">
                       {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
@@ -856,43 +1002,40 @@
                     <strong>{{name}}</strong>
                     {{#if brand}}<span class="device-card-ref"> · {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}
                     {{#if out_of_service}}<span class="device-card-hs">HS</span>{{/if}}
-                    <span class="shared-badge shared-badge-wrap" title="Équipement inventorié dans un autre système : sa fiche complète y figure.">↔ Partagé depuis {{sharedFromLabel}}</span>
+                    <span class="shared-badge shared-badge-wrap" title="Équipement inventorié dans un autre système : sa fiche complète y figure.">{{{faIcon "arrow-right-arrow-left" "currentColor" "7"}}} Partagé depuis {{sharedFromLabel}}</span>
                   </div>
                   {{#if ../is_bacs}}
                   <div class="device-card-r175">
-                    <span class="r175-3-pill {{triCls is_communicating 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
-                      {{triSym is_communicating}} Communicant
+                    {{!-- Système exempté (règle des 5 %) : la communication
+                         n'est pas exigée, pastille neutre (pas de rouge). --}}
+                    <span class="r175-3-pill {{#if ../marked_negligible_under_5pct}}r175-3-na{{else}}{{triCls commTri 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}{{/if}}">
+                      {{triSym commTri}} Communicant
                     </span>
+                    {{#if p4NotApplicable}}
+                    <span class="r175-3-pill r175-3-na" title="Équipement relié à aucune GTB : l'arrêt manuel depuis la GTB et la gestion autonome sont sans objet.">Arrêt manuel et autonomie : sans objet (non relié à la GTB)</span>
+                    {{else}}
                     <span class="r175-3-pill {{triCls meets_r175_3_p4 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
                       {{triSym meets_r175_3_p4}} Arrêt manuel
                     </span>
                     <span class="r175-3-pill {{triCls meets_r175_3_p4_autonomous 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
                       {{triSym meets_r175_3_p4_autonomous}} Autonome
                     </span>
+                    {{/if}}
                   </div>
                   {{/if}}
                 </div>
-                <div class="device-card-attrs">
-                  <div class="device-attr">
-                    <span class="device-attr-label">Fonction(s)</span>
-                    <span class="device-attr-value device-attr-roles">
-                      {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}}{{/each}}{{else}}<span class="bool-na">—</span>{{/if}}
-                    </span>
-                  </div>
-                  <div class="device-attr">
-                    <span class="device-attr-label">Communication</span>
-                    <span class="device-attr-value">{{commLabel}}</span>
-                  </div>
-                  <div class="device-attr">
-                    <span class="device-attr-label">Puissance</span>
-                    <span class="device-attr-value muted">Comptée dans {{sharedFromLabel}}</span>
-                  </div>
+                {{!-- Fiche abrégée sur une ligne : le détail figure dans le
+                     système d'origine (plus de fiche redétaillée). --}}
+                <div class="device-card-shared-note">
+                  {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}}{{/each}}{{/if}}
+                  <span>{{commLabel}}</span>
+                  <span class="muted">Puissance {{#if powerCalc.inScope}}comptée dans {{sharedFromLabel}}{{else}}: voir {{sharedFromLabel}}{{#if powerCalc.reasonLabel}} — hors cumul : {{powerCalc.reasonLabel}}{{/if}}{{/if}}</span>
                 </div>
               </div>
             {{/each}}
           </div>
         {{else}}
-          <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
+          <p class="muted">Système présent sur site ; ses équipements n'ont pas été détaillés lors de l'audit.</p>
         {{/if}}
         {{!-- Notes/photos au niveau systeme (commentaires globaux sur la
              categorie, distincts des notes par equipement integrees dans
@@ -910,83 +1053,34 @@
         {{/if}}
       </div>
     </div>
-  {{else}}
-    <div class="system-absent">
-      {{{categoryIcon system_category "16"}}}
-      <span class="system-absent-label">{{categoryLabel}}</span>
-      <span class="system-absent-status">{{#if not_concerned}}{{negativeLabel}}{{else}}Non présent{{/if}}</span>
-    </div>
   {{/if}}
 {{/each}}
+{{/unless}}
 {{/each}}
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "16"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#1b2842" "16"}}} <span class="chapter-text">4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</span></h1>
 
 {{#if isBacs}}
 <div class="callout callout-info">
-  <span class="callout-icon">{{{faIcon "circle-info" "#0ea5e9" "14"}}}</span>
+  <span class="callout-icon">{{{faIcon "circle-info" "#1b2842" "14"}}}</span>
   <div class="callout-body">
-    <strong>Ce que le décret exige.</strong> Le décret (R175-3 1°) impose de <strong>mesurer en continu</strong>
-    les consommations d'énergie du bâtiment, <strong>usage par usage</strong> (chauffage, climatisation,
-    éclairage…) et <strong>zone par zone</strong>, et de <strong>conserver ces relevés pendant cinq ans</strong>.
-    Concrètement, chaque usage doit disposer de son propre compteur communicant. Un compteur
-    <strong>« requis mais manquant »</strong> ci-dessous est donc un point de mesure absent : la consommation
-    correspondante ne peut être ni suivie ni optimisée — c'est un écart au décret, à corriger dans le plan de
-    mise en conformité (chapitre du plan d'action).
+    <strong>Ce que le décret exige.</strong> La GTB doit <strong>suivre, enregistrer et analyser en continu</strong>,
+    <strong>par zone fonctionnelle</strong> et <strong>au pas horaire</strong>, les données de production et de
+    consommation d'énergie des systèmes techniques qui doivent lui être reliés, et <strong>conserver ces données</strong>
+    à l'échelle mensuelle <strong>pendant cinq ans</strong> (R175-3 1°). Le décret ne fixe pas de nombre minimal de
+    compteurs : il faut autant de mesures que nécessaire pour obtenir ces données (FAQ BACS n° 26). Le plan de
+    comptage ci-dessous est celui que Buildy préconise pour y parvenir ; un compteur <strong>« requis mais
+    manquant »</strong> est un point de mesure prévu par ce plan mais absent du site ; il est traité dans le
+    plan de mise en conformité (chapitre {{planChapterNumber}}).
   </div>
 </div>
 {{/if}}
 
-{{#if meterCoverageMatrix.rows.length}}
-{{!-- ─── Matrice de couverture du plan de comptage ────────────────────
-     Grille zones × énergies pour visualiser le plan de comptage en un
-     coup d'œil. Cellule = badges-icônes d'usage (ou d'énergie pour le
-     compteur général). Dot vert/rouge/noir pour l'état. --}}
-<div class="coverage-matrix">
-  <div class="coverage-matrix-head">{{{faIcon "gauge" "#10b981" "12"}}} Plan de comptage — vue d'ensemble de la couverture</div>
-  <table class="coverage-table">
-    <thead>
-      <tr>
-        <th class="coverage-zone-head">Zone</th>
-        {{#each meterCoverageMatrix.energies}}
-          <th class="coverage-energy-head{{#unless used}} coverage-energy-empty{{/unless}}">
-            <span class="coverage-energy-cell">
-              <span class="coverage-energy-icon" style="background:{{color}}1a;color:{{color}}">{{{faIcon icon color "9"}}}</span>
-              <span class="coverage-energy-label">{{label}}</span>
-            </span>
-          </th>
-        {{/each}}
-      </tr>
-    </thead>
-    <tbody>
-      {{#each meterCoverageMatrix.rows}}
-        <tr class="coverage-row{{#if (eq zone.kind "general")}} coverage-row-general{{/if}}">
-          <td class="coverage-zone-cell">
-            {{#if (eq zone.kind "general")}}{{{faIcon "building-circle-arrow-right" "#6b7280" "10"}}} {{/if}}{{zone.name}}{{#if (eq zone.kind "technical")}} <span class="coverage-zone-kind">(technique)</span>{{/if}}
-          </td>
-          {{#each cells}}
-            <td class="coverage-cell{{#unless energy.used}} coverage-cell-empty{{/unless}}">
-              {{#each meters}}
-                <span class="coverage-badge coverage-badge-{{state}}" style="background:{{color}}1a;color:{{color}}">
-                  {{{faIcon icon color "10"}}}
-                  <span class="coverage-dot coverage-dot-{{state}}"></span>
-                </span>
-              {{/each}}
-            </td>
-          {{/each}}
-        </tr>
-      {{/each}}
-    </tbody>
-  </table>
-  <div class="coverage-legend">
-    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-present"></span>Présent</span>
-    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-missing"></span>Requis manquant</span>
-    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-unanswered"></span>À qualifier</span>
-    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-hs"></span>Hors service</span>
-  </div>
-</div>
-{{/if}}
+{{!-- Matrice « Plan de comptage » (zones × énergies) retirée du rapport
+     comme de l'écran (2026-09-24, demande Kévin) : elle répétait les
+     tableaux par énergie ci-dessous et se lisait mal (pastilles d'état
+     minuscules). --}}
 
 {{#if meterEnergyGroups.length}}
 {{!-- ─── Sections détaillées par énergie, compteurs groupés par zone
@@ -994,11 +1088,13 @@
 {{#if isBacs}}
 <p class="meter-col-legend">
   <strong>Lecture des colonnes :</strong>
-  <strong>Requis</strong> = un compteur est exigé par le décret pour cet usage ·
+  <strong>Requis</strong> = compteur prévu par le plan de comptage que Buildy préconise pour répondre au R175-3 1° ·
   <strong>Présent</strong> = un compteur est physiquement installé ·
   <strong>Communicant</strong> = le compteur peut transmettre ses relevés ·
   <strong>Câblé GTB</strong> = raccordé physiquement à la supervision ·
-  <strong>Intégré GTB</strong> = ses données sont réellement remontées et exploitées par la GTB.
+  <strong>Intégré GTB</strong> = ses données sont réellement remontées et exploitées par la GTB ·
+  <strong>—</strong> = sans objet (compteur absent ou dont la présence n'est pas vérifiée){{#if metersAnyOutOfService}} ·
+  <strong>HS</strong> = hors service{{/if}}.
 </p>
 {{/if}}
 {{#each meterEnergyGroups}}
@@ -1007,9 +1103,13 @@
     <span class="energy-section-icon" style="background:{{energy.color}}1a;color:{{energy.color}}">{{{faIcon energy.icon energy.color "10"}}}</span>
     <span class="energy-section-title">{{energy.label}}</span>
     <span class="energy-section-stats">
-      <span>{{stats.total}} compteur{{#unless (eq stats.total 1)}}s{{/unless}}</span>
+      <span>{{stats.total}} point{{#unless (eq stats.total 1)}}s{{/unless}} de comptage</span>
       <span class="energy-sep">·</span>
-      <span class="energy-stat-present">{{stats.present}} présent{{#unless (eq stats.present 1)}}s{{/unless}}</span>
+      {{#if stats.present}}<span class="energy-stat-present">{{stats.present}} compteur{{#unless (eq stats.present 1)}}s{{/unless}} en service</span>{{else}}<span class="energy-stat-none">aucun compteur en service</span>{{/if}}
+      {{#if stats.hs}}
+        <span class="energy-sep">·</span>
+        <span class="energy-stat-missing">{{stats.hs}} hors service</span>
+      {{/if}}
       {{#if stats.missing}}
         <span class="energy-sep">·</span>
         <span class="energy-stat-missing">{{stats.missing}} requis manquant{{#unless (eq stats.missing 1)}}s{{/unless}}</span>
@@ -1018,9 +1118,18 @@
         <span class="energy-sep">·</span>
         <span class="energy-stat-unanswered">{{stats.unanswered}} à qualifier</span>
       {{/if}}
+      {{#if stats.covered}}
+        <span class="energy-sep">·</span>
+        <span>{{stats.covered}} couvert{{#unless (eq stats.covered 1)}}s{{/unless}} par une zone regroupée</span>
+      {{/if}}
     </span>
   </div>
+  {{!-- Même grille pour chaque énergie : les tableaux empilés s'alignent
+       (relecture PDF 2026-09-24). --}}
   <table class="energy-section-table">
+    <colgroup>
+      {{#if @root.metersAnyOutOfService}}<col style="width:19%"><col style="width:9%"><col style="width:9%"><col style="width:17%"><col style="width:11%"><col style="width:11%"><col style="width:8%"><col style="width:8%"><col style="width:8%">{{else}}<col style="width:20%"><col style="width:10%"><col style="width:10%"><col style="width:20%"><col style="width:11%"><col style="width:11%"><col style="width:9%"><col style="width:9%">{{/if}}
+    </colgroup>
     <thead>
       <tr>
         <th>Usage</th>
@@ -1029,35 +1138,57 @@
         <th class="bool-cell">Communicant</th><th>Protocole(s)</th>
         <th class="bool-cell">Câblé GTB</th>
         <th class="bool-cell">Intégré GTB</th>
-        <th class="bool-cell">Hors service</th>
+        {{#if @root.metersAnyOutOfService}}<th class="bool-cell">Hors service</th>{{/if}}
       </tr>
     </thead>
     <tbody>
       {{#each zones}}
         {{!-- Subheader de zone (regroupement visuel) --}}
         <tr class="energy-subheader{{#if is_general}} energy-subheader-general{{/if}}">
-          <td colspan="9">
+          <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}">
             {{#if is_general}}{{{faIcon "building-circle-arrow-right" "#6b7280" "9"}}} {{/if}}{{zone_name}}
             <span class="energy-subheader-count">— {{items.length}} compteur{{#unless (eq items.length 1)}}s{{/unless}}</span>
           </td>
         </tr>
         {{#each items}}
           <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}{{#if complianceFailed}} meter-row-noncompliant{{/if}}">
-            <td>{{#if isGeneral}}<span class="bool-na">—</span>{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
-            <td class="bool-cell">{{{boolPill required "sm"}}}</td>
+            <td>{{#if isGeneral}}{{{meterUsagePill "other" "sm"}}}{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
+            <td class="bool-cell">{{#if notRequiredReason}}<span class="muted">Non requis</span>{{else if coveredByGroup}}<span class="muted">Commun</span>{{else}}{{{boolPill required "sm" "neutral"}}}{{/if}}</td>
             <td class="bool-cell">{{{boolPill present_actual "sm"}}}</td>
             <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            {{!-- Communication et raccordement : sans objet tant que le compteur
+                 n'est pas constaté présent (relecture clarté R2 M1, m6). --}}
+            {{#if isPresent}}
             <td class="bool-cell">{{{boolPill communicating "sm"}}}</td>
             <td class="meter-protocols-cell">{{#if protocolsLabel}}<span class="muted">{{protocolsLabel}}</span>{{else}}<span class="bool-na">—</span>{{/if}}</td>
             <td class="bool-cell">{{{boolPill wired "sm"}}}</td>
             <td class="bool-cell">
-              {{#if bms_integration_out_of_service}}<strong style="color:#b91c1c" title="Intégration GTB hors service">HS</strong>{{else}}{{{boolPill managed_by_bms "sm"}}}{{/if}}
+              {{#if bms_integration_out_of_service}}<strong style="color:#b91c1c" title="Liaison avec la GTB hors service">HS</strong>{{else}}{{{boolPill managed_by_bms "sm"}}}{{/if}}
             </td>
-            <td class="bool-cell">{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            {{else}}
+            {{!-- Une cellule explicite au lieu de quatre « — ». --}}
+            <td colspan="4" class="meter-absent-cell">{{#if (eq presenceState "no")}}Sans objet : compteur absent{{else}}Présence à vérifier{{/if}}</td>
+            {{/if}}
+            {{#if @root.metersAnyOutOfService}}<td class="bool-cell">{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}<span class="bool-na">—</span>{{/if}}</td>{{/if}}
           </tr>
+          {{#if notRequiredReason}}
+          <tr class="meter-row-recommendation">
+            <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}"><span class="meter-recommendation-label">Non requis :</span> {{notRequiredReason}}.</td>
+          </tr>
+          {{/if}}
+          {{#if coveredByGroup}}
+          <tr class="meter-row-recommendation">
+            <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}"><span class="meter-recommendation-label">Zone regroupée :</span> comptage commun à {{coveredByGroup}}{{#if coveredLeadZone}} (voir le compteur de {{coveredLeadZone}}){{/if}} ; aucun compteur propre n'est exigé.</td>
+          </tr>
+          {{/if}}
+          {{#if mergedLeadGroup}}
+          <tr class="meter-row-recommendation">
+            <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}"><span class="meter-recommendation-label">Zone regroupée :</span> compteur unique de la zone {{mergedLeadGroup}}.</td>
+          </tr>
+          {{/if}}
           {{#if recommendation}}
           <tr class="meter-row-recommendation">
-            <td colspan="9"><span class="meter-recommendation-label">Recommandation :</span> {{recommendation}}</td>
+            <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}"><span class="meter-recommendation-label">Recommandation :</span> {{recommendation}}</td>
           </tr>
           {{/if}}
         {{/each}}
@@ -1072,12 +1203,11 @@
 {{#if (gt meters.length metersForPdf.length)}}
 <p class="muted" style="font-size: 7pt; margin-top: 1mm">
   Note : {{minus meters.length metersForPdf.length}} compteur{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}}
-  ni requis ni présent{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}} non listé{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}}
-  ci-dessus (zéro information actionnable).
+  ni requis ni présent{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}} {{#if (eq (minus meters.length metersForPdf.length) 1)}}figure{{else}}figurent{{/if}} pour mémoire dans les tableaux ci-dessus, hors du plan de comptage.
 </p>
 {{/if}}
 {{#if metersWithDetails.length}}
-<h3 class="subheading">Notes terrain & photos</h3>
+<h3 class="subheading">Notes terrain et photos</h3>
 <p class="muted" style="margin: -1mm 0 2mm">Détails relevés par l'auditeur sur les compteurs du tableau ci-dessus.</p>
 {{#each metersWithDetails}}
   <div class="detail-card">
@@ -1098,48 +1228,56 @@
 {{/each}}
 {{/if}}
 {{else}}
-<p class="muted">Aucun compteur listé. Saisis les équipements (avec leur énergie) pour générer automatiquement les compteurs requis.</p>
+<p class="muted">Aucun compteur n'a été relevé ni prévu pour ce site.</p>
 {{/if}}
 
 {{#if isBacs}}
 {{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="thermal">{{{faIcon "fire" "#dc2626" "16"}}} 5. Régulation thermique automatique (R175-6)</h1>
+<h1 class="chapter" data-toc-anchor="thermal">{{{faIcon "fire" "#1b2842" "16"}}} <span class="chapter-text">5. Régulation automatique du chauffage (R175-6)</span></h1>
 
+{{!-- Règle commune aux 3 branches : L.175-2 / R175-6, chauffage seul,
+     dispense à SIX ans (et non dix comme pour la GTB). --}}
 {{#if r175_6_applicable.applies}}
-<div class="callout callout-warn">
-  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
-  <div class="callout-body"><strong>R175-6 applicable</strong> — {{r175_6_applicable.reason}}.</div>
+<div class="callout callout-r175">
+  <span class="callout-icon">{{{faIcon "scale-balanced" "#1b2842" "14"}}}</span>
+  <div class="callout-body">
+    <p><strong>R175-6 applicable</strong> — {{r175_6_applicable.reason}}.</p>
+    <p class="explainer-rule"><em>Ce qu'impose le décret.</em> Pour chaque système de chauffage concerné, les émetteurs doivent disposer d'une régulation automatique de la température par pièce ou, si cela est justifié, par zone chauffée{{#if r175_6_applicable.byWorks}} (émetteurs reliés au générateur installé ou remplacé){{/if}} — article R175-6, qui applique l'article L.&nbsp;175-2. {{#if r175_6_applicable.byWorks}}Pour ce bâtiment (R175-6 II 2°), l'obligation ne s'applique pas si une étude établit que cette régulation n'est pas réalisable avec un temps de retour sur investissement inférieur à six&nbsp;ans.{{else}}Ce bâtiment relève du 1° de l'article R175-6 (permis de construire déposé à partir du 22 juillet 2021) : aucune dispense fondée sur le temps de retour sur investissement ne s'applique ; la dispense de six&nbsp;ans ne concerne que les autres bâtiments (R175-6 II 2°).{{/if}} Le refroidissement n'est pas visé.</p>
+  </div>
+</div>
+{{else}}{{#if r175_6_applicable.undetermined}}
+<div class="callout callout-info">
+  <span class="callout-icon">{{{faIcon "circle-question" "#475569" "14"}}}</span>
+  <div class="callout-body">
+    <p><strong>R175-6 — applicabilité à confirmer</strong> — {{r175_6_applicable.reason}}.</p>
+    <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-6, qui applique l'article L.&nbsp;175-2, impose aux propriétaires des émetteurs de chauffage reliés à un générateur de chaleur installé ou remplacé une régulation automatique de la température par pièce ou, si cela est justifié, par zone chauffée. Elle vise&nbsp;: (1)&nbsp;les bâtiments dont le permis de construire a été déposé à partir du 22&nbsp;juillet&nbsp;2021&nbsp;; (2)&nbsp;les autres bâtiments, dès que des travaux d'installation ou de remplacement d'un générateur de chaleur y sont engagés depuis cette date, sauf étude établissant que cette régulation n'est pas réalisable avec un temps de retour sur investissement inférieur à six&nbsp;ans. Seul le chauffage est visé&nbsp;; les appareils indépendants de chauffage au bois ne sont pas concernés.</p>
+    <p class="explainer-check"><em>Constats de l'audit.</em>
+      {{#if r175_6_applicable.permitDateFr}}Permis de construire&nbsp;: <strong>{{r175_6_applicable.permitDateFr}}</strong>{{else}}Date du permis de construire non communiquée{{/if}}.
+      {{#if r175_6_applicable.worksDateFr}}Derniers travaux sur le générateur de chaleur&nbsp;: <strong>{{r175_6_applicable.worksDateFr}}</strong>{{else}}Date des derniers travaux sur le générateur de chaleur non communiquée{{/if}}.
+      {{#if r175_6_applicable.recentGeneratorVigilance}}Générateur de chaleur d'installation récente relevé sur site&nbsp;: {{#each r175_6_applicable.recentGeneratorVigilance}}{{zone}}, installé vers {{installYear}}{{#unless @last}}&nbsp;; {{/unless}}{{/each}}.{{/if}}
+      Si des travaux d'installation ou de remplacement d'un générateur de chaleur ont été engagés à partir du 22&nbsp;juillet&nbsp;2021, l'obligation s'applique aux émetteurs reliés à ce générateur (R175-6 II 2°).</p>
+  </div>
 </div>
 {{else}}
 <div class="callout callout-reco">
   <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
   <div class="callout-body">
-    <p><strong>R175-6 — régulation thermique automatique par zone : non applicable à votre bâtiment.</strong></p>
-    <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-6 oblige les propriétaires des émetteurs reliés à un générateur de chaleur installé ou remplacé à mettre en place une régulation automatique de la température «&nbsp;par pièce ou par zone chauffée&nbsp;». Cette obligation s'enclenche dans deux cas&nbsp;: (1)&nbsp;dans les bâtiments dont le permis de construire est déposé après le 21&nbsp;juillet&nbsp;2021&nbsp;; (2)&nbsp;dans les autres bâtiments, dès lors que des travaux d'installation ou de remplacement du générateur de chaleur sont engagés après cette date — sauf étude attestant d'un temps de retour sur investissement supérieur à dix&nbsp;ans. Les appareils indépendants de chauffage au bois sont exclus.</p>
-    <p class="explainer-check"><em>Ce que nous avons vérifié pour votre bâtiment.</em>
-      {{#if r175_6_applicable.permitDateFr}}Permis de construire&nbsp;: <strong>{{r175_6_applicable.permitDateFr}}</strong>{{else}}Permis de construire non renseigné dans cet audit{{/if}}.
-      {{#if r175_6_applicable.worksDateFr}}Derniers travaux de générateur de chaleur&nbsp;: <strong>{{r175_6_applicable.worksDateFr}}</strong>{{else}}Aucun remplacement de générateur de chaleur postérieur à la mise en service n'a été déclaré{{/if}}.
-      Aucune de ces dates ne dépasse le seuil du 21&nbsp;juillet&nbsp;2021 — votre bâtiment n'est donc pas soumis aujourd'hui à l'obligation de régulation thermique automatique par zone.</p>
-    <p class="explainer-watch"><em>Point de vigilance.</em> Tout futur remplacement ou ajout d'un générateur de chaleur (chaudière, pompe à chaleur, sous-station de réseau urbain…) postérieur au 21&nbsp;juillet&nbsp;2021 enclenche immédiatement l'obligation sur les zones desservies par ce nouveau générateur, sauf à produire une étude justifiant un temps de retour sur investissement supérieur à dix&nbsp;ans.</p>
-    {{#if r175_6_applicable.recentGeneratorVigilance}}
-    <p class="explainer-watch" style="border-left-color:#d97706;background:#fffbeb">
-      <em>À vérifier.</em> Aucune date de travaux de générateur n'est renseignée dans cet audit, mais
-      un générateur relevé sur site paraît récent
-      ({{#each r175_6_applicable.recentGeneratorVigilance}}{{zone}} (installé vers {{installYear}}){{#unless @last}}, {{/unless}}{{/each}}) —
-      possiblement installé après le 21&nbsp;juillet&nbsp;2021. Si c'est le cas, l'obligation R175-6
-      s'appliquerait. <strong>Renseigner la date exacte des derniers travaux de générateur</strong>
-      pour lever le doute avant livraison.
-    </p>
-    {{/if}}
+    <p><strong>R175-6 — régulation automatique du chauffage : non applicable à ce bâtiment à la date de l'audit.</strong></p>
+    <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-6, qui applique l'article L.&nbsp;175-2, impose aux propriétaires des émetteurs de chauffage reliés à un générateur de chaleur installé ou remplacé une régulation automatique de la température par pièce ou, si cela est justifié, par zone chauffée. Elle vise&nbsp;: (1)&nbsp;les bâtiments dont le permis de construire a été déposé à partir du 22&nbsp;juillet&nbsp;2021&nbsp;; (2)&nbsp;les autres bâtiments, dès que des travaux d'installation ou de remplacement d'un générateur de chaleur y sont engagés depuis cette date, sauf étude établissant que cette régulation n'est pas réalisable avec un temps de retour sur investissement inférieur à six&nbsp;ans. Seul le chauffage est visé&nbsp;; les appareils indépendants de chauffage au bois ne sont pas concernés.</p>
+    <p class="explainer-check"><em>Constats de l'audit.</em>
+      {{#if r175_6_applicable.noHeating}}Aucun système de chauffage n'a été relevé sur le site.{{else}}Permis de construire&nbsp;: <strong>{{r175_6_applicable.permitDateFr}}</strong>.
+      {{#if r175_6_applicable.worksDateFr}}Derniers travaux sur le générateur de chaleur&nbsp;: <strong>{{r175_6_applicable.worksDateFr}}</strong>.{{else}}Générateurs de chaleur installés avant 2021, d'après leur âge relevé sur site.{{/if}}
+      Aucun de ces déclencheurs n'est postérieur au 21&nbsp;juillet&nbsp;2021&nbsp;: l'obligation ne s'applique pas à ce stade.{{/if}}</p>
+    <p class="explainer-watch"><em>Point de vigilance.</em> L'installation ou le remplacement d'un générateur de chaleur (chaudière, pompe à chaleur, sous-station de réseau de chaleur…) déclenchera l'obligation pour les émetteurs reliés à ce générateur, sauf étude établissant qu'une régulation par pièce ou par zone chauffée n'est pas réalisable avec un temps de retour sur investissement inférieur à six&nbsp;ans (R175-6 II 2°).</p>
   </div>
 </div>
-{{/if}}
+{{/if}}{{/if}}
 
 {{#if thermal.length}}
 {{#unless r175_6_applicable.applies}}
 <div class="callout callout-info">
   <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
-  <div class="callout-body"><strong>Inventaire documenté à titre informatif.</strong> L'obligation R175-6 ne s'applique pas aujourd'hui à ce bâtiment (voir ci-dessus), mais la régulation thermique relevée sur site est conservée ci-dessous — elle sera directement exploitable le jour où un remplacement de générateur de chaleur enclenchera l'obligation.</div>
+  <div class="callout-body"><strong>Inventaire documenté à titre informatif.</strong> {{#if r175_6_applicable.undetermined}}L'applicabilité de l'article R175-6 reste à confirmer (voir ci-dessus)&nbsp;; la régulation relevée sur site est présentée ci-dessous.{{else}}L'obligation R175-6 ne s'applique pas à ce stade (voir ci-dessus)&nbsp;; la régulation relevée sur site est conservée ci-dessous, exploitable le jour où un remplacement de générateur de chaleur déclenchera l'obligation.{{/if}}</div>
 </div>
 {{/unless}}
 {{!-- Mig 129 : 1 carte par couple (zone × catégorie) avec en-tête (champs
@@ -1155,11 +1293,12 @@
         {{{categoryIcon category "12"}}}<span class="thermal-usage-label">{{categoryLabel}}</span>
       </span>
       {{#if displayLabel}}<span class="thermal-system-label">{{displayLabel}}</span>{{/if}}
+      {{#if outOfR175_6}}<span class="thermal-out-of-scope">Hors champ R175-6 — pour information</span>{{/if}}
     </div>
     <div class="thermal-head-meta">
       <span class="thermal-meta-item">
-        <span class="thermal-meta-label">Régul. auto</span>
-        <span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span>
+        <span class="thermal-meta-label">Régulation automatique</span>
+        {{#if (eq autoRegState "yes")}}<span class="bool-yes">{{{glyph "✓" "10"}}} Oui</span>{{else}}{{#if (eq autoRegState "no")}}<span class="bool-no">{{{glyph "✗" "10"}}} Non</span>{{else}}<span class="muted">Non renseignée</span>{{/if}}{{/if}}
       </span>
       {{#if has_automatic_regulation}}
       <span class="thermal-meta-item">
@@ -1169,7 +1308,7 @@
       {{/if}}
       {{#if generator_exempt_wood}}
       <span class="thermal-meta-item">
-        <span class="bool-yes">✓ Exempté bois (R175-6 II)</span>
+        <span class="bool-yes">{{{glyph "✓" "10"}}} Exempté bois (R175-6 II)</span>
       </span>
       {{/if}}
     </div>
@@ -1198,12 +1337,12 @@
              loi d'eau, vanne 3 voies, thermostat ambiant…). Affiché seulement
              si renseigné — un système peut avoir un régulateur sans avoir
              explicité son type. --}}
-        {{#if regulation_type}}
+        {{!-- Toujours affiché (« — » si non renseigné) : les colonnes restent
+             alignées d'un niveau à l'autre (relecture PDF 2026-09-24). --}}
         <span class="thermal-level-field">
           <span class="thermal-field-label">Type de régulation</span>
-          <span class="thermal-field-value">{{regulation_type}}</span>
+          <span class="thermal-field-value">{{#if regulation_type}}{{regulation_type}}{{else}}<span class="muted">—</span>{{/if}}</span>
         </span>
-        {{/if}}
         {{!-- Régulateur — champ TOUJOURS affiché, 3 états :
              · identité saisie (marque/réf) → on l'affiche ;
              · régulation présente mais régulateur non saisi → « Non renseigné » ;
@@ -1213,7 +1352,7 @@
           <span class="thermal-field-value">
             {{#if regulator_brand}}{{regulator_brand}}{{#if regulator_model_reference}} · {{regulator_model_reference}}{{/if}}
             {{else}}{{#if regulator_model_reference}}{{regulator_model_reference}}
-            {{else}}{{#if has_any_regulation}}<span class="muted">Non renseigné</span>{{else}}<span class="muted">Aucune régulation</span>{{/if}}{{/if}}{{/if}}
+            {{else}}{{#if has_any_regulation}}<span class="muted">Non renseigné</span>{{else}}{{#if device_name}}<span class="muted">Régulation non renseignée</span>{{else}}<span class="muted">Aucun équipement désigné à ce niveau</span>{{/if}}{{/if}}{{/if}}{{/if}}
           </span>
         </span>
         {{!-- Mig 181 : Localisation libre par niveau (« chaufferie », « bureau
@@ -1233,7 +1372,7 @@
         {{#if ../generator_age_years}}{{#if (eq key "production")}}
         <span class="thermal-level-field">
           <span class="thermal-field-label">Âge du générateur</span>
-          <span class="thermal-field-value">{{../generator_age_years}} ans</span>
+          <span class="thermal-field-value">{{../generator_age_years}} an{{#unless (eq ../generator_age_years 1)}}s{{/unless}}</span>
         </span>
         {{/if}}{{/if}}
       </div>
@@ -1253,36 +1392,39 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 6 — GTB / Supervision ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#1b2842" "16"}}} {{#if isBacs}}6. Solution GTB (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#1b2842" "16"}}} <span class="chapter-text">{{#if isBacs}}6. Solution GTB (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</span></h1>
 {{#if isBacs}}
 <p class="chapter-intro">
-  La <strong>GTB (Gestion Technique du Bâtiment)</strong> est le système informatique qui pilote et
-  supervise à distance les équipements techniques du bâtiment (chauffage, climatisation, ventilation,
-  éclairage, comptage). C'est l'outil central exigé par le décret pour mesurer, réguler et arrêter
-  automatiquement ces équipements.
+  La <strong>GTB (gestion technique du bâtiment)</strong> est le système qui supervise et pilote les
+  équipements techniques du bâtiment (chauffage, climatisation, ventilation, eau chaude sanitaire,
+  éclairage) et en suit les consommations. Au sens du décret BACS, elle suit et analyse les consommations,
+  ajuste automatiquement le fonctionnement des systèmes, permet leur arrêt manuel et les laisse fonctionner
+  de façon autonome si elle est arrêtée (R175-3).
 </p>
 {{/if}}
 {{#if (eq bms.present 0)}}
-<div class="callout callout-warn">
-  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
-  <div class="callout-body"><strong>Aucune GTB sur le site.</strong> Le bâtiment ne dispose d'aucun système de gestion technique. L'installation d'une GTB conforme au décret BACS figure dans le plan de mise en conformité (chapitre 7). Les exigences R175-3, R175-4 et R175-5 ne sont donc pas évaluées en détail dans ce chapitre.</div>
+<div class="callout callout-r175">
+  <span class="callout-icon">{{{faIcon "circle-exclamation" "#1b2842" "14"}}}</span>
+  <div class="callout-body"><strong>Aucune GTB sur le site.</strong> Le bâtiment ne dispose d'aucun système de gestion technique. L'installation d'une GTB conforme au décret BACS figure dans le plan de mise en conformité (chapitre {{planChapterNumber}}). Les exigences R175-3, R175-4 et R175-5 ne sont donc pas évaluées en détail dans ce chapitre.</div>
 </div>
 {{else}}
 {{#if bms}}
 {{#if bms.out_of_service}}
-<div class="callout callout-warn">
-  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
-  <div class="callout-body"><strong>GTB Hors-Service.</strong> Les exigences R175-3, R175-4 et R175-5 ne sont pas évaluées car la GTB n'est pas opérationnelle au moment de l'audit.</div>
+<div class="callout callout-r175">
+  <span class="callout-icon">{{{faIcon "circle-exclamation" "#1b2842" "14"}}}</span>
+  <div class="callout-body"><strong>GTB hors service au moment de l'audit.</strong> Ses fonctions ne sont pas assurées : sa remise en service figure au plan de mise en conformité (chapitre {{planChapterNumber}}). Les réponses ci-dessous décrivent les capacités déclarées de la solution ; elles n'ont pas pu être constatées en fonctionnement.</div>
 </div>
 {{/if}}
-{{#if bms.buildyOffer.showRequirement}}
-<div class="callout callout-warn">
-  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
-  <div class="callout-body"><strong>Niveau {{bms.buildyOffer.requiredLabel}} requis pour la conformité au décret BACS.</strong> La supervision Buildy Cloud du site est souscrite en niveau {{bms.buildyOffer.levelLabel}}, qui ne couvre pas :
-    <ul>{{#each bms.buildyOffer.uncovered}}<li>{{label}} ({{article}})</li>{{/each}}</ul>
-    Le passage au niveau {{bms.buildyOffer.requiredLabel}}, avec l'option API Buildy Connect, figure dans le plan de mise en conformité (chapitre 7).</div>
+{{!-- Supervision Buildy (doctrine 2026-09-23) : conforme quel que soit le
+     niveau d'offre, sous réserve des obligations du niveau. --}}
+{{#if bms.buildyOffer}}{{#if isBacs}}
+<div class="callout {{#if bms.buildyOffer.hasReserves}}callout-reserve{{else}}callout-reco{{/if}}">
+  <span class="callout-icon">{{#if bms.buildyOffer.hasReserves}}{{{faIcon "clipboard-list" "#1b2842" "14"}}}{{else}}{{{faIcon "circle-check" "#00cd92" "14"}}}{{/if}}</span>
+  <div class="callout-body"><strong>Supervision Buildy Cloud — niveau {{bms.buildyOffer.levelLabel}}.</strong> La solution assure les fonctions exigées par le décret (suivi des consommations, détection des dérives, interopérabilité, arrêt manuel et gestion autonome, mise à disposition des données).
+    {{#if bms.buildyOffer.hasReserves}}La conformité est acquise sous réserve des obligations suivantes, reprises dans le plan de mise en conformité :
+    <ul>{{#each bms.buildyOffer.reserves}}<li>{{label}} ({{article}})</li>{{/each}}</ul>{{/if}}</div>
 </div>
-{{/if}}
+{{/if}}{{/if}}
 
 {{!-- Card 1 — Identité de la solution GTB --}}
 <div class="info-cards">
@@ -1301,7 +1443,7 @@
   {{#if bms.buildyOffer}}
   <div class="info-card">
     <span class="info-card-label">Niveau d'offre Buildy</span>
-    <span class="info-card-value {{#if bms.buildyOffer.showRequirement}}info-card-value-warn{{/if}}">{{bms.buildyOffer.levelLabel}}</span>
+    <span class="info-card-value">{{bms.buildyOffer.levelLabel}}</span>
   </div>
   {{/if}}
   {{#if bms.model_reference}}
@@ -1318,17 +1460,19 @@
   {{/if}}
   {{#if bms.providedProtocolsLabels.length}}
   <div class="info-card info-card-wide">
-    <span class="info-card-label">Protocoles de mise à disposition des points</span>
+    <span class="info-card-label">Protocoles de communication proposés par la GTB</span>
     <span class="info-card-value">{{join bms.providedProtocolsLabels ", "}}</span>
   </div>
   {{/if}}
   <div class="info-card info-card-wide">
     <span class="info-card-label">Analyse fonctionnelle de la GTB existante</span>
     {{#if (eq document.audit_existing_af_status "absent")}}
-      <span class="info-card-value info-card-value-warn">Aucun document d'AF disponible</span>
+      <span class="info-card-value info-card-value-warn">Aucune analyse fonctionnelle n'a été remise lors de l'audit (document examiné lors de la première inspection périodique, R175-5-1 1°)</span>
+    {{else}}{{#if (eq document.audit_existing_af_status "present")}}
+      <span class="info-card-value">Analyse fonctionnelle remise par le propriétaire ou son exploitant</span>
     {{else}}
-      <span class="info-card-value">Document fourni par le propriétaire ou son exploitant</span>
-    {{/if}}
+      <span class="info-card-value">Non renseigné</span>
+    {{/if}}{{/if}}
   </div>
   {{#if bmsTopicNotes.analyse_fonctionnelle}}
   <div class="info-card info-card-wide">
@@ -1384,14 +1528,17 @@
 <div class="panel">
   <div class="panel-head">
     <h3 class="panel-title">R175-3 — Capacités de supervision</h3>
-    <p class="panel-subtitle">3° (interopérabilité) et 4° (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (chapitre 3).</p>
+    <p class="panel-subtitle">L'interopérabilité (3°), l'arrêt manuel et la gestion autonome (4°) sont appréciés système par système, à partir des équipements relevés (chapitre 3).</p>
   </div>
   <div class="panel-body">
     <div class="kv-list">
       <div class="kv-row">
         <div class="kv-label-block">
-          <span class="kv-label">P1. Relevé des consommations au pas horaire, en continu, conservé 5 ans</span>
-          <span class="kv-explainer">La GTB doit collecter et analyser <em>en continu</em>, à un pas de temps horaire et par zone fonctionnelle, les consommations et productions énergétiques de chaque système technique du bâtiment, ajuster automatiquement ces systèmes en conséquence, et conserver les données à l'échelle mensuelle pendant cinq ans (article R175-3 §1).</span>
+          <span class="kv-label">1°. Suivi des consommations au pas horaire, conservation 5 ans</span>
+          <span class="kv-explainer">La GTB doit collecter et analyser <em>en continu</em>, à un pas de temps horaire et par zone fonctionnelle, les consommations et productions énergétiques de chaque système technique du bâtiment, ajuster automatiquement ces systèmes en conséquence, et conserver les données à l'échelle mensuelle pendant cinq ans (R175-3 1°).</span>
+          {{#if bms.meets_r175_3_p1}}{{#unless (eq bms.data_storage_5y_compliant "yes")}}
+          <span class="kv-explainer kv-caveat">Conservation sur 5 ans : {{#if (eq bms.data_storage_5y_compliant "no")}}non conforme{{else}}à qualifier{{/if}} (voir « Conservation et accès aux données »).</span>
+          {{/unless}}{{/if}}
         </div>
         <span class="kv-value {{triCls bms.meets_r175_3_p1 'kv-yes' 'kv-no' 'kv-na'}}">
           <span class="kv-ico">{{triSym bms.meets_r175_3_p1}}</span>{{boolLabel bms.meets_r175_3_p1}}
@@ -1399,8 +1546,8 @@
       </div>
       <div class="kv-row">
         <div class="kv-label-block">
-          <span class="kv-label">P2. Détection des pertes d'efficacité</span>
-          <span class="kv-explainer">La GTB doit situer l'efficacité énergétique du bâtiment par rapport à des valeurs de référence (étude énergétique, caractéristiques nominales de chaque système technique), détecter automatiquement les pertes d'efficacité et informer l'exploitant des possibilités d'amélioration (article R175-3 §2).</span>
+          <span class="kv-label">2°. Détection des pertes d'efficacité</span>
+          <span class="kv-explainer">La GTB doit situer l'efficacité énergétique du bâtiment par rapport à des valeurs de référence (étude énergétique, caractéristiques nominales de chaque système technique), détecter automatiquement les pertes d'efficacité et informer l'exploitant des possibilités d'amélioration (R175-3 2°).</span>
         </div>
         <span class="kv-value {{triCls bms.meets_r175_3_p2 'kv-yes' 'kv-no' 'kv-na'}}">
           <span class="kv-ico">{{triSym bms.meets_r175_3_p2}}</span>{{boolLabel bms.meets_r175_3_p2}}
@@ -1409,21 +1556,21 @@
     </div>
     {{!-- Sous-bloc P1 : format d'archivage + vérification rétention 5 ans
          (visibles si P1 est marqué Oui). --}}
-    {{#if bms.meets_r175_3_p1}}{{#if (or bms.r175_3_p1_archival_format bms.r175_3_p1_retention_verified)}}
+    {{#if bms.meets_r175_3_p1}}{{#if (or bms.r175_3_p1_archival_format (eq bms.r175_3_p1_retention_verified 1) (eq bms.r175_3_p1_retention_verified 0))}}
     <div class="bms-sub-detail">
-      <span class="bms-sub-label">Détail P1 — archivage</span>
+      <span class="bms-sub-label">Détail 1° — conservation des données</span>
       {{#if bms.r175_3_p1_archival_format}}
       <span class="bms-sub-item"><strong>Format :</strong> {{bms.r175_3_p1_archival_format}}</span>
       {{/if}}
-      {{#if bms.r175_3_p1_retention_verified}}
-      <span class="bms-sub-item"><strong>Rétention 5 ans vérifiée sur site :</strong> {{boolLabel bms.r175_3_p1_retention_verified}}</span>
+      {{#if (or (eq bms.r175_3_p1_retention_verified 1) (eq bms.r175_3_p1_retention_verified 0))}}
+      <span class="bms-sub-item"><strong>Conservation sur 5 ans :</strong> {{#if (eq bms.r175_3_p1_retention_verified 1)}}vérifiée lors de l'audit{{else}}non vérifiée lors de l'audit{{/if}}</span>
       {{/if}}
     </div>
     {{/if}}{{/if}}
     {{!-- Sous-bloc P2 : règles / seuils / alertes (visibles si P2 = Oui). --}}
     {{#if bms.meets_r175_3_p2}}{{#if bms.r175_3_p2_anomaly_rules_html}}
     <div class="bms-sub-detail">
-      <span class="bms-sub-label">Détail P2 — règles d'anomalie en place</span>
+      <span class="bms-sub-label">Détail 2° — règles de détection en place</span>
       <span class="bms-sub-item rich-notes">{{{bms.r175_3_p2_anomaly_rules_html}}}</span>
     </div>
     {{/if}}{{/if}}
@@ -1449,8 +1596,8 @@
     <div class="kv-list">
       <div class="kv-row">
         <div class="kv-label-block">
-          <span class="kv-label">Procédure de mise à disposition au gestionnaire du bâtiment</span>
-          <span class="kv-explainer">Le propriétaire de la GTB doit, à la demande du gestionnaire du bâtiment (responsable opérationnel), lui mettre à disposition les données produites et archivées. Cette procédure formalise les modalités d'accès (canal, format, délai). Référence : article R175-3, alinéa final.</span>
+          <span class="kv-label">Mise à disposition des données au gestionnaire du bâtiment</span>
+          <span class="kv-explainer">Le propriétaire de la GTB, propriétaire des données produites et archivées, les met à la disposition du gestionnaire du bâtiment, à sa demande (R175-3, dernier alinéa). Le décret n'impose pas de procédure écrite : Buildy vérifie que l'accès existe (canal, format, délai).</span>
         </div>
         <span class="kv-value {{triCls bms.data_provision_to_manager 'kv-yes' 'kv-no' 'kv-na'}}">
           <span class="kv-ico">{{triSym bms.data_provision_to_manager}}</span>{{boolLabel bms.data_provision_to_manager}}
@@ -1458,8 +1605,8 @@
       </div>
       <div class="kv-row">
         <div class="kv-label-block">
-          <span class="kv-label">Procédure de transmission aux exploitants des systèmes techniques</span>
-          <span class="kv-explainer">Le propriétaire de la GTB doit également transmettre à chaque exploitant des systèmes techniques reliés (chauffage, climatisation, ventilation, éclairage…) les données qui le concernent — pour qu'il puisse suivre, diagnostiquer et optimiser son propre périmètre. Référence : article R175-3, alinéa final.</span>
+          <span class="kv-label">Transmission des données aux exploitants des systèmes techniques</span>
+          <span class="kv-explainer">Le propriétaire de la GTB transmet à chaque exploitant des systèmes techniques reliés (chauffage, climatisation, ventilation, éclairage…) les données qui le concernent, pour qu'il puisse suivre, diagnostiquer et optimiser son propre périmètre (R175-3, dernier alinéa).</span>
         </div>
         <span class="kv-value {{triCls bms.data_provision_to_operators 'kv-yes' 'kv-no' 'kv-na'}}">
           <span class="kv-ico">{{triSym bms.data_provision_to_operators}}</span>{{boolLabel bms.data_provision_to_operators}}
@@ -1505,13 +1652,13 @@
   <div class="panel-body">
     <table class="storage-access-table">
       <thead>
-        <tr><th>Exigence</th><th>État constaté</th></tr>
+        <tr><th>Point vérifié</th><th>État constaté</th></tr>
       </thead>
       <tbody>
         <tr>
           <td>Conservation des consommations à l'échelle mensuelle pendant 5 ans</td>
           <td class="sa-state sa-{{bms.data_storage_5y_compliant}}">
-            {{#if (eq bms.data_storage_5y_compliant "yes")}}✓ Conforme{{else}}{{#if (eq bms.data_storage_5y_compliant "no")}}✗ Non conforme{{else}}? À vérifier{{/if}}{{/if}}
+            {{#if (eq bms.data_storage_5y_compliant "yes")}}{{{glyph "✓" "10"}}} Conforme{{#if bms.buildyOffer.retentionByExport}}, sous réserve d'exports réguliers depuis Hyperveez (12 mois conservés en {{bms.buildyOffer.levelLabel}}){{/if}}{{else}}{{#if (eq bms.data_storage_5y_compliant "no")}}{{{glyph "✗" "10"}}} Non conforme{{else}}? Non déterminé{{/if}}{{/if}}
           </td>
         </tr>
         <tr>
@@ -1523,19 +1670,17 @@
         <tr>
           <td>Accès direct du propriétaire à ses données</td>
           <td class="sa-state sa-{{bms.data_owner_access}}">
-            {{#if (eq bms.data_owner_access "yes")}}✓ Oui{{else}}{{#if (eq bms.data_owner_access "no")}}✗ Non{{else}}Partiel{{/if}}{{/if}}
+            {{#if (eq bms.data_owner_access "yes")}}{{{glyph "✓" "10"}}} Oui{{else}}{{#if (eq bms.data_owner_access "no")}}{{{glyph "✗" "10"}}} Non{{else}}{{#if (eq bms.data_owner_access "partial")}}Partiel{{else}}Non renseigné{{/if}}{{/if}}{{/if}}
           </td>
         </tr>
         <tr>
           <td>Accès du gestionnaire et des exploitants aux données</td>
-          <td class="sa-state sa-{{bms.gestionnaire_exploitant_access}}">
-            {{#if (eq bms.gestionnaire_exploitant_access "yes")}}✓ Oui{{else}}{{#if (eq bms.gestionnaire_exploitant_access "no")}}✗ Non{{else}}Partiel{{/if}}{{/if}}
-          </td>
+          <td class="sa-state sa-{{dataAccessRow.state}}">{{#if (eq dataAccessRow.state "yes")}}{{{glyph "✓" "10"}}} {{/if}}{{#if (eq dataAccessRow.state "no")}}{{{glyph "✗" "10"}}} {{/if}}{{dataAccessRow.label}}</td>
         </tr>
         <tr>
-          <td>Export des données au format standard (CSV / Excel)</td>
+          <td>Export des données dans un format ouvert (CSV ou tableur) — non exigé par le décret</td>
           <td class="sa-state sa-{{bms.export_capability}}">
-            {{#if (eq bms.export_capability "yes")}}✓ Possible{{else}}{{#if (eq bms.export_capability "no")}}✗ Impossible{{else}}—{{/if}}{{/if}}
+            {{#if (eq bms.export_capability "yes")}}{{{glyph "✓" "10"}}} Possible{{else}}{{#if (eq bms.export_capability "no")}}{{{glyph "✗" "10"}}} Impossible{{else}}—{{/if}}{{/if}}
           </td>
         </tr>
       </tbody>
@@ -1558,12 +1703,19 @@
     <div class="kv-list">
       <div class="kv-row">
         <div class="kv-label-block">
-          <span class="kv-label">Consignes écrites de maintenance présentes</span>
-          <span class="kv-explainer">La GTB doit faire l'objet de vérifications périodiques (prestataire externe ou personnel interne compétent), encadrées par des consignes écrites données au gestionnaire qui précisent la périodicité des interventions, les points à contrôler et la procédure de réparation ou de remplacement rapide des éléments défaillants. Référence : article R175-4.</span>
+          <span class="kv-label">Vérifications périodiques organisées (contrat de maintenance ou personnel interne, consignes écrites)</span>
+          <span class="kv-explainer">La GTB fait l'objet de vérifications périodiques, par un prestataire externe ou un personnel interne compétent, encadrées par des consignes écrites données au gestionnaire : périodicité des interventions, points à contrôler, réparation rapide ou remplacement des éléments défaillants (R175-4).</span>
+          {{#if maintenanceReserveNumber}}<span class="kv-explainer kv-reserve-note">Réserve : obligation à respecter, sans effet sur la conformité de l'installation (voir {{maintenanceReserveNumber}} au plan d'actions).</span>{{/if}}
         </div>
+        {{!-- Réserve (obligation du propriétaire) : même teinte que les autres
+             réserves, pas le rouge d'un écart. --}}
+        {{#if maintenanceReserveNumber}}
+        <span class="kv-value kv-reserve">À mettre en place</span>
+        {{else}}
         <span class="kv-value {{triCls bms.has_maintenance_procedures 'kv-yes' 'kv-no' 'kv-na'}}">
           <span class="kv-ico">{{triSym bms.has_maintenance_procedures}}</span>{{boolLabel bms.has_maintenance_procedures}}
         </span>
+        {{/if}}
       </div>
     </div>
     {{!-- Périodicité + responsable de la maintenance (visibles si consignes
@@ -1601,8 +1753,8 @@
     <div class="kv-list">
       <div class="kv-row">
         <div class="kv-label-block">
-          <span class="kv-label">Exploitant formé au paramétrage{{#if bms.operator_training_date}} <span class="muted">(formation : {{bms.operator_training_date}})</span>{{/if}}</span>
-          <span class="kv-explainer">Le propriétaire de la GTB doit s'assurer que son exploitant est formé au fonctionnement du système, et en particulier aux modalités de son paramétrage (consignes, programmes horaires, seuils d'alarme…). Référence : article R175-5.</span>
+          <span class="kv-label">Exploitant formé au paramétrage{{#if bms.operator_training_date}} <span class="muted">(formation du {{frDate bms.operator_training_date}})</span>{{/if}}</span>
+          <span class="kv-explainer">Le propriétaire de la GTB doit s'assurer que son exploitant est formé au fonctionnement de la GTB, et en particulier aux modalités de son paramétrage (consignes, programmes horaires, seuils d'alarme…). Référence : article R175-5.</span>
         </div>
         <span class="kv-value {{triCls bms.operator_trained 'kv-yes' 'kv-no' 'kv-na'}}">
           <span class="kv-ico">{{triSym bms.operator_trained}}</span>{{boolLabel bms.operator_trained}}
@@ -1625,10 +1777,14 @@
     {{!-- 7mm de marge haute : le bandeau « Modalités de formation » a une marge
          basse négative (-3mm) pour déborder au bas du panneau. Sans surcompenser
          ici, l'encart vert se collerait au bandeau bleu. --}}
-    <div class="callout callout-reco" style="margin: 7mm 0 0;">
-      <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
+    <div class="callout callout-info" style="margin: 7mm 0 0;">
+      <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
       <div class="callout-body">
-        <strong>Solution Buildy déployée.</strong> L'exigence R175-5 est nativement couverte par le support utilisateur intégré (assistance contextuelle, documentation embarquée, support continu). Cf. Annexe B point 8.
+        {{#if bms.operator_trained}}
+        <strong>Solution Buildy déployée.</strong> L'aide en ligne et le support de la solution facilitent la prise en main. Formation de l'exploitant{{#if bms.operator_training_date}} du {{frDate bms.operator_training_date}}{{/if}}{{#if bms.operator_training_provider}} ({{bms.operator_training_provider}}){{/if}} : la feuille d'émargement est à conserver, elle est demandée lors de l'inspection périodique (R175-5, FAQ n° 30).
+        {{else}}
+        <strong>Solution Buildy déployée.</strong> L'aide en ligne et le support de la solution facilitent la prise en main. La formation de l'exploitant au fonctionnement et au paramétrage de la GTB reste à attester (date, participants, feuille d'émargement), comme le prévoit l'inspection périodique (R175-5, FAQ n° 30).
+        {{/if}}
       </div>
     </div>
     {{/if}}
@@ -1651,7 +1807,7 @@
 <div class="panel">
   <div class="panel-head">
     <h3 class="panel-title">Équipements et leur intégration à la GTB</h3>
-    <p class="panel-subtitle">Inventaire des équipements présents avec leur statut d'intégration : <strong>{{bmsManagedDevices.length}}</strong> déjà intégré{{#unless (eq bmsManagedDevices.length 1)}}s{{/unless}}, <strong>{{bmsUnmanagedDevices.length}}</strong> à intégrer{{#if bmsUnansweredDevices.length}}, {{bmsUnansweredDevices.length}} à qualifier{{/if}}. Les équipements « Non » sont à chiffrer dans le devis (passerelle, retrofit ou remplacement selon le cas).</p>
+    <p class="panel-subtitle">Inventaire des équipements présents avec leur statut d'intégration : <strong>{{bmsManagedDevices.length}}</strong> déjà intégré{{#unless (eq bmsManagedDevices.length 1)}}s{{/unless}}, <strong>{{bmsUnmanagedDevices.length}}</strong> à intégrer{{#if bmsOutOfScopeDevices.length}} (dont {{bmsOutOfScopeDevices.length}} d'usages que la GTB ne traite pas){{/if}}{{#if bmsUnansweredDevices.length}}, {{bmsUnansweredDevices.length}} à qualifier{{/if}}{{#if bmsNotTargetedDevices.length}}, {{bmsNotTargetedDevices.length}} non visé{{#unless (eq bmsNotTargetedDevices.length 1)}}s{{/unless}} (émetteurs à régulation locale, ou équipements déclarés non concernés par l'auditeur){{/if}}.{{#if bmsUnmanagedDevices.length}} Les équipements marqués « Non » ne sont pas raccordés à la GTB. Le plan d'actions précise les raccordements à réaliser (en priorité les générateurs, directement ou par leur régulateur : passerelle, module de communication ou remplacement selon le cas) ; dans un bâtiment existant, certains ne sont exigés que sous condition de temps de retour sur investissement.{{/if}}</p>
   </div>
   <div class="panel-body panel-body-flush">
     {{#if bmsDevicesByZone.length}}
@@ -1670,7 +1826,7 @@
         <tr>
           <td class="bms-col-name"><strong>{{name}}</strong>{{#if brand}} <span class="muted">· {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}{{#if sharedWithLabel}}<br><span class="muted">Dessert aussi : {{sharedWithLabel}}</span>{{/if}}</td>
           <td class="bms-col-usage">{{{systemCategoryPill system_category "sm"}}}</td>
-          <td class="bms-col-int">{{{boolPill managed_by_bms "sm"}}}</td>
+          <td class="bms-col-int">{{#if excludedByAuditor}}<span class="muted" title="Équipement déclaré non concerné par l'intégration à la GTB par l'auditeur">Non concerné<br><span style="font-size:6.5pt">(décision de l'auditeur)</span></span>{{else if interopNotTargeted}}<span class="muted" title="Émetteur à régulation locale : le raccordement n'est pas visé (R175-3 3°)">Non visé</span>{{else if outOfGtbScope}}{{{boolPill 0 "sm"}}}<br><span class="muted" style="font-size:6.5pt">usage non traité par la GTB</span>{{else if bms_integration_out_of_service}}<strong style="color:#b91c1c" title="Liaison avec la GTB hors service">Liaison interrompue</strong>{{else}}{{{boolPill managed_by_bms "sm" "" "À qualifier"}}}{{/if}}</td>
         </tr>
         {{/each}}
         {{/each}}
@@ -1698,7 +1854,7 @@
 <div class="panel">
   <div class="panel-head">
     <h3 class="panel-title">Compteurs et leur intégration à la GTB</h3>
-    <p class="panel-subtitle">Ce tableau ne concerne que les compteurs <strong>déjà installés</strong> sur le site : <strong>{{bmsManagedMeters.length}}</strong> déjà relevé{{#unless (eq bmsManagedMeters.length 1)}}s{{/unless}} par la GTB, <strong>{{bmsUnmanagedMeters.length}}</strong> présent{{#unless (eq bmsUnmanagedMeters.length 1)}}s{{/unless}} mais non relevé{{#unless (eq bmsUnmanagedMeters.length 1)}}s{{/unless}} par la GTB{{#if bmsUnansweredMeters.length}}, {{bmsUnansweredMeters.length}} à qualifier{{/if}} (à raccorder). Les compteurs <strong>requis mais totalement absents</strong> — souvent le principal écart au décret — sont recensés au chapitre 4 « Compteurs et mesurage » et chiffrés dans le plan d'action.</p>
+    <p class="panel-subtitle">Ce tableau ne concerne que les compteurs <strong>déjà installés</strong> sur le site : <strong>{{bmsManagedMeters.length}}</strong> déjà relevé{{#unless (eq bmsManagedMeters.length 1)}}s{{/unless}} par la GTB, {{#if bmsBrokenLinkMeters.length}}<strong>{{bmsBrokenLinkMeters.length}}</strong> dont la liaison avec la GTB est interrompue, {{/if}}<strong>{{bmsUnmanagedMeters.length}}</strong> présent{{#unless (eq bmsUnmanagedMeters.length 1)}}s{{/unless}} mais non relevé{{#unless (eq bmsUnmanagedMeters.length 1)}}s{{/unless}} par la GTB{{#if bmsUnansweredMeters.length}}, {{bmsUnansweredMeters.length}} à qualifier{{/if}} (à raccorder). Les compteurs <strong>requis mais totalement absents</strong> — souvent le principal écart au décret — sont recensés au chapitre 4 « Compteurs et mesurage » et traités dans le plan de mise en conformité (chapitre {{planChapterNumber}}).</p>
   </div>
   <div class="panel-body panel-body-flush">
     {{#if bmsMetersByEnergy.length}}
@@ -1721,8 +1877,8 @@
         {{#each meters}}
         <tr>
           <td class="bms-col-name"><strong>{{zoneLabel}}</strong>{{#if locationLabel}} <span class="muted">· {{locationLabel}}</span>{{/if}}</td>
-          <td class="bms-col-usage">{{#if isGeneral}}<span class="muted">Général</span>{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
-          <td class="bms-col-int">{{{boolPill managed_by_bms "sm"}}}</td>
+          <td class="bms-col-usage">{{#if isGeneral}}{{{meterUsagePill "other" "sm"}}}{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
+          <td class="bms-col-int">{{#if bms_integration_out_of_service}}<strong style="color:#b91c1c" title="Liaison avec la GTB hors service">Liaison interrompue</strong>{{else}}{{{boolPill managed_by_bms "sm" "" "À qualifier"}}}{{/if}}</td>
         </tr>
         {{/each}}
         {{/each}}
@@ -1747,7 +1903,7 @@
 {{!-- Card 9 — Notes & photos GTB --}}
 <div class="panel">
   <div class="panel-head">
-    <h3 class="panel-title">Notes terrain &amp; photos GTB</h3>
+    <h3 class="panel-title">Notes terrain et photos de la GTB</h3>
   </div>
   <div class="panel-body">
     {{#if bms.notes_html}}<div class="rich-notes">{{{bms.notes_html}}}</div>{{/if}}
@@ -1767,14 +1923,14 @@
 {{!-- ═══════════ Chapitre 7 — Inspections périodiques R175-5-1 (BACS uniquement)
      Visible si (a) l'auditeur a saisi des infos d'inspection OU (b) il a
      coché « inspection non applicable » avec justification. --}}
-{{#if isBacs}}{{#if (or (and inspections (or inspections.last_inspection_date inspections.last_inspection_inspector inspections.last_inspection_anomalies_html inspections.last_inspection_recommendations_html inspections.next_inspection_due_date inspections.notes)) document.inspection_not_applicable)}}
-<h1 class="chapter" data-toc-anchor="inspections">{{{faIcon "clipboard-check" "#0ea5e9" "16"}}} 7. Inspections périodiques (R175-5-1)</h1>
+{{#if showInspectionsChapter}}
+<h1 class="chapter" data-toc-anchor="inspections">{{{faIcon "clipboard-check" "#1b2842" "16"}}} <span class="chapter-text">7. Inspections périodiques (R175-5-1)</span></h1>
 
 <div class="callout callout-info">
   <span class="callout-icon">{{{faIcon "clipboard" "#6b7280" "14"}}}</span>
   <div class="callout-body">
-    <p><strong>À quoi sert ce chapitre.</strong> Tracer les inspections périodiques R175-5-1 réalisées sur les systèmes de chauffage et de climatisation et leurs systèmes d'automatisation et de contrôle.</p>
-    <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-5-1 (issu du décret n°2023-259 du 7 avril 2023) impose une inspection périodique du système d'automatisation et de contrôle (BACS) des bâtiments assujettis à l'article R175-2 (c'est-à-dire les bâtiments tertiaires équipés d'un chauffage ou d'une climatisation dont la puissance nominale dépasse le seuil du décret — 290&nbsp;kW, puis 70&nbsp;kW à l'échéance de 2030), à l'initiative du propriétaire. La première inspection intervient au plus tard le 1<sup>er</sup> janvier 2025, puis tous les cinq ans. Le rapport, remis dans le mois, est conservé dix ans. Le ministère recommande de confier cette inspection à un tiers indépendant, sans l'imposer. À ne pas confondre avec l'inspection périodique des chaudières et systèmes de climatisation (articles R224-* du code de l'environnement) — dont les systèmes reliés à un BACS conforme sont précisément exemptés depuis 2023.</p>
+    <p><strong>À quoi sert ce chapitre.</strong> Tracer les inspections périodiques de la GTB (R175-5-1) : date, inspecteur, rapport et prochaine échéance.</p>
+    <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-5-1 soumet la GTB des bâtiments assujettis au décret (article R175-2) à une inspection périodique, à l'initiative de son propriétaire. Selon l'arrêté du 7 avril 2023, elle a lieu au moins tous les cinq ans ; la première était due au plus tard le 1<sup>er</sup> janvier 2025 pour une GTB déjà en place au 8 avril 2023, et intervient dans les deux ans qui suivent l'installation ou le remplacement de la GTB ou d'un système qui lui est relié. Le rapport est remis dans le mois qui suit la visite et conservé dix ans. La FAQ ministérielle n° 30 (non opposable) indique qu'il « peut être pertinent » de confier l'inspection à un tiers indépendant des fabricants et installateurs ; le décret ne l'impose pas (R175-5-1). Elle est distincte des contrôles et inspections des chaudières et des systèmes thermodynamiques prévus par le code de l'environnement, dont les systèmes reliés à une GTB sont exemptés (article R175-4, dernier alinéa). Depuis le décret du 7 avril 2023, ces systèmes restent soumis à l'entretien prévu par le code de l'environnement (entretien annuel des chaudières de 4 à 400 kW, entretien tous les deux ans des systèmes thermodynamiques de 4 à 70 kW).</p>
   </div>
 </div>
 
@@ -1782,11 +1938,9 @@
 <div class="callout callout-info">
   <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
   <div class="callout-body">
-    <p><strong>Aucune inspection R175-5-1 à déclarer pour l'instant.</strong> L'inspection périodique
-    R175-5-1 est réalisée par un organisme tiers indépendant, à l'initiative du propriétaire — elle ne
-    fait pas partie de l'audit Buildy. Aucun rapport d'inspection n'est à tracer à ce stade.</p>
+    <p><strong>{{inspectionNotice.title}}</strong> {{inspectionNotice.body}}</p>
     {{#if document.inspection_not_applicable_reason}}
-    <p><em>Précision saisie par l'auditeur :</em> {{document.inspection_not_applicable_reason}}</p>
+    <p><em>Précision de l'auditeur :</em> {{document.inspection_not_applicable_reason}}</p>
     {{/if}}
   </div>
 </div>
@@ -1806,7 +1960,7 @@
       {{/if}}
       {{#if inspections.last_inspection_inspector}}
       <div class="info-card info-card-wide">
-        <span class="info-card-label">Inspecteur (organisme tiers)</span>
+        <span class="info-card-label">Inspecteur</span>
         <span class="info-card-value">{{inspections.last_inspection_inspector}}</span>
       </div>
       {{/if}}
@@ -1849,15 +2003,15 @@
   </div>
 </div>
 {{/if}}
-{{/if}}{{/if}}
+{{/if}}
 
 {{!-- ═══════════ Chapitre 7 (ou 8 selon présence inspections) — Plan de mise en conformité / Préconisations Buildy ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "16"}}} {{#if isBacs}}{{#if inspections}}{{#if (or inspections.last_inspection_date inspections.last_inspection_inspector inspections.last_inspection_anomalies_html inspections.last_inspection_recommendations_html inspections.next_inspection_due_date inspections.notes)}}8. Plan de mise en conformité{{else}}7. Plan de mise en conformité{{/if}}{{else}}7. Plan de mise en conformité{{/if}}{{else}}7. Préconisations Buildy pour le devis{{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#1b2842" "16"}}} <span class="chapter-text">{{#if isBacs}}{{planChapterNumber}}. Plan de mise en conformité{{else}}7. Préconisations Buildy pour le devis{{/if}}</span></h1>
 
 {{!-- Item 13 — rappel de la base de consommations de référence --}}
 {{#if energyReference}}
 <div class="callout callout-info">
-  <span class="callout-icon">{{{faIcon "chart-line" "#6366f1" "14"}}}</span>
+  <span class="callout-icon">{{{faIcon "chart-line" "#1b2842" "14"}}}</span>
   <div class="callout-body">
     <strong>Base de consommations de référence (année {{energyReference.referenceYear}}) disponible.</strong>
     Cette base de référence, saisie depuis les factures du site, permettra de mesurer les économies réelles après mise en place du BACS et d'objectiver le retour sur investissement des actions ci-dessous.
@@ -1879,20 +2033,35 @@
      (seule source opposable = décret R175, les guides et la norme servent
      d'aide à l'interprétation). --}}
 <div class="callout callout-sources" style="margin: 0 0 5mm;">
-  <span class="callout-icon">{{{faIcon "circle-info" "#4f46e5" "14"}}}</span>
+  <span class="callout-icon">{{{faIcon "circle-info" "#1b2842" "14"}}}</span>
   <div class="callout-body">
-    <strong>Sources d'aide à l'interprétation (non opposables).</strong> Les actions ci-dessous reposent sur le <strong>décret R175</strong> (seule source juridiquement opposable), complété par : <em>Guide d'application du décret BACS</em> (ministère, version 2, janvier 2026) ; <em>Guide pratique d'application du décret BACS</em> (PROFEEL, novembre 2025) ; norme <em>NF EN ISO 52120-1</em>.
+    <strong>Sources d'aide à l'interprétation (non opposables).</strong> Les actions ci-dessous reposent sur le <strong>décret BACS</strong> (articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l'habitation, et arrêté du 7 avril 2023 : seuls textes juridiquement opposables), éclairé par : <em>Guide d'application du décret BACS</em> (ministère, version 2, janvier 2026) ; <em>FAQ BACS</em> du ministère ; <em>Guide pratique d'application du décret BACS</em> (PROFEEL, novembre 2025).
   </div>
 </div>
+{{!-- Légende des niveaux, au plus près des cartes (définition complète :
+     annexe B « Hiérarchisation ») ; seuls les niveaux présents au plan. --}}
+{{#if isBacs}}
+<div class="plan-legend">
+  <p class="plan-legend-title">Lecture du plan</p>
+  <ul>
+    {{#if actionStats.blocking}}<li><span class="sev sev-blocking">Bloquante</span><span>Écart qui empêche à lui seul la conformité, par exemple l'absence de GTB ou d'un compteur requis.</span></li>{{/if}}
+    {{#if actionStats.major}}<li><span class="sev sev-major">Majeure</span><span>Exigence du décret non satisfaite, à traiter pour atteindre la conformité.</span></li>{{/if}}
+    {{#if actionStats.minor}}<li><span class="sev sev-minor">Mineure</span><span>Recommandation, ou raccordement exigé seulement sous condition de temps de retour sur investissement.</span></li>{{/if}}
+    {{#if actionStats.reserves}}<li><span class="sev sev-reserve">Réserve</span><span>Obligation du propriétaire à respecter dans la durée (maintenance, inspection périodique, export des données), sans effet sur la conformité de l'installation.</span></li>{{/if}}
+  </ul>
+</div>
+{{/if}}
 {{#each actionItemsByCard}}
 <section class="theme-section">
   <header class="theme-head">
     <h2 class="theme-title">{{label}}</h2>
+    {{!-- Actions et réserves comptées à part (R3 n11). --}}
     <span class="theme-meta">
-      {{count}} action{{#unless (eq count 1)}}s{{/unless}}
+      {{#if (gt (minus count reserves) 0)}}{{minus count reserves}} action{{#unless (eq (minus count reserves) 1)}}s{{/unless}}{{/if}}
       {{#if blocking}} · <span class="sev-dot sev-dot-blocking"></span>{{blocking}} bloquante{{#unless (eq blocking 1)}}s{{/unless}}{{/if}}
       {{#if major}} · <span class="sev-dot sev-dot-major"></span>{{major}} majeure{{#unless (eq major 1)}}s{{/unless}}{{/if}}
       {{#if minor}} · <span class="sev-dot sev-dot-minor"></span>{{minor}} mineure{{#unless (eq minor 1)}}s{{/unless}}{{/if}}
+      {{#if reserves}}{{#if (gt (minus count reserves) 0)}} · {{/if}}<span class="sev-dot sev-dot-reserve"></span>{{reserves}} réserve{{#unless (eq reserves 1)}}s{{/unless}}{{/if}}
     </span>
   </header>
   {{#each subsections}}
@@ -1904,10 +2073,10 @@
         {{> _action-group sev=severity sevLabel=severity_label sevClass=severity_class}}
       {{else}}
         {{#with item}}
-        <div class="action-card{{#if (eq severity "minor")}} action-card-minor{{/if}}">
+        <div class="action-card{{#if (eq severity "minor")}} action-card-minor{{/if}}{{#if is_reserve}} action-card-reserve{{/if}}">
           <div class="action-card-head">
             <span class="action-num">{{display_number}}</span>
-            <span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}{{#if ../../../../isBacs}}Bloquante{{else}}Essentielle{{/if}}{{else}}{{#if (eq severity "major")}}{{#if ../../../../isBacs}}Majeure{{else}}Recommandée{{/if}}{{else}}{{#if ../../../../isBacs}}Mineure{{else}}Optimisation{{/if}}{{/if}}{{/if}}</span>
+            {{#if is_reserve}}<span class="sev sev-reserve">Réserve</span>{{else}}<span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}{{#if ../../../../isBacs}}Bloquante{{else}}Essentielle{{/if}}{{else}}{{#if (eq severity "major")}}{{#if ../../../../isBacs}}Majeure{{else}}Recommandée{{/if}}{{else}}{{#if ../../../../isBacs}}Mineure{{else}}Optimisation{{/if}}{{/if}}{{/if}}</span>{{/if}}
             {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
             {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
             {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
@@ -1934,19 +2103,47 @@
 <p>{{#if isBacs}}Aucune action corrective à ce stade.{{else}}Aucune préconisation à ce stade — la GTB couvre l'intégralité du périmètre.{{/if}}</p>
 {{/if}}
 
-<div class="callout callout-reco" style="margin-top: 8mm;">
-  <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
-  <div class="callout-body"><strong>{{#if isBacs}}Pour la mise en conformité{{else}}Pour le devis détaillé{{/if}}</strong>, l'équipe commerciale Buildy se tient à votre disposition pour établir un devis chiffré.</div>
+{{!-- Informations hors plan d'actions et hors décomptes (cf.
+     exemptionItems / vigilanceItems, _export-data.js) : systèmes exemptés
+     par la règle des 5 % et points de vigilance. --}}
+{{#if exemptionItems.length}}
+<div class="callout callout-info plan-exemptions">
+  <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
+  <div class="callout-body">
+    <p><strong>Systèmes exemptés du raccordement à la GTB (règle des 5 %).</strong> Ces systèmes ne donnent lieu à aucune action : les consommations d'énergie effectives et induites de l'ensemble des équipements régulés par la même fonction ont été estimées à moins de 5 % de la consommation d'énergie totale du bâtiment, ce qui permet de ne pas les raccorder à la GTB. Cette part s'apprécie sur tous les équipements concernés du bâtiment, et non système par système (FAQ ministérielle n° 16, non opposable). La justification relevée lors de l'audit figure au chapitre 3.</p>
+    <ul>{{#each exemptionItems}}<li><strong>{{title}}</strong>{{#if zones_label}} — {{zones_label}}{{/if}}{{#if justification}} (justification relevée : {{justification}}){{/if}}</li>{{/each}}</ul>
+  </div>
 </div>
+{{/if}}
+{{#if outOfDecreeItems.length}}
+<div class="callout callout-info plan-exemptions">
+  <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
+  <div class="callout-body">
+    <p><strong>Recommandations hors décret (non comptées dans le plan).</strong> Ces points ne sont pas exigés par le décret BACS ; ils facilitent l'exploitation de la GTB.</p>
+    <ul>{{#each outOfDecreeItems}}<li><strong>{{title}}.</strong> {{description}}</li>{{/each}}</ul>
+  </div>
+</div>
+{{/if}}
+{{#if vigilanceItems.length}}
+<div class="callout callout-info plan-exemptions">
+  <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
+  <div class="callout-body">
+    <p><strong>Points de vigilance.</strong> Ces points ne sont pas des écarts au décret ; ils encadrent la mise en œuvre des actions ci-dessus.</p>
+    <ul>{{#each vigilanceItems}}<li><strong>{{title}}.</strong> {{description}}</li>{{/each}}</ul>
+  </div>
+</div>
+{{/if}}
+
+{{!-- Appel au devis : une seule fois, en 4e de couverture (bouton cliquable). --}}
 </div>{{!-- /.sections --}}
 
 {{#if isBacs}}
 {{!-- ═══════════ Annexe A — Texte du décret ═══════════ --}}
 <section class="annex">
-  <h1>Annexe A — Décret BACS (R175-1 à R175-6)</h1>
+  <h1 data-toc-anchor="annex-a">Annexe A — Décret BACS (R175-1 à R175-6)</h1>
   <div class="callout callout-r175">
     <span class="callout-icon">{{{faIcon "book-open" "#1b2842" "14"}}}</span>
-    <div class="callout-body">Texte intégral des articles du décret R175 — Bâtiments tertiaires, automatisation et contrôle. Ce qui suit est la base réglementaire utilisée pour évaluer la conformité au chapitre 7. {{#if currentDecreeVersionLabel}}<strong>{{currentDecreeVersionLabel}}.</strong>{{/if}} Texte de référence consultable sur Légifrance (lien sous chaque article).</div>
+    <div class="callout-body">Texte intégral des articles R175-1 à R175-6 du code de la construction et de l'habitation (décret BACS), dans leur version en vigueur. C'est la base réglementaire utilisée pour évaluer la conformité dans le présent rapport. {{#if currentDecreeVersionLabel}}<strong>{{currentDecreeVersionLabel}}.</strong>{{/if}} Texte de référence consultable sur Légifrance (lien sous chaque article). Les repères de lecture sur fond gris sont des aides de Buildy, sans valeur réglementaire.</div>
   </div>
   {{#each bacsArticles}}
   <article class="article-card">
@@ -1955,6 +2152,9 @@
       <h3 class="article-title">{{title}}</h3>
     </header>
     <div class="article-body">{{{html}}}</div>
+    {{#if reading_note_html}}
+    <p class="article-reading-note"><span class="article-reading-note-label">Repère de lecture Buildy — non opposable</span>{{{reading_note_html}}}</p>
+    {{/if}}
     {{#if source_url}}
     <p class="article-source">{{#if version_label}}{{version_label}} · {{/if}}Texte officiel : <a href="{{source_url}}">{{source_url}}</a></p>
     {{/if}}
@@ -1964,30 +2164,30 @@
 
 {{!-- ═══════════ Annexe B — Méthodologie ═══════════ --}}
 <section class="annex">
-  <h1>Annexe B — Méthodologie et hypothèses retenues par Buildy</h1>
+  <h1 data-toc-anchor="annex-b">Annexe B — Méthodologie et hypothèses retenues par Buildy</h1>
   <div class="callout callout-info">
     <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
-    <div class="callout-body">Cette annexe trace les choix méthodologiques de Buildy. Toute évaluation de conformité du présent rapport repose sur ces hypothèses, librement opposables.</div>
+    <div class="callout-body">Cette annexe présente les choix de méthode de Buildy, sur lesquels repose l'évaluation de conformité du présent rapport. Ces hypothèses n'ont pas de valeur réglementaire : en cas de divergence, le texte du décret prime.</div>
   </div>
 
   {{!-- Item 6 — Hiérarchie des sources : opposables vs méthodologiques --}}
   <article class="method-card">
     <h3 class="method-title">Sources réglementaires opposables</h3>
-    <p class="method-body">Le présent audit s'appuie exclusivement, pour l'évaluation de conformité, sur les textes réglementaires en vigueur. Seules ces sources ont valeur de norme :</p>
+    <p class="method-body">Le présent audit évalue la conformité au regard des seuls textes réglementaires ci-dessous, qui ont seuls valeur de norme ; les documents listés ensuite en éclairent l'interprétation :</p>
     <ul class="method-list">
-      <li>Articles L. 174-3 et R. 175-1 à R. 175-6 du Code de la construction et de l'habitation — accessibles sur Légifrance.</li>
-      <li>Décret n° 2020-887 du 20 juillet 2020, modifié par le décret n° 2023-259 du 7 avril 2023.</li>
-      <li>Arrêté du 7 avril 2023 (modalités d'inspection des systèmes d'automatisation et de contrôle et modalités de calcul du temps de retour sur investissement).</li>
+      <li>Articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l'habitation — accessibles sur Légifrance.</li>
+      <li>Décret n° 2020-887 du 20 juillet 2020 (recodifié par le décret n° 2021-872 du 30 juin 2021), modifié par les décrets n° 2023-259 du 7 avril 2023 et n° 2025-1343 du 26 décembre 2025.</li>
+      <li>Arrêté du 7 avril 2023 (fréquence et modalités de l'inspection de la GTB ; méthode de calcul du temps de retour sur investissement).</li>
     </ul>
   </article>
   <article class="method-card">
     <h3 class="method-title">Références méthodologiques (non opposables, à titre indicatif)</h3>
     <p class="method-body">Les documents suivants éclairent l'interprétation du décret mais n'ont pas valeur réglementaire. L'audit s'inspire des bonnes pratiques qui y sont décrites sans en faire une exigence :</p>
     <ul class="method-list">
-      <li>Guide d'application BACS — Ministère de la Transition écologique, mai 2023.</li>
-      <li>FAQ Décret BACS — Ministère de la Transition écologique, juin 2025.</li>
-      <li>Guide pratique d'application du décret BACS — PROFEEL / COSTIC, novembre 2025.</li>
-      <li>Fiche décryptage du décret BACS — Cerema, 2023.</li>
+      <li>Guide d'application du décret BACS, version 2 — ministère chargé de la construction, janvier 2026.</li>
+      <li>FAQ BACS — ministère chargé de la construction, 30 questions publiées en juin 2025, mises à jour en janvier et février 2026.</li>
+      <li>Guide pratique d'application du décret BACS — PROFEEL / COSTIC, version 1.1, novembre 2025.</li>
+      <li>Fiche décryptage du décret BACS — Cerema, 2023 (antérieure à la FAQ de 2025 sur le cumul des puissances).</li>
     </ul>
     <p class="method-body" style="margin-top: 2mm;">Ces documents sont des supports d'interprétation utiles mais n'ont pas valeur réglementaire. En cas de contradiction avec le texte du décret, le décret prime.</p>
   </article>
@@ -2004,15 +2204,15 @@
     <h3 class="method-title">Sur les estimations d'économies d'énergie</h3>
     <p class="method-body">Le présent audit établit la <strong>conformité fonctionnelle</strong> du bâtiment aux exigences de l'article R175-3 du décret BACS. Il ne préjuge ni de la classe atteinte au sens de la norme NF EN ISO 52120-1, ni du montant des économies d'énergie qui seront réellement obtenues après la mise en conformité.</p>
     <p class="method-body" style="margin-top: 2mm;">Comme le rappelle le guide pratique PROFEEL / COSTIC : <em>« Les économies dépendent beaucoup de la situation de départ. Les pourcentages d'économies annoncés, basés sur la norme NF EN ISO 52120-1, peuvent être très différents de ceux réellement obtenus. »</em></p>
-    <p class="method-body" style="margin-top: 2mm;">En conséquence, Buildy n'affiche aucune estimation chiffrée d'économies et ne réalise aucun calcul de temps de retour sur investissement (TRI) — ce calcul relève de la seule responsabilité du propriétaire, qui s'appuie sur les devis reçus et ses propres hypothèses (cf. clause de dispense de l'article R175-2 et Annexe D).</p>
+    <p class="method-body" style="margin-top: 2mm;">En conséquence, Buildy n'affiche aucune estimation chiffrée d'économies et ne réalise aucun calcul de temps de retour sur investissement (TRI) — ce calcul relève de la seule responsabilité du propriétaire. Pour la GTB, il suit la méthode fixée par l'arrêté du 7 avril 2023 : coût établi sur au moins deux devis réels, aides déduites ; gain de 15 % ou issu d'un audit énergétique ; coût moyen facturé de chaque énergie (clause de dispense de l'article R175-2 ; annexe D).</p>
   </article>
 
   {{!-- Item 10 — Contre-indications de pilotage par type d'équipement --}}
   <article class="method-card">
     <h3 class="method-title">Contre-indications de pilotage par type d'équipement</h3>
-    <p class="method-body">Certains équipements ne peuvent pas être arrêtés ou coupés sans risque technique ou sanitaire. Lorsqu'un équipement audité est concerné, Buildy ne génère pas d'action « arrêt manuel » contraire à sa nature : le pilotage BACS doit alors être adapté plutôt que suspendu. Les contre-indications retenues sont les suivantes :</p>
+    <p class="method-body">Certains équipements ne doivent pas être arrêtés par une simple coupure de leur alimentation, pour des raisons techniques ou sanitaires (guide PROFEEL). L'arrêt manuel exigé par le décret passe alors par la régulation de l'équipement (arrêt piloté, mise en hors gel, réduction de consigne), jamais par une coupure brutale. Les contre-indications retenues sont les suivantes :</p>
     <ul class="method-list">
-      <li><strong>Eau chaude sanitaire bouclée</strong> — l'arrêt de la boucle est interdit (arrêté du 30 novembre 2005 — risque légionelle).</li>
+      <li><strong>Eau chaude sanitaire bouclée</strong> — en période d'occupation, et dans les 24 heures qui la précèdent, les températures de l'arrêté du 30 novembre 2005 doivent être respectées : pas d'arrêt de la boucle. Un arrêt pendant une inoccupation de plusieurs semaines reste possible, avec une remise en service encadrée (risque lié aux légionelles).</li>
       <li><strong>Équipement thermodynamique</strong> (PAC, DRV, climatisation) — ne pas couper l'alimentation électrique en cours de fonctionnement (lubrification du compresseur).</li>
       <li><strong>Chaudière en période hivernale</strong> — ne pas couper l'alimentation : perte de la protection hors-gel.</li>
       <li><strong>Ballon ECS à anode à courant imposé (ACI)</strong> — pas de coupure prolongée au-delà de 8 h : perte de la protection anti-corrosion.</li>
@@ -2020,7 +2220,7 @@
       <li><strong>Ventilation en EHPAD, hôpitaux et locaux sanitaires</strong> — ventilation en continu requise pour la qualité de l'air et l'hygiène.</li>
       <li><strong>Éclairage déjà optimisé</strong> (détection de présence + LED récentes) — généraliser une commande BACS n'apporte pas de gisement d'économies.</li>
     </ul>
-    <p class="method-body" style="margin-top: 2mm;">Dans ces cas, le rapport substitue à l'action d'arrêt une recommandation de pilotage adapté (programmation de consigne, surveillance, dérogation contrôlée).</p>
+    <p class="method-body" style="margin-top: 2mm;">Dans ces cas, le rapport rappelle le pilotage adapté à mettre en œuvre (programmation de consigne, surveillance, dérogation contrôlée).</p>
   </article>
 
   {{!-- Item 5 — Méthode de cumul des puissances chaud / froid --}}
@@ -2030,43 +2230,55 @@
     <ul class="method-list">
       <li><strong>Systèmes thermodynamiques</strong> (PAC, DRV, climatisation) — la puissance retenue est le maximum déclaré entre puissance calorifique et frigorifique (norme EN 14511) ; la machine ne compte qu'une fois.</li>
       <li><strong>Chaudières</strong> — somme des puissances nominales constructeur.</li>
-      <li><strong>Effet joule</strong> (radiateurs et batteries électriques) — somme des puissances électriques.</li>
-      <li><strong>Réseau de chaleur ou de froid urbain</strong> — puissance nominale de la sous-station (échangeur primaire). Les <strong>émetteurs aval</strong> alimentés par cette sous-station (radiateurs eau chaude, ventilo-convecteurs sur boucle secondaire, batteries CTA alimentées en eau du réseau urbain) ne sont <strong>pas additionnés</strong> au cumul — seule la puissance de l'échangeur est retenue, conformément à R175-2 §I.</li>
-      <li><strong>Exclus du cumul</strong> — équipements de secours, systèmes mobiles, appareils indépendants de chauffage au bois, systèmes non destinés au chauffage ou à la climatisation.</li>
+      <li><strong>Effet Joule</strong> (radiateurs et batteries électriques) — somme des puissances électriques.</li>
+      <li><strong>Réseau de chaleur ou de froid urbain</strong> — puissance nominale de la sous-station (échangeur primaire). Les <strong>émetteurs aval</strong> alimentés par cette sous-station (radiateurs eau chaude, ventilo-convecteurs sur boucle secondaire, batteries CTA alimentées en eau du réseau urbain) ne sont <strong>pas additionnés</strong> au cumul — seule la puissance de la station d'échange est retenue (R175-2 I).</li>
+      <li><strong>Exclus du cumul</strong> — équipements de secours au sens de la FAQ BACS n° 8 (normalement à l'arrêt, démarrés seulement après un défaut de l'équipement principal ; un générateur appelé en cascade n'en est pas un), systèmes mobiles, appareils indépendants de chauffage au bois, systèmes non destinés au chauffage ou à la climatisation.</li>
     </ul>
-    <p class="method-body" style="margin-top: 2mm;">La puissance chaud cumulée et la puissance froid cumulée ne s'additionnent pas : la puissance retenue est le maximum des deux. La valeur calculée peut être surchargée manuellement par l'auditeur ; tout écart supérieur à 10 % entre le calcul et la saisie manuelle est signalé.</p>
+    <p class="method-body" style="margin-top: 2mm;">La puissance chaud cumulée et la puissance froid cumulée ne s'additionnent pas : la puissance retenue est le maximum des deux (FAQ BACS n° 11). Un équipement de production dont la puissance n'est pas relevée n'est pas compté : la puissance retenue est alors un minimum, ce que le rapport signale. La valeur calculée peut être remplacée par une valeur déclarée par l'auditeur ; tout écart supérieur à 10 % entre la valeur déclarée et le calcul est signalé.</p>
   </article>
 
-  {{!-- Item 7 — zone fonctionnelle au sens du décret BACS --}}
+  {{!-- Item 7 — découpage et regroupement des zones fonctionnelles (la
+       définition figure plus haut, fiche « Définition de zone fonctionnelle ») --}}
   <article class="method-card">
-    <h3 class="method-title">Zone fonctionnelle au sens du décret BACS</h3>
-    <p class="method-body">Une zone fonctionnelle <strong>n'est pas une pièce</strong> : c'est un ensemble de locaux suivis ensemble du point de vue de l'énergie — une <strong>unité de suivi</strong>. Le décret (R175-1 6°) ne définit pas le niveau de découpage : Buildy applique un test simple — <em>« est-ce que ça a du sens de suivre la consommation de cette zone séparément du reste ? »</em></p>
-    <p class="method-body" style="margin-top: 2mm;">Une zone séparée n'est créée que si les <strong>trois conditions</strong> sont réunies :</p>
-    <ul class="method-list">
-      <li>l'usage est vraiment différent — activité ou horaires différents ;</li>
-      <li>le poste pèse assez lourd pour mériter un suivi (cf. règle des 5 %) ;</li>
-      <li>le suivi séparé est techniquement faisable.</li>
-    </ul>
-    <p class="method-body" style="margin-top: 2mm;">Si une seule condition manque, les locaux sont regroupés. Les vestiaires, sanitaires, circulations et locaux de rangement ne forment jamais une zone fonctionnelle à part. Le découpage <strong>peut varier selon le système technique concerné</strong> : une école peut former une seule zone fonctionnelle pour le chauffage (chaudière et circuit uniques) mais deux pour l'éclairage (tableaux électriques distincts). Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones sont regroupées en une seule zone fonctionnelle de suivi, avec justification écrite au chapitre Zones.</p>
+    <h3 class="method-title">Découpage et regroupement des zones fonctionnelles</h3>
+    <p class="method-body">Une zone distincte est créée dès que l'usage diffère : activité ou amplitude d'utilisation (R175-1 6° ; FAQ ministérielle n° 25, non opposable). Le découpage <strong>peut varier selon le système technique concerné</strong> : une école peut former une seule zone fonctionnelle pour le chauffage (chaudière et circuit uniques) mais deux pour l'éclairage (tableaux électriques distincts).</p>
+    <p class="method-body" style="margin-top: 2mm;">Le suivi peut être regroupé lorsqu'il n'est pas techniquement séparable (FAQ ministérielle n° 25) ou, à titre de préconisation Buildy, pour un poste de très faible poids (guide PROFEEL), avec une justification écrite au chapitre 2 « Zones fonctionnelles ». Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones forment une seule zone fonctionnelle de suivi : un compteur unique suffit alors pour l'ensemble.</p>
   </article>
 </section>
 
 {{!-- ═══════════ Annexe C — Justification des préconisations ═══════════ --}}
 <section class="annex">
-  <h1>Annexe C — Justification des préconisations</h1>
+  <h1 data-toc-anchor="annex-c">Annexe C — Justification des préconisations</h1>
   <div class="callout callout-info">
     <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
-    <div class="callout-body">Chaque action corrective listée au chapitre 7 a été générée à partir des données saisies pendant l'audit, en référence à un article précis du décret BACS. Cette annexe trace pour chaque item le raisonnement appliqué.</div>
+    <div class="callout-body">Chaque action du plan de mise en conformité (chapitre {{planChapterNumber}}) est reprise ci-dessous avec son numéro, l'article visé, l'élément de l'audit à l'origine du constat et le raisonnement appliqué. Les actions ajoutées par l'auditeur sont signalées.</div>
   </div>
-  {{#each justifications}}
-  <div class="justif-card">
-    <h3>{{title}}</h3>
+  {{!-- Justifications identiques regroupées (texte commun une fois, puis
+       la liste des actions concernées), comme au plan. --}}
+  {{#each justificationGroups}}
+  {{#if isGroup}}
+  <div class="justif-card justif-card-group{{#if isShort}} justif-card-short{{/if}}">
+    <h3>{{rangeLabel}} — {{items.length}} actions de même justification</h3>
     <table class="meta-table">
       <tr><th>Article visé</th><td><strong>{{article}}</strong></td></tr>
-      <tr><th>Donnée audit</th><td>{{source}}</td></tr>
-      <tr><th>Recommandation</th><td class="justif-desc">{{{description}}}</td></tr>
+      <tr><th>Actions et origine du constat</th><td>
+        <table class="justif-items"><tbody>
+          {{#each items}}<tr><td class="ji-num">{{number}}</td><td>{{title}}</td><td class="ji-src">{{source}}</td></tr>{{/each}}
+        </tbody></table>
+      </td></tr>
+      <tr><th>Justification</th><td class="justif-desc">{{{description}}}</td></tr>
     </table>
   </div>
+  {{else}}
+  <div class="justif-card{{#if isShort}} justif-card-short{{/if}}">
+    <h3>{{first.number}} — {{first.title}}</h3>
+    <table class="meta-table">
+      <tr><th>Article visé</th><td><strong>{{first.article}}</strong></td></tr>
+      <tr><th>Origine du constat</th><td>{{first.source}}{{#if first.manual}} · action ajoutée par l'auditeur{{/if}}</td></tr>
+      <tr><th>Justification</th><td class="justif-desc">{{{first.description}}}</td></tr>
+    </table>
+  </div>
+  {{/if}}
   {{/each}}
   {{#unless justifications.length}}
   <div class="callout callout-reco">
@@ -2078,9 +2290,9 @@
 
 {{!-- ═══════════ Annexe D — Disclaimers ═══════════ --}}
 <section class="annex">
-  <h1>Annexe D — Mentions légales et disclaimers</h1>
-  <div class="callout callout-warn">
-    <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
+  <h1 data-toc-anchor="annex-d">Annexe D — Mentions légales et avertissements</h1>
+  <div class="callout callout-r175">
+    <span class="callout-icon">{{{faIcon "circle-info" "#1b2842" "14"}}}</span>
     <div class="callout-body">Lecture obligatoire avant utilisation du présent rapport en support de devis ou de procédure de mise en conformité.</div>
   </div>
   <ol class="disclaimer-list">
@@ -2089,19 +2301,71 @@
     {{/each}}
   </ol>
 </section>
+
+{{!-- ═══════════ Annexe E — Documents joints ═══════════
+     Documents du site cochés « Inclure dans le rapport » (décochés par
+     défaut) : liste complète, transcription des notes vocales, images
+     reproduites (sauf photos déjà imprimées dans un chapitre). --}}
+{{#if reportAttachments.length}}
+<section class="annex">
+  <h1 data-toc-anchor="annex-e">Annexe E — Documents joints</h1>
+  <div class="callout callout-info">
+    <span class="callout-icon">{{{faIcon "paperclip" "#1b2842" "14"}}}</span>
+    <div class="callout-body">Documents relevés ou remis lors de l'audit et joints au présent rapport. Les images sont reproduites ci-dessous, sauf les photos déjà présentes dans un chapitre, qui y renvoient ; les notes vocales sont retranscrites ; les autres fichiers (PDF, plans, schémas, tableurs) sont seulement listés.</div>
+  </div>
+  <table class="attachments-table">
+    <colgroup><col style="width:8%"><col style="width:26%"><col style="width:21%"><col style="width:21%"><col style="width:14%"><col style="width:10%"></colgroup>
+    <thead>
+      <tr><th>Réf.</th><th>Document</th><th>Type</th><th>Rattaché à</th><th>Date</th><th>Taille</th></tr>
+    </thead>
+    <tbody>
+      {{#each reportAttachments}}
+      <tr>
+        <td class="att-ref">{{ref}}</td>
+        <td class="att-title">{{title}}{{#if shownInChapter}}<span class="att-note">Photo reproduite au chapitre {{shownInChapter}}.</span>{{else if dataUrl}}<span class="att-note">Image reproduite ci-dessous.</span>{{/if}}</td>
+        <td>{{typeLabel}}<span class="att-format"> · {{formatLabel}}</span></td>
+        <td>{{attachedTo}}</td>
+        <td class="att-date">{{#if date}}{{frDate date}}{{else}}—{{/if}}</td>
+        <td class="att-size">{{sizeLabel}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{#if reportAttachmentTranscripts.length}}
+  <h2 class="subheading">Notes vocales — transcription</h2>
+  {{#each reportAttachmentTranscripts}}
+  <div class="attachment-transcript">
+    <div class="attachment-transcript-head"><span class="att-ref-inline">{{ref}}</span> — <strong>{{title}}</strong><span class="muted"> · {{attachedTo}}</span></div>
+    <p>{{transcript}}</p>
+  </div>
+  {{/each}}
+  {{/if}}
+  {{#if reportAttachmentImages.length}}
+  <h2 class="subheading">Images</h2>
+  <div class="attachment-gallery">
+    {{#each reportAttachmentImages}}
+    <figure class="attachment-figure">
+      <img src="{{dataUrl}}" alt="" />
+      <figcaption><strong>{{ref}}</strong> — {{title}}<span class="muted"> · {{attachedTo}}</span></figcaption>
+    </figure>
+    {{/each}}
+  </div>
+  {{/if}}
+</section>
+{{/if}}
 {{/if}}
 
 {{!-- ═══════════ Page de clôture plein-bord — accompagnement Buildy ═══════════ --}}
 <section class="closing">
   <header class="closing-top">
     <img class="closing-logo" src="{{logoWhiteDataUrl}}" alt="Buildy" />
-    <span class="closing-eyebrow">{{#if isBacs}}Mise en conformité · Décret R175{{else}}Extension de votre GTB{{/if}}</span>
+    <span class="closing-eyebrow">{{#if isBacs}}Mise en conformité · Décret BACS{{else}}Extension de la GTB{{/if}}</span>
   </header>
 
   <main class="closing-main">
-    <h2 class="closing-title">{{#if isBacs}}Passez à la mise en conformité avec Buildy{{else}}Faisons évoluer votre GTB ensemble{{/if}}</h2>
+    <h2 class="closing-title">{{#if isBacs}}La mise en conformité avec Buildy{{else}}L'évolution de la GTB avec Buildy{{/if}}</h2>
     <p class="closing-lead">
-      {{#if actionStats.total}}Ce rapport identifie <strong>{{actionStats.total}} action{{#unless (eq actionStats.total 1)}}s{{/unless}} corrective{{#unless (eq actionStats.total 1)}}s{{/unless}}</strong> à engager{{#if isBacs}}{{#if applicabilityLabel}} pour répondre à l'échéance réglementaire ({{applicabilityLabel}}){{/if}}{{/if}}.{{else}}Ce rapport dresse l'état des lieux complet de votre installation.{{/if}}
+      {{#if actionStats.total}}Ce rapport identifie {{#if closingActionCount}}<strong>{{closingActionCount}} action{{#unless (eq closingActionCount 1)}}s{{/unless}} corrective{{#unless (eq closingActionCount 1)}}s{{/unless}}</strong>{{#if closingConditionalCount}} (dont {{closingConditionalCount}} sous condition de temps de retour sur investissement){{/if}}{{/if}}{{#if actionStats.reserves}}{{#if closingActionCount}} et {{/if}}<strong>{{actionStats.reserves}} réserve{{#unless (eq actionStats.reserves 1)}}s{{/unless}}</strong>{{/if}}.{{#if isBacs}} {{closingDeadlinePhrase}} {{closingInspectionNote}}{{/if}}{{else}}Ce rapport dresse l'état des lieux complet de l'installation.{{/if}}
       Buildy accompagne les propriétaires et exploitants de la définition du plan d'actions jusqu'à sa mise en œuvre.
     </p>
 
@@ -2113,15 +2377,15 @@
   </main>
 
   <div class="closing-cta-button-wrap">
-    <span class="closing-cta-button">{{#if isBacs}}Demandez votre devis de mise en conformité BACS{{else}}Demandez votre devis d'extension GTB{{/if}}</span>
+    <a class="closing-cta-button" href="{{#if quoteMailto}}{{{quoteMailto}}}{{else}}mailto:contact@buildy.fr?subject={{#if isBacs}}Devis%20de%20mise%20en%20conformit%C3%A9%20BACS{{else}}Devis%20d%27extension%20de%20la%20GTB{{/if}}{{/if}}">{{#if isBacs}}Devis de mise en conformité BACS sur demande{{else}}Devis d'extension de la GTB sur demande{{/if}}</a>
   </div>
 
   <div class="closing-cta">
     <span class="closing-cta-label">Pour échanger sur la suite</span>
     <div class="closing-cta-rows">
-      <span class="closing-cta-row"><span class="closing-cta-key">Courriel</span> contact@buildy.fr</span>
-      <span class="closing-cta-row"><span class="closing-cta-key">Téléphone</span> 04 28 39 03 34</span>
-      <span class="closing-cta-row"><span class="closing-cta-key">Site</span> www.buildy.fr</span>
+      <span class="closing-cta-row"><span class="closing-cta-key">Courriel</span> <a href="mailto:contact@buildy.fr">contact@buildy.fr</a></span>
+      <span class="closing-cta-row"><span class="closing-cta-key">Téléphone</span> <a href="tel:+33428390334">04 28 39 03 34</a></span>
+      <span class="closing-cta-row"><span class="closing-cta-key">Site</span> <a href="https://www.buildy.fr">www.buildy.fr</a></span>
     </div>
   </div>
 </section>

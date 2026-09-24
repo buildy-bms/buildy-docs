@@ -8,6 +8,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
 import { useAuditStore } from '@/stores/audit'
+import { isMeterMissing } from '@/lib/meter-plan-state'
 import { useAuditAutoSync } from '@/composables/useAuditAutoSync'
 import { useNotification } from '@/composables/useNotification'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -56,7 +57,7 @@ useAuditAutoSync({ intervalMs: 5000 })
 // perdre ses changements.
 const offlineQueue = inject('offlineQueue', { pendingCount: ref(0) })
 const {
-  document, loading, zones, systems, meters, bms, actionItems,
+  document, loading, zones, systems, meters, bms, actionItems, meterPlanStatus,
 } = storeToRefs(auditStore)
 const { error, success } = useNotification()
 const { isOnline } = useOnlineStatus()
@@ -137,7 +138,8 @@ const tabDot = computed(() => {
   out.systems = sysToFill > 0 ? { tone: 'amber', count: sysToFill } : null
   // Compteurs : nombre de compteurs required absents (pas HS)
   const m = meters.value || []
-  const missingMeters = m.filter(x => x.required && !x.present_actual && !x.out_of_service).length
+  // Même décompte que le plan et le PDF (lib/meter-plan-state.js).
+  const missingMeters = m.filter(x => isMeterMissing(x, meterPlanStatus.value)).length
   out.meters = missingMeters > 0 ? { tone: 'red', count: missingMeters } : null
   // GTB : si BMS vide → amber (pas de compteur, juste un dot)
   const b = bms.value || {}
@@ -233,14 +235,44 @@ async function deliver() {
     confirmLabel: 'Livrer',
   })
   if (!ok) return
+  // Sans réseau : on ne tente rien (une livraison n'est jamais mise en
+  // attente pour plus tard).
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    error('Pas de réseau : la livraison n\'est pas partie. Réessaie avec une connexion.')
+    return
+  }
+  const result = await attemptDelivery(false)
+  if (result === 'precheck_failed') {
+    const forceOk = await confirm({
+      title: 'Vérification impossible',
+      message: 'La vérification automatique avant livraison a rencontré une erreur technique. Tu peux livrer sans cette vérification : ce sera noté dans l\'activité de l\'audit.',
+      confirmLabel: 'Livrer sans vérification',
+      danger: true,
+    })
+    if (forceOk) await attemptDelivery(true)
+  }
+}
+
+async function attemptDelivery(force) {
   delivering.value = true
   try {
-    const { data } = await deliverBacsAudit(docId)
+    const { data } = await deliverBacsAudit(docId, { force })
     success(`Audit livré — tag ${data.delivered_git_tag}`)
     showSettings.value = false
     await refresh()
+    return 'ok'
   } catch (e) {
-    error(e.response?.data?.detail || 'Échec de la livraison')
+    if (e.response?.status === 409 && e.response?.data?.precheck_failed) return 'precheck_failed'
+    if (e.response?.status === 409 && e.response?.data?.precheck) {
+      error('Livraison refusée : des points bloquants restent à corriger. Ouvre « Vérifier » sur ordinateur pour les voir.')
+    } else if (e.code === 'ECONNABORTED') {
+      error('La livraison prend plus de 3 minutes. Vérifie sur ordinateur (Plus → Activité) si elle a abouti avant de relancer.')
+    } else if (!e.response) {
+      error('Pas de réseau : la livraison n\'est pas partie. Réessaie avec une connexion.')
+    } else {
+      error(e.response?.data?.detail || 'Échec de la livraison')
+    }
+    return 'error'
   } finally {
     delivering.value = false
   }

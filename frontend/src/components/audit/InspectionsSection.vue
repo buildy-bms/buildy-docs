@@ -12,7 +12,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { addYearsIso, todayIso as todayIsoLocal } from '@/lib/date-helpers'
 
-// Section "Inspection périodique par un tiers" (R175-5-1).
+// Section "Inspection périodique" (R175-5-1).
 // Refonte compacte : chaque inspection = ligne accordéon. Pré-calc auto
 // des échéances dès qu'on saisit la date d'inspection (5 ans pour la
 // prochaine, 10 ans pour la conservation du rapport).
@@ -138,7 +138,7 @@ function statusFor(ins) {
 <template>
   <CollapsibleSection storage-key="inspections" section-id="section-inspections" :active="active">
     <template #header>
-      <SectionHeader number="7" :title="'Inspection périodique par un tiers'"
+      <SectionHeader number="7" :title="'Inspection périodique de la GTB'"
                      subtitle="R175-5-1 — rapport conservé 10 ans"
                      :icon="ClockIcon" icon-color="text-amber-600"
                      :step="step"
@@ -148,7 +148,7 @@ function statusFor(ins) {
       </SectionHeader>
     </template>
     <template #summary>
-      <span v-if="notApplicable" class="italic text-emerald-700">Aucune inspection à déclarer</span>
+      <span v-if="notApplicable" class="italic text-amber-700">Aucune inspection à déclarer · réserve au rapport</span>
       <span v-else-if="inspections.length">
         {{ inspections.length }} inspection{{ inspections.length > 1 ? 's' : '' }} tracée{{ inspections.length > 1 ? 's' : '' }}
         <span v-if="latestInspection" class="text-gray-500">
@@ -158,32 +158,35 @@ function statusFor(ins) {
           </span>
         </span>
       </span>
-      <span v-else class="italic text-amber-700">Aucune inspection R175-5-1 tracée — action corrective générée</span>
+      <span v-else class="italic text-amber-700">Aucune inspection tracée · réserve au rapport</span>
     </template>
     <div class="px-5 py-4 space-y-3">
       <!-- Toggle factuel : « Y a-t-il une inspection à tracer ? »
-           Oui = à tracer (état par défaut, action corrective si rien tracé).
-           Non = rien à tracer (bypass + raison optionnelle au PDF).
+           Oui = à tracer (état par défaut).
+           Non = rien à tracer : l'étape peut être validée.
+           Dans les deux cas, sans inspection tracée, le rapport garde la
+           réserve « Faire réaliser l'inspection » (générateur, no_inspection) ;
+           la précision saisie est reprise dans son constat.
            Volontairement sans référence au statut réglementaire R175-5-1
            — l'auditeur n'a pas toujours l'info pour le déterminer. -->
       <div class="rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2.5 flex items-start justify-between gap-3">
         <div class="text-xs text-gray-700 leading-snug">
           <div class="font-medium text-gray-800">Y a-t-il une inspection officielle à tracer pour ce site ?</div>
-          <div class="text-gray-500 mt-0.5">Réponds Non si rien n'est à tracer (aucune inspection passée connue, ou site non concerné par R175-5-1). Cela débloque la validation de la card sans générer d'action corrective.</div>
+          <div class="text-gray-500 mt-0.5">Réponds Non si aucune inspection n'a encore eu lieu ou si aucun rapport n'est disponible. L'étape peut alors être validée ; le rapport indique en réserve que l'inspection reste à faire réaliser par le propriétaire.</div>
         </div>
         <SegmentedToggle :model-value="notApplicable === true ? false : (notApplicable === false ? true : null)"
                          :options="[{ value: true, label: 'Oui', tone: 'green' }, { value: false, label: 'Non', tone: 'slate' }]"
                          @update:model-value="v => setNotApplicable(v === false)" />
       </div>
       <div v-if="notApplicable" class="px-1">
-        <label class="block text-[11px] text-gray-600 mb-1">Raison (optionnelle, apparaît dans le PDF)</label>
+        <label class="block text-[11px] text-gray-600 mb-1">Précision (optionnelle, reprise dans la réserve du rapport)</label>
         <input :value="document?.inspection_not_applicable_reason || ''" type="text"
-               placeholder="ex : ERP non concerné par R175-5-1, ou inspection prévue après livraison du chantier…"
+               placeholder="ex : GTB installée il y a moins de deux ans, aucun rapport transmis…"
                @input="e => onReasonInput(e.target.value)"
                class="input-base text-sm py-1.5 w-full" />
       </div>
       <p v-if="!inspections.length && !notApplicable" class="text-xs text-gray-500 italic">
-        Trace ici les inspections officielles réalisées par un tiers (organisme indépendant). L'audit Buildy est interne et ne se substitue pas à cette obligation.
+        Trace ici les inspections périodiques de la GTB, réalisées à l'initiative de son propriétaire (R175-5-1). La FAQ ministérielle n° 30 (non opposable) indique qu'il « peut être pertinent » de la confier à un tiers indépendant des fabricants et installateurs ; le décret ne l'impose pas. L'audit Buildy ne remplace pas cette inspection.
       </p>
 
       <!-- Liste compacte des inspections : 1 ligne d'accroche + détails repliables -->
@@ -231,7 +234,7 @@ function statusFor(ins) {
                      class="input-base text-sm py-1.5 w-full" />
             </div>
             <div>
-              <label class="block text-[11px] text-gray-600 mb-1">Tiers inspecteur</label>
+              <label class="block text-[11px] text-gray-600 mb-1">Inspecteur (nom / société)</label>
               <input :value="ins.last_inspection_inspector || ''" type="text"
                      placeholder="APAVE, SOCOTEC, Bureau Veritas…"
                      @input="e => patchInspectionDebounced(ins, { last_inspection_inspector: e.target.value || null })"

@@ -8,6 +8,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
+import DevicePanelShell from '@/components/audit/DevicePanelShell.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
@@ -26,8 +27,12 @@ const props = defineProps({
   system: { type: Object, required: true },
   systemLabel: { type: String, default: '' },
   zoneName: { type: String, default: '' },
+  // Fiche équipement dans la page (étape Systèmes à onglets) plutôt qu'une
+  // fenêtre : même formulaire, sans fond ni fenêtre (DevicePanelShell).
+  panel: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'changed'])
+const shell = computed(() => (props.panel ? DevicePanelShell : BaseModal))
 const { error } = useNotification()
 const audit = useAuditStore()
 
@@ -389,7 +394,8 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
 </script>
 
 <template>
-  <BaseModal
+  <component
+    :is="shell"
     :title="`Modifier l'équipement — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`"
     size="2xl"
     :dismiss-on-backdrop="false"
@@ -411,12 +417,12 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           </div>
           <div>
             <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Marque</label>
-            <input type="text" :value="device.brand || ''" placeholder="Atlantic"
+            <input type="text" :value="device.brand || ''" placeholder="ex : Atlantic"
                    @blur="e => patchInput('brand', e.target.value)" :class="inputCls" class="w-full" />
           </div>
           <div>
             <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Référence</label>
-            <input type="text" :value="device.model_reference || ''" placeholder="Varmax 70"
+            <input type="text" :value="device.model_reference || ''" placeholder="ex : Varmax 70"
                    @blur="e => patchInput('model_reference', e.target.value)" :class="inputCls" class="w-full" />
           </div>
           <div class="sm:col-span-2">
@@ -701,7 +707,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                 Cet équipement est-il concerné par l'intégration à la GTB ?
                 <span class="font-normal text-gray-400 ml-1">· périmètre</span>
               </div>
-              <div class="text-xs text-gray-500 mt-0.5">Par défaut, le périmètre suit les « usages traités par la GTB » (card GTB). Forcez « Oui » ou « Non » pour cet équipement précis (ex. exclure un émetteur passif, inclure un équipement d'un usage non coché).</div>
+              <div class="text-xs text-gray-500 mt-0.5">Par défaut, le périmètre suit les « usages traités par la GTB » (card GTB) ; un usage que la GTB ne traite pas reste à raccorder au sens du décret. Forcez « Non » seulement si cet équipement n'a pas à être raccordé (ex. émetteur passif, unité extérieure pilotée par des unités intérieures raccordées) : il n'est alors pas évalué.</div>
             </div>
             <div class="inline-flex rounded-md overflow-hidden border border-gray-200 shrink-0">
               <button v-for="opt in SCOPE_OPTIONS" :key="String(opt.value)" type="button"
@@ -716,7 +722,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">
                 L'équipement est-il relié à la GTB par une liaison câblée ?
-                <span class="font-normal text-gray-400 ml-1">· R175-3 §3</span>
+                <span class="font-normal text-gray-400 ml-1">· R175-3 3°</span>
               </div>
               <div class="text-xs text-gray-500 mt-0.5">L'équipement est relié à la supervision par un câble dédié — la base de l'interopérabilité exigée par le décret.</div>
             </div>
@@ -726,10 +732,10 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">
-                Peut-on arrêter l'équipement manuellement, sur place ?
-                <span class="font-normal text-gray-400 ml-1">· R175-3 §4</span>
+                La GTB permet-elle d'arrêter l'équipement manuellement ?
+                <span class="font-normal text-gray-400 ml-1">· R175-3 4°</span>
               </div>
-              <div class="text-xs text-gray-500 mt-0.5">On peut arrêter l'équipement directement sur place, sans passer par la supervision.</div>
+              <div class="text-xs text-gray-500 mt-0.5">Depuis la GTB, on peut arrêter puis remettre en marche l'équipement, ou le passer en hors gel (par exemple pendant une période d'inoccupation).</div>
             </div>
             <SegmentedToggle :model-value="triState(device.meets_r175_3_p4)" :options="YESNO"
                              @update:model-value="v => patch({ meets_r175_3_p4: v })" />
@@ -737,10 +743,10 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">
-                L'équipement redémarre-t-il de façon autonome après une coupure ?
-                <span class="font-normal text-gray-400 ml-1">· R175-3 §4</span>
+                L'équipement fonctionne-t-il seul si la GTB est arrêtée ?
+                <span class="font-normal text-gray-400 ml-1">· R175-3 4°</span>
               </div>
-              <div class="text-xs text-gray-500 mt-0.5">Après une coupure de courant ou un redémarrage de la GTB, l'équipement repart seul, sans intervention d'un technicien.</div>
+              <div class="text-xs text-gray-500 mt-0.5">Si la GTB est arrêtée ou la communication coupée, l'équipement continue de fonctionner avec sa régulation locale, et repart seul après une coupure.</div>
             </div>
             <SegmentedToggle :model-value="triState(device.meets_r175_3_p4_autonomous)" :options="YESNO"
                              @update:model-value="v => patch({ meets_r175_3_p4_autonomous: v })" />
@@ -792,7 +798,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">Est-ce un équipement de secours ?</div>
-              <div class="text-xs text-gray-500 mt-0.5">Équipement de relève qui ne tourne qu'en cas de panne, pointe extrême ou maintenance — typiquement une 2<sup>e</sup> chaudière en cascade qui ne démarre que quelques heures par an. Sa puissance est <strong>exclue du cumul</strong> retenu pour l'assujettissement BACS (seuils 70 puis 290 kW). Si elle fonctionne en permanence en complément, la laisser sur Non.</div>
+              <div class="text-xs text-gray-500 mt-0.5">Équipement normalement à l'arrêt, qui ne démarre qu'après un défaut de l'équipement principal (FAQ BACS n° 8). Un générateur appelé en cascade ou en appoint de pointe <strong>n'est pas</strong> un secours : sa puissance est comptée. Seule la puissance d'un vrai secours est <strong>exclue du cumul</strong> retenu pour l'assujettissement (seuils 70 et 290 kW).</div>
             </div>
             <SegmentedToggle :model-value="triState(device.is_backup)" :options="YESNO"
                              @update:model-value="v => patch({ is_backup: v })" />
@@ -887,5 +893,5 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
         </button>
       </div>
     </template>
-  </BaseModal>
+  </component>
 </template>

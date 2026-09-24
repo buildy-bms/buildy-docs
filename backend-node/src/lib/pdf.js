@@ -5,13 +5,31 @@ const path = require('path');
 const Handlebars = require('handlebars');
 const puppeteer = require('puppeteer');
 const log = require('./logger').system;
+const { createBrowserPool } = require('./browser-pool');
 
 // Helpers Handlebars (utilises dans les templates .hbs)
 Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('lt', (a, b) => a < b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
-Handlebars.registerHelper('minus', (a, b) => Number(a) - Number(b));
+Handlebars.registerHelper('minus', (a, b) => (Number(a) || 0) - (Number(b) || 0));
 Handlebars.registerHelper('add', (a, b) => Number(a) + Number(b));
+// Date ISO au format français long : {{frDate "2022-01-01"}} → « 1er janvier 2022 ».
+Handlebars.registerHelper('frDate', (v) => {
+  if (!v) return v;
+  const d = new Date(v);
+  if (isNaN(d)) return v;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+    .replace(/^1 /, '1er ');
+});
+// Nombre au format français (virgule décimale, espace des milliers) :
+// {{frNum 155.8}} → « 155,8 ». Valeur non numérique renvoyée telle quelle.
+Handlebars.registerHelper('frNum', (v, digits) => {
+  if (v == null || v === '' || !Number.isFinite(Number(v))) return v;
+  // Petites valeurs (0,03 kW par luminaire) : deux décimales, sinon « 0 ».
+  const abs = Math.abs(Number(v));
+  const max = typeof digits === 'number' ? digits : (abs > 0 && abs < 1 ? 2 : 1);
+  return Number(v).toLocaleString('fr-FR', { maximumFractionDigits: max }).replace(/ /g, ' ');
+});
 Handlebars.registerHelper('and', function(...args) { args.pop(); return args.every(Boolean); });
 Handlebars.registerHelper('join', (arr, sep) => Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : '');
 
@@ -22,11 +40,13 @@ Handlebars.registerHelper('join', (arr, sep) => Array.isArray(arr) ? arr.join(ty
 // être confondu avec la catégorie d'usage Ventilation, fa-industry
 // pour Production évoquait à tort l'industriel. La couleur fait
 // office de marqueur, le label porte le sens.
+// Charte PDF : rouge / orange / vert réservés aux verdicts. La production
+// (le générateur) en navy, les autres fonctions en ardoise.
 const ROLE_PILL = {
-  production:   { label: 'Production',   color: '#dc2626' },
-  distribution: { label: 'Distribution', color: '#0ea5e9' },
-  emission:     { label: 'Émission',     color: '#3b82f6' },
-  regulation:   { label: 'Régulation',   color: '#a855f7' },
+  production:   { label: 'Production',   color: '#1b2842' },
+  distribution: { label: 'Distribution', color: '#475569' },
+  emission:     { label: 'Émission',     color: '#475569' },
+  regulation:   { label: 'Régulation',   color: '#475569' },
   autre:        { label: 'Autre',        color: '#6b7280' },
 };
 Handlebars.registerHelper('rolePill', (role, variant) => {
@@ -131,8 +151,18 @@ const METER_USAGE_PILL = {
   dhw:      { icon: 'faucet',       label: 'ECS',           bg: '#f0f9ff', fg: '#0369a1', border: '#bae6fd' },
   pv:       { icon: 'solar-panel',  label: 'PV',            bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
   lighting: { icon: 'lightbulb',    label: 'Éclairage',     bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
-  other:    { icon: 'circle-notch', label: 'Général',       bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
+  // Jauge : l'anneau « circle-notch » se lisait comme une icône de chargement
+  // dans le PDF (relecture 2026-09-24).
+  other:    { icon: 'gauge',        label: 'Général',       bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
 };
+// Charte PDF : catégories, usages, types de compteur et énergies en pastille
+// NEUTRE ; seule l'icône garde la couleur de la catégorie. Le rouge, l'orange
+// et le vert restent aux verdicts (sinon « Gaz » ou « Chauffage » en rouge
+// se lisaient comme une non-conformité).
+const NEUTRAL_PILL = { bg: '#f8fafc', fg: '#374151', border: '#e2e8f0' };
+function neutralPill(cfg) {
+  return cfg ? { ...cfg, iconColor: cfg.iconColor || cfg.fg, ...NEUTRAL_PILL } : cfg;
+}
 function renderMeterPill(cfg, opts = {}) {
   if (!cfg) return '';
   // Variantes de taille : 'md' (défaut, cards / encarts) | 'sm' (tableaux
@@ -146,7 +176,7 @@ function renderMeterPill(cfg, opts = {}) {
     const [w, h, , , p] = def.icon;
     const d = Array.isArray(p) ? p[p.length - 1] : p;
     const margin = variant === 'sm' ? '0.8mm' : '1.2mm';
-    svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${iconSize}" height="${iconSize}" style="vertical-align:-1px;flex-shrink:0;margin-right:${margin}"><path fill="${cfg.fg}" d="${d}"/></svg>`;
+    svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${iconSize}" height="${iconSize}" style="vertical-align:-1px;flex-shrink:0;margin-right:${margin}"><path fill="${cfg.iconColor || cfg.fg}" d="${d}"/></svg>`;
   }
   return new Handlebars.SafeString(
     `<span class="${cls}" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${svgHtml}${cfg.label}</span>`
@@ -156,11 +186,20 @@ function renderMeterPill(cfg, opts = {}) {
 // {{{meterTypePill type "sm"}}} -> pastille sm pour tableaux denses
 Handlebars.registerHelper('meterTypePill', (type, variant) => {
   const cfg = METER_TYPE_PILL[type] || METER_TYPE_PILL.other;
-  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+  return renderMeterPill(neutralPill(cfg), { variant: typeof variant === 'string' ? variant : 'md' });
 });
+// Usage de compteur → catégorie de système : l'icône d'un usage a la même
+// couleur que celle de la catégorie partout dans le rapport (chapitres 3, 4,
+// 6, 8 et tableaux A3 — relecture PDF 2026-09-24).
+const USAGE_TO_CATEGORY = { heating: 'heating', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw', pv: 'electricity_production', lighting: 'lighting_indoor' };
+function usageIconColor(usage) {
+  const cat = USAGE_TO_CATEGORY[usage];
+  return cat && CATEGORY_ICON[cat] ? CATEGORY_ICON[cat].color : '#64748b';
+}
 Handlebars.registerHelper('meterUsagePill', (usage, variant) => {
-  const cfg = METER_USAGE_PILL[usage] || METER_USAGE_PILL.other;
-  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+  const base = METER_USAGE_PILL[usage] || METER_USAGE_PILL.other;
+  const cfg = { ...base, iconColor: usageIconColor(usage) };
+  return renderMeterPill(neutralPill(cfg), { variant: typeof variant === 'string' ? variant : 'md' });
 });
 
 // Pill « catégorie système » pour les équipements (heating / cooling /
@@ -176,12 +215,16 @@ const SYSTEM_CATEGORY_PILL = {
   lighting_indoor:        { icon: 'lightbulb',   label: 'Éclairage intérieur',bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
   lighting_outdoor:       { icon: 'lightbulb',   label: 'Éclairage extérieur',bg: '#fefce8', fg: '#a16207', border: '#fde047' },
   lighting:               { icon: 'lightbulb',   label: 'Éclairage',          bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
-  electricity_production: { icon: 'solar-panel', label: 'Production PV',      bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
-  other:                  { icon: 'circle-notch',label: 'Autre',              bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
+  electricity_production: { icon: 'solar-panel', label: 'Production photovoltaïque', bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
+  other:                  { icon: 'gauge',       label: 'Autre',              bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
 };
 Handlebars.registerHelper('systemCategoryPill', (cat, variant) => {
-  const cfg = SYSTEM_CATEGORY_PILL[cat] || SYSTEM_CATEGORY_PILL.other;
-  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+  const base = SYSTEM_CATEGORY_PILL[cat] || SYSTEM_CATEGORY_PILL.other;
+  // Icône à la couleur de la catégorie (CATEGORY_ICON = UI SystemCategoryIcon) :
+  // la même catégorie garde la même couleur partout dans le rapport.
+  const catColor = (CATEGORY_ICON[cat] || (String(cat || '').startsWith('lighting') ? CATEGORY_ICON.lighting_indoor : null))?.color;
+  const cfg = catColor ? { ...base, iconColor: catColor } : base;
+  return renderMeterPill(neutralPill(cfg), { variant: typeof variant === 'string' ? variant : 'md' });
 });
 
 // Pill « énergie primaire » pour la colonne Énergie d'un équipement
@@ -194,14 +237,14 @@ const ENERGY_PILL = {
   wood:             { icon: 'tree',                 label: 'Bois',                bg: '#ecfccb', fg: '#3f6212', border: '#bef264' },
   biomass:          { icon: 'leaf',                 label: 'Biomasse',            bg: '#ecfccb', fg: '#3f6212', border: '#bef264' },
   fuel_oil:         { icon: 'oil-can',              label: 'Fioul',               bg: '#f3f4f6', fg: '#374151', border: '#d1d5db' },
-  district_heating: { icon: 'temperature-half',     label: 'Calories / Frigories',bg: '#ede9fe', fg: '#5b21b6', border: '#c4b5fd' },
+  district_heating: { icon: 'temperature-half',     label: 'Réseau de chaleur / de froid', bg: '#ede9fe', fg: '#5b21b6', border: '#c4b5fd' },
   solar:            { icon: 'solar-panel',          label: 'Solaire',             bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
   autre:            { icon: 'circle-question',      label: 'Autre',               bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
 };
 Handlebars.registerHelper('energyPill', (energy, variant) => {
   if (!energy) return '';
   const cfg = ENERGY_PILL[energy] || ENERGY_PILL.autre;
-  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+  return renderMeterPill(neutralPill(cfg), { variant: typeof variant === 'string' ? variant : 'md' });
 });
 
 // Pastille Oui / Non / —, colorée + texte (au lieu d'un simple ✓/✗
@@ -228,8 +271,36 @@ function renderBoolPill(state, opts = {}) {
     `<span class="${cls}" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${cfg.label}</span>`
   );
 }
-Handlebars.registerHelper('boolPill', (v, variant) => {
-  return renderBoolPill(triState(v), { variant: typeof variant === 'string' ? variant : 'md' });
+// {{{boolPill v "sm" "neutral"}}} : question dont le « Non » n'est pas un
+// écart (ex. « Requis : Non ») → Oui navy, Non gris, jamais de rouge.
+const BOOL_PILL_NEUTRAL = {
+  yes: { label: 'Oui', bg: '#f1f5f9', fg: '#1b2842', border: '#cbd5e1' },
+  no:  { label: 'Non', bg: '#f8fafc', fg: '#6b7280', border: '#e5e7eb' },
+};
+// 4e argument facultatif : libellé de la réponse manquante, à la place du
+// « — » muet — {{{boolPill v "sm" "" "À qualifier"}}} (règle ternaire :
+// non répondu n'est ni Oui ni Non).
+Handlebars.registerHelper('boolPill', (v, variant, tone, naLabel) => {
+  const state = triState(v);
+  // « dash » : tiret simple, sans pastille (réponse sans objet ou non
+  // qualifiable dans un tableau dense — plus de pastille vide).
+  if (state === 'na' && naLabel === 'dash') {
+    return new Handlebars.SafeString('<span class="muted">—</span>');
+  }
+  if (state === 'na' && typeof naLabel === 'string' && naLabel) {
+    const cls = variant === 'sm' ? 'bool-pill bool-pill-sm' : 'bool-pill';
+    return new Handlebars.SafeString(
+      `<span class="${cls}" style="background:#f8fafc;color:#475569;border:0.4pt solid #cbd5e1">${Handlebars.escapeExpression(naLabel)}</span>`
+    );
+  }
+  if (typeof tone === 'string' && tone === 'neutral' && BOOL_PILL_NEUTRAL[state]) {
+    const cfg = BOOL_PILL_NEUTRAL[state];
+    const cls = variant === 'sm' ? 'bool-pill bool-pill-sm' : 'bool-pill';
+    return new Handlebars.SafeString(
+      `<span class="${cls}" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${cfg.label}</span>`
+    );
+  }
+  return renderBoolPill(state, { variant: typeof variant === 'string' ? variant : 'md' });
 });
 
 // Pill communication équipement : rouge pâle quand non communicant,
@@ -239,7 +310,14 @@ Handlebars.registerHelper('boolPill', (v, variant) => {
 const COMM_STATE_PILL = {
   yes: { icon: 'wifi',              label: 'Communicant',     bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
   no:  { icon: 'plug-circle-xmark', label: 'Non communicant', bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
+  unknown: { icon: 'circle-question', label: 'Non renseigné', bg: '#f8fafc', fg: '#64748b', border: '#e2e8f0' },
 };
+// Pastille à trois états (ternaire, jamais « non répondu » = « non ») :
+// state ∈ 'yes' | 'no' | autre (non renseigné). Cf. commState (_export-data.js).
+Handlebars.registerHelper('commStatePill', (state, variant) => {
+  const cfg = state === 'yes' ? COMM_STATE_PILL.yes : state === 'no' ? COMM_STATE_PILL.no : COMM_STATE_PILL.unknown;
+  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+});
 Handlebars.registerHelper('commPill', (hasProtocol, variant) => {
   const cfg = hasProtocol ? COMM_STATE_PILL.yes : COMM_STATE_PILL.no;
   return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
@@ -252,16 +330,64 @@ Handlebars.registerHelper('and', function(...args) {
   return args.slice(0, -1).every(v => !!v);
 });
 
-// boolLabel : 1 -> 'Oui', 0 -> 'Non', null/undefined -> '—'
+// boolLabel : 1 -> 'Oui', 0 -> 'Non', null/undefined -> 'Non renseigné'
+// (jamais un tiret seul : le lecteur doit distinguer « non répondu » de « non »).
 Handlebars.registerHelper('boolLabel', (v) => {
   if (v === 1 || v === true) return 'Oui';
   if (v === 0 || v === false) return 'Non';
-  return '—';
+  return 'Non renseigné';
+});
+
+// Symboles (✓ ✗ ⚠ ? i –) rendus en icônes vectorielles : ces glyphes
+// n'existent pas dans Inter et tombaient sur des polices système (Zapf
+// Dingbats, Lucida Grande…) au rendu variable d'un poste à l'autre
+// (relecture PDF 2026-09-24). Couleur héritée du texte (currentColor).
+const GLYPH_ICON = {
+  '✓': 'check', '✗': 'xmark', '✕': 'xmark', '⚠': 'triangle-exclamation',
+  '?': 'question', 'i': 'info', '–': 'minus', '↗': 'arrow-up-right-from-square',
+  '→': 'arrow-right',
+};
+function glyphSvg(ch, size = '9') {
+  const name = GLYPH_ICON[String(ch == null ? '' : ch).trim()];
+  const def = name ? lookupFaIcon(name) : null;
+  if (!def) return ch == null ? '' : String(ch);
+  const [w, h, , , path] = def.icon;
+  const d = Array.isArray(path) ? path[path.length - 1] : path;
+  return new Handlebars.SafeString(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" style="vertical-align:-0.1em;display:inline-block;flex-shrink:0"><path fill="currentColor" d="${d}"/></svg>`);
+}
+// {{{glyph verdictIcon "9"}}}
+Handlebars.registerHelper('glyph', (ch, size) => glyphSvg(ch, typeof size === 'string' ? size : '9'));
+
+// Colonnes facultatives (notes, surface…) : affichées seulement si au moins
+// une ligne est renseignée (relecture PDF 2026-09-24 : colonnes vides sur la
+// moitié de la largeur). {{#if (anyOf list "notes" "notes_html")}} ;
+// anyItemOf pour une liste de groupes { items: [...] }.
+const hasContent = (v) => v != null && String(v).replace(/<[^>]*>/g, '').trim() !== '';
+Handlebars.registerHelper('anyOf', function (list, ...fields) {
+  fields.pop();
+  return Array.isArray(list) && list.some(it => it && fields.some(f => hasContent(it[f])));
+});
+Handlebars.registerHelper('anyItemOf', function (groups, ...fields) {
+  fields.pop();
+  return Array.isArray(groups) && groups.some(g => (g && g.items || []).some(it => it && fields.some(f => hasContent(it[f]))));
+});
+// Variantes « au moins une valeur VRAIE » (0 / false / '' ne comptent pas) :
+// colonne « Statut » seulement si un compteur est hors service, « Âge »
+// seulement si un âge est connu, etc.
+const isTruthyVal = (v) => v === true || (typeof v === 'number' && v !== 0)
+  || (typeof v === 'string' && v.trim() !== '' && v !== '0' && v !== 'false');
+Handlebars.registerHelper('anyTrue', function (list, ...fields) {
+  fields.pop();
+  return Array.isArray(list) && list.some(it => it && fields.some(f => isTruthyVal(it[f])));
+});
+Handlebars.registerHelper('anyItemTrue', function (groups, ...fields) {
+  fields.pop();
+  return Array.isArray(groups) && groups.some(g => (g && g.items || []).some(it => it && fields.some(f => isTruthyVal(it[f]))));
 });
 
 // Tri-état (oui / non / non renseigne) pour les questions de conformite
 // dont la valeur peut etre NULL = jamais saisie (cf migration 172).
-Handlebars.registerHelper('triSym', (v) => (v == null ? '—' : (v ? '✓' : '✗')));
+Handlebars.registerHelper('triSym', (v) => (v == null ? '—' : glyphSvg(v ? '✓' : '✗', '10')));
 Handlebars.registerHelper('triCls', (v, yes, no, na) => (v == null ? na : (v ? yes : no)));
 
 // Lot 31 — Libelle du contrat requis a partir du service_level d'une section
@@ -394,11 +520,9 @@ function loadAssetDataUrl(filename) {
 // Healthcheck (version()) avant chaque utilisation : si l'instance est
 // morte, on la relance immediatement. Timeout global RENDER_TIMEOUT_MS
 // applique par renderPdf (Promise.race) pour eviter les freezes.
+// Le recyclage attend la fin des rendus en cours (lib/browser-pool.js).
 const RENDER_RECYCLE_AFTER = parseInt(process.env.PUPPETEER_RECYCLE_AFTER || '50', 10);
 const RENDER_TIMEOUT_MS = parseInt(process.env.PUPPETEER_RENDER_TIMEOUT_MS || '120000', 10);
-
-let _browserPromise = null;
-let _browserUseCount = 0;
 
 async function _launchBrowser() {
   const b = await puppeteer.launch({
@@ -406,42 +530,28 @@ async function _launchBrowser() {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
   log.info(`Puppeteer browser started (pid=${b.process()?.pid || '?'})`);
-  b.on('disconnected', () => {
-    log.warn('Puppeteer browser disconnected — will relaunch on next export');
-    _browserPromise = null;
-    _browserUseCount = 0;
-  });
   return b;
 }
 
-async function getBrowser() {
-  if (_browserPromise) {
-    try {
-      const b = await _browserPromise;
-      // Healthcheck : si version() echoue, l'instance est morte.
-      await b.version();
-      // Recyclage planifie apres N renders.
-      if (_browserUseCount >= RENDER_RECYCLE_AFTER) {
-        log.info(`Puppeteer recycle apres ${_browserUseCount} renders`);
-        _browserPromise = null;
-        _browserUseCount = 0;
-        try { await b.close(); } catch { /* ignore */ }
-      } else {
-        _browserUseCount++;
-        return b;
-      }
-    } catch (err) {
-      log.warn(`Puppeteer healthcheck KO (${err.message}) — relance`);
-      _browserPromise = null;
-      _browserUseCount = 0;
-    }
-  }
-  _browserPromise = _launchBrowser().catch((err) => {
-    _browserPromise = null;
+const _browserPool = createBrowserPool({
+  launch: _launchBrowser,
+  recycleAfter: RENDER_RECYCLE_AFTER,
+  // Filet : une instance recyclée ferme au plus tard après le délai
+  // maximal d'un rendu (+ 30 s), même si un rendu figé ne l'a pas rendue.
+  retireGraceMs: RENDER_TIMEOUT_MS + 30000,
+  log,
+});
+
+// Réserve le navigateur et ouvre un onglet pour un rendu. L'appelant ferme
+// l'onglet puis appelle `release()` (bloc finally).
+async function _openRenderPage() {
+  const lease = await _browserPool.lease();
+  try {
+    return { page: await lease.browser.newPage(), release: lease.release };
+  } catch (err) {
+    lease.release();
     throw err;
-  });
-  _browserUseCount = 1;
-  return _browserPromise;
+  }
 }
 
 function _withTimeout(promise, ms, label) {
@@ -485,14 +595,55 @@ async function renderPdf(opts) {
   return _withTimeout(_renderPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPdf(${opts.template})`);
 }
 
+// Rapports d'audit BACS : espace insécable entre un nombre et son unité
+// (« 290 kW » ne se coupe plus en fin de ligne — relecture clarté R2 m4).
+// Limité aux gabarits bacs-audit* ; n'agit que sur « chiffre espace unité ».
+const NBSP_UNITS_RE = /(\d) (kWh|kW|MWh|m²|°C|%)(?=[\s,.;:!?)<\]»]|$)/g;
+// Typographie française sur les seuls NŒUDS TEXTE (jamais dans les balises,
+// les attributs, les <style> ni les <script>) : espace insécable avant « : ;
+// ! ? » » et après « « » (relecture clarté R2 m4).
+function frenchTypography(text) {
+  // Forme composée (NFC) : un nom de fichier macOS arrive décomposé (« a »
+  // + accent combinant), glyphe absent de la police embarquée.
+  return text.normalize('NFC')
+    // « R175-1 6° » jamais coupé avant l'alinéa (avant l'habillage ci-dessous).
+    .replace(/(R175-\d+(?:-\d+)?) (\d+°)/g, '$1\u00a0$2')
+    // Références d'articles jamais coupées au trait d'union (« R175- » / « 2 »).
+    .replace(/\b((?:R|L)\.?\u00a0?\s?1\d{2}-\d+(?:-\d+)?)/g, '<span style="white-space:nowrap">$1</span>')
+    .replace(NBSP_UNITS_RE, '$1\u00a0$2')
+    // Groupes de milliers saisis en dur (« 1 000 m² ») jamais coupés.
+    .replace(/(?<=\d) (?=\d{3}(?!\d))/g, '\u00a0')
+    // Tiret d'incise jamais en début de ligne ; « (44 unités) » et « (zone
+    // Cellule 1) » jamais coupés avant leur nombre.
+    .replace(/ — /g, '\u00a0— ')
+    .replace(/(\d) (unités?|équipements?|ans?)\b/g, '$1\u00a0$2')
+    .replace(/ (\d{1,3}\))/g, '\u00a0$1')
+    // Séparateurs « · » et « - » (noms de zone « Vestiaires - Sanitaires »)
+    // jamais en début de ligne.
+    .replace(/ · /g, '\u00a0· ')
+    .replace(/ - /g, '\u00a0- ')
+    // Ordinal « 1er » / « 1re » en exposant (comme dans l'annexe A), lié au
+    // mot suivant (« 1er janvier » jamais coupé).
+    .replace(/\b1(er|re)\b( ?)/g, (_m, suf, sp) => `1<sup class="ord">${suf}</sup>${sp ? '\u00a0' : ''}`)
+    .replace(/ ([:;!?»])/g, '\u00a0$1')
+    .replace(/« /g, '«\u00a0')
+    .replace(/n° (\d)/g, 'n°\u00a0$1');
+}
+function typographyForTemplate(template, html) {
+  if (!/^bacs-audit/.test(template)) return html;
+  return html
+    .split(/(<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>|<title[\s\S]*?<\/title>)/i)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/>([^<]+)</g, (_m, text) => `>${frenchTypography(text)}<`)))
+    .join('');
+}
+
 async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, closingFullBleed = false, backCoverFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false, pageMarginTopMm = 22, pageMarginBottomMm = 18 }) {
   const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
-  const html = tpl({ ...data, styles: fullCss });
+  const html = typographyForTemplate(template, tpl({ ...data, styles: fullCss }));
 
-  const browser = await getBrowser();
-  const page = await browser.newPage();
+  const { page, release } = await _openRenderPage();
   try {
     // Viewport en pixels = format de page A4 ou A3 a 96 DPI (1mm = 3.7795px)
     // A4 = 210x297mm = 794x1123px, A3 = 297x420mm = 1123x1587px
@@ -590,6 +741,31 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       preferCSSPageSize: true,
       ...pdfOptions,
     };
+
+    // Numéros de page EXACTS de la TOC. L'estimation ci-dessus (hauteur écran
+    // ÷ hauteur de page) dérive dès qu'un chapitre contient des sauts forcés
+    // (break-inside: avoid, tableau de bord sur 2 pages…) : sommaire décalé
+    // d'1 à 2 pages sur les audits BACS réels. On rend donc une première fois
+    // le PDF avec les mêmes options, on lit la page réelle de chaque
+    // destination « toc-X » (Chrome les inscrit dans /Dests grâce aux liens
+    // de la TOC), puis on réécrit les numéros avant le rendu définitif.
+    // En cas d'échec, l'estimation est conservée.
+    if (populateToc) {
+      try {
+        const probe = await page.pdf(baseOptions);
+        const exactPages = await readTocDestinationPages(probe);
+        if (exactPages.size) {
+          await page.evaluate((entries) => {
+            for (const [id, n] of entries) {
+              const el = document.querySelector(`[data-toc-link="${CSS.escape(id)}"] .toc-page`);
+              if (el) el.textContent = String(n);
+            }
+          }, [...exactPages]);
+        }
+      } catch (err) {
+        log.warn(`populateToc : numéros de page exacts indisponibles (${err.message}) — estimation conservée`);
+      }
+    }
 
     // Pour les checklists editables : on capture la position des elements
     // [data-field="text|textarea|checkbox"] AVANT de fermer la page, en
@@ -743,6 +919,7 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
     }
   } finally {
     await page.close().catch(() => {});
+    release();
   }
 
   const stats = fs.statSync(outputPath);
@@ -750,6 +927,28 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
 }
 
 const mmToPt = (mm) => parseFloat(mm) * 2.83465;
+
+// Page réelle (1 = première page du PDF, comme le pied de page « N / total »)
+// de chaque destination nommée « toc-X » d'un PDF rendu par Chrome.
+// Renvoie une Map X → numéro de page.
+async function readTocDestinationPages(pdfBuffer) {
+  const { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef } = require('pdf-lib');
+  const pdf = await PDFDocument.load(pdfBuffer);
+  const refToPage = new Map(pdf.getPages().map((p, i) => [p.ref.toString(), i + 1]));
+  const out = new Map();
+  const dests = pdf.catalog.lookupMaybe(PDFName.of('Dests'), PDFDict);
+  if (!dests) return out;
+  for (const [key, value] of dests.entries()) {
+    const name = key.decodeText();
+    if (!name.startsWith('toc-')) continue;
+    let target = value instanceof PDFRef ? pdf.context.lookup(value) : value;
+    if (target instanceof PDFDict) target = target.lookup(PDFName.of('D'));
+    if (!(target instanceof PDFArray)) continue;
+    const pageNum = refToPage.get(target.get(0).toString());
+    if (pageNum) out.set(name.slice(4), pageNum);
+  }
+  return out;
+}
 
 async function replaceFirstPage(mainPath, coverPath) {
   const { PDFDocument } = require('pdf-lib');
@@ -914,13 +1113,7 @@ async function postProcessPdf(pdfPath, { maskFirstPage, maskLastPage, watermark,
 }
 
 async function shutdown() {
-  if (_browserPromise) {
-    try {
-      const b = await _browserPromise;
-      await b.close();
-    } catch { /* ignore */ }
-    _browserPromise = null;
-  }
+  await _browserPool.shutdown();
 }
 
 /**
@@ -977,6 +1170,25 @@ body > .closing:last-child {
 // Header/footer Puppeteer unifie pour tous les PDF Buildy.
 // - HEADER : "CLIENT · PROJET" a gauche (uppercase), "<Doc> · <version>" a droite (mono)
 // - FOOTER : [logo Buildy] | "<Doc> · note" | "Page X / Y"
+// Inter (400 / 600) embarquée en data URL pour les gabarits d'en-tête et de
+// pied de page, que Chromium rend hors du document principal.
+let _hfFontCss = null;
+function headerFooterFontCss() {
+  if (_hfFontCss != null) return _hfFontCss;
+  const parts = [];
+  for (const [weight, file] of [
+    [400, '@fontsource/inter/files/inter-latin-400-normal.woff2'],
+    [600, '@fontsource/inter/files/inter-latin-600-normal.woff2'],
+  ]) {
+    try {
+      const b64 = fs.readFileSync(require.resolve(file)).toString('base64');
+      parts.push(`@font-face{font-family:'Inter';font-style:normal;font-weight:${weight};src:url(data:font/woff2;base64,${b64}) format('woff2');}`);
+    } catch { /* police absente : repli système */ }
+  }
+  _hfFontCss = parts.length ? `<style>${parts.join('')}</style>` : '';
+  return _hfFontCss;
+}
+
 // Toujours utiliser cet helper, jamais de header/footer custom dans une route :
 // l'objectif est d'avoir des en-tetes/pieds de page identiques sur tous les exports.
 function buildHeaderFooter({
@@ -993,7 +1205,14 @@ function buildHeaderFooter({
   const esc = (s) => String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-  const ctx = `${esc(clientName)} · ${esc(projectName)}`;
+  // Pas de doublon « Audit BACS · … Audit BACS — Site » : un nom de projet
+  // qui commence par le type de document (déjà affiché à droite) en est
+  // débarrassé dans l'en-tête (relecture PDF 2026-09-24).
+  const reEsc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const shortProject = docType
+    ? (String(projectName || '').replace(new RegExp(`^\\s*${reEsc(docType)}\\s*[—–:-]\\s*`, 'i'), '') || projectName)
+    : projectName;
+  const ctx = `${esc(clientName)} · ${esc(shortProject)}`;
   const docRight = `${esc(docType)} · ${esc(version)}`;
   // Lot 2 — Versioning juridique : pour les audits BACS livrés, on grave la
   // version du décret de référence dans le pied de page, en l'ajoutant au
@@ -1004,14 +1223,16 @@ function buildHeaderFooter({
   return {
     displayHeaderFooter: true,
     margin: margin || { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
-    headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between; align-items:center; letter-spacing:0.02em;">
+    // Inter embarquée aussi dans l'en-tête et le pied de page (gabarits rendus
+    // à part par Chromium) : sinon Helvetica / Menlo selon le poste.
+    headerTemplate: `${headerFooterFontCss()}<div style="font-family:'Inter',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between; align-items:center; letter-spacing:0.02em;">
       <span style="text-transform:uppercase; letter-spacing:0.1em; font-size:6.5pt; color:#9ca3af;">${ctx}</span>
-      <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#6b7280;">${docRight}</span>
+      <span style="font-variant-numeric:tabular-nums; font-size:7pt; color:#6b7280;">${docRight}</span>
     </div>`,
-    footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:4mm; border-top:0.4pt solid #e5e7eb; padding-top:2mm;">
+    footerTemplate: `${headerFooterFontCss()}<div style="font-family:'Inter',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:4mm; border-top:0.4pt solid #e5e7eb; padding-top:2mm;">
       <img src="${logoDataUrl}" style="height:4mm; opacity:0.55;" />
       <span style="flex:1; color:#9ca3af; font-size:7pt;">${esc(note)}</span>
-      ${hidePagination ? '' : `<span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#4b5563; font-weight:600;">
+      ${hidePagination ? '' : `<span style="font-variant-numeric:tabular-nums; font-size:7pt; color:#4b5563; font-weight:600;">
         <span class="pageNumber"></span> <span style="color:#9ca3af; font-weight:400;">/</span> <span class="totalPages"></span>
       </span>`}
     </div>`,
@@ -1022,7 +1243,7 @@ function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation
   const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css + '\n' + buildPreviewOverride({ pageFormat, pageOrientation });
-  return tpl({ ...data, styles: fullCss });
+  return typographyForTemplate(template, tpl({ ...data, styles: fullCss }));
 }
 
 // ── Rendu PDF d'un livre blanc « HTML brut » ─────────────────────────
@@ -1037,8 +1258,7 @@ async function renderRawHtmlPdf(opts) {
 }
 
 async function _renderRawHtmlPdfImpl({ htmlPath, outputPath }) {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
+  const { page, release } = await _openRenderPage();
   try {
     await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 1 });
     await page.goto('file://' + htmlPath, { waitUntil: 'networkidle0', timeout: 120_000 });
@@ -1074,6 +1294,7 @@ async function _renderRawHtmlPdfImpl({ htmlPath, outputPath }) {
     return { path: outputPath, sizeBytes: stat.size };
   } finally {
     await page.close().catch(() => { /* ignore */ });
+    release();
   }
 }
 

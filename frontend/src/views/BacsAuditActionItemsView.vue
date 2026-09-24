@@ -78,7 +78,7 @@ const filtered = computed(() => {
     } else if (statusFilter.value !== 'all' && it.status !== statusFilter.value) return false
     if (categoryFilter.value !== 'all' && it.category !== categoryFilter.value) return false
     if (q && q.length >= 2) {
-      const hay = `${it.title} ${it.description || ''} ${it.zone_name || ''} ${it.equipment_name || ''} ${it.commercial_notes || ''}`
+      const hay = `${it.display_number || ''} ${it.title_plain || it.title} ${it.description_plain || it.description || ''} ${it.zone_name || ''} ${it.equipment_name || ''}`
         .toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
       if (!hay.includes(q)) return false
     }
@@ -101,7 +101,9 @@ const stats = computed(() => {
 async function refresh() {
   loading.value = true
   try {
-    const [d, a] = await Promise.all([getAf(docId), getBacsActionItems(docId)])
+    // plain=1 : titres et descriptions avec les noms des équipements à la
+    // place des repères techniques (cette vue ne charge pas l'audit complet).
+    const [d, a] = await Promise.all([getAf(docId), getBacsActionItems(docId, { plain: 1 })])
     document.value = d.data
     items.value = a.data
   } catch {
@@ -244,7 +246,7 @@ onMounted(refresh)
     <div class="bg-white border border-gray-200 rounded-lg p-3 mb-4 flex items-center gap-3 flex-wrap">
       <div class="relative flex-1 max-w-sm">
         <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-        <input v-model="searchQuery" type="text" placeholder="Rechercher dans titre, description, notes…"
+        <input v-model="searchQuery" type="text" placeholder="Rechercher (n°, titre, description, zone…)"
                class="w-full pl-9 pr-9 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
         <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
           <XMarkIcon class="w-4 h-4" />
@@ -277,33 +279,34 @@ onMounted(refresh)
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
     <!-- Table -->
-    <div v-else class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+    <div v-else class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
           <tr>
-            <th class="text-left px-3 py-2 w-24">Sévérité</th>
+            <th class="text-left px-3 py-2 w-24">N°</th>
+            <th class="text-left py-2 w-24">Sévérité</th>
             <th class="text-left py-2 w-24">Article</th>
             <th class="text-left py-2">Action</th>
             <th class="text-left py-2 w-28">Zone</th>
             <th class="text-left py-2 w-24">Effort</th>
             <th class="text-left py-2 w-28">Statut</th>
-            <th class="text-left px-3 py-2 w-72">Notes commerciales (devis)</th>
             <th class="text-right px-3 py-2 w-12"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           <tr v-for="it in filtered" :key="it.id"
               :class="[(it.status === 'done' || it.status === 'declined') ? 'opacity-50' : '', 'group']">
-            <td class="px-3 py-2">
+            <td class="px-3 py-2 text-[11px] text-gray-500 font-mono whitespace-nowrap">{{ it.display_number || '—' }}</td>
+            <td class="py-2">
               <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border', SEVERITY_LABEL[it.severity].cls]">
                 {{ SEVERITY_LABEL[it.severity].label }}
               </span>
               <span v-if="!it.auto_generated" class="ml-1 text-[9px] text-purple-600 font-semibold uppercase">Manuel</span>
             </td>
             <td class="py-2 text-[11px] text-gray-500 font-mono">{{ it.r175_article || '—' }}</td>
-            <td class="py-2">
-              <div class="text-gray-800 font-medium">{{ it.title }}</div>
-              <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{{ it.description }}</div>
+            <td class="py-2 pr-3 whitespace-normal">
+              <div class="text-gray-800 font-medium">{{ it.title_plain || it.title }}</div>
+              <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{{ it.description_plain || it.description }}</div>
             </td>
             <td class="py-2 text-xs text-gray-600">{{ it.zone_name || '—' }}</td>
             <td class="py-2">
@@ -319,12 +322,6 @@ onMounted(refresh)
                       class="text-xs px-2 py-1 border border-gray-200 rounded">
                 <option v-for="s in STATUS_OPTS" :key="s.value" :value="s.value">{{ s.label }}</option>
               </select>
-            </td>
-            <td class="px-3 py-2">
-              <textarea :value="it.commercial_notes" placeholder="Référence produit, prix HT estimé, fournisseur, délai…"
-                        @blur="e => e.target.value !== (it.commercial_notes || '') && patchItem(it, { commercial_notes: e.target.value || null })"
-                        rows="2"
-                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
             </td>
             <td class="px-3 py-2 text-right">
               <button v-if="!it.auto_generated"

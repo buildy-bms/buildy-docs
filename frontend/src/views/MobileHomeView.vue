@@ -25,7 +25,12 @@ const { isOnline } = useOnlineStatus()
 const audits = ref([])
 const loading = ref(true)
 
+// Statuts réellement enregistrés (redaction / validee / livree) + anciens
+// codes gardés par compatibilité.
 const STATUS_LABEL = {
+  redaction:{ label: 'En rédaction', cls: 'bg-gray-100 text-gray-700' },
+  validee:  { label: 'Validé',       cls: 'bg-amber-100 text-amber-800' },
+  livree:   { label: 'Livré',        cls: 'bg-emerald-100 text-emerald-800' },
   draft:    { label: 'Brouillon', cls: 'bg-gray-100 text-gray-700' },
   review:   { label: 'À relire',  cls: 'bg-amber-100 text-amber-800' },
   delivered:{ label: 'Livré',     cls: 'bg-emerald-100 text-emerald-800' },

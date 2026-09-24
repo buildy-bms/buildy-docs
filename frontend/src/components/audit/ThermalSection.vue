@@ -21,14 +21,16 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal, reorderBacsThermal, updateBacsDevice } from '@/api'
 import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
+import { requestAuditReveal } from '@/lib/audit-reveal'
 
 // Niveaux R175-6 (Production / Distribution / Émission). Chaque niveau
 // porte 4 saisies dans la table : équipement, équipement de régulation,
 // (Production seul : type + âge), notes par niveau.
+// `color` = couleur de la fonction (ROLE_OPTIONS), reprise dans l'en-tête.
 const LEVELS = [
-  { key: 'production',   label: 'Production',   icon: '🔧' },
-  { key: 'distribution', label: 'Distribution', icon: '🚰' },
-  { key: 'emission',     label: 'Émission',     icon: '♨️' },
+  { key: 'production',   label: 'Production',   icon: '🔧', color: '#dc2626' },
+  { key: 'distribution', label: 'Distribution', icon: '🚰', color: '#0ea5e9' },
+  { key: 'emission',     label: 'Émission',     icon: '♨️', color: '#3b82f6' },
 ]
 const LEVEL_DEVICE_FIELD = {
   production:   'generator_device_id',
@@ -89,6 +91,14 @@ const sortedThermal = computed(() => sortedRows(props.thermalFiltered, sortTherm
 // Mig 187 v3 — état repli/dépli par zone. Map nomZone → boolean (true =
 // replié). Par défaut tout déplié. Toggle individuel via clic header + 2
 // boutons globaux « Tout replier » / « Tout déplier » au-dessus de la liste.
+// Rappel R175-6 replié par défaut, état mémorisé (tous audits).
+const INTRO_KEY = 'bacs-thermal-r175-6-intro'
+const introOpen = ref((() => { try { return localStorage.getItem(INTRO_KEY) === '1' } catch { return false } })())
+function toggleIntro() {
+  introOpen.value = !introOpen.value
+  try { localStorage.setItem(INTRO_KEY, introOpen.value ? '1' : '0') } catch { /* navigation privée */ }
+}
+
 const collapsedZones = reactive({})
 function toggleZone(name) { collapsedZones[name] = !collapsedZones[name] }
 function collapseAll() {
@@ -99,6 +109,16 @@ function expandAll() {
 }
 const allCollapsed = computed(() => thermalGroups.value.length > 0 &&
   thermalGroups.value.every(g => collapsedZones[g.zoneName]))
+
+// Lien direct vers une ligne (bouton « Voir » de la vérification avant
+// livraison) : la vue appelle prepareReveal avant de chercher
+// `[data-thermal-id]` → la zone de la ligne est dépliée.
+async function prepareReveal({ id }) {
+  const g = thermalGroups.value.find(x => x.rows.some(t => t.id === id))
+  if (g) collapsedZones[g.zoneName] = false
+  await nextTick()
+}
+defineExpose({ prepareReveal })
 
 const thermalGroups = computed(() => {
   const groups = []
@@ -182,6 +202,8 @@ function levelRegulationTypeLabel(t, level) {
 // 3. Highlight bref pour le repérage visuel
 function gotoSystemInCard03(systemId) {
   if (!systemId) return
+  // Page à onglets : ouvre l'étape Systèmes sur la bonne zone + surbrillance.
+  if (requestAuditReveal({ kind: 'system', id: systemId })) return
   window.dispatchEvent(new CustomEvent('bacs-collapse:open', { detail: { storageKey: 'systems' } }))
   nextTick(() => {
     const el = document.querySelector(`[data-system-id="${systemId}"]`)
@@ -465,7 +487,7 @@ onBeforeUnmount(teardownSortable)
     <div v-if="prefillCount > 0" class="mx-3 mt-2 flex items-center justify-between gap-2 p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-lg">
       <div class="text-xs text-gray-700">
         <strong class="text-emerald-700">{{ prefillCount }} champ{{ prefillCount > 1 ? 's' : '' }}</strong>
-        peu{{ prefillCount > 1 ? 'vent' : 't' }} être pré-rempli{{ prefillCount > 1 ? 's' : '' }} automatiquement depuis les équipements saisis dans la card « Systèmes ».
+        peu{{ prefillCount > 1 ? 'vent' : 't' }} être pré-rempli{{ prefillCount > 1 ? 's' : '' }} automatiquement depuis les équipements saisis à l'étape « Systèmes ».
       </div>
       <button type="button" :disabled="prefillBusy"
               @click="prefillAllFromDevices"
@@ -474,7 +496,31 @@ onBeforeUnmount(teardownSortable)
         Pré-remplir depuis les équipements
       </button>
     </div>
-    <div class="mx-3 mt-2 mb-3 p-3 bg-amber-50/50 border border-amber-100 rounded-lg text-xs text-gray-700 leading-relaxed">
+    <!-- Rappel réglementaire R175-6 : replié par défaut (mémorisé) pour
+         alléger l'écran ; le texte reste dans la page (v-show). -->
+    <div class="px-3 pt-2 pb-2 flex items-center justify-between gap-2">
+      <button type="button" data-audit-disclosure="thermal-r175-6"
+              :aria-expanded="introOpen ? 'true' : 'false'" aria-controls="thermal-r175-6-intro"
+              @click="toggleIntro"
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition">
+        <InformationCircleIcon class="w-4 h-4 text-amber-600 shrink-0" />
+        Comprendre R175-6
+        <ChevronDownIcon :class="['w-3.5 h-3.5 transition-transform', introOpen ? 'rotate-180' : '']" />
+      </button>
+      <!-- Mig 187 v3 — bouton global : sous-cards par zone repliables.
+           L'en-tête de zone est cliquable pour replier/déplier sa liste de
+           systèmes ; ce bouton bascule toutes les zones. -->
+      <button v-if="thermalGroups.length"
+              type="button"
+              @click="allCollapsed ? expandAll() : collapseAll()"
+              class="inline-flex items-center gap-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 px-2 py-1 rounded transition">
+        <ChevronRightIcon v-if="allCollapsed" class="w-3.5 h-3.5" />
+        <ChevronDownIcon v-else class="w-3.5 h-3.5" />
+        {{ allCollapsed ? 'Tout déplier' : 'Tout replier' }}
+      </button>
+    </div>
+    <div v-show="introOpen" id="thermal-r175-6-intro"
+         class="mx-3 mt-2 mb-3 p-3 bg-amber-50/50 border border-amber-100 rounded-lg text-xs text-gray-700 leading-relaxed">
       <p class="flex items-start gap-1.5">
         <InformationCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <span>
@@ -492,105 +538,106 @@ onBeforeUnmount(teardownSortable)
       </p>
     </div>
 
-    <!-- Mig 187 v3 — boutons globaux + sous-cards par zone repliables.
-         L'en-tête de zone est cliquable pour replier/déplier sa liste de
-         systèmes. Plus une ligne globale au-dessus pour tout basculer. -->
-    <div class="px-3 pb-2 flex items-center justify-end">
-      <button v-if="thermalGroups.length"
-              type="button"
-              @click="allCollapsed ? expandAll() : collapseAll()"
-              class="inline-flex items-center gap-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 px-2 py-1 rounded transition">
-        <ChevronRightIcon v-if="allCollapsed" class="w-3.5 h-3.5" />
-        <ChevronDownIcon v-else class="w-3.5 h-3.5" />
-        {{ allCollapsed ? 'Tout déplier' : 'Tout replier' }}
-      </button>
-    </div>
-    <!-- Mig 187 v8 — UNE SEULE table pour TOUTE la card, pour que les
-         largeurs de colonnes (Production / Distribution / Émission) soient
-         calculées sur le contenu MAXIMUM de toute la card, pas par zone.
-         Sinon chaque zone calculait ses propres largeurs et les colonnes
-         étaient inconsistantes d'une zone à l'autre.
-         Les zones sont matérialisées par des tbody (zone-header cliquable
-         + zone-content masquable en v-show). -->
-    <div ref="tableRef" class="px-3 pb-3">
-      <table class="thermal-card-table w-full border border-gray-200 rounded-xl overflow-hidden">
-        <!-- Mig 187 v16 — 4 colonnes : 3 niveaux + 1 colonne Actions dédiée
-             alignée à droite. Émission absorbe le surplus. -->
+    <!-- Mig 187 v8 — UNE SEULE table pour TOUTE la card : colonnes alignées
+         d'une zone à l'autre. Refonte 2026-09 : largeurs fixes (table-layout
+         fixed), une ligne par système, libellés des champs (Équipement, Type
+         de régulation, Granularité, Note) portés une seule fois par l'en-tête,
+         collant sous l'en-tête de la carte (--section-header-h). Grille
+         `.thermal-level-grid` (main.css) partagée entre en-tête et lignes ;
+         conteneur « thermal » : 2 lignes par niveau si le tableau est étroit.
+         Les zones restent des tbody (en-tête cliquable + systèmes en v-show). -->
+    <div ref="tableRef" class="px-3 pb-3 [container:thermal/inline-size]">
+      <table class="thermal-card-table w-full table-fixed border-separate border-spacing-0 rounded-xl ring-1 ring-slate-200 bg-white">
         <colgroup>
-          <col />
-          <col />
-          <col style="width: 100%" />
-          <col />
+          <col style="width: 16%" />
+          <col style="width: 23.5%" />
+          <col style="width: 23.5%" />
+          <col style="width: 31%" />
+          <col style="width: 6%" />
         </colgroup>
-        <thead class="bg-gray-50">
+        <thead class="sticky z-[4] shadow-[0_1px_0_rgba(15,23,42,0.08)]"
+               :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + var(--section-header-h, 60px))' }">
+          <tr>
+            <th rowspan="2"
+                class="rounded-tl-xl bg-slate-50 px-3 py-2 text-left align-bottom text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+              Système
+            </th>
+            <th v-for="level in LEVELS" :key="level.key"
+                class="bg-slate-50 px-2 pt-2 pb-0.5 text-left text-[11px] uppercase tracking-wider text-gray-700 font-medium border-l border-slate-200">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: level.color }"></span>
+                {{ level.label }}
+              </span>
+            </th>
+            <th rowspan="2" class="rounded-tr-xl bg-slate-50"></th>
+          </tr>
           <tr>
             <th v-for="level in LEVELS" :key="level.key"
-                class="px-4 py-2 text-left text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
-              {{ level.label }}
-            </th>
-            <th class="px-4 py-2 text-right text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
-              Actions
+                class="bg-slate-50 px-2 pt-0.5 pb-2 text-left text-[10px] font-normal text-gray-400 border-l border-slate-200">
+              <div :class="['thermal-level-grid', level.key === 'emission' ? 'is-emission' : '']">
+                <span class="tl-eq truncate px-2">Équipement</span>
+                <span class="tl-type truncate px-2">Type de régulation</span>
+                <span v-if="level.key === 'emission'" class="tl-gran truncate px-2">Granularité</span>
+                <span class="tl-note text-center">Note</span>
+              </div>
             </th>
           </tr>
         </thead>
         <template v-for="g in thermalGroups" :key="g.zoneName">
-          <!-- tbody zone-header — bande grise cliquable pour replier la zone. -->
+          <!-- tbody zone-header — bande cliquable pour replier la zone. -->
           <tbody class="thermal-zone-header">
-            <tr @click="toggleZone(g.zoneName)"
-                class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100 transition select-none">
-              <td colspan="4" class="px-4 py-2">
+            <tr @click="toggleZone(g.zoneName)" class="group/zone cursor-pointer select-none">
+              <td colspan="5" class="px-3 py-1.5 bg-slate-100/70 border-t border-slate-200 group-hover/zone:bg-slate-100 transition">
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-4 h-4 text-gray-500" />
-                    <ChevronDownIcon v-else class="w-4 h-4 text-gray-500" />
-                    <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
+                  <div class="flex items-center gap-1.5">
+                    <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-3.5 h-3.5 text-gray-500" />
+                    <ChevronDownIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                    <h3 class="text-[13px] font-medium text-gray-800">{{ g.zoneName }}</h3>
                   </div>
                   <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
                 </div>
               </td>
             </tr>
           </tbody>
-          <!-- tbody par système (regroupe les rows identification + data
-               sous un même drag handle / data-id pour Sortable). -->
+          <!-- tbody par système (data-id + poignée pour Sortable). -->
           <tbody v-for="t in g.rows" :key="t.id"
                  v-show="!collapsedZones[g.zoneName]"
                  :data-id="t.id"
-                 class="thermal-row border-t border-gray-100">
-            <!-- Ligne 1 — identification (colspan 4) -->
-            <tr>
-              <td colspan="4" class="px-4 pt-3 pb-1">
-                <div class="flex w-full items-center gap-3 flex-nowrap">
+                 :data-thermal-id="t.id"
+                 class="thermal-row">
+            <tr class="hover:bg-slate-50/70 transition-colors">
+              <!-- Système : poignée, usage (icône + libellé), nom (lien vers
+                   l'étape Systèmes), exemption bois -->
+              <td class="px-2 py-1.5 border-t border-slate-100 align-middle">
+                <div class="flex items-center gap-1.5 min-w-0">
                   <button type="button"
-                          class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
+                          class="drag-handle inline-flex p-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
                           v-tooltip="'Glisser pour réordonner ce système'">
                     <Bars3Icon class="w-4 h-4" />
                   </button>
-                  <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
-                  <span class="text-xs font-semibold uppercase tracking-wider"
-                        :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
-                    {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
-                  </span>
-                  <span class="text-gray-400">·</span>
-                  <button type="button"
-                          @click="gotoSystemInCard03(t.system_id)"
-                          v-tooltip="'Remonter vers ce système dans la card 03'"
-                          class="text-sm font-semibold text-gray-800 hover:text-indigo-600 hover:underline underline-offset-2 cursor-pointer">
-                    {{ systemDisplayName(t) }}
-                  </button>
-                  <Tooltip v-if="exemptAutoFromWood(t)"
-                           text="Exemption R175-6 II : l'équipement de Production est au bois.">
-                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
-                      Exempté — bois
-                    </span>
-                  </Tooltip>
+                  <SystemCategoryIcon :category="t.category || 'heating'" size="sm" class="shrink-0" />
+                  <div class="min-w-0">
+                    <button type="button"
+                            @click="gotoSystemInCard03(t.system_id)"
+                            v-tooltip="`${systemDisplayName(t)}\nAller à ce système (étape 3 · Systèmes)`"
+                            class="block max-w-full truncate text-left text-sm font-medium text-gray-800 hover:text-indigo-700 hover:underline underline-offset-2 cursor-pointer">
+                      {{ systemDisplayName(t) }}
+                    </button>
+                    <div class="flex items-center gap-1.5 flex-wrap text-[10px] font-medium uppercase tracking-wider"
+                         :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
+                      {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
+                      <Tooltip v-if="exemptAutoFromWood(t)"
+                               text="Exemption R175-6 II : l'équipement de Production est au bois.">
+                        <span class="inline-flex items-center px-1.5 py-px rounded normal-case tracking-normal bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
+                          Exempté — bois
+                        </span>
+                      </Tooltip>
+                    </div>
+                  </div>
                 </div>
               </td>
-            </tr>
-            <!-- Ligne 2 — 3 cellules niveaux. Largeurs auto par contenu max
-                 sur TOUTE la card (vrai bénéfice du single-table). -->
-            <tr>
               <td v-for="level in LEVELS" :key="level.key"
-                  class="px-4 pb-3 align-top">
+                  class="px-2 py-1.5 border-t border-l border-slate-100 align-middle">
                 <ThermalLevelCell
                   :thermal="t"
                   :level="level.key"
@@ -615,21 +662,20 @@ onBeforeUnmount(teardownSortable)
                        granularité fait visuellement PARTIE de la colonne
                        Émission, comme demandé. -->
                   <template v-if="level.key === 'emission'" #after>
-                    <div class="flex flex-col gap-0.5 shrink-0">
-                      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Granularité</span>
-                      <SearchableSelect
-                        :model-value="granularityForRow(t).key"
-                        @update:modelValue="(v) => patchGranularity(t, v)"
-                        :options="GRANULARITY_OPTIONS"
-                        :invalid="!GRANULARITY_R175_COMPLIANT.has(granularityForRow(t).key)"
-                        :clearable="true" :creatable="true" :auto-width="true"
-                        size="sm" placeholder="Granularité…" />
-                    </div>
+                    <!-- Rouge = granularité non conforme R175-6 (centralisée). -->
+                    <SearchableSelect
+                      class="tl-gran"
+                      :model-value="granularityForRow(t).key"
+                      @update:modelValue="(v) => patchGranularity(t, v)"
+                      :options="GRANULARITY_OPTIONS"
+                      :invalid="!GRANULARITY_R175_COMPLIANT.has(granularityForRow(t).key)"
+                      :clearable="true" :creatable="true"
+                      size="sm" placeholder="Granularité…" />
                   </template>
                 </ThermalLevelCell>
               </td>
               <!-- Mig 187 v16 — Colonne Actions dédiée, alignée à droite. -->
-              <td class="px-4 pb-3 align-bottom text-right whitespace-nowrap">
+              <td class="px-1 py-1.5 border-t border-slate-100 align-middle text-right whitespace-nowrap">
                 <button type="button"
                         @click="emit('open-notes', {
                           title: 'Notes régulation thermique',
@@ -659,8 +705,8 @@ onBeforeUnmount(teardownSortable)
          systèmes présents (heating/cooling). Pour ajouter une régulation,
          on ajoute un système dans la card 03. -->
     <p class="px-3 pb-3 pt-1 text-[11px] text-gray-500 italic">
-      Une ligne par système chauffage / refroidissement présent dans la card « Systèmes ».
-      Pour ajouter une régulation, créer un système dans la card 03.
+      Une ligne par système chauffage / refroidissement présent à l'étape « Systèmes ».
+      Pour ajouter une régulation, crée un système à l'étape 3 · Systèmes.
     </p>
   </CollapsibleSection>
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, inject, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
 import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
@@ -16,8 +16,20 @@ import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { systemUsageLabel } from '@/lib/audit-options'
-import { updateBacsSystem, reorderBacsSystems, deleteBacsSystem, listSystemCategories } from '@/api'
+import { systemUsageLabel, isDeviceComplete, deviceMissingFields } from '@/lib/audit-options'
+import {
+  updateBacsSystem, reorderBacsSystems, deleteBacsSystem, listSystemCategories,
+  duplicateBacsDevice, deleteBacsDevice,
+} from '@/api'
+import AuditSubTabs from '@/components/audit/AuditSubTabs.vue'
+import SystemsPresenceMatrix from '@/components/audit/SystemsPresenceMatrix.vue'
+import SystemDeviceList from '@/components/audit/SystemDeviceList.vue'
+import DeviceEditModal from '@/components/audit/DeviceEditModal.vue'
+import DeviceMoveShare from '@/components/DeviceMoveShare.vue'
+import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { flashAuditTarget } from '@/lib/audit-reveal'
 
 // Couleur d'accent par categorie de systeme : aligne avec
 // SystemCategoryIcon, sert de border-l-4 pour mieux distinguer les
@@ -118,6 +130,34 @@ function isSystemPresentWithoutDevices(s) {
   )
   return !shared
 }
+// Résumé affiché dans l'en-tête d'une carte système (mode étape), à la place
+// de la ligne « Refroidissement — X kW total » du tableau : nombre
+// d'équipements affichés (propres + partagés depuis un autre système) et
+// puissance des équipements propres (même calcul que SystemDevicesTable :
+// puissance froid des réversibles sur un système Refroidissement).
+function devicePowerField(s, d) {
+  if (s.system_category !== 'cooling') return 'power_kw'
+  const ids = new Set([d.system_id, ...(d.extra_system_ids || [])])
+  const reversible = (audit.systems || []).some(x => ids.has(x.id) && x.system_category === 'heating')
+  return reversible ? 'power_kw_cooling' : 'power_kw'
+}
+function deviceSummary(s) {
+  const own = props.devicesBySystem[s.id] || []
+  const shared = (audit.devices || []).filter(d =>
+    d.system_id !== s.id && (d.extra_system_ids || []).includes(s.id))
+  const count = own.length + shared.length
+  const kw = Math.round(own.reduce((t, d) =>
+    t + (Number(d[devicePowerField(s, d)]) || 0) * (Number(d.quantity) || 1), 0) * 10) / 10
+  if (!count) return ''
+  const parts = [`${count} équipement${count > 1 ? 's' : ''}`]
+  if (shared.length) {
+    parts.push(shared.length === count
+      ? `partagé${count > 1 ? 's' : ''} depuis une autre zone`
+      : `dont ${shared.length} partagé${shared.length > 1 ? 's' : ''}`)
+  }
+  if (kw > 0) parts.push(`${kw.toLocaleString('fr-FR')} kW`)
+  return parts.join(' · ')
+}
 function sitePowerKw() {
   let total = 0
   for (const g of props.systemsByZone) {
@@ -150,7 +190,7 @@ async function toggleNegligible(s, checked) {
     // prompt inline pour ne pas faire capoter le PATCH en 400.
     const existing = (s.negligible_justification || '').trim()
     const text = window.prompt(
-      'Justifie l\'exemption R175-2 §5 (FAQ ministère juin 2025) — ex : « petits ballons ECS individuels », « groupe de secours ».\n\nLa justification est obligatoire.',
+      'Justifie l\'exemption par la règle des 5 % (FAQ ministérielle n° 16) — ex : « petits ballons ECS individuels », « groupe de secours ». La part s\'apprécie sur tous les équipements de même fonction du bâtiment.\n\nLa justification est obligatoire.',
       existing,
     )
     if (text == null) return  // annulation
@@ -240,6 +280,278 @@ const filteredSystemsByZone = computed(() => {
     }))
     .filter(g => g.items.length > 0)
 })
+
+// ─── Mode étape (page audit à onglets) : une zone affichée à la fois ───
+// Sous-onglets de zones (mémorisés par audit). Chaque zone est montée à sa
+// 1re ouverture puis conservée. Les usages « non concernés » passent en
+// pastilles grisées (toujours visibles, « Présent » en 1 clic) ; « Afficher
+// en détail » redonne les lignes complètes (v-model showNotConcernedSystems,
+// persisté par la vue sous `bacs-show-not-concerned`).
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const isStepMode = computed(() => !!stepMode?.enabled)
+const zoneStorageKey = () => `bacs-systems-zone:${audit.docId}`
+const activeZoneId = ref(null)
+const visitedZones = ref(new Set())
+function selectZone(zid) {
+  if (zid == null) return
+  activeZoneId.value = zid
+  visitedZones.value.add(zid)
+  try { localStorage.setItem(zoneStorageKey(), String(zid)) } catch { /* navigation privée */ }
+}
+
+// Points à reprendre dans une zone (même règle que l'étape « Systèmes » de la
+// vue : équipements incomplets des usages présents) + usages sans réponse et
+// usages présents sans équipement.
+function zoneTodo(g) {
+  let incomplete = 0
+  for (const s of g.items) {
+    if (!s.present) continue
+    for (const d of (props.devicesBySystem[s.id] || [])) {
+      if (!isDeviceComplete(d, s.system_category)) incomplete++
+    }
+  }
+  const noDevice = g.items.filter(isSystemPresentWithoutDevices).length
+  const unanswered = g.items.filter(s => !s.present && !s.not_concerned).length
+  return { incomplete, noDevice, unanswered }
+}
+
+const zoneTabs = computed(() => props.systemsByZone.map(g => {
+  const total = g.items.length
+  const active = g.items.filter(s => s.present).length
+  const { incomplete, noDevice, unanswered } = zoneTodo(g)
+  const warn = [
+    incomplete && `${incomplete} équipement${incomplete > 1 ? 's' : ''} incomplet${incomplete > 1 ? 's' : ''} (bouton « Modifier » rouge)`,
+    noDevice && `${noDevice} usage${noDevice > 1 ? 's' : ''} présent${noDevice > 1 ? 's' : ''} sans équipement`,
+    unanswered && `${unanswered} usage${unanswered > 1 ? 's' : ''} sans réponse (Présent / Non concerné)`,
+  ].filter(Boolean)
+  const natureLabel = g.zone_nature ? (props.zoneNatures.find(z => z.value === g.zone_nature)?.label || g.zone_nature) : null
+  return {
+    key: g.zone_id,
+    label: g.zone_name || 'Zone sans nom',
+    meta: `${active} actif${active > 1 ? 's' : ''} / ${total}`,
+    tag: g.zone_kind === 'technical' ? 'tech.' : null,
+    badge: incomplete || null,
+    badgeTone: 'amber',
+    dot: !incomplete && (noDevice || unanswered) ? 'amber' : null,
+    tooltip: [
+      g.zone_name + (natureLabel ? ` — ${natureLabel}` : ''),
+      g.zone_kind === 'technical' ? 'Zone technique (hors décret BACS)' : null,
+      `${active} usage${active > 1 ? 's' : ''} présent${active > 1 ? 's' : ''} sur ${total}`,
+      ...warn,
+    ].filter(Boolean).join('\n'),
+  }
+}))
+
+// Zone par défaut : dernière consultée, sinon la 1re qui a un point à
+// reprendre, sinon la 1re. Réévaluée si la zone active disparaît.
+watch(() => props.systemsByZone.map(g => g.zone_id).join(','), () => {
+  const ids = props.systemsByZone.map(g => g.zone_id)
+  if (!ids.length || ids.includes(activeZoneId.value)) return
+  let saved = NaN
+  try { saved = Number(localStorage.getItem(zoneStorageKey())) } catch { /* */ }
+  if (ids.includes(saved)) { selectZone(saved); return }
+  const todo = props.systemsByZone.find(g => {
+    const t = zoneTodo(g)
+    return t.incomplete || t.noDevice || t.unanswered
+  })
+  selectZone(todo ? todo.zone_id : ids[0])
+}, { immediate: true })
+
+// En mode étape, pas de filtre d'usage (boutons masqués) : le tableau de
+// présence donne la vue par usage, toutes les zones restent en onglets.
+const displayGroups = computed(() => isStepMode.value ? props.systemsByZone : filteredSystemsByZone.value)
+const ncCompact = computed(() => isStepMode.value && !showNotConcernedSystems.value)
+function rowItems(g) { return ncCompact.value ? g.items.filter(s => !s.not_concerned) : g.items }
+function ncItems(g) { return ncCompact.value ? g.items.filter(s => s.not_concerned) : [] }
+// Libellé d'une pastille : même texte que la ligne (catégorie + nom du
+// système entre parenthèses, ou nom de l'usage personnalisé).
+function ncChipLabel(s) {
+  if (!s.is_bacs) return s.custom_label || 'Usage personnalisé'
+  return usageLabel(s) + (s.custom_label ? ` (${s.custom_label})` : '')
+}
+
+// Liens croisés (plan d'actions, régulation, check-list) : la vue appelle
+// prepareReveal avant de chercher l'élément → bonne zone, filtre levé,
+// système déplié.
+async function prepareReveal({ kind, id }) {
+  const dev = kind === 'device' ? (audit.devices || []).find(d => d.id === id) : null
+  const sys = (audit.systems || []).find(s => s.id === (dev ? dev.system_id : id))
+  if (!sys) return
+  if (isStepMode.value) selectZone(sys.zone_id)
+  if (sys.is_bacs && usageFilter.value.size && !usageFilter.value.has(sys.system_category)) resetUsageFilter()
+  if (dev && props.collapsedSystems.has(sys.id)) emit('toggle-system-collapsed', sys.id)
+  // Lien vers un équipement : on ouvre aussi sa fiche.
+  if (dev && isStepMode.value) openDevice(dev, sys)
+  await nextTick()
+}
+defineExpose({ prepareReveal, selectZone })
+
+// ─── Fiche équipement (mode étape) ─────────────────────────────────────
+// La liste des équipements est en lecture ; un clic ouvre la fiche à
+// droite (formulaire complet de DeviceEditModal, en panneau). Navigation
+// précédent / suivant dans la zone, liste « à compléter » quand aucune
+// fiche n'est ouverte.
+const selectedDeviceId = ref(null)
+const selectedSystemId = ref(null) // système depuis lequel la fiche est ouverte
+const panelDevice = computed(() => (audit.devices || []).find(d => d.id === selectedDeviceId.value) || null)
+const panelSystem = computed(() => (audit.systems || []).find(s => s.id === selectedSystemId.value) || null)
+const panelSystemLabel = computed(() => {
+  const s = panelSystem.value
+  if (!s) return ''
+  return s.is_bacs ? usageLabel(s) : (s.custom_label || 'Usage personnalisé')
+})
+const panelZoneName = computed(() => panelSystem.value?.zone_name || '')
+
+// Même ordre que la liste : Production → Distribution → Émission →
+// Régulation, puis nom.
+const ROLE_ORDER = { production: 1, distribution: 2, emission: 3, regulation: 4 }
+function rolePriorityOf(d) {
+  const roles = Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])
+  if (!roles.length) return 5
+  return Math.min(...roles.map(r => ROLE_ORDER[String(r).toLowerCase()] || 5))
+}
+const zoneDeviceEntries = computed(() => {
+  const g = displayGroups.value.find(x => x.zone_id === activeZoneId.value)
+  if (!g) return []
+  const out = []
+  for (const s of g.items) {
+    if (!s.present) continue
+    const own = props.devicesBySystem[s.id] || []
+    const shared = (audit.devices || []).filter(d =>
+      d.system_id !== s.id && (d.extra_system_ids || []).includes(s.id))
+    const list = [...own, ...shared].sort((a, b) =>
+      (rolePriorityOf(a) - rolePriorityOf(b))
+      || (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()))
+    for (const d of list) out.push({ device: d, system: s })
+  }
+  return out
+})
+const panelIndex = computed(() => zoneDeviceEntries.value.findIndex(e =>
+  e.device.id === selectedDeviceId.value && e.system.id === selectedSystemId.value))
+const prevEntry = computed(() => (panelIndex.value > 0 ? zoneDeviceEntries.value[panelIndex.value - 1] : null))
+const nextEntry = computed(() => (panelIndex.value >= 0 && panelIndex.value < zoneDeviceEntries.value.length - 1
+  ? zoneDeviceEntries.value[panelIndex.value + 1] : null))
+// Équipements propres de la zone encore incomplets (les partagés sont
+// comptés dans leur zone d'origine, comme l'étape).
+const zoneIncompleteDevices = computed(() => zoneDeviceEntries.value
+  .filter(e => e.device.system_id === e.system.id && !isDeviceComplete(e.device, e.system.system_category))
+  .map(e => ({ ...e, missing: deviceMissingFields(e.device, e.system.system_category).length })))
+
+function openDevice(d, s) {
+  selectedDeviceId.value = d.id
+  selectedSystemId.value = s.id
+}
+function openDeviceEntry(e) { if (e) openDevice(e.device, e.system) }
+function closeDevice() {
+  selectedDeviceId.value = null
+  selectedSystemId.value = null
+}
+// « Agrandir » : même fiche dans une grande fenêtre (mode modale de
+// DeviceEditModal). Les deux lisent et écrivent le même équipement du store :
+// le panneau reste à jour. Refermée à chaque changement d'équipement.
+const deviceExpanded = ref(false)
+watch(selectedDeviceId, () => { deviceExpanded.value = false })
+// Changement de zone : la fiche d'un équipement d'une autre zone se ferme.
+watch(activeZoneId, () => {
+  if (selectedDeviceId.value != null && panelIndex.value < 0) closeDevice()
+})
+function deviceDisplayName(d) {
+  return d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || `Équipement #${d.id}`
+}
+function openDeviceNotes() {
+  const d = panelDevice.value
+  if (!d) return
+  emit('open-notes', {
+    title: 'Notes équipement',
+    contextLabel: deviceDisplayName(d) + ' - ' + panelSystemLabel.value + ' / ' + panelZoneName.value,
+    entityType: 'device', entityRef: d,
+    currentHtml: d.notes_html || d.notes || '',
+  })
+}
+async function duplicatePanelDevice() {
+  const d = panelDevice.value
+  if (!d) return
+  try {
+    await duplicateBacsDevice(d.id)
+    await refreshAuditData()
+  } catch { error('Duplication impossible') }
+}
+async function removePanelDevice() {
+  const d = panelDevice.value
+  if (!d) return
+  const ok = await confirm({
+    title: 'Supprimer cet équipement ?',
+    message: `« ${deviceDisplayName(d)} »`,
+    confirmLabel: 'Supprimer', danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteBacsDevice(d.id)
+    closeDevice()
+    await refreshAuditData()
+  } catch { error('Suppression impossible') }
+}
+
+// Hauteurs collantes (mode étape) : la barre des zones colle sous l'en-tête
+// de la carte, la fiche sous la barre. Mesurées (ResizeObserver) et posées
+// en variables CSS sur la section (--systems-header-h, --systems-tabs-h).
+const zoneTabsBarRef = ref(null)
+let stickyObs = null
+function applyStickyHeights() {
+  const section = window.document.getElementById('section-systems')
+  if (!section) return
+  const header = section.firstElementChild
+  if (header) section.style.setProperty('--systems-header-h', `${Math.round(header.getBoundingClientRect().height)}px`)
+  const bar = zoneTabsBarRef.value
+  if (bar) section.style.setProperty('--systems-tabs-h', `${Math.round(bar.getBoundingClientRect().height)}px`)
+}
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined') return
+  stickyObs = new ResizeObserver(() => applyStickyHeights())
+  const header = window.document.getElementById('section-systems')?.firstElementChild
+  if (header) stickyObs.observe(header)
+  nextTick(applyStickyHeights)
+})
+watch(zoneTabsBarRef, (el, old) => {
+  if (!stickyObs) return
+  if (old) stickyObs.unobserve(old)
+  if (el) { stickyObs.observe(el); nextTick(applyStickyHeights) }
+})
+onBeforeUnmount(() => { stickyObs?.disconnect(); stickyObs = null })
+
+// Tableau de présence : case « — » (usage absent de la zone) → fenêtre
+// « Ajouter un système » pré-remplie avec la zone et l'usage.
+function onMatrixAddSystem({ zoneId, zoneName, category }) {
+  selectZone(zoneId)
+  createSystemForZone.value = { id: zoneId, name: zoneName }
+  createSystemInitial.value = { category: category === '__other' ? '__custom__' : category, label: '' }
+}
+
+// Tableau de présence : clic sur une zone (et éventuellement un usage).
+function onMatrixSelect({ zoneId, category }) {
+  selectZone(zoneId)
+  if (!category) {
+    // Clic sur une zone : on descend jusqu'à son détail (sous la barre des zones).
+    nextTick(() => {
+      const el = [...window.document.querySelectorAll(`#section-systems [data-zone-id="${zoneId}"]`)]
+        .find(e => e.offsetParent !== null)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return
+  }
+  nextTick(() => {
+    const g = props.systemsByZone.find(x => x.zone_id === zoneId)
+    const target = category === '__other'
+      ? g?.items.find(s => !s.is_bacs)
+      : g?.items.find(s => s.is_bacs && s.system_category === category)
+    if (!target) return
+    const el = [...window.document.querySelectorAll(`#section-systems [data-system-id="${target.id}"]`)]
+      .find(e => e.offsetParent !== null)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    flashAuditTarget(el)
+  })
+}
 
 // Mig 182 : modale dédiée pour ajouter un système (BACS standard ou usage
 // hors décret). Remplace le picker inline qui ne supportait que les usages
@@ -346,7 +658,11 @@ function hasNotes(html) {
 
 // Drag & drop des cartes système, INTRA-zone uniquement (le système ne
 // change pas de zone — la zone_id est une FK invariante ici). À chaque
-// onEnd, on relit l'ordre du DOM sur l'ENSEMBLE des zones et on POST.
+// onEnd, on relit l'ordre du DOM de la zone déplacée et on POST la liste
+// complète de la zone : les systèmes non affichés en carte (pastilles
+// « non concerné », usages filtrés) gardent leur rang. Le serveur ne
+// renumérote que les ids reçus ; les zones ne s'entremêlent pas (tri
+// z.position, puis s.position).
 const zoneListRefs = ref({})
 const sortables = []
 function setZoneListRef(zoneId, el) {
@@ -367,15 +683,14 @@ function setupSortables() {
       ghostClass: 'sortable-ghost',
       onEnd: async (evt) => {
         if (evt.oldIndex === evt.newIndex) return
-        // Récupère l'ordre global (toutes zones, dans l'ordre du DOM).
-        const allIds = []
-        for (const zoneEl of Object.values(zoneListRefs.value)) {
-          if (!zoneEl) continue
-          for (const card of zoneEl.querySelectorAll('.system-card')) {
-            const id = parseInt(card.getAttribute('data-id'), 10)
-            if (id) allIds.push(id)
-          }
-        }
+        const g = props.systemsByZone.find(x => String(x.zone_id) === evt.from.dataset.zoneList)
+        if (!g) return
+        const domIds = [...evt.from.querySelectorAll('.system-card')]
+          .map(card => parseInt(card.getAttribute('data-id'), 10))
+          .filter(Boolean)
+        const visible = new Set(domIds)
+        let k = 0
+        const allIds = g.items.map(s => (visible.has(s.id) ? domIds[k++] : s.id))
         try {
           await reorderBacsSystems(audit.docId, allIds)
           await audit.refreshAuditCore()
@@ -388,7 +703,9 @@ function setupSortables() {
     sortables.push(s)
   }
 }
-watch(() => props.systemsByZone, async () => {
+// Recrée les Sortable quand les données changent, quand une zone est montée
+// pour la 1re fois (onglet) ou quand les non concernés changent d'affichage.
+watch([() => props.systemsByZone, () => visitedZones.value.size, showNotConcernedSystems], async () => {
   await nextTick()
   setupSortables()
 }, { immediate: true, flush: 'post', deep: true })
@@ -411,8 +728,9 @@ onBeforeUnmount(teardownSortables)
         <!-- Filtres usage centrés dans la rangée du header. Restent
              visibles dans le sticky au scroll. Couleurs douces : actif
              = white + bordure + icône colorée, inactif = gray-50
-             grayscale. -->
-        <template #center>
+             grayscale. Absents en mode étape : le tableau de présence
+             donne déjà la vue par usage (clic sur une case = zone + usage). -->
+        <template v-if="!isStepMode" #center>
           <div class="flex items-center flex-wrap gap-1 justify-center" @click.stop>
             <button v-for="cat in usageFilterOptions" :key="cat.value"
                     type="button" @click.stop="toggleUsageFilter(cat.value)"
@@ -464,24 +782,74 @@ onBeforeUnmount(teardownSortables)
       <span v-else class="italic">Pas encore de systèmes saisis</span>
     </template>
     <div class="px-3 py-3 bg-gray-50">
+      <!-- Mode étape : tableau de présence zones × usages (vue d'ensemble,
+           ✓ / ✗ en un clic, accès direct à une zone ou un usage). -->
+      <SystemsPresenceMatrix
+        v-if="isStepMode && systemsByZone.length"
+        class="mb-3"
+        :groups="systemsByZone"
+        :devices-by-system="devicesBySystem"
+        :all-devices="audit.devices || []"
+        :active-zone-id="activeZoneId"
+        @select="onMatrixSelect"
+        @set-presence="({ system, value }) => setPresence(system, value)"
+        @add-system="onMatrixAddSystem" />
+      <!-- Mode étape : sous-onglets de zones sous le tableau, collants sous
+           l'en-tête de la carte (hauteur mesurée : --systems-header-h). -->
+      <div v-if="isStepMode && systemsByZone.length" ref="zoneTabsBarRef"
+           class="sticky z-[5] -mx-3 px-3 pt-1 pb-2 mb-2 bg-gray-50/95 backdrop-blur"
+           :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + var(--systems-header-h, 64px))' }">
+        <AuditSubTabs
+          data-audit-subtabs="systems-zones"
+          id-prefix="systems-zone"
+          aria-label="Zones du site"
+          :items="zoneTabs"
+          :model-value="activeZoneId"
+          @update:model-value="selectZone"
+        />
+      </div>
+      <!-- Mode étape : liste des équipements à gauche, fiche à droite. -->
+      <div :class="isStepMode ? 'flex items-start gap-3' : ''">
+      <div :class="isStepMode ? 'flex-1 min-w-0' : ''">
       <!-- Les usages "non concerné" restent toujours visibles (grisés et
            atténués via la classe opacity-60 + bordure dashed sur la card),
            pour permettre à l'auditeur de les remettre actifs facilement
            sans avoir à toggle un flag d'affichage. -->
       <div class="space-y-3">
-        <div v-for="g in filteredSystemsByZone" :key="g.zone_id"
+        <template v-for="g in displayGroups" :key="g.zone_id">
+        <!-- Mode étape : zone montée à sa 1re ouverture, puis conservée. -->
+        <div v-if="!isStepMode || visitedZones.has(g.zone_id)"
+             v-show="!isStepMode || activeZoneId === g.zone_id"
              :data-zone-id="g.zone_id"
-             class="bg-slate-100/60 border border-slate-200 rounded-lg p-3">
-          <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
+             :class="isStepMode ? '' : 'bg-slate-100/60 border border-slate-200 rounded-lg p-3'">
+          <!-- Mode étape : le sous-onglet porte déjà le nom de la zone et le
+               compte d'usages → simple ligne d'info (nature, hors décret).
+               Hauteur fixe (h-7) sur une seule ligne : le panneau « Fiche
+               équipement » est décalé d'autant (mt-7) pour que son haut
+               s'aligne sur la 1re carte. -->
+          <div v-if="isStepMode" class="flex items-center gap-2 px-1 h-7 min-w-0 text-xs text-gray-500">
+            <MapPinIcon class="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span class="truncate min-w-0"><span class="font-medium text-gray-700">{{ g.zone_name }}</span><span v-if="g.zone_nature"> · {{ zoneNatures.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span></span>
+            <span v-if="g.zone_kind === 'technical'"
+                  class="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 whitespace-nowrap">
+              hors décret BACS
+            </span>
+            <span class="ml-auto shrink-0 whitespace-nowrap">
+              {{ g.items.filter(s => s.present).length }} usage{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }} présent{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
+              sur {{ g.items.length }}
+            </span>
+          </div>
+          <div v-else class="flex items-center gap-2 pb-2 border-b border-gray-100"
                :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
-            <button type="button" @click="emit('toggle-zone-collapsed', g.zone_id)"
+            <button v-if="!isStepMode" type="button" @click="emit('toggle-zone-collapsed', g.zone_id)"
                     class="p-1 -ml-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
                     v-tooltip="collapsedZones.has(g.zone_id) ? 'Déplier la zone' : 'Replier la zone'">
               <ChevronDownIcon v-if="collapsedZones.has(g.zone_id)" class="w-4 h-4" />
               <ChevronUpIcon v-else class="w-4 h-4" />
             </button>
             <MapPinIcon class="w-5 h-5 text-indigo-500" />
-            <span class="font-semibold text-lg text-gray-900 cursor-pointer" @click="emit('toggle-zone-collapsed', g.zone_id)">{{ g.zone_name }}</span>
+            <span :class="['font-semibold text-lg text-gray-900', !isStepMode && 'cursor-pointer']"
+                  @click="!isStepMode && emit('toggle-zone-collapsed', g.zone_id)">{{ g.zone_name }}</span>
             <span v-if="g.zone_nature" class="text-xs text-gray-500 italic">— {{ zoneNatures.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
             <span v-if="g.zone_kind === 'technical'"
                   class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 whitespace-nowrap">
@@ -492,9 +860,13 @@ onBeforeUnmount(teardownSortables)
               / {{ g.items.length }}
             </span>
           </div>
-          <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2"
+          <div v-show="isStepMode || !collapsedZones.has(g.zone_id)" class="space-y-2"
+               :data-zone-list="g.zone_id"
                :ref="el => setZoneListRef(g.zone_id, el)">
-            <template v-for="s in g.items" :key="s.id">
+            <p v-if="isStepMode && !g.items.length" class="px-2 py-3 text-sm text-gray-500 italic">
+              Aucun usage dans cette zone pour l'instant.
+            </p>
+            <template v-for="s in rowItems(g)" :key="s.id">
               <!-- Pas de PhotoDropzone autour de la catégorie : drops scopés
                    au système (device card) uniquement, voir SystemDevicesTable.
                    Les usages "non concerné" restent visibles (grisés via
@@ -508,7 +880,7 @@ onBeforeUnmount(teardownSortables)
                      drag 20px, chevron 20px, picto 28px, label 240px (truncate),
                      contrôle segmenté présence en auto, puis 1fr pour pousser
                      les actions à droite. -->
-                <div class="px-3 py-2 grid items-center gap-3 bg-white"
+                <div :class="['px-3 grid items-center gap-3 bg-white rounded-t-lg', isStepMode ? 'py-1.5' : 'py-2']"
                      :style="'grid-template-columns: 20px 20px 28px minmax(240px, auto) auto minmax(0, 1fr);'">
                   <button type="button"
                           class="drag-handle p-0.5 -ml-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
@@ -574,6 +946,12 @@ onBeforeUnmount(teardownSortables)
                           v-tooltip="'Aucun équipement saisi. Ajoute au moins une chaudière, une unité DRV, etc.'">
                       ⚠ Aucun équipement
                     </span>
+                    <!-- Mode étape : résumé des équipements (remplace la ligne
+                         d'en-tête du tableau, supprimée pour gagner de la place). -->
+                    <span v-if="isStepMode && s.present && deviceSummary(s)"
+                          class="ml-1 text-xs text-gray-500 whitespace-nowrap">
+                      {{ deviceSummary(s) }}
+                    </span>
                   </div>
                   <SegmentedToggle :model-value="presenceValue(s)" :options="PRESENCE_OPTIONS"
                                    @update:model-value="v => setPresence(s, v)" />
@@ -618,8 +996,8 @@ onBeforeUnmount(teardownSortables)
                      quand le système est présent et déplié) :
                      · bouclage ECS (catégorie dhw uniquement)
                      · règle des 5 % — poste considéré négligeable -->
-                <div v-if="s.present && !collapsedSystems.has(s.id)"
-                     class="px-3 py-2.5 border-t border-gray-100 bg-slate-50/60 space-y-2.5">
+                <div v-if="s.present && !collapsedSystems.has(s.id) && (s.system_category === 'dhw' || s.marked_negligible_under_5pct)"
+                     :class="['px-3 border-t border-gray-100 bg-slate-50/60', isStepMode ? 'py-2 space-y-2' : 'py-2.5 space-y-2.5']">
                   <!-- Item 3 — bouclage ECS -->
                   <div v-if="s.system_category === 'dhw'" class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs font-medium text-gray-600 whitespace-nowrap">Bouclage ECS :</span>
@@ -653,8 +1031,19 @@ onBeforeUnmount(teardownSortables)
                   </div>
                 </div>
 
+                <!-- Mode étape : liste en lecture, clic = fiche à droite. -->
+                <SystemDeviceList
+                  v-if="isStepMode && s.present && !collapsedSystems.has(s.id)"
+                  :system="s"
+                  :devices="devicesBySystem[s.id] || []"
+                  :selected-id="selectedSystemId === s.id ? selectedDeviceId : null"
+                  :site-uuid="document?.site_uuid"
+                  @select="d => openDevice(d, s)"
+                  @changed="refreshAuditData"
+                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
                 <SystemDevicesTable
-                  v-if="s.present && !collapsedSystems.has(s.id)"
+                  v-else-if="s.present && !collapsedSystems.has(s.id)"
+                  :compact="isStepMode"
                   :system="s"
                   :devices="devicesBySystem[s.id] || []"
                   :system-label="usageLabel(s)"
@@ -670,20 +1059,177 @@ onBeforeUnmount(teardownSortables)
                   @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
               </div>
             </template>
+            <!-- Mode étape : usages « non concernés » regroupés en pastilles
+                 grisées — toujours visibles, un clic les repasse « Présent ».
+                 « Afficher en détail » redonne les lignes complètes (renommer,
+                 dupliquer, supprimer, glisser). -->
+            <div v-if="ncItems(g).length"
+                 class="flex flex-wrap items-center gap-1.5 px-1 py-1.5">
+              <span class="text-[11px] text-gray-500 mr-1">
+                Non concerné{{ ncItems(g).length > 1 ? 's' : '' }} ({{ ncItems(g).length }}) :
+              </span>
+              <button v-for="s in ncItems(g)" :key="s.id" type="button"
+                      :data-system-id="s.id" data-audit-nc-chip
+                      @click="setPresence(s, 'present')"
+                      v-tooltip="`${ncChipLabel(s)} — non concerné dans cette zone. Cliquer pour le marquer « Présent ».${hasNotes(s.notes_html || s.notes) ? '\nCe système a une note (visible avec « Afficher en détail »).' : ''}`"
+                      class="inline-flex items-center gap-1.5 h-7 pl-1.5 pr-2 rounded-full border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition">
+                <SystemCategoryIcon :category="s.system_category" size="sm" class="opacity-60 grayscale" />
+                <span>{{ ncChipLabel(s) }}</span>
+                <FontAwesomeIcon v-if="hasNotes(s.notes_html || s.notes)" :icon="['fas', 'pen-to-square']" class="w-2.5 h-2.5 text-indigo-400" />
+                <FontAwesomeIcon :icon="['fas', 'plus']" class="w-2.5 h-2.5" />
+              </button>
+              <button type="button" data-audit-nc-expand
+                      @click="showNotConcernedSystems = true"
+                      class="ml-auto text-[11px] text-gray-500 hover:text-gray-800 underline underline-offset-2"
+                      v-tooltip="'Afficher les usages non concernés en lignes complètes (renommer, dupliquer, supprimer, réordonner)'">
+                Afficher en détail
+              </button>
+            </div>
+            <div v-else-if="isStepMode && showNotConcernedSystems && g.items.some(s => s.not_concerned)"
+                 class="flex justify-end px-1">
+              <button type="button" data-audit-nc-collapse
+                      @click="showNotConcernedSystems = false"
+                      class="text-[11px] text-gray-500 hover:text-gray-800 underline underline-offset-2">
+                Regrouper les non concernés en pastilles
+              </button>
+            </div>
             <!-- Mig 182 : ouverture d'une modale pour ajouter un système
                  (catégorie BACS standard OU usage hors décret). Le bouton
                  unique remplace l'ancien picker inline (limité aux usages
                  manuels). On peut désormais créer N systèmes BACS de même
                  catégorie dans une même zone (ex: 2 chaudières indépendantes). -->
             <button type="button" @click="openCreateSystem({ id: g.zone_id, name: g.zone_name })"
-                    class="btn-add">
+                    :class="isStepMode
+                      ? 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-indigo-700 rounded-lg hover:bg-indigo-50 transition'
+                      : 'btn-add'">
               <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un système
             </button>
           </div>
         </div>
+        </template>
       </div>
       <div v-if="!systemsByZone.length" class="px-5 py-6 text-center text-sm text-gray-500">
         Aucune zone définie pour ce site. Ajoute-en depuis la section ci-dessus.
+      </div>
+      </div>
+      <!-- Fiche équipement (mode étape) : tous les champs de l'équipement,
+           précédent / suivant dans la zone ; sinon, ce qu'il reste à compléter. -->
+      <!-- mt-7 = hauteur de la ligne de zone (h-7) : haut aligné sur la
+           1re carte système (le décalage ne compte plus une fois collé). -->
+      <aside v-if="isStepMode && systemsByZone.length"
+             class="w-[440px] shrink-0 sticky self-start mt-7"
+             :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + var(--systems-header-h, 64px) + var(--systems-tabs-h, 52px) + 8px)' }"
+             data-device-panel>
+        <div v-if="panelDevice && panelSystem"
+             class="bg-white rounded-xl ring-1 ring-slate-200 shadow-md overflow-hidden flex flex-col"
+             :style="{ maxHeight: 'calc(100vh - var(--audit-sticky-offset, 0px) - var(--systems-header-h, 64px) - var(--systems-tabs-h, 52px) - 24px)' }">
+          <header class="px-4 pt-3 pb-2 border-b border-slate-100">
+            <div class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <p class="text-[11px] text-gray-500 truncate">{{ panelZoneName }} › {{ panelSystemLabel }}</p>
+                <h3 class="text-sm font-medium text-gray-900 truncate">{{ deviceDisplayName(panelDevice) }}</h3>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button type="button" class="btn-icon" :disabled="!prevEntry" @click="openDeviceEntry(prevEntry)"
+                        v-tooltip="'Équipement précédent'">
+                  <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-3 h-3" />
+                </button>
+                <span v-if="panelIndex >= 0" class="text-[11px] text-gray-500 tabular-nums px-0.5">
+                  {{ panelIndex + 1 }}/{{ zoneDeviceEntries.length }}
+                </span>
+                <button type="button" class="btn-icon" :disabled="!nextEntry" @click="openDeviceEntry(nextEntry)"
+                        v-tooltip="'Équipement suivant'">
+                  <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-3 h-3" />
+                </button>
+                <button type="button" class="btn-icon" @click="deviceExpanded = true"
+                        v-tooltip="'Agrandir la fiche'" aria-label="Agrandir la fiche">
+                  <FontAwesomeIcon :icon="['fas', 'up-right-and-down-left-from-center']" class="w-3 h-3" />
+                </button>
+                <button type="button" class="btn-icon" @click="closeDevice" v-tooltip="'Fermer la fiche'">
+                  <FontAwesomeIcon :icon="['fas', 'xmark']" class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <!-- Actions de l'équipement (auparavant sur la ligne du tableau) -->
+            <div class="mt-2 flex items-center gap-1 flex-wrap">
+              <button type="button" @click="openDeviceNotes"
+                      :class="['btn-icon', hasNotes(panelDevice.notes_html || panelDevice.notes) && 'is-active']"
+                      v-tooltip="hasNotes(panelDevice.notes_html || panelDevice.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3.5 h-3.5" />
+              </button>
+              <BacsPhotoButton
+                v-if="document?.site_uuid"
+                :key="`photo-${panelDevice.id}`"
+                :site-uuid="document.site_uuid"
+                :attach-to="{ device_id: panelDevice.id, system_id: panelSystem.id }"
+                :label="deviceDisplayName(panelDevice)" />
+              <VoiceNoteButton
+                v-if="document?.site_uuid"
+                :key="`voice-${panelDevice.id}`"
+                :site-uuid="document.site_uuid"
+                :attach-to="{ device_id: panelDevice.id }"
+                :label="deviceDisplayName(panelDevice)" />
+              <DeviceMoveShare
+                :key="`move-${panelDevice.id}`"
+                :device="panelDevice"
+                :systems="audit.systems || []"
+                @updated="refreshAuditData" />
+              <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
+              <button type="button" class="btn-icon" @click="duplicatePanelDevice" v-tooltip="'Dupliquer'">
+                <FontAwesomeIcon :icon="['fas', 'clone']" class="w-3.5 h-3.5" />
+              </button>
+              <button type="button" class="btn-icon btn-icon-danger" @click="removePanelDevice" v-tooltip="'Supprimer'">
+                <FontAwesomeIcon :icon="['fas', 'trash']" class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </header>
+          <div class="overflow-y-auto min-h-0 flex-1">
+            <DeviceEditModal
+              :key="`edit-${panelDevice.id}-${panelSystem.id}`"
+              panel
+              :device="panelDevice"
+              :system="panelSystem"
+              :system-label="panelSystemLabel"
+              :zone-name="panelZoneName"
+              @changed="refreshAuditData"
+              @close="closeDevice" />
+          </div>
+          <!-- Fiche agrandie (grande fenêtre, téléportée dans <body>) -->
+          <DeviceEditModal
+            v-if="deviceExpanded"
+            :key="`edit-full-${panelDevice.id}-${panelSystem.id}`"
+            :device="panelDevice"
+            :system="panelSystem"
+            :system-label="panelSystemLabel"
+            :zone-name="panelZoneName"
+            @changed="refreshAuditData"
+            @close="deviceExpanded = false" />
+        </div>
+        <div v-else class="bg-white rounded-xl ring-1 ring-slate-200 p-4">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-600">Fiche équipement</h3>
+          <p class="mt-2 text-sm text-gray-600">
+            Clique sur un équipement pour ouvrir sa fiche : tous ses champs et ce qu'il reste à compléter.
+          </p>
+          <div v-if="zoneIncompleteDevices.length" class="mt-3">
+            <p class="text-xs font-medium text-amber-800">
+              À compléter dans cette zone ({{ zoneIncompleteDevices.length }})
+            </p>
+            <ul class="mt-1.5 space-y-1">
+              <li v-for="e in zoneIncompleteDevices" :key="`${e.system.id}-${e.device.id}`" class="flex items-center gap-2 text-xs">
+                <button type="button" @click="openDeviceEntry(e)"
+                        class="text-left text-indigo-700 hover:text-indigo-900 hover:underline truncate">
+                  {{ deviceDisplayName(e.device) }}
+                </button>
+                <span class="text-gray-400 shrink-0">· {{ e.system.is_bacs ? usageLabel(e.system) : (e.system.custom_label || 'Usage') }}</span>
+                <span class="ml-auto shrink-0 px-1.5 py-px rounded-full bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200">
+                  {{ e.missing }}
+                </span>
+              </li>
+            </ul>
+          </div>
+          <p v-else class="mt-3 text-xs text-emerald-700">✓ Tous les équipements de cette zone sont complets.</p>
+        </div>
+      </aside>
       </div>
     </div>
     <!-- Modale paramètres système : 5 % + surcharge parties assujetties -->

@@ -192,7 +192,7 @@ async function routes(fastify) {
     return {
       decree_version: {
         effective_from: latestEffective,
-        label: 'Décret n°2023-259 du 7 avril 2023 (échéance 70 kW reportée au 1ᵉʳ janvier 2030, JO du 26/12/2025)',
+        label: 'Articles R175-1 à R175-6 — R175-2 modifié par le décret n° 2025-1343 du 26 décembre 2025 (en vigueur depuis le 28 décembre 2025)',
         generated_from: 'bacs_knowledge',
       },
       refs,

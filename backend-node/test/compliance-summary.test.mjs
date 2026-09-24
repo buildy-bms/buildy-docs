@@ -90,9 +90,37 @@ describe('buildComplianceSummary — verdict R175 selon GTB', () => {
     }
   });
 
-  it('verdict compliant possible quand GTB présente et aucune action bloquante', () => {
-    const c = buildComplianceSummary(makeArgs({ bms: { present: 1 } }));
+  it('verdict compliant possible quand GTB présente, questions répondues et aucune action', () => {
+    const c = buildComplianceSummary(makeArgs({ bms: {
+      present: 1, meets_r175_3_p1: 1, meets_r175_3_p2: 1, data_provision_to_manager: 1,
+      has_maintenance_procedures: 1, operator_trained: 1,
+    } }));
     expect(c.verdict).toBe('compliant');
+    expect(c.verdictHeadline).toBe('Conforme au décret BACS');
+  });
+
+  it('verdict non déterminé quand aucune action mais une exigence reste à qualifier', () => {
+    const c = buildComplianceSummary(makeArgs({ bms: { present: 1 } }));
+    expect(c.verdict).toBe('unknown');
+    expect(c.verdictLabel).toBe('Non déterminé');
+    expect(c.verdictDetail).toMatch(/restent à qualifier/);
+  });
+
+  it('bâtiment non assujetti sans action : verdict « non assujetti », jamais « conforme »', () => {
+    const c = buildComplianceSummary(makeArgs({
+      document: makeDoc({ bacs_applicability_status: 'not_subject', bacs_total_power_kw: 50 }),
+      powerSummary: { effectiveKw: 50, autoHeatKw: 50, autoCoolKw: 0 },
+    }));
+    expect(c.verdict).toBe('not_subject');
+    expect(c.verdictHeadline).toMatch(/non assujetti/i);
+  });
+
+  it('GTB hors service : axes dépendant de la GTB non conformes', () => {
+    const c = buildComplianceSummary(makeArgs({ bms: { present: 1, out_of_service: 1, operator_trained: 1 } }));
+    for (const axis of ['r175_3_1', 'r175_3_2', 'r175_3_3', 'r175_3_4', 'r175_4']) {
+      expect(c.r175Dashboard.find(r => r.axis === axis).verdict).toBe('non_compliant');
+    }
+    expect(c.r175Dashboard.find(r => r.axis === 'r175_5').verdict).toBe('compliant');
   });
 });
 
@@ -150,7 +178,7 @@ describe('buildComplianceSummary — Lectures Buildy attachées', () => {
 
 describe('nouveaux axes r175_3_2 et r175_5_1', () => {
   it('une action R175-5-1 atterrit sur l\'axe r175_5_1, pas sur r175_5', () => {
-    const a = { r175_article: 'R175-5-1', severity: 'major', title: 'Programmer une inspection' };
+    const a = { r175_article: 'R175-5-1', severity: 'major', title: 'Faire réaliser l\'inspection périodique de la GTB' };
     const c = buildComplianceSummary(makeArgs({
       actionItems: { blocking: [], major: [a], minor: [] },
       actionItemsRaw: [a],
@@ -161,7 +189,8 @@ describe('nouveaux axes r175_3_2 et r175_5_1', () => {
     const insp = c.r175Dashboard.find(r => r.axis === 'r175_5_1');
     const training = c.r175Dashboard.find(r => r.axis === 'r175_5');
     expect(insp.actionsCount).toBe(1);
-    expect(insp.verdict).toBe('partial');
+    // Exigence d'un seul tenant : un écart majeur la laisse non remplie.
+    expect(insp.verdict).toBe('non_compliant');
     expect(training.actionsCount).toBe(0);
     expect(training.verdict).toBe('compliant');
   });

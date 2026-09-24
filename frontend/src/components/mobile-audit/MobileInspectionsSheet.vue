@@ -10,14 +10,16 @@ import '@/lib/equipment-icons'
  * - Boutons rapides « Aujourd'hui », « +5 ans », « +10 ans ».
  * - Pill statut (à jour / < 6 mois / dépassée) sur la ligne d'accroche.
  */
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { updateAf } from '@/api'
 import { addYearsIso, todayIso as todayIsoLocal } from '@/lib/date-helpers'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
+import MobileYesNo from './MobileYesNo.vue'
 import InspectionReportDrop from '@/components/audit/InspectionReportDrop.vue'
 
 defineProps({
@@ -26,9 +28,39 @@ defineProps({
 const emit = defineEmits(['close'])
 
 const audit = useAuditStore()
-const { inspections, todayIso } = storeToRefs(audit)
+const { inspections, todayIso, document } = storeToRefs(audit)
 const { error } = useNotification()
 const { confirm } = useConfirm()
+
+// « Y a-t-il une inspection officielle à tracer ? » (mig 187), comme sur
+// desktop : Non = aucune inspection à déclarer (étape validable) ; sans
+// inspection tracée, le rapport garde la réserve « Faire réaliser
+// l'inspection », avec la précision saisie dans son constat.
+const notApplicable = computed(() => {
+  const v = document.value?.inspection_not_applicable
+  return v === 1 || v === true
+})
+// Enregistrement groupé : deux modifications rapprochées (réponse puis
+// précision) partent ensemble, aucune ne se perd.
+let docTimer = null
+let pendingDoc = {}
+function saveDoc(patch) {
+  if (!document.value) return
+  Object.assign(document.value, patch)
+  pendingDoc = { ...pendingDoc, ...patch }
+  clearTimeout(docTimer)
+  docTimer = setTimeout(async () => {
+    const body = pendingDoc
+    pendingDoc = {}
+    try { await updateAf(document.value.id, body) }
+    catch (e) { error(e.response?.data?.detail || 'Sauvegarde impossible') }
+  }, 400)
+}
+function setNotApplicable(v) {
+  saveDoc(v
+    ? { inspection_not_applicable: true }
+    : { inspection_not_applicable: false, inspection_not_applicable_reason: null })
+}
 
 const openIds = ref(new Set())
 watch(inspections, (list) => {
@@ -128,12 +160,31 @@ function statusFor(ins) {
           R175-5-1
         </p>
         <p class="text-sm text-amber-900 leading-relaxed">
-          Trace ici les inspections officielles réalisées par un tiers (organisme indépendant).
-          Rapport conservé <strong>10 ans</strong> (R175-5-1). Le décret n'impose pas de
-          périodicité explicite ; Buildy propose <strong>+5 ans</strong> par défaut — à ajuster
-          selon votre planning. L'audit Buildy est interne et ne se substitue pas à cette obligation.
+          Trace ici les inspections périodiques de la GTB, réalisées à l'initiative de son
+          propriétaire (la FAQ ministérielle n° 30, non opposable, juge « pertinent » un inspecteur
+          indépendant ; le décret ne l'impose pas).
+          Rapport conservé <strong>10 ans</strong> (R175-5-1). L'inspection a lieu au moins tous les
+          <strong>5 ans</strong>, et dans les <strong>2 ans</strong> qui suivent l'installation ou le
+          remplacement de la GTB ou d'un système relié (arrêté du 7 avril 2023). L'audit Buildy ne
+          remplace pas cette inspection.
         </p>
       </div>
+
+      <MobileYesNo
+        label="Y a-t-il une inspection officielle à tracer pour ce site ?"
+        description="Réponds Non si aucune inspection n'a encore eu lieu ou si aucun rapport n'est disponible. Le rapport indique alors en réserve que l'inspection reste à faire réaliser par le propriétaire."
+        :model-value="!notApplicable"
+        @update:model-value="v => setNotApplicable(v === false)"
+      />
+      <MobileField v-if="notApplicable" label="Précision (optionnelle, reprise dans la réserve du rapport)">
+        <input
+          :value="document?.inspection_not_applicable_reason || ''"
+          type="text"
+          placeholder="ex : GTB installée il y a moins de deux ans, aucun rapport transmis…"
+          @input="e => saveDoc({ inspection_not_applicable_reason: e.target.value || null })"
+          class="pwa-input w-full"
+        />
+      </MobileField>
 
       <!-- Liste compacte -->
       <div v-if="inspections.length" class="space-y-2">
@@ -189,7 +240,7 @@ function statusFor(ins) {
               </div>
             </MobileField>
 
-            <MobileField label="Tiers inspecteur (nom / société)">
+            <MobileField label="Inspecteur (nom / société)">
               <input
                 :value="ins.last_inspection_inspector || ''"
                 type="text"
@@ -277,7 +328,7 @@ function statusFor(ins) {
       <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center">
         <FontAwesomeIcon :icon="['fas', 'clock']" class="w-10 h-10 text-gray-300 mx-auto" />
         <p class="text-sm font-medium text-gray-700 mt-3">Aucune inspection tracée</p>
-        <p class="text-xs text-gray-500 mt-1">Une action corrective est générée automatiquement tant qu'aucune inspection R175-5-1 n'est documentée.</p>
+        <p class="text-xs text-gray-500 mt-1">Tant qu'aucune inspection n'est tracée, le rapport indique en réserve que l'inspection périodique de la GTB (R175-5-1) reste à faire réaliser.</p>
       </div>
 
       <button

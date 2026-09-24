@@ -291,6 +291,7 @@ onBeforeUnmount(teardownZonesSortable)
             <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
             <th>Nature</th>
             <th v-if="!isTechnical">Régime d'activité</th>
+            <th v-if="!isTechnical">Contrainte de confort</th>
             <th>Type</th>
             <DataTableSortHeader sort-key="surface_m2" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Surface (m²)</DataTableSortHeader>
             <th>Actions</th>
@@ -334,6 +335,7 @@ onBeforeUnmount(teardownZonesSortable)
                 @update:model-value="v => patchZone(z, { nature: v || null })"
                 :options="zoneNatures"
                 placeholder="Nature de la zone"
+                size="sm"
               />
             </td>
             <td v-if="!isTechnical" class="min-w-44">
@@ -342,7 +344,22 @@ onBeforeUnmount(teardownZonesSortable)
                 @update:model-value="v => patchZone(z, { occupancy_profile: v || null })"
                 :options="ZONE_OCCUPANCY_PROFILES"
                 placeholder="Régime d'activité"
+                size="sm"
               />
+            </td>
+            <!-- Contrainte de confort (zones fonctionnelles, comme à la
+                 création et sur la PWA) : texte libre, enregistré en sortie.
+                 Colonne à part pour garder une ligne par zone. -->
+            <td v-if="!isTechnical" class="min-w-40">
+              <input v-if="(z.kind || 'functional') !== 'technical'"
+                     type="text"
+                     :value="z.comfort_constraint || ''"
+                     placeholder="Optionnel"
+                     v-tooltip="'Contrainte de confort spécifique : température minimale imposée, qualité d\'air…'"
+                     @keydown.enter="e => e.target.blur()"
+                     @blur="e => { const v = e.target.value.trim() || null; if (v !== (z.comfort_constraint || null)) patchZone(z, { comfort_constraint: v }) }"
+                     class="w-full text-sm px-2 py-1 bg-white border border-gray-200 rounded-md placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+              <span v-else class="text-gray-300" v-tooltip="'Sans objet pour une zone technique'">—</span>
             </td>
             <td class="whitespace-nowrap">
               <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
@@ -410,7 +427,7 @@ onBeforeUnmount(teardownZonesSortable)
           </PhotoDropTr>
           </template>
           <tr>
-            <td :colspan="isTechnical ? 6 : 7" class="px-3 py-3">
+            <td :colspan="isTechnical ? 6 : 8" class="px-3 py-3">
               <button @click="emit('add-zone', { kind })"
                       class="btn-add">
                 <PlusIcon class="w-4 h-4 shrink-0" />

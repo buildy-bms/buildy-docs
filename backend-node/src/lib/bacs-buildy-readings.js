@@ -22,56 +22,66 @@
 
 // Version du catalogue. À bumper si un libellé change ; le PDF audit livré
 // gravera cette version pour traçabilité.
-const CATALOG_VERSION = '1.0';
-const CATALOG_DATE = '2026-06-08';
+const CATALOG_VERSION = '1.1';
+const CATALOG_DATE = '2026-09-24';
 
 const READINGS = [
-  // ── R175-3 §1° — Suivi continu pas horaire ───────────────────────────
+  // ── R175-3 1° — Suivi continu pas horaire ────────────────────────────
   {
     code: 'LB-R175-3-P1-PERIMETRE',
     article: 'R175-3 1°',
     title: 'Périmètre du suivi continu',
-    summary: 'Compteurs principaux + sous-comptage par zone fonctionnelle.',
-    body: `Le décret demande un <strong>suivi continu des consommations énergétiques</strong>
-      au pas horaire, avec conservation des données 5 ans. La lettre du
-      décret ne précise pas la granularité spatiale.
-      <em>Lecture Buildy</em> : pour respecter l'esprit du décret (suivi par
-      zone fonctionnelle), on attend un compteur pour chaque énergie (gaz,
-      électricité, fioul, réseau de chaleur…) au niveau du bâtiment, et un
-      sous-comptage par zone fonctionnelle pour les usages chauffage,
-      refroidissement, ECS et éclairage. Cette lecture est plus précise
-      que le décret nu — elle permet à l'exploitant de localiser une dérive.`,
+    summary: 'Un compteur par énergie pour le bâtiment et un sous-comptage par zone fonctionnelle pour chaque système relié.',
+    body: `Le décret impose un suivi, un enregistrement et une analyse en
+      continu, <strong>par zone fonctionnelle et à un pas de temps horaire</strong>,
+      des données de production et de consommation énergétique des systèmes
+      techniques, conservées à l'échelle mensuelle pendant cinq ans (R175-3 1°).
+      <em>Lecture Buildy</em> : le décret ne fixe pas de plan de comptage ;
+      Buildy attend un compteur par énergie au niveau du bâtiment et un
+      sous-comptage par zone fonctionnelle pour chaque système technique
+      relié à la GTB (chauffage, refroidissement, ventilation, eau chaude
+      sanitaire, éclairage, production d'électricité). Pour un bâtiment
+      existant, seuls les systèmes à relier selon le II de l'article R175-2
+      sont concernés.`,
     authority: 'internal',
   },
-  // ── R175-3 §3° — Interopérabilité ────────────────────────────────────
+  // ── R175-3 3° — Interopérabilité ─────────────────────────────────────
   {
     code: 'LB-R175-3-P3-PASSIF',
     article: 'R175-3 3°',
     title: 'Émetteurs passifs et régulation autonome exclus',
-    summary: 'Radiateurs, FCU, vannes thermostatiques mécaniques : pas d\'interopérabilité requise.',
-    body: `Le décret demande l'interopérabilité des <strong>systèmes techniques</strong>.
-      <em>Lecture Buildy</em> : les émetteurs passifs sans interface
-      technique (radiateurs simples, ventilo-convecteurs passifs) et la
-      régulation d'émission autonome (vanne thermostatique mécanique,
-      thermostat de zone non communicant) ne sont pas concernés par
-      l'exigence d'interopérabilité R175-3 §3 — l'action portera sur le
-      générateur ou le régulateur amont, pas sur l'émetteur.`,
+    summary: 'Radiateurs, ventilo-convecteurs passifs, robinets thermostatiques : pas d\'interopérabilité requise.',
+    body: `Le décret impose que la GTB soit <strong>interopérable avec les
+      différents systèmes techniques du bâtiment</strong> (R175-3 3°), sans
+      imposer de protocole : un protocole normalisé, une interface de
+      programmation ou une passerelle conviennent (guide du ministère).
+      <em>Lecture Buildy</em> : l'interopérabilité est vérifiée sur les
+      équipements qui produisent, distribuent ou régulent l'énergie de chaque
+      système : chaque générateur communique avec la GTB, directement ou par
+      l'automate ou le régulateur qui le pilote (guide PROFEEL). Les émetteurs
+      sans interface de communication (radiateurs, ventilo-convecteurs
+      passifs) et la régulation locale autonome (robinet thermostatique,
+      thermostat intégré) ne sont pas visés : l'action porte sur le générateur
+      ou le régulateur amont. Un usage que la GTB en place ne traite pas est
+      considéré comme non relié.`,
     authority: 'internal',
   },
-  // ── R175-3 §4° — Arrêt manuel + redémarrage autonome ─────────────────
+  // ── R175-3 4° — Arrêt manuel + gestion autonome ──────────────────────
   {
-    code: 'LB-R175-3-P4-PAR-EQUIPEMENT',
+    code: 'LB-R175-3-P4-PAR-SYSTEME',
     article: 'R175-3 4°',
-    title: 'Arrêt manuel et redémarrage évalués par équipement',
-    summary: 'Critère évalué pour chaque équipement, pas seulement au niveau GTB global.',
-    body: `Le décret demande que la GTB <strong>permette un arrêt manuel
-      et la gestion autonome d'un ou plusieurs systèmes techniques</strong>.
-      <em>Lecture Buildy</em> : ces deux critères (arrêt manuel possible
-      sur place, redémarrage autonome après coupure) sont évalués au
-      niveau de <strong>chaque équipement</strong> de l'audit, et pas
-      seulement au niveau GTB global. Lecture plus stricte que le décret
-      qui parle « d'un ou plusieurs systèmes techniques » — un seul
-      équipement non conforme déclenche une action corrective.`,
+    title: 'Arrêt manuel et gestion autonome vérifiés par système',
+    summary: 'Chaque système relié peut être arrêté depuis la GTB et continue de fonctionner si elle est arrêtée.',
+    body: `Le décret impose que la GTB <strong>permette un arrêt manuel et
+      la gestion autonome d'un ou plusieurs systèmes techniques</strong>
+      (R175-3 4°). Selon le guide du ministère, les systèmes reliés doivent
+      continuer à fonctionner normalement lorsque la supervision est
+      arrêtée ; selon le guide PROFEEL, la GTB permet de les arrêter puis de
+      les remettre en marche manuellement (ou de les passer en hors gel).
+      <em>Lecture Buildy</em> : ces deux capacités sont vérifiées pour chaque
+      système technique relié ; un système satisfait l'exigence dès qu'un de
+      ses équipements de production, de distribution ou de régulation la
+      remplit.`,
     authority: 'internal',
   },
   // ── R175-3 dernier alinéa — Mise à disposition des données ──────────
@@ -79,60 +89,64 @@ const READINGS = [
     code: 'LB-R175-3-DATA-EXPLOITANT',
     article: 'R175-3 dernier alinéa',
     title: 'Mise à disposition des données aux exploitants',
-    summary: 'Les exploitants (mainteneurs, conseil énergie) doivent accéder aux historiques.',
-    body: `Le décret demande la <strong>mise à disposition des données</strong>
-      au gestionnaire technique et à l'exploitant. <em>Lecture Buildy</em> :
-      les exploitants au sens large (mainteneurs, conseil en énergie,
-      bureau de contrôle R175-5-1) doivent avoir un accès en lecture aux
-      historiques. L'envoi mensuel par email ou un export Excel manuel
-      ne suffisent pas — l'accès doit être continu (API, web, ou rapport
-      automatisé hebdomadaire au minimum).`,
+    summary: 'Le gestionnaire et chaque exploitant accèdent aux données qui les concernent.',
+    body: `Le décret impose au propriétaire de la GTB, propriétaire des
+      données produites et archivées, de les <strong>mettre à disposition
+      du gestionnaire du bâtiment</strong>, à sa demande, et de transmettre
+      à chacun des exploitants des systèmes techniques reliés les données
+      qui les concernent (R175-3, dernier alinéa). <em>Lecture Buildy</em> :
+      un accès continu en lecture (comptes nominatifs, exports ou interface
+      de programmation) est la façon la plus simple d'y répondre ; le décret
+      n'impose pas de moyen particulier.`,
     authority: 'internal',
   },
   // ── R175-5 — Formation de l'exploitant ───────────────────────────────
   {
     code: 'LB-R175-5-FORMATION',
     article: 'R175-5',
-    title: 'Formation au paramétrage, pas seulement au pilotage',
-    summary: 'L\'exploitant doit savoir modifier consignes, horaires, alarmes — pas juste regarder.',
-    body: `Le décret demande la <strong>formation de l'exploitant</strong>
-      au pilotage de la GTB. <em>Lecture Buildy</em> : la formation doit
-      couvrir le <strong>paramétrage</strong> (modification des consignes,
-      des horaires, des seuils d'alarme) et pas seulement le pilotage
-      passif (consultation des écrans). Une formation purement
-      « démonstration » sans manipulation par l'exploitant ne suffit pas
-      à satisfaire l'esprit du décret.`,
+    title: 'Formation au paramétrage, avec preuve',
+    summary: 'L\'exploitant sait modifier lui-même consignes, horaires et seuils d\'alarme ; la formation est attestée.',
+    body: `Le décret impose au propriétaire de la GTB de veiller à ce que
+      l'exploitant soit formé à son fonctionnement, notamment aux
+      <strong>modalités de son paramétrage</strong> (R175-5).
+      <em>Lecture Buildy</em> : la formation doit permettre à l'exploitant de
+      modifier lui-même consignes, horaires et seuils d'alarme ; une
+      démonstration sans manipulation ne suffit pas. Buildy demande une
+      preuve (date, intervenant, contenu, feuille d'émargement), que la FAQ
+      du ministère cite parmi les pièces à présenter lors de l'inspection.`,
     authority: 'internal',
   },
   // ── R175-6 — Régulation thermique automatique ────────────────────────
   {
     code: 'LB-R175-6-GRANULARITE',
     article: 'R175-6',
-    title: 'Granularité spatiale de la régulation',
-    summary: 'Per_room ou per_zone exigés pour atteindre le verdict « Conforme R175-6 ».',
-    body: `Le décret R175-6 demande une régulation thermique
-      <strong>automatique</strong>, sans préciser la granularité spatiale
-      à atteindre. <em>Lecture Buildy</em> : la granularité est dérivée
-      du type d'émission saisi — thermostat ambiant et vanne
-      thermostatique → <code>per_room</code>, sonde de zone →
-      <code>per_zone</code>, autre/null → <code>central_only</code>
-      (insuffisant pour le verdict Conforme R175-6).`,
+    title: 'Granularité de la régulation',
+    summary: 'Régulation par pièce, ou par zone chauffée si cela est justifié, exigée pour conclure à la conformité.',
+    body: `La loi impose une régulation automatique de la température
+      <strong>par pièce ou, si cela est justifié, par zone chauffée</strong>
+      (L. 175-2 ; R175-6). <em>Lecture Buildy</em> : la granularité est
+      déduite de la régulation relevée au niveau des émetteurs — thermostat
+      d'ambiance ou robinet thermostatique : par pièce ; sonde de zone : par
+      zone chauffée ; régulation centrale seule (loi d'eau, par exemple) :
+      insuffisante pour conclure à la conformité.`,
     authority: 'internal',
   },
   // ── R175-2 — Assujettissement ────────────────────────────────────────
   {
     code: 'LB-R175-2-CUMUL',
     article: 'R175-2',
-    title: 'Règle du cumul de puissance (chaud + froid retenu max)',
-    summary: 'On retient max(chaud, froid) — le chaud et le froid ne s\'additionnent pas.',
-    body: `Le décret R175-2 fixe les seuils d'assujettissement (290 kW,
-      70 kW) sans préciser comment cumuler chauffage et climatisation.
-      <em>Lecture Buildy</em> : pour les systèmes thermodynamiques
-      réversibles, on retient <strong>max(puissance chaud, puissance
-      froid)</strong> — la même machine produit les deux, à des moments
-      différents. Pour les équipements distincts (chaudière gaz +
-      groupe froid), on retient la somme. Cette lecture est conforme au
-      guide PROFEEL et à la FAQ ministérielle.`,
+    title: 'Cumul des puissances (chaud et froid séparés)',
+    summary: 'Le seuil s\'apprécie séparément pour le chaud et pour le froid ; les puissances d\'un même usage s\'additionnent.',
+    body: `Le décret fixe les seuils d'assujettissement de 290 kW et 70 kW
+      (R175-2). Selon la FAQ du ministère, les puissances de chauffage et de
+      climatisation ne s'additionnent pas : le seuil s'apprécie d'un côté
+      pour le chaud, de l'autre pour le froid (FAQ n° 11) ; au sein d'un même
+      usage, les puissances de tous les équipements s'additionnent (FAQ
+      n° 12). La capacité calorifique d'une pompe à chaleur réversible est
+      comptée avec le chauffage et sa capacité frigorifique avec la
+      climatisation ; la puissance retenue est la plus élevée des deux
+      totaux (guide PROFEEL). Les équipements de secours au sens de la FAQ
+      n° 8 ne sont pas comptés.`,
     authority: 'internal',
   },
 ];
@@ -153,7 +167,7 @@ function readingsForAxis(axis) {
     r175_2:      ['LB-R175-2-CUMUL'],
     r175_3_1:    ['LB-R175-3-P1-PERIMETRE'],
     r175_3_3:    ['LB-R175-3-P3-PASSIF'],
-    r175_3_4:    ['LB-R175-3-P4-PAR-EQUIPEMENT'],
+    r175_3_4:    ['LB-R175-3-P4-PAR-SYSTEME'],
     r175_3_data: ['LB-R175-3-DATA-EXPLOITANT'],
     r175_5:      ['LB-R175-5-FORMATION'],
     r175_6:      ['LB-R175-6-GRANULARITE'],

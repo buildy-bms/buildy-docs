@@ -21,10 +21,10 @@ const ARTICLES = [
   { code: 'R175-1',   title: 'Définitions' },
   { code: 'R175-2',   title: 'Champ d\'application' },
   { code: 'R175-3',   title: 'Fonctions du système BACS' },
-  { code: 'R175-4',   title: 'Échéances de mise en œuvre' },
-  { code: 'R175-5',   title: 'Mise en service' },
+  { code: 'R175-4',   title: 'Vérifications périodiques' },
+  { code: 'R175-5',   title: 'Formation de l\'exploitant' },
   { code: 'R175-5-1', title: 'Inspection périodique' },
-  { code: 'R175-6',   title: 'Sanctions' },
+  { code: 'R175-6',   title: 'Régulation automatique de la chaleur' },
 ]
 
 function parseRefs(str) {

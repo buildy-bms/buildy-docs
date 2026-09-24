@@ -54,6 +54,10 @@ async function renderMap() {
   // chercher la ref.
   await nextTick()
   if (!mapEl.value) return
+  // Onglet masqué (page audit à onglets, v-show) : largeur nulle → un
+  // fitBounds calculé maintenant serait faux. On redessine à l'affichage.
+  if (!mapEl.value.offsetWidth) { pendingRender = true; return }
+  pendingRender = false
   try {
     google = await loadGoogleMaps()
   } catch (e) {
@@ -103,17 +107,33 @@ async function renderMap() {
   status.value = 'ready'
 }
 
-watch(() => props.zones, async () => {
-  // Re-render quand l'inventaire change (ajout/édition/suppression de zone).
-  if (status.value === 'loading' || status.value === 'empty') {
-    await renderMap()
-  } else {
-    await renderMap()
-  }
-}, { deep: true })
+// Re-render quand l'inventaire géolocalisé change vraiment (ajout,
+// suppression, déplacement, renommage, ordre). La synchro automatique de
+// l'audit (toutes les 5 s) remplace le tableau des zones par des objets
+// neufs : un `watch` profond sur `props.zones` effaçait et recréait les
+// marqueurs à chaque passage et recadrait la carte (clignotement, zoom de
+// l'utilisateur perdu).
+const markersSignature = computed(() => locatedZones.value
+  .map(z => `${z.zone_id ?? z.id}:${z.latitude},${z.longitude}:${z.name || ''}`)
+  .join('|'))
+watch(markersSignature, () => renderMap())
+
+// Redessine quand la carte devient visible (retour sur l'onglet Zones).
+let pendingRender = false
+let resizeObs = null
+if (typeof ResizeObserver !== 'undefined') {
+  resizeObs = new ResizeObserver(() => {
+    if (pendingRender && mapEl.value?.offsetWidth) renderMap()
+  })
+}
+watch(mapEl, (el, old) => {
+  if (!resizeObs) return
+  if (old) resizeObs.unobserve(old)
+  if (el) resizeObs.observe(el)
+})
 
 onMounted(renderMap)
-onBeforeUnmount(() => { clearMarkers(); map = null })
+onBeforeUnmount(() => { clearMarkers(); map = null; resizeObs?.disconnect(); resizeObs = null })
 </script>
 
 <template>

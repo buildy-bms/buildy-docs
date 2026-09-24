@@ -32,6 +32,10 @@ const props = defineProps({
   devices: { type: Array, required: true, default: () => [] },
   systemLabel: { type: String, required: true },
   siteUuid: { type: String, default: null },
+  // Page audit à onglets : tableau resserré (pas de ligne d'en-tête — le
+  // résumé est dans l'en-tête de la carte système —, lignes moins hautes,
+  // bouton d'ajout discret).
+  compact: { type: Boolean, default: false },
 })
 const emit = defineEmits(['changed', 'system-updated', 'open-device-notes', 'add-device'])
 
@@ -307,9 +311,9 @@ async function removeDevice(d) {
 </script>
 
 <template>
-  <div class="bg-slate-50 border-t border-gray-200 px-3 py-3">
-    <!-- Header avec puissance totale -->
-    <div class="flex items-center mb-2 flex-wrap gap-2 min-w-0">
+  <div :class="compact ? 'devices-compact bg-white border-t border-gray-100 px-3 pt-1 pb-2' : 'bg-slate-50 border-t border-gray-200 px-3 py-3'">
+    <!-- Header avec puissance totale (mode compact : résumé dans l'en-tête de la carte système) -->
+    <div v-if="!compact" class="flex items-center mb-2 flex-wrap gap-2 min-w-0">
       <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
         <span v-truncate-tooltip class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
         <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono whitespace-nowrap">
@@ -360,7 +364,7 @@ async function removeDevice(d) {
                       class="select-none text-base leading-none shrink-0"
                       :class="connectorColorClass(d)"
                       aria-hidden="true">└─</span>
-                <input type="text" :value="d.name" placeholder="Nommer ce système"
+                <input type="text" :value="d.name" placeholder="Nom de l'équipement"
                        @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                        :class="inputCls"
                        class="font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic name-input" />
@@ -376,13 +380,13 @@ async function removeDevice(d) {
             </td>
             <!-- Marque -->
             <td class="px-2 py-2 align-middle">
-              <input type="text" :value="d.brand" placeholder="Atlantic"
+              <input type="text" :value="d.brand" placeholder="Marque"
                      @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
                      :class="inputCls" class="min-w-32 placeholder:italic placeholder:text-gray-300" />
             </td>
             <!-- Référence -->
             <td class="px-2 py-2 align-middle">
-              <input type="text" :value="d.model_reference" placeholder="Varmax 70"
+              <input type="text" :value="d.model_reference" placeholder="Référence"
                      @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
                      :class="inputCls" class="min-w-32 placeholder:italic placeholder:text-gray-300" />
             </td>
@@ -524,11 +528,13 @@ async function removeDevice(d) {
 
     <!-- Bouton d'ajout unique, pleine largeur : ouvre la modale à 2 onglets
          (bibliothèque préfiltrée + saisie manuelle). -->
-    <div class="mt-2">
+    <div :class="compact ? 'mt-1' : 'mt-2'">
       <button
         type="button"
         @click="onClickAddDevice"
-        class="btn-add"
+        :class="compact
+          ? 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-indigo-700 rounded-lg hover:bg-indigo-50 transition'
+          : 'btn-add'"
       >
         <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un équipement
       </button>
@@ -559,6 +565,16 @@ async function removeDevice(d) {
 /* Champ Nom — auto-grow au contenu (field-sizing, Chrome 123+ / Safari 18+).
    Pas de troncature sur les noms longs (« Centrale de traitement d'air ») ;
    reste >= 10rem pour les noms courts et le placeholder. */
+/* Mode compact : lignes moins hautes (styles non « layered » → priment sur
+   les utilitaires py-2 des cellules). */
+.devices-compact .data-table tbody td {
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+.devices-compact .data-table thead th {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}
 .name-input {
   field-sizing: content;
   min-width: 10rem;

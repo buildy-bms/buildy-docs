@@ -52,7 +52,10 @@ const showInspections = ref(false)
 function openInspections() { showInspections.value = true }
 const inspectionStatus = computed(() => {
   const list = inspections.value || []
-  if (!list.length) return { label: 'Aucune inspection tracée', tone: 'warn' }
+  if (!list.length) {
+    const na = document.value?.inspection_not_applicable === 1 || document.value?.inspection_not_applicable === true
+    return { label: na ? 'Aucune inspection à déclarer · réserve au rapport' : 'Aucune inspection tracée', tone: 'warn' }
+  }
   const latest = list[0]
   const overdue = latest.next_inspection_due_date && latest.next_inspection_due_date < todayIso.value
   if (overdue) return { label: '⚠ Échéance dépassée', tone: 'warn' }
@@ -325,7 +328,8 @@ const USAGES = [
           </div>
           <p class="text-xs text-gray-500 mt-1 leading-relaxed">
             Coche chaque usage que la GTB pilote ou supervise réellement, même partiellement.
-            Les usages absents du bâtiment ne sont pas concernés.
+            Les usages absents du bâtiment ne sont pas concernés. Un usage présent mais non coché
+            n'est pas relié à la GTB : le plan d'actions signale son raccordement.
           </p>
         </div>
         <div class="p-2 space-y-1">
@@ -358,7 +362,7 @@ const USAGES = [
           </div>
           <div class="p-4 space-y-4">
             <MobileYesNo
-              label="P1. La GTB enregistre-t-elle la consommation en continu par zone et conserve-t-elle ces données pendant 5 ans ?"
+              label="1°. La GTB suit-elle en continu, par zone fonctionnelle et au pas horaire, les consommations, et conserve-t-elle ces données pendant 5 ans ?"
               description="Enregistrement au pas horaire ou plus fin, conservation 5 ans minimum."
               :model-value="bms.meets_r175_3_p1"
               @update:model-value="v => { bms.meets_r175_3_p1 = v ? 1 : 0; saveDebounced() }"
@@ -381,7 +385,7 @@ const USAGES = [
             <div class="border-t border-gray-100 pt-3"></div>
 
             <MobileYesNo
-              label="P2. La GTB détecte-t-elle les pertes d'efficacité énergétique ?"
+              label="2°. La GTB compare-t-elle l'efficacité énergétique à des valeurs de référence, détecte-t-elle les pertes d'efficacité et en informe-t-elle l'exploitant ?"
               description="La GTB déclenche des alertes en cas de surconsommation, de panne d'équipement ou de dérive de performance (ex : COP qui chute)."
               :model-value="bms.meets_r175_3_p2"
               @update:model-value="v => { bms.meets_r175_3_p2 = v ? 1 : 0; saveDebounced() }"
@@ -409,18 +413,19 @@ const USAGES = [
           </div>
           <div class="p-4 space-y-4">
             <p class="text-xs text-gray-500 leading-relaxed">
-              Le décret R175-3 oblige la GTB à transmettre régulièrement les données
-              de consommation au gestionnaire et aux exploitants. Coche ci-dessous
-              ce qui est documenté sur place (procédure écrite ou démontrée).
+              Les données de la GTB appartiennent à son propriétaire, qui les met à
+              disposition du gestionnaire du bâtiment, à sa demande, et transmet à chaque
+              exploitant de système technique relié les données qui le concernent
+              (R175-3, dernier alinéa). Coche ci-dessous ce qui est constaté sur place.
             </p>
             <MobileYesNo
-              label="La procédure de mise à disposition des données au gestionnaire du bâtiment est-elle documentée ?"
+              label="Les données sont-elles mises à disposition du gestionnaire du bâtiment lorsqu'il les demande ?"
               description="Gestionnaire = propriétaire / syndic / exploitant principal du bâtiment."
               :model-value="bms.data_provision_to_manager"
               @update:model-value="v => { bms.data_provision_to_manager = v ? 1 : 0; saveDebounced() }"
             />
             <MobileYesNo
-              label="La procédure de transmission des données aux exploitants des systèmes techniques est-elle documentée ?"
+              label="Chaque exploitant des systèmes techniques reçoit-il les données qui le concernent ?"
               description="Exploitants = mainteneur GTB, mainteneur CVC, intégrateur supervision."
               :model-value="bms.data_provision_to_operators"
               @update:model-value="v => { bms.data_provision_to_operators = v ? 1 : 0; saveDebounced() }"
@@ -524,7 +529,7 @@ const USAGES = [
           </div>
           <div class="p-4 space-y-4">
             <MobileYesNo
-              label="Les maintenances passées ont-elles fait l'objet de consignes écrites ?"
+              label="Les vérifications périodiques de la GTB sont-elles organisées (contrat de maintenance ou personnel interne compétent) et encadrées par des consignes écrites ?"
               description="Document écrit indiquant qui fait quoi sur la GTB et à quelle fréquence (carnet d'entretien, contrat de maintenance, plan de prévention…)."
               :model-value="bms.has_maintenance_procedures"
               @update:model-value="v => { bms.has_maintenance_procedures = v ? 1 : 0; saveDebounced() }"
@@ -558,7 +563,7 @@ const USAGES = [
           </div>
           <div class="p-4 space-y-4">
             <MobileYesNo
-              label="L'exploitant a-t-il été formé à l'utilisation de la supervision ?"
+              label="L'exploitant a-t-il été formé au fonctionnement de la GTB, notamment à son paramétrage (attestation ou feuille d'émargement) ?"
               description="La personne en charge de la GTB a suivi une formation (intégrateur, éditeur, interne) lui permettant de consulter les données et corriger les dérives."
               :model-value="bms.operator_trained"
               @update:model-value="v => { bms.operator_trained = v ? 1 : 0; saveDebounced() }"

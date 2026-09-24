@@ -36,6 +36,8 @@ const _canvas = new ChartJSNodeCanvas({
   chartCallback: (ChartJS) => {
     // Disable l'animation (irrelevant en PNG static)
     ChartJS.defaults.animation = false;
+    // Nombres au format français (« 1 000 », pas « 1,000 »).
+    ChartJS.defaults.locale = 'fr-FR';
     ChartJS.defaults.font.family = 'Manrope, Helvetica, Arial, sans-serif';
     ChartJS.defaults.font.size = 13;
     ChartJS.defaults.color = '#374151'; // gray-700

@@ -15,9 +15,17 @@ import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
+import { isMeterMissing, isMeterUnanswered, meterPlanNote } from '@/lib/meter-plan-state'
 
 const audit = useAuditStore()
-const { document, meters, zones } = storeToRefs(audit)
+const { document, meters, zones, meterPlanStatus } = storeToRefs(audit)
+// « Requis manquant » / « à vérifier » : même décompte que le plan et le PDF
+// (zone regroupée, usage exempté, ternaires stricts — lib/meter-plan-state.js).
+const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
+const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
+const planNote = (m) => meterPlanNote(m, meterPlanStatus.value)
+// Oui / Non / non répondu : null reste null (jamais « Non » par défaut).
+const tri = (v) => (v == null ? null : !!v)
 const { error, success } = useNotification()
 const { confirm } = useConfirm()
 
@@ -131,7 +139,7 @@ const LOCATION_OPTIONS = computed(() => {
 const stats = computed(() => ({
   total: meters.value.length,
   present: meters.value.filter(m => m.present_actual).length,
-  missing: meters.value.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+  missing: meters.value.filter(isMissing).length,
 }))
 
 // ── KPI niveau 1 : une card par énergie + compteur général ──────────
@@ -146,7 +154,7 @@ const energyCards = computed(() => METER_TYPES.map(et => {
     ...et,
     total: arr.length,
     present: arr.filter(m => m.present_actual).length,
-    missing: arr.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+    missing: arr.filter(isMissing).length,
   }
 }))
 // Compteurs « généraux » = zone_id null, tous types confondus.
@@ -290,9 +298,12 @@ async function save() {
         usage,
         meter_type: editForm.value.meter_type,
         required: !!editForm.value.required,
-        present_actual: !!editForm.value.present_actual,
-        communicating: !!editForm.value.communicating,
-        wired: !!editForm.value.wired,
+        // Ternaires : une question laissée sans réponse reste « non
+        // répondue » (sinon un compteur non vérifié devenait « absent » et
+        // générait « Installer un compteur »).
+        present_actual: tri(editForm.value.present_actual),
+        communicating: tri(editForm.value.communicating),
+        wired: tri(editForm.value.wired),
         out_of_service: !!editForm.value.out_of_service,
         // Localisation physique (zone technique d'installation),
         // saisie uniquement si le compteur est présent.
@@ -563,10 +574,10 @@ function toggleProtocol(p) {
           @click="openEdit(m)"
           :class="['w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50',
                    m.out_of_service ? 'opacity-50' : '',
-                   m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : '']"
+                   isMissing(m) ? 'bg-red-50/40' : '']"
         >
           <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']"
-            v-if="m.required && !m.present_actual && !m.out_of_service"
+            v-if="isMissing(m)"
             class="w-6 h-6 text-red-500 shrink-0"
           />
           <div class="flex-1 min-w-0">
@@ -577,6 +588,8 @@ function toggleProtocol(p) {
               <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
               <span v-if="m.communicating" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">Communicant</span>
               <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
+              <span v-if="isUnanswered(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Présence à vérifier</span>
+              <span v-if="planNote(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">{{ planNote(m).label }}</span>
             </div>
           </div>
           <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
@@ -676,7 +689,7 @@ function toggleProtocol(p) {
                   <p class="text-base font-medium text-gray-700">Présent physiquement sur site ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le compteur existe et est installé, peu importe s'il communique ou pas.</p>
                 </div>
-                <SegmentedToggle size="lg" :model-value="!!editForm.present_actual"
+                <SegmentedToggle size="lg" :model-value="tri(editForm.present_actual)"
                                  @update:model-value="v => (editForm.present_actual = v)" class="mt-1 shrink-0" />
               </div>
               <div v-if="editForm.present_actual"
@@ -686,7 +699,7 @@ function toggleProtocol(p) {
                     <p class="text-base font-medium text-gray-700">Communicant ?</p>
                     <p class="text-xs text-gray-500 mt-1">Le compteur peut transmettre ses index par un protocole (Modbus, M-Bus, KNX, MQTT…). Pas seulement un afficheur.</p>
                   </div>
-                  <SegmentedToggle size="lg" :model-value="!!editForm.communicating"
+                  <SegmentedToggle size="lg" :model-value="tri(editForm.communicating)"
                                    @update:model-value="v => (editForm.communicating = v)" class="mt-1 shrink-0" />
                 </div>
                 <!-- Protocoles : visibles si Oui, juste sous la question
@@ -716,7 +729,7 @@ function toggleProtocol(p) {
                   <p class="text-base font-medium text-gray-700">Câblé vers la GTB ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le câble (RS485, Ethernet…) est physiquement raccordé à la GTB du site. Le compteur communique vraiment, pas seulement potentiellement.</p>
                 </div>
-                <SegmentedToggle size="lg" :model-value="!!editForm.wired"
+                <SegmentedToggle size="lg" :model-value="tri(editForm.wired)"
                                  @update:model-value="v => (editForm.wired = v)" class="mt-1 shrink-0" />
               </div>
               <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">

@@ -25,16 +25,16 @@ const { document, systems } = storeToRefs(audit)
 <template>
   <CollapsibleSection storage-key="credentials" section-id="section-credentials" :active="active">
     <template #header>
-      <SectionHeader number="10" title="Credentials d'accès"
-                     subtitle="Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)"
+      <SectionHeader number="10" title="Accès aux systèmes"
+                     subtitle="Identifiants web, SSH et VPN de la GTB et des systèmes (chiffrés AES-256-GCM)"
                      :icon="WrenchScrewdriverIcon" icon-color="text-amber-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"
                      @invalidate="emit('invalidate-step', $event)" />
     </template>
     <template #summary>
-      <span v-if="siteCredCount">{{ siteCredCount }} credential{{ siteCredCount > 1 ? 's' : '' }} chiffré{{ siteCredCount > 1 ? 's' : '' }}</span>
-      <span v-else class="italic">Aucun credential</span>
+      <span v-if="siteCredCount">{{ siteCredCount }} accès chiffré{{ siteCredCount > 1 ? 's' : '' }}</span>
+      <span v-else class="italic">Aucun accès</span>
     </template>
     <div class="px-5 py-4">
       <SiteCredentialsManager

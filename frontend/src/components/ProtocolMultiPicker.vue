@@ -128,6 +128,7 @@ const buttonCls = computed(() => {
   <div class="relative" ref="rootEl">
     <button
       type="button"
+      data-select-trigger
       :disabled="disabled"
       :class="buttonCls"
       @click="open ? (open = false) : openPopover()"

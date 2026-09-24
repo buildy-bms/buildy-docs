@@ -213,6 +213,7 @@ for (const cat of Object.values(BACS)) {
 // telles quelles.
 function regulationTypeLabel(raw) {
   if (!raw) return null;
+  if (raw === 'autre') return 'Autre';
   return REGULATION_TYPE_LABEL[raw] || raw;
 }
 

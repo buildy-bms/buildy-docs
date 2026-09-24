@@ -30,11 +30,15 @@ defineProps({
   // Sans l'inversion du "Non", la bonne réponse s'affichait en rouge et
   // incitait à cliquer ✓ pour « corriger » — donc à déclarer HS par erreur.
   yesDanger: { type: Boolean, default: false },
+  // Variante « non neutre » : le « Non » actif est gris (ex. usage « non
+  // concerné » dans le tableau de présence), ni bonne ni mauvaise nouvelle.
+  neutralNo: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   // Taille : 'sm' = 28px (defaut, colonnes tableau, desktop dense),
   // 'lg' = 48px (gabarit tactile PWA, force la hauteur partout sans
   // dependre du media query pointer:coarse — necessaire en dev sur
-  // Mac trackpad qui ne match pas le query).
+  // Mac trackpad qui ne match pas le query), 'xs' = 22px (tableaux très
+  // denses : tableau de présence zones × usages de l'audit).
   size: { type: String, default: 'sm' },
 });
 const emit = defineEmits(['update:modelValue']);
@@ -46,13 +50,13 @@ function pick(v) {
 </script>
 
 <template>
-  <div :class="['seg-toggle inline-flex rounded-lg border border-gray-200 overflow-hidden shrink-0',
-                size === 'lg' ? 'text-base' : 'text-xs',
+  <div :class="['seg-toggle inline-flex border border-gray-200 overflow-hidden shrink-0',
+                size === 'lg' ? 'text-base rounded-lg' : (size === 'xs' ? 'text-[11px] rounded-md' : 'text-xs rounded-lg'),
                 disabled ? 'opacity-50 pointer-events-none' : '']"
        :title="tooltip">
     <button type="button"
             :class="['seg-btn font-medium transition whitespace-nowrap select-none',
-                     size === 'lg' ? 'min-h-12 px-4' : 'h-7 px-3',
+                     size === 'lg' ? 'min-h-12 px-4' : (size === 'xs' ? 'seg-btn-xs h-[22px] px-1.5' : 'h-7 px-3'),
                      modelValue === true
                        ? (yesDanger ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800')
                        : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50']"
@@ -61,9 +65,9 @@ function pick(v) {
     </button>
     <button type="button"
             :class="['seg-btn font-medium transition whitespace-nowrap select-none border-l border-gray-200',
-                     size === 'lg' ? 'min-h-12 px-4' : 'h-7 px-3',
+                     size === 'lg' ? 'min-h-12 px-4' : (size === 'xs' ? 'seg-btn-xs h-[22px] px-1.5' : 'h-7 px-3'),
                      modelValue === false
-                       ? (yesDanger ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700')
+                       ? (yesDanger ? 'bg-emerald-100 text-emerald-800' : (neutralNo ? 'bg-slate-200 text-slate-700' : 'bg-red-100 text-red-700'))
                        : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50']"
             @click="pick(false)">
       <span class="font-bold">✗</span><span v-if="!compact" class="ml-1">{{ noLabel }}</span>
@@ -77,6 +81,8 @@ function pick(v) {
    (aligné sur .pwa-button — cf. main.css §PWA tactile design system)
    pour homogénéité parfaite avec inputs/selects/MobileYesNo voisins. */
 .seg-btn { min-width: 36px; }
+/* Taille « xs » : tableaux très denses (tableau de présence zones × usages). */
+.seg-btn.seg-btn-xs { min-width: 22px; }
 @media (pointer: coarse) {
   .seg-btn { min-height: 48px; min-width: 56px; padding: 0 16px; font-size: 1rem; }
 }

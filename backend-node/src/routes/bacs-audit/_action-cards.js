@@ -26,6 +26,9 @@
 // article R175 puis id. Le numero suit la lecture top-down du plan.
 
 const CARDS = [
+  // Action dont dépendent toutes les autres (GTB absente ou hors service) :
+  // en tête du plan et numérotée BACS-001 (D-39).
+  { key: 'priority',       label: 'Action prioritaire' },
   { key: 'identification', label: 'Identification' },
   { key: 'systems',        label: 'Systèmes' },
   { key: 'meters',         label: 'Compteurs' },
@@ -83,15 +86,6 @@ function isBmsMaintenanceArticle(art) {
   return art === 'R175-4' || art === 'R175-5' || art === 'R175-5-1';
 }
 
-const DEVICE_BMS_SUBTYPES = new Set([
-  'r175_3_p3_connect',
-  'r175_3_p3_replace',
-  'r175_3_p4',
-  'r175_3_p4_autonomous',
-  'bms_link_broken',
-  'contraindication_no_cut',
-]);
-
 function cardOfAction(a) {
   if (!a) return { card: 'misc', subsection: null };
   // 1) Items manuels : on respecte le choix de l'auditeur si saisi.
@@ -100,10 +94,15 @@ function cardOfAction(a) {
     if (assigned && CARD_ORDER.has(assigned)) return cardSpec(assigned, a.assigned_subsection);
     return { card: 'misc', subsection: null };
   }
-  // 2) Article R175-2 → identification (quand on en generera).
+  // 2) « Installer une GTB » / « Remettre en service la GTB » : action
+  //    prioritaire, en tête du plan — les autres actions en dépendent.
+  if (a.source_subtype === 'no_gtb' || a.source_subtype === 'bms_out_of_service') {
+    return { card: 'priority', subsection: null };
+  }
+  // Article R175-2 → identification.
   if (a.r175_article === 'R175-2') return { card: 'identification', subsection: null };
-  // 3) Inspection R175-5-1.
-  if (a.source_inspection_id) return { card: 'inspections', subsection: null };
+  // 3) Inspection R175-5-1 (y compris « aucune inspection tracée », sans FK).
+  if (a.source_inspection_id || a.source_subtype === 'no_inspection') return { card: 'inspections', subsection: null };
   // 4) Regulation thermique R175-6.
   if (a.source_thermal_id) return { card: 'thermal', subsection: null };
   // 5) GTB elle-meme : capacites / maintenance.
@@ -122,7 +121,7 @@ function cardOfAction(a) {
   //    decoupe ainsi : ajout/remplacement = Compteurs, integration GTB =
   //    sous-section GTB.
   if (a.source_meter_id) {
-    if (a.source_subtype === 'bms_link_broken') {
+    if (a.source_subtype === 'bms_link_broken' || a.source_subtype === 'meter_bms_integration') {
       return { card: 'bms', subsection: 'bms_meters' };
     }
     return { card: 'meters', subsection: null };
@@ -196,9 +195,12 @@ function groupByCard(numberedItems) {
       key: c.key,
       label: c.label,
       count: b.items.length,
-      blocking: b.items.filter(x => x.severity === 'blocking').length,
-      major:    b.items.filter(x => x.severity === 'major').length,
-      minor:    b.items.filter(x => x.severity === 'minor').length,
+      // severity_display = 'reserve' pour les réserves (obligations qui ne
+      // dégradent pas le verdict), comptées à part des actions majeures.
+      blocking: b.items.filter(x => (x.severity_display || x.severity) === 'blocking').length,
+      major:    b.items.filter(x => (x.severity_display || x.severity) === 'major').length,
+      minor:    b.items.filter(x => (x.severity_display || x.severity) === 'minor').length,
+      reserves: b.items.filter(x => x.severity_display === 'reserve').length,
       first_number: b.items[0].display_number,
       last_number:  b.items[b.items.length - 1].display_number,
       items: b.items,
@@ -212,14 +214,42 @@ function groupByCard(numberedItems) {
           key: s.key,
           label: s.label,
           count: list.length,
-          blocking: list.filter(x => x.severity === 'blocking').length,
-          major:    list.filter(x => x.severity === 'major').length,
-          minor:    list.filter(x => x.severity === 'minor').length,
+          blocking: list.filter(x => (x.severity_display || x.severity) === 'blocking').length,
+          major:    list.filter(x => (x.severity_display || x.severity) === 'major').length,
+          minor:    list.filter(x => (x.severity_display || x.severity) === 'minor').length,
+          reserves: list.filter(x => x.severity_display === 'reserve').length,
           items: list,
         });
       }
     }
     groups.push(out);
+  }
+  return groups;
+}
+
+// Annexe C : justifications identiques et consécutives (même article, même
+// texte) regroupées — texte commun une fois, puis la liste des actions
+// (relecture PDF 2026-09-24 : le même paragraphe revenait jusqu'à 13 fois).
+// Les actions ajoutées par l'auditeur restent à part. Entrée : liste
+// { number, title, article, source, manual, description } dans l'ordre du plan.
+function groupJustifications(justifications) {
+  const groups = [];
+  for (const j of justifications || []) {
+    const key = `${j.article}|${j.description}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key && !j.manual && !last.manual) { last.items.push(j); continue; }
+    groups.push({ key, article: j.article, description: j.description, manual: j.manual, items: [j] });
+  }
+  for (const g of groups) {
+    g.isGroup = g.items.length > 1;
+    g.first = g.items[0];
+    g.rangeLabel = g.isGroup ? `${g.items[0].number} à ${g.items[g.items.length - 1].number}` : null;
+    // Fiche courte (≈ un tiers de page au plus) : imprimée d'un seul tenant.
+    // La justification est dans une cellule de tableau, où Chromium ignore
+    // les veuves : une fiche coupée pouvait laisser sa dernière ligne seule
+    // en haut de page (relecture PDF 2026-09-24).
+    const plainLength = String(g.description || '').replace(/<[^>]*>/g, '').length;
+    g.isShort = plainLength <= 1100 && g.items.length <= 4;
   }
   return groups;
 }
@@ -231,4 +261,5 @@ module.exports = {
   subsectionMeta,
   sortActions,
   groupByCard,
+  groupJustifications,
 };

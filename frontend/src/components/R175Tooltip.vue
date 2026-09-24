@@ -93,44 +93,44 @@ const BUILDY_NOTES = {
     body: `Définit les systèmes techniques du bâtiment (chauffage, climatisation, ventilation, ECS, éclairage intégré, automatisation et contrôle, production électrique sur site), la <strong>zone fonctionnelle</strong> (espace dans lequel les usages sont homogènes) et l'<strong>interopérabilité</strong> (capacité d'un produit à communiquer et interagir avec d'autres dans le respect des exigences de sécurité).`,
   },
   'R175-1 4°': {
-    title: 'R175-1 4° — Éclairage intégré et production électrique',
-    body: `Sous-point R175-1 4° : éclairage intégré au bâtiment et production d'électricité sur site (PV, cogénération, micro-éolien). Au-delà, la définition globale de "système technique de bâtiment" (article R175-1) couvre tout équipement de chauffage, refroidissement, ventilation, ECS, éclairage intégré, automatisation et production électrique sur site.<br/><br/>L'audit identifie pour chaque zone les systèmes attendus, leur présence effective et leurs équipements (marque, modèle, énergie, puissance, communication).`,
+    title: 'R175-1 4° — Système technique de bâtiment',
+    body: `Le 4° définit le système technique de bâtiment : tout équipement technique de chauffage des locaux, de refroidissement des locaux, de ventilation, de production d'eau chaude sanitaire, d'éclairage intégré, d'automatisation et de contrôle des bâtiments, de production d'électricité sur site, ou combinant plusieurs de ces systèmes, y compris les systèmes utilisant une énergie renouvelable.<br/><br/>L'audit identifie pour chaque zone les systèmes attendus, leur présence et leurs équipements (marque, modèle, énergie, puissance, communication).`,
   },
   'R175-1 6°': {
     title: 'R175-1 6° — Zone fonctionnelle',
-    body: `Toute zone dans laquelle les usages sont homogènes (open-space tertiaire, salle de réunion, atelier, local technique, parking…). Le découpage zonal est la base du suivi R175-3 1° : <strong>chaque zone doit être suivie indépendamment</strong>.`,
+    body: `Toute zone dans laquelle les usages sont homogènes. Elle se définit par l'activité et l'amplitude d'utilisation, pas par pièce : par exemple une zone de bureaux et une zone de restauration (FAQ BACS n° 25). Le découpage zonal est la base du suivi R175-3 1°.`,
   },
   'R175-2': {
     title: 'R175-2 — Champ d\'application',
-    body: `Le décret BACS s'applique aux bâtiments tertiaires dotés d'une puissance nominale utile <strong>cumulée chauffage + climatisation</strong> :<br/>· <strong>&gt; 290 kW</strong> : échéance 1<sup>er</sup> janvier 2025 (immédiate pour les permis postérieurs au 8 avril 2024)<br/>· <strong>70 à 290 kW</strong> : échéance 1<sup>er</sup> janvier 2030 (report acté au Journal officiel du 26 décembre 2025)<br/>· <strong>&lt; 70 kW</strong> : non assujetti.<br/><br/>Une clause de dispense existe si le TRI des travaux dépasse 10 ans (à la charge du propriétaire — Buildy ne calcule pas le TRI).`,
+    body: `Le décret BACS s'applique aux bâtiments tertiaires dont le système de chauffage ou le système de climatisation (ventilation combinée comprise) dépasse le seuil ; chaud et froid ne s'additionnent pas (FAQ BACS n° 11).<br/>· <strong>&gt; 290 kW</strong> : neuf (permis déposé après le 21 juillet 2021) dès la livraison ; existant au plus tard le 1<sup>er</sup> janvier 2025.<br/>· <strong>&gt; 70 kW</strong> : neuf (permis déposé après le 8 avril 2024) dès la livraison ; existant lors du renouvellement du système de chauffage ou de climatisation, et au plus tard le 1<sup>er</sup> janvier 2030 (décret n° 2025-1343 du 26 décembre 2025).<br/>· <strong>70 kW ou moins</strong> : non assujetti.<br/><br/>Dispense si le propriétaire établit que l'installation n'est pas réalisable avec un temps de retour sur investissement inférieur à 10 ans (Buildy ne calcule pas le TRI).`,
   },
   'R175-3': {
     title: 'R175-3 — 4 exigences fonctionnelles',
-    body: `<strong>1°.</strong> Suivi continu, à pas horaire, conservation 5 ans (capacité de la GTB)<br/><strong>2°.</strong> Détection des pertes d'efficacité (capacité de la GTB)<br/><strong>3°.</strong> Interopérabilité (par système : protocole standard ouvert)<br/><strong>4°.</strong> Arrêt manuel + gestion autonome (par équipement)`,
+    body: `<strong>1°.</strong> Suivi continu par zone fonctionnelle, au pas horaire, conservation mensuelle 5 ans<br/><strong>2°.</strong> Comparaison à des valeurs de référence, détection des pertes d'efficacité, information de l'exploitant<br/><strong>3°.</strong> Interopérabilité de la GTB avec les systèmes techniques<br/><strong>4°.</strong> Arrêt manuel et gestion autonome (évalués par système)<br/><br/>Ces exigences portent sur les systèmes reliés selon le II de l'article R175-2.`,
   },
   'R175-3 1°': {
     title: 'R175-3 1° — Suivi continu et conservation',
-    body: `La consommation énergétique des systèmes techniques doit être suivie en continu, à pas horaire, et les données conservées à l'échelle mensuelle pendant 5 ans minimum.<br/><br/><em>Interprétation Buildy :</em> pour respecter le suivi par zone fonctionnelle, on attend un compteur de chaque énergie (gaz, électricité, fioul, réseau de chaleur…) au niveau du bâtiment, et un sous-comptage par zone fonctionnelle pour les usages chauffage / refroidissement / ECS / éclairage.`,
+    body: `La GTB suit, enregistre et analyse en continu, par zone fonctionnelle et au pas horaire, les données de production et de consommation énergétique des systèmes techniques, ajuste ces systèmes en conséquence, et conserve les données à l'échelle mensuelle pendant 5 ans.<br/><br/><em>Interprétation Buildy :</em> le décret ne fixe pas de plan de comptage ; on attend un compteur de chaque énergie au niveau du bâtiment, et un sous-comptage par zone fonctionnelle pour chaque système relié à la GTB.`,
   },
   'R175-3 3°': {
     title: 'R175-3 3° — Interopérabilité',
-    body: `Les systèmes techniques doivent pouvoir communiquer entre eux dans le respect des exigences de sécurité. Buildy considère un équipement <strong>communicant</strong> s'il expose au moins un protocole standard ouvert : <strong>BACnet/IP, BACnet MS/TP, Modbus TCP, Modbus RTU, KNX, M-Bus, MQTT, LoRaWAN</strong>.`,
+    body: `La GTB est interopérable avec les différents systèmes techniques du bâtiment. Le guide du ministère admet les protocoles normalisés (il cite BACnet, LonWorks et KNX), les interfaces de programmation (API) et les passerelles. Buildy vérifie, par système, que chaque générateur communique avec la GTB, directement ou par le régulateur qui le pilote. Un usage que la GTB ne traite pas est considéré comme non relié.`,
   },
   'R175-3 4°': {
     title: 'R175-3 4° — Arrêt manuel et gestion autonome',
-    body: `Le décret demande que la GTB <strong>permette un arrêt manuel et la gestion autonome d'un ou plusieurs systèmes techniques</strong>. La GTB doit pouvoir être stoppée manuellement, puis reprendre la main sans intervention humaine.<br/><br/><em>Lecture Buildy :</em> ces 2 critères sont évalués au niveau de chaque équipement (lecture plus stricte que le décret, qui parle « d'un ou plusieurs systèmes techniques »).`,
+    body: `Le décret demande que la GTB <strong>permette un arrêt manuel et la gestion autonome d'un ou plusieurs systèmes techniques</strong>. La GTB permet d'arrêter puis de remettre en marche manuellement les systèmes (ou de les passer en hors gel), et les systèmes reliés continuent de fonctionner normalement si la GTB est arrêtée.<br/><br/><em>Lecture Buildy :</em> ces deux capacités sont vérifiées pour chaque système relié.`,
   },
   'R175-4': {
     title: 'R175-4 — Vérifications périodiques',
-    body: `Le BACS doit faire l'objet de <strong>vérifications périodiques</strong> documentées par des consignes écrites de maintenance. Buildy vérifie l'existence de ces consignes ; leur absence constitue une non-conformité majeure.<br/><br/><em>Bonus commercial :</em> R175-4 dispense les bâtiments équipés d'un BACS conforme des contrôles R224-31 à R224-41-3 (générateurs).`,
+    body: `La GTB fait l'objet de <strong>vérifications périodiques</strong> par un prestataire externe ou un personnel interne compétent, encadrées par des consignes écrites (périodicité, points à contrôler, réparation ou remplacement des éléments défaillants). Leur absence est signalée comme une réserve (obligation à respecter).<br/><br/>Les systèmes techniques reliés à la GTB sont exemptés des contrôles et inspections des articles R. 224-31 à R. 224-41-3 et R. 224-45 à R. 224-45-9 du code de l'environnement ; leur entretien reste obligatoire.`,
   },
   'R175-5': {
     title: 'R175-5 — Formation de l\'exploitant',
-    body: `Le propriétaire du BACS veille à ce que son exploitant soit formé à son fonctionnement, notamment à son paramétrage. Le décret n'impose pas de modalité spécifique de formation, mais la formation doit être effective. Buildy demande la preuve documentée (date, intervenant, contenu).`,
+    body: `Le propriétaire de la GTB veille à ce que son exploitant soit formé à son fonctionnement, notamment à son paramétrage. Le décret n'impose pas de modalité de formation, mais la formation doit être effective. Buildy demande la preuve (date, intervenant, contenu, feuille d'émargement).`,
   },
   'R175-6': {
-    title: 'R175-6 — Régulation thermique automatique',
-    body: `Une régulation thermique automatique <strong>par pièce ou par zone</strong> doit être installée, appréciée à l'installation ou au remplacement du générateur de chaleur. Les appareils indépendants de chauffage au bois bénéficient d'une exemption explicite.`,
+    title: 'R175-6 — Régulation automatique de la chaleur',
+    body: `Une régulation automatique de la température <strong>par pièce ou, si cela est justifié, par zone chauffée</strong> est installée dans les bâtiments dont le permis de construire a été déposé après le 21 juillet 2021, et dans les autres bâtiments lors de l'installation ou du remplacement d'un générateur de chaleur (sauf étude montrant un temps de retour sur investissement d'au moins six ans). Chauffage seulement ; les appareils indépendants de chauffage au bois sont exemptés.`,
   },
 }
 

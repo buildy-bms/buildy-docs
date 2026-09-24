@@ -623,3 +623,81 @@ input[type="checkbox"]:disabled {
     @apply text-sm text-gray-700 leading-relaxed;
   }
 }
+
+/* ── Audit BACS desktop à onglets d'étapes (mode étape) ─────────────────── */
+@layer components {
+  /* Sous-carte à l'intérieur d'une étape (GTB, Identification…) : blanche,
+     détachée du fond gris de l'étape, et qui ne finit pas sous les en-têtes
+     collants quand on y saute depuis un sommaire. */
+  .audit-subcard {
+    @apply bg-white rounded-xl border border-slate-200 p-4;
+    scroll-margin-top: calc(var(--audit-sticky-offset, 0px) + 76px);
+  }
+  /* Corps d'une section en mode étape : le dernier bloc (souvent sur fond
+     gris) épouse les coins arrondis de la carte, sans overflow qui couperait
+     les menus déroulants. */
+  .audit-step-body > :last-child {
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+  }
+  /* Cibles des liens croisés (plan d'actions, check-list, matrice…). */
+  [data-zone-id], [data-system-id], [data-device-id], [data-meter-id] {
+    scroll-margin-top: calc(var(--audit-sticky-offset, 0px) + 120px);
+  }
+  /* Régulation (R175-6) : grille d'un niveau — équipement (tl-eq), type de
+     régulation (tl-type), granularité pour l'émission (tl-gran), note
+     (tl-note). Partagée entre l'en-tête du tableau et chaque ligne pour que
+     tout s'aligne. Tableau étroit : 2 lignes (équipement + note / type
+     [+ granularité]) ; assez large (conteneur « thermal ») : 1 ligne. */
+  .thermal-level-grid {
+    display: grid;
+    align-items: center;
+    column-gap: 0.375rem;
+    row-gap: 0.25rem;
+    grid-template-columns: minmax(0, 1fr) 1.75rem;
+    grid-template-areas: "eq note" "type type";
+  }
+  .thermal-level-grid.is-emission {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 1.75rem;
+    grid-template-areas: "eq eq note" "type gran gran";
+  }
+  .thermal-level-grid > .tl-eq { grid-area: eq; min-width: 0; }
+  .thermal-level-grid > .tl-type { grid-area: type; min-width: 0; }
+  .thermal-level-grid > .tl-gran { grid-area: gran; min-width: 0; }
+  .thermal-level-grid > .tl-note { grid-area: note; }
+  @container thermal (min-width: 84rem) {
+    .thermal-level-grid {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 1.75rem;
+      grid-template-areas: "eq type note";
+    }
+    .thermal-level-grid.is-emission {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.8fr) 1.75rem;
+      grid-template-areas: "eq type gran note";
+    }
+  }
+}
+
+/* Champs « remplis » sur la page d'audit et ses fenêtres (`audit-ui` posé
+   sur <html> par la vue) : fond gris-bleu clair au lieu du blanc sur blanc,
+   blanc au focus. Hors couche Tailwind, donc prioritaire sur les `bg-white`
+   des composants. Ne vise que les champs blancs ou sans fond : les fonds
+   d'état (erreur, ambre…), les champs transparents (titre éditable), les
+   champs « texte » des tableaux (bordure transparente jusqu'au survol), les
+   champs désactivés ou en lecture seule gardent leur rendu.
+   ⚠ Sélecteur composé sur UNE ligne : un retour à la ligne entre deux
+   `:is()` deviendrait un combinateur descendant. */
+:is(.audit-page, .audit-ui [role='dialog']) :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden']), textarea, select, [data-select-trigger]):is([class~='bg-white'], :not([class*='bg-'])):not(:disabled, [readonly], [class~='border-transparent']) {
+  background-color: #f1f5f9; /* slate-100 */
+  border-color: #e2e8f0;     /* slate-200 */
+  &:hover { border-color: #cbd5e1; } /* slate-300 */
+  &:focus { background-color: #ffffff; border-color: var(--color-indigo-500); }
+}
+
+/* En-têtes de colonnes centrés dans tous les tableaux (demande Kévin,
+   2026-09-24). Hors couche Tailwind, donc prioritaire sur les `text-left` /
+   `text-right` posés sur les <th> d'en-tête. Exception ponctuelle possible
+   avec `!text-left`. Les en-têtes de ligne (<th scope="row"> du corps) ne
+   sont pas concernés. Équivalent hors tableau : la grille de SystemDeviceList. */
+thead th {
+  text-align: center;
+}

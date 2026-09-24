@@ -15,12 +15,16 @@
  */
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../..');
-const DATA = resolve(ROOT, '../data/buildy_af.db');
+// DATABASE_PATH ABSOLU (variable de shell) permet de viser une autre base,
+// ex. une copie de test. Chemin relatif ignoré (piège de la « DB fantôme »).
+const DATA = process.env.DATABASE_PATH && isAbsolute(process.env.DATABASE_PATH)
+  ? process.env.DATABASE_PATH
+  : resolve(ROOT, '../data/buildy_af.db');
 const DOCS_DIR = resolve(ROOT, '../docs');
 
 const require = createRequire(import.meta.url);
@@ -106,19 +110,26 @@ async function ingestDecree() {
   const { BACS_ARTICLES } = require('../../src/seeds/bacs-articles');
   const htmlByCode = new Map((BACS_ARTICLES || []).map(a => [a.code, a.full_html || null]));
   db.prepare("DELETE FROM bacs_knowledge WHERE source = 'decree'").run();
+  // authority : 'opposable' pour les articles R175 (texte du décret) ;
+  // les synthèses Buildy (historique, ISO 52120) portent 'internal' dans le
+  // JSON — jamais servies comme texte opposable (MCP, recherche).
+  // effective_from : date d'entrée en vigueur de la version de l'article
+  // (sert au libellé « version du … » gravé à la livraison).
   const ins = db.prepare(`
     INSERT INTO bacs_knowledge
-      (source, authority, kind, code, title, body_text, body_html, r175_refs, version_label, source_url, position)
-    VALUES ('decree','opposable','article',?,?,?,?,?,?,?,?)
+      (source, authority, kind, code, title, body_text, body_html, r175_refs, version_label, source_url, position, effective_from)
+    VALUES ('decree',?,'article',?,?,?,?,?,?,?,?,?)
   `);
   const tx = db.transaction((rows) => {
     rows.forEach((row, i) => ins.run(
+      row.authority || 'opposable',
       row.code, row.title, row.body_text,
       htmlByCode.get(row.code) || null,
       row.r175_refs || extractR175Refs(row.body_text),
       row.version_label || null,
       'https://www.legifrance.gouv.fr/codes/section_lc/LEGITEXT000006074096/LEGISCTA000043819533/',
       i,
+      row.effective_from || null,
     ));
   });
   tx(items);

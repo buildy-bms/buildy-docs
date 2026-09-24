@@ -19,7 +19,7 @@ import { useNotification } from '@/composables/useNotification'
 import {
   getBacsChecklist, getBacsPhotoCoverage, updateBacsChecklistItem,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
-  getSiteDocumentDownloadUrl,
+  getSiteDocumentDownloadUrl, getSiteDocumentViewUrl,
 } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
@@ -509,7 +509,9 @@ async function quickToggleNotAvailable(it) {
           <ul v-if="editingFiles.length" class="mt-2 divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
             <li v-for="f in editingFiles" :key="f.id"
                 class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm">
-              <a :href="getSiteDocumentDownloadUrl(f.id)" target="_blank" class="flex-1 truncate text-indigo-700">{{ f.title }}</a>
+              <!-- PDF ouvert dans la visionneuse du téléphone (plus de téléchargement forcé). -->
+              <a :href="(f.mime_type === 'application/pdf' || /\.pdf$/i.test(f.original_name || '')) ? getSiteDocumentViewUrl(f.id) : getSiteDocumentDownloadUrl(f.id)"
+                 target="_blank" class="flex-1 truncate text-indigo-700">{{ f.title }}</a>
               <button type="button" @click="removeFile(f)" class="text-gray-500 active:text-red-600 p-1.5">
                 <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4" />
               </button>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, inject, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -10,13 +10,16 @@ import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
-import MeterCoverageMatrix from '@/components/audit/MeterCoverageMatrix.vue'
 import MeterEnergyGroup from '@/components/audit/MeterEnergyGroup.vue'
 import { METER_TYPES as ENERGY_METAS } from '@/lib/meter-options'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { updateBacsMeter, deleteBacsMeter, duplicateBacsMeter, reorderBacsMeters } from '@/api'
+import AuditSubTabs from '@/components/audit/AuditSubTabs.vue'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { flashAuditTarget } from '@/lib/audit-reveal'
+import { isMeterMissing, isMeterUnanswered, presentToggleValue } from '@/lib/meter-plan-state'
 
 // Section 4 — Compteurs et mesurage (R175-3 1°).
 const props = defineProps({
@@ -31,9 +34,13 @@ const emit = defineEmits([
 ])
 
 const audit = useAuditStore()
-const { meters, document, zones, systems } = storeToRefs(audit)
+const { meters, document, zones, systems, meterPlanStatus } = storeToRefs(audit)
 const { error } = useNotification()
 const { confirm } = useConfirm()
+// « Requis manquant » / « à vérifier » : même décompte que le plan et le PDF
+// (zone regroupée, usage exempté, ternaires stricts — lib/meter-plan-state.js).
+const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
+const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
 
 // ── Plan de comptage : agrégations par énergie pour les 5 sections ──
 function metersOfEnergy(energy) {
@@ -48,30 +55,97 @@ const globalStats = computed(() => {
     total: arr.length,
     present: arr.filter(m => m.present_actual).length,
     communicating: arr.filter(m => m.communicating).length,
-    missing: arr.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+    missing: arr.filter(isMissing).length,
+    unanswered: arr.filter(isUnanswered).length,
   }
 })
 
-// Highlight temporaire d'une ligne quand l'utilisateur clique sur une
-// pill de la matrice : on scrolle vers la section concernée et on met
-// un ring ambre 2 s pour identifier visuellement la ligne.
-const highlightId = ref(null)
-function focusMeterFromMatrix(meter) {
-  if (!meter?.id) return
-  highlightId.value = meter.id
-  nextTick(() => {
-    const el = window.document.querySelector(`[data-id="${meter.id}"]`)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  })
-  setTimeout(() => { highlightId.value = null }, 2000)
+// ── Mode étape (page audit à onglets) : une énergie affichée à la fois ──
+// Sous-onglets d'énergie (mémorisés par audit). Les 5 groupes restent montés
+// (v-show) : leur état (groupage, glisser-déposer) est conservé.
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const isStepMode = computed(() => !!stepMode?.enabled)
+const energyStorageKey = () => `bacs-meters-energy:${audit.docId}`
+function initialEnergy() {
+  let saved = null
+  try { saved = localStorage.getItem(energyStorageKey()) } catch { saved = null }
+  if (ENERGY_METAS.some(e => e.value === saved)) return saved
+  return (ENERGY_METAS.find(e => metersOfEnergy(e.value).length) || ENERGY_METAS[0])?.value
 }
+const activeEnergy = ref(initialEnergy())
+function selectEnergy(v) {
+  activeEnergy.value = v
+  try { localStorage.setItem(energyStorageKey(), v) } catch { /* navigation privée */ }
+}
+const energyTabs = computed(() => energySections.value.map(({ energy, meters: list }) => {
+  const present = list.filter(m => m.present_actual).length
+  const missing = list.filter(isMissing).length
+  const unanswered = list.filter(isUnanswered).length
+  return {
+    key: energy.value,
+    label: energy.label,
+    count: list.length,
+    muted: !list.length,
+    icon: ['fas', energy.icon.replace(/^fa-/, '')],
+    iconColor: energy.color,
+    badge: missing || null,
+    badgeTone: 'red',
+    tooltip: list.length
+      ? `${list.length} compteur${list.length > 1 ? 's' : ''} · ${present} présent${present > 1 ? 's' : ''}${missing ? ` · ${missing} requis manquant${missing > 1 ? 's' : ''}` : ''}${unanswered ? ` · ${unanswered} présence${unanswered > 1 ? 's' : ''} à vérifier` : ''}`
+      : `Aucun compteur ${energy.label.toLowerCase()} — ouvrir pour en ajouter un`,
+  }
+}))
+
+// Mise en évidence d'une ligne (nouveau compteur, lien croisé) : on bascule
+// sur l'énergie du compteur (mode étape), on scrolle vers la ligne et on met
+// un ring ambre 2 s pour la repérer.
+// `data-meter-id` (et non `data-id`, porté aussi par zones / systèmes).
+const highlightId = ref(null)
+async function focusMeter(id) {
+  const m = meters.value.find(x => x.id === id)
+  if (!m) return false
+  if (isStepMode.value && m.meter_type !== activeEnergy.value) selectEnergy(m.meter_type)
+  highlightId.value = id
+  setTimeout(() => { if (highlightId.value === id) highlightId.value = null }, 2000)
+  await nextTick()
+  await new Promise(r => requestAnimationFrame(r))
+  const el = window.document.getElementById('section-meters')?.querySelector(`[data-meter-id="${id}"]`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    flashAuditTarget(el)
+  }
+  return true
+}
+// Lien croisé (check-list…) : la vue appelle prepareReveal avant de chercher
+// la ligne → bonne énergie affichée.
+async function prepareReveal({ id }) {
+  const m = meters.value.find(x => x.id === id)
+  if (m && isStepMode.value) selectEnergy(m.meter_type)
+  await nextTick()
+}
+defineExpose({ prepareReveal, focusMeter, selectEnergy })
 
 // Ajout d'un compteur avec préfill éventuel (clic sur cellule vide ou
 // bouton « + Ajouter un compteur <énergie> »). Le parent (BacsAuditDetailView)
 // reçoit le payload via `@add-meter` et l'utilise pour pré-remplir la modale.
+// En mode étape, le nouveau compteur est ensuite affiché (bonne énergie) et
+// mis en évidence.
+let expectNewMeterUntil = 0
+let meterIdsBeforeAdd = new Set()
 function onAddMeter(payload) {
-  emit('add-meter', payload || {})
+  const p = payload || {}
+  if (isStepMode.value && p.meter_type) selectEnergy(p.meter_type)
+  expectNewMeterUntil = Date.now() + 120000
+  meterIdsBeforeAdd = new Set(meters.value.map(m => m.id))
+  emit('add-meter', p)
 }
+watch(() => meters.value.length, (n, prev) => {
+  if (!isStepMode.value || n <= prev || Date.now() > expectNewMeterUntil) return
+  const added = meters.value.filter(m => !meterIdsBeforeAdd.has(m.id))
+  if (!added.length) return
+  expectNewMeterUntil = 0
+  focusMeter(added[added.length - 1].id)
+})
 
 async function patchMeter(m, patch) {
   Object.assign(m, patch)
@@ -167,52 +241,61 @@ function hasNotes(html) {
         {{ meters.length }} compteur{{ meters.length > 1 ? 's' : '' }}
         · {{ meters.filter(m => m.present_actual).length }} présent{{ meters.filter(m => m.present_actual).length > 1 ? 's' : '' }}
         · {{ meters.filter(m => m.communicating).length }} communicant{{ meters.filter(m => m.communicating).length > 1 ? 's' : '' }}
-        · {{ meters.filter(m => m.required && !m.present_actual && !m.out_of_service).length }} requis manquant{{ meters.filter(m => m.required && !m.present_actual && !m.out_of_service).length > 1 ? 's' : '' }}
+        · {{ globalStats.missing }} requis manquant{{ globalStats.missing > 1 ? 's' : '' }}
       </span>
       <span v-else class="italic">Aucun compteur listé</span>
     </template>
     <!-- Desktop : « Plan de comptage » en 3 étages (≥768px) -->
     <div class="hidden md:block space-y-4 p-3">
-      <!-- Étage 3 — Stats globales -->
-      <div class="grid grid-cols-4 gap-3">
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
-          <p class="text-2xl font-semibold text-gray-900 leading-none">{{ globalStats.total }}</p>
-          <p class="text-xs text-gray-500 mt-1.5">Compteurs total</p>
-        </div>
-        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-          <p class="text-2xl font-semibold text-emerald-700 leading-none">{{ globalStats.present }}</p>
-          <p class="text-xs text-emerald-600 mt-1.5">Présents</p>
-        </div>
-        <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-          <p class="text-2xl font-semibold text-indigo-700 leading-none">{{ globalStats.communicating }}</p>
-          <p class="text-xs text-indigo-600 mt-1.5">Communicants</p>
-        </div>
-        <div :class="['rounded-2xl border p-4',
-                      globalStats.missing > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200']">
-          <p :class="['text-2xl font-semibold leading-none',
-                      globalStats.missing > 0 ? 'text-red-700' : 'text-gray-700']">
-            {{ globalStats.missing }}
-          </p>
-          <p :class="['text-xs mt-1.5', globalStats.missing > 0 ? 'text-red-600' : 'text-gray-500']">
-            Requis manquants
-          </p>
-        </div>
+      <!-- Étage 3 — Stats globales : pastilles compactes sur une ligne (les
+           grandes tuiles occupaient toute la largeur pour 4 chiffres). -->
+      <div data-meters-kpis class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-xs text-gray-600">
+          <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ globalStats.total }}</span>
+          compteur{{ globalStats.total > 1 ? 's' : '' }}
+        </span>
+        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
+          <span class="text-sm font-semibold tabular-nums">{{ globalStats.present }}</span>
+          présent{{ globalStats.present > 1 ? 's' : '' }}
+        </span>
+        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-xs text-indigo-700">
+          <span class="text-sm font-semibold tabular-nums">{{ globalStats.communicating }}</span>
+          communicant{{ globalStats.communicating > 1 ? 's' : '' }}
+        </span>
+        <span :class="['inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border text-xs',
+                       globalStats.missing > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-500']">
+          <span class="text-sm font-semibold tabular-nums">{{ globalStats.missing }}</span>
+          requis manquant{{ globalStats.missing > 1 ? 's' : '' }}
+        </span>
+        <span v-if="globalStats.unanswered > 0"
+              class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800"
+              v-tooltip="'Compteurs requis dont la présence n\'a pas été vérifiée : le rapport les indique « à qualifier »'">
+          <span class="text-sm font-semibold tabular-nums">{{ globalStats.unanswered }}</span>
+          présence{{ globalStats.unanswered > 1 ? 's' : '' }} à vérifier
+        </span>
       </div>
 
-      <!-- Étage 1 — Matrice de couverture visuelle -->
-      <MeterCoverageMatrix
-        :meters="meters"
-        :zones="zones"
-        :systems="systems"
-        @cell-click="focusMeterFromMatrix"
-        @add-meter="onAddMeter"
-      />
+      <!-- Matrice « Plan de comptage » retirée (2026-09-23, demande Kévin) :
+           elle répétait les tableaux par énergie. Le nom du système desservi,
+           seule info propre à ses infobulles, est affiché dans les tableaux. -->
 
-      <!-- Étage 2 — Sections par énergie -->
+      <!-- Étage 2 — Sections par énergie (mode étape : une énergie à la fois,
+           sous-onglets ; les énergies vides restent visibles, grisées) -->
+      <AuditSubTabs
+        v-if="isStepMode"
+        data-audit-subtabs="meters-energies"
+        id-prefix="meters-energy"
+        aria-label="Énergies"
+        :items="energyTabs"
+        :model-value="activeEnergy"
+        @update:model-value="selectEnergy"
+      />
       <div class="space-y-3">
         <MeterEnergyGroup
           v-for="section in energySections"
+          v-show="!isStepMode || activeEnergy === section.energy.value"
           :key="section.energy.value"
+          :tab-mode="isStepMode"
           :energy="section.energy"
           :meters="section.meters"
           :zones="zones"
@@ -243,12 +326,12 @@ function hasNotes(html) {
       <div v-for="m in meters" :key="`m-${m.id}`"
            :class="['p-3 space-y-2',
              m.out_of_service ? 'opacity-60' : '',
-             m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40 border-l-4 border-l-red-300' : '']">
+             isMissing(m) ? 'bg-red-50/40 border-l-4 border-l-red-300' : '']">
         <!-- Header card : zone + actions -->
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span v-if="m.required && !m.present_actual && !m.out_of_service"
+              <span v-if="isMissing(m)"
                     class="text-red-600" v-tooltip="'Compteur requis non présent'">⚠</span>
               <span v-truncate-tooltip class="font-medium text-sm text-gray-800 truncate">
                 {{ m.zone_name || 'Compteur général' }}
@@ -277,7 +360,7 @@ function hasNotes(html) {
           </label>
           <label class="flex items-center justify-between gap-2">
             <span class="text-gray-700">Présent ?</span>
-            <SegmentedToggle compact :model-value="!!m.present_actual"
+            <SegmentedToggle compact :model-value="presentToggleValue(m)"
                              @update:model-value="v => patchMeter(m, { present_actual: v })" />
           </label>
           <label v-if="m.present_actual" class="flex items-center justify-between gap-2">

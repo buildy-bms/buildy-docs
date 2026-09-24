@@ -4,6 +4,7 @@
 // doit etre faite des deux cotes (sinon UI/PDF/MCP divergent).
 
 const CARDS = [
+  { key: 'priority',       label: 'Action prioritaire' },
   { key: 'identification', label: 'Identification' },
   { key: 'systems',        label: 'Systèmes' },
   { key: 'meters',         label: 'Compteurs' },
@@ -21,12 +22,6 @@ const CARDS = [
 const CARD_KEYS = new Set(CARDS.map(c => c.key))
 const SUBSECTION_KEYS = new Set(CARDS.flatMap(c => (c.subsections || []).map(s => s.key)))
 
-const DEVICE_BMS_SUBTYPES = new Set([
-  'r175_3_p3_connect', 'r175_3_p3_replace',
-  'r175_3_p4', 'r175_3_p4_autonomous',
-  'bms_link_broken', 'contraindication_no_cut',
-])
-
 function isBmsMaintenanceArticle(art) {
   if (!art) return false
   return art === 'R175-4' || art === 'R175-5' || art === 'R175-5-1'
@@ -42,8 +37,10 @@ export function cardOfAction(a) {
     }
     return { card: 'misc', subsection: null }
   }
+  // GTB absente ou hors service : action prioritaire, en tête du plan.
+  if (a.source_subtype === 'no_gtb' || a.source_subtype === 'bms_out_of_service') return { card: 'priority', subsection: null }
   if (a.r175_article === 'R175-2') return { card: 'identification', subsection: null }
-  if (a.source_inspection_id) return { card: 'inspections', subsection: null }
+  if (a.source_inspection_id || a.source_subtype === 'no_inspection') return { card: 'inspections', subsection: null }
   if (a.source_thermal_id) return { card: 'thermal', subsection: null }
   if (a.source_bms_document_id) {
     if (isBmsMaintenanceArticle(a.r175_article)) return { card: 'bms', subsection: 'bms_maintenance' }
@@ -51,7 +48,7 @@ export function cardOfAction(a) {
   }
   if (a.source_device_id) return { card: 'bms', subsection: 'bms_devices' }
   if (a.source_meter_id) {
-    if (a.source_subtype === 'bms_link_broken') return { card: 'bms', subsection: 'bms_meters' }
+    if (a.source_subtype === 'bms_link_broken' || a.source_subtype === 'meter_bms_integration') return { card: 'bms', subsection: 'bms_meters' }
     return { card: 'meters', subsection: null }
   }
   if (a.source_system_id) return { card: 'systems', subsection: null }

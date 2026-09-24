@@ -53,6 +53,12 @@ import {
   faClone,
   // Drop-zone rapport d'inspection (InspectionReportDrop)
   faCloudArrowUp,
+  // Check-list documentaire (icônes du catalogue en base : plans, synoptique,
+  // AF GTB, contacts) + décor « Système » de la vérification avant livraison
+  // + encart du plan mobile
+  faLayerGroup, faSitemap, faFileLines, faAddressBook, faCircleInfo,
+  // Fiche équipement : bouton « Agrandir » (grande fenêtre)
+  faUpRightAndDownLeftFromCenter,
 } from '@fortawesome/pro-solid-svg-icons'
 
 const ICONS = [
@@ -84,6 +90,8 @@ const ICONS = [
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
   faClone,
   faCloudArrowUp,
+  faLayerGroup, faSitemap, faFileLines, faAddressBook, faCircleInfo,
+  faUpRightAndDownLeftFromCenter,
 ]
 
 library.add(...ICONS)

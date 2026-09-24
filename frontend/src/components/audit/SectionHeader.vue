@@ -1,5 +1,7 @@
 <script setup>
+import { computed, inject } from 'vue'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
 
 // Header partagé pour toutes les CollapsibleSection de la fiche d'audit.
 // Uniformise le pattern "[N°] [Icône] Titre / Sous-titre [Actions]"
@@ -19,7 +21,7 @@ import StepValidateBadge from '@/components/StepValidateBadge.vue'
 //     </template>
 //   </CollapsibleSection>
 
-defineProps({
+const props = defineProps({
   number: { type: [String, Number], required: true },
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
@@ -30,6 +32,12 @@ defineProps({
 const emit = defineEmits(['validate', 'invalidate'])
 
 function pad(n) { return String(n).padStart(2, '0') }
+
+// Mode étape (page audit à onglets) : numéro = position de l'onglet, tuile et
+// icône à la couleur de la phase, validation portée par le bandeau guide.
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const phase = computed(() => (stepMode?.enabled && props.step?.key) ? stepMode.phaseFor(props.step.key) : null)
+const displayNumber = computed(() => (phase.value && stepMode.numberFor?.(props.step.key)) || props.number)
 </script>
 
 <template>
@@ -37,12 +45,13 @@ function pad(n) { return String(n).padStart(2, '0') }
        les titres longs). Plus de flex-1 ici : on laisse la place au
        slot `center` pour un contenu centré (filtres, breadcrumb…). -->
   <div class="flex items-center gap-3 min-w-0 shrink">
-    <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 font-mono text-xs font-medium shrink-0">
-      {{ pad(number) }}
+    <span :class="['inline-flex items-center justify-center w-8 h-8 rounded-lg font-mono text-xs font-medium shrink-0',
+                   phase ? phase.tone.tile : 'bg-indigo-50 text-indigo-700']">
+      {{ pad(displayNumber) }}
     </span>
-    <component v-if="icon" :is="icon" :class="['w-5 h-5 shrink-0', iconColor]" />
+    <component v-if="icon" :is="icon" :class="['w-5 h-5 shrink-0', phase ? phase.tone.icon : iconColor]" />
     <div class="min-w-0">
-      <h2 class="text-base font-medium text-gray-900 leading-tight truncate">{{ title }}</h2>
+      <h2 :class="['font-medium text-gray-900 leading-tight truncate', phase ? 'text-[15px]' : 'text-base']">{{ title }}</h2>
       <p v-if="subtitle || $slots['subtitle-extra']" class="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
         <span v-if="subtitle" class="truncate">{{ subtitle }}</span>
         <slot name="subtitle-extra" />
@@ -58,7 +67,7 @@ function pad(n) { return String(n).padStart(2, '0') }
   <span v-else class="flex-1"></span>
   <div class="flex items-center gap-2 shrink-0">
     <slot name="actions" />
-    <StepValidateBadge v-if="step" :step="step"
+    <StepValidateBadge v-if="step && !phase" :step="step"
                        @validate="emit('validate', $event)"
                        @invalidate="emit('invalidate', $event)" />
   </div>

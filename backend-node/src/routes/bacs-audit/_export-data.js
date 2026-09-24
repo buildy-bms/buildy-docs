@@ -9,12 +9,16 @@ const config = require('../../config');
 const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
+const { buildReportAttachments } = require('./_report-attachments');
 const { parseRoles } = require('../../lib/device-roles');
 const { isTrue, isFalse } = require('./_ternary');
-const { sortActions, groupByCard, cardOfAction } = require('./_action-cards');
+const { deviceOutOfGtbScope, deviceExcludedByAuditor } = require('../../lib/bacs-gtb-scope');
+const { buildConnectionScope } = require('../../lib/bacs-audit-action-generator');
+const { sortActions, groupByCard, cardOfAction, groupJustifications } = require('./_action-cards');
 const { buildMeterCoverage } = require('./_meter-coverage');
-const { systemInteropStatus } = require('./_interop');
-const { METER_USAGE_TO_SYSTEM_CATS } = require('./_shared');
+const { systemInteropStatus, deviceCommState, deviceInteropState, deviceInteropContradiction, isInteropRelevant } = require('./_interop');
+const { METER_USAGE_TO_SYSTEM_CATS, auditShortName } = require('./_shared');
+const { SYSTEM_LABEL_FR, makePlainTagResolver } = require('./_action-tags');
 const { buildSiteStaticMap, buildZonesStaticMap } = require('../../lib/static-map');
 const { regulationTypeLabel, resolveEmissionGranularity } = require('../../lib/regulation-defaults');
 const bacsArticlesData = require('../../seeds/bacs-articles');
@@ -38,17 +42,17 @@ function getCharts() {
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
-  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, TECHNICAL_ZONE_NATURES, OCCUPANCY_PROFILE_LABEL,
+  APPLICABILITY_LABEL, CLOSING_DEADLINE_PHRASE, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, TECHNICAL_ZONE_NATURES, OCCUPANCY_PROFILE_LABEL,
   OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL,
 } = require('./_labels');
-const { buildComplianceSummary } = require('./_compliance-summary');
+const { buildComplianceSummary, isReserveAction, isInfoAction, frLongDate } = require('./_compliance-summary');
 // Items 5 + 8 — cumul automatique des puissances chaud / froid.
 const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL, POWER_EXCLUSION_REASON_LABEL, SHARED_TO_HEATING_SQL } = require('../../lib/bacs-audit-power');
 const {
-  BUILDY_OFFER_LEVEL_LABEL, BUILDY_REQUIRED_LEVEL, BUILDY_UNCOVERED_BY_LEVEL, isBuildyOfferLevel,
+  BUILDY_OFFER_LEVEL_LABEL, isBuildyOfferLevel, buildyReserves, effectiveBuildyBms,
 } = require('../../lib/buildy-cloud-preset');
 // Item 7 — calcul des zones fonctionnelles de suivi (regroupement BACS).
-const { computeFunctionalZones } = require('../../lib/bacs-functional-zones');
+const { computeFunctionalZones, mergedMeterRoles } = require('../../lib/bacs-functional-zones');
 // Item 4 — calcul automatique de l'assujetti par système.
 const { computeSystemLiability } = require('../../lib/bacs-liability');
 // Item 13 — base de consommations mensuelles de référence.
@@ -103,9 +107,13 @@ async function buildBacsAuditExportData(af, opts = {}) {
   const zonesTechnical = zones.filter(z => z.isTechnical);
   // Flags pour conditionner l'affichage du sous-bloc "Notes terrain par
   // zone" dans le PDF (évite un h3 orphelin si aucune zone n'a de note).
+  // Recalculés après le rattachement des photos aux zones (bloc « Photos »
+  // plus bas) : calculés ici seulement, ils ignoraient les photos, et une
+  // zone sans note mais avec photos n'était jamais imprimée (relecture PDF
+  // 2026-09-24).
   const hasZoneNotes = (z) => !!(z.notes_html || z.notes || (z.photos && z.photos.length) || z.comfort_constraint);
-  const zonesFunctionalHaveNotes = zonesFunctional.some(hasZoneNotes);
-  const zonesTechnicalHaveNotes = zonesTechnical.some(hasZoneNotes);
+  let zonesFunctionalHaveNotes = zonesFunctional.some(hasZoneNotes);
+  let zonesTechnicalHaveNotes = zonesTechnical.some(hasZoneNotes);
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
     FROM bacs_audit_systems s LEFT JOIN zones z ON z.id = s.zone_id
@@ -120,7 +128,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     WHERE m.document_id = ?
     ORDER BY z.position NULLS LAST, m.usage
   `).all(documentId);
-  const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
+  // Supervision Buildy : champs découlant du niveau d'offre = valeurs du
+  // modèle (cf. effectiveBuildyBms), comme le générateur d'actions.
+  const bms = effectiveBuildyBms(db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null);
   // Composants matériels de la GTB (serveurs, contrôleurs, passerelles…) saisis
   // par l'auditeur. Affichés dans le chapitre GTB du PDF si présents.
   const bmsComponents = db.db.prepare(`
@@ -163,15 +173,20 @@ async function buildBacsAuditExportData(af, opts = {}) {
   if (!bms?.providedProtocolsLabels) {
     if (bms) bms.providedProtocolsLabels = [];
   }
-  // Mig 205 — supervision Buildy Cloud : niveau d'offre + exigences non
-  // couvertes (encadré « niveau Premium requis », audits BACS uniquement).
+  // Mig 205 — supervision Buildy Cloud : niveau d'offre + réserves de
+  // conformité du niveau (doctrine 2026-09-23 : conforme sous réserves,
+  // jamais « non conforme » à cause du niveau souscrit).
   if (bms && isBuildyOfferLevel(bms.buildy_offer_level)) {
     const level = bms.buildy_offer_level;
+    const reserves = af.kind === 'bacs_audit' ? buildyReserves(bms) : [];
     bms.buildyOffer = {
       levelLabel: BUILDY_OFFER_LEVEL_LABEL[level],
-      requiredLabel: BUILDY_OFFER_LEVEL_LABEL[BUILDY_REQUIRED_LEVEL],
-      showRequirement: af.kind === 'bacs_audit' && level !== BUILDY_REQUIRED_LEVEL,
-      uncovered: BUILDY_UNCOVERED_BY_LEVEL[level] || [],
+      reserves,
+      hasReserves: reserves.length > 0,
+      // Essentials : 12 mois de données dans la solution → conservation
+      // 5 ans assurée par les exports réguliers du client.
+      retentionByExport: level === 'essentials',
+      maintenanceIncluded: level !== 'essentials',
     };
   }
   // Mig 180 : 1 ligne par système. On joint sur bacs_audit_systems pour
@@ -190,12 +205,19 @@ async function buildBacsAuditExportData(af, opts = {}) {
   `).all(documentId);
   // On filtre done + declined : ces actions ne doivent pas apparaitre
   // dans le PDF livre aux integrateurs GTB.
-  const actionItemsRaw = db.db.prepare(`
+  const actionItemsAll = db.db.prepare(`
     SELECT a.*, z.name AS zone_name FROM bacs_audit_action_items a
     LEFT JOIN zones z ON z.id = a.zone_id
     WHERE a.document_id = ? AND a.status NOT IN ('done', 'declined')
     ORDER BY a.position, a.id
   `).all(documentId);
+  // Informations (INFO_SUBTYPES : systèmes exemptés par la règle des 5 %,
+  // FAQ n° 16 ; points de vigilance) : ce sont des TRACES, pas des actions à
+  // engager — sorties du plan, des numéros BACS-XXX et des décomptes ;
+  // listées à part en fin de plan.
+  // (libellés résolus plus bas, une fois zones / systèmes / équipements chargés)
+  const exemptionRaw = actionItemsAll.filter(a => isInfoAction(a));
+  const actionItemsRaw = actionItemsAll.filter(a => !isInfoAction(a));
   // Labels FR pour l'effort estimé saisi par l'auditeur sur chaque action.
   const EFFORT_LABEL = { low: 'Faible', medium: 'Moyen', high: 'Élevé' };
   for (const a of actionItemsRaw) {
@@ -247,6 +269,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
     d.total_power_kw = d.power_kw != null
       ? Math.round((Number(d.power_kw) || 0) * qty * 100) / 100
       : null;
+    // Froid unitaire × quantité aussi (relecture juridique R1 m11 : « 3 ×
+    // 37 kW · froid 37 kW » alors que le cumul froid retenu est de 111 kW).
+    d.total_power_kw_cooling = d.power_kw_cooling != null
+      ? Math.round((Number(d.power_kw_cooling) || 0) * qty * 100) / 100
+      : null;
     d.has_multiple = qty > 1;
     // Protocole(s) de communication du device : tableau JSON `communication_protocols`
     // (source utilisée par l'UI + le moteur de conformité), repli sur la colonne
@@ -269,7 +296,13 @@ async function buildBacsAuditExportData(af, opts = {}) {
       ? devProtocols.join(' / ')
       : (isTrue(d.is_communicating)
           ? 'Communicant (protocole non précisé)'
-          : (isFalse(d.is_communicating) ? 'Non communicant' : '—'));
+          : (isFalse(d.is_communicating) ? 'Non communicant' : 'Non renseigné'));
+    // État de communication à trois états, source unique _interop.js (les
+    // tableaux A3 lisaient la colonne dépréciée communication_protocol).
+    d.commState = deviceCommState(d);
+    // Pastille « Communicant » du chapitre 3 : déduite de la même règle que
+    // la fiche (« Non communicant » saisi → ✗, et non « — ») — R2 M2.
+    d.commTri = d.commState === 'yes' ? 1 : d.commState === 'no' ? 0 : null;
     if (!devicesBySystem.has(d.system_id)) devicesBySystem.set(d.system_id, []);
     devicesBySystem.get(d.system_id).push(d);
   }
@@ -369,12 +402,35 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (names.length <= 3) return names.join(', ');
     return `${names.slice(0, 3).join(', ')} + ${names.length - 3} autre${names.length - 3 > 1 ? 's' : ''}`;
   }
-  function computeSystemCompliance(s, devs) {
+  // Portée de raccordement R175-2 II et périmètre GTB déclaré : mêmes règles
+  // que le générateur d'actions, pour que le verdict par système du
+  // chapitre 3 et le plan d'actions ne se contredisent jamais.
+  const connectionScope = isBacsKind ? buildConnectionScope(documentId, af.bacs_applicability_status || null) : null;
+  const siteWithoutGtb = !!bms && bms.present === 0;
+  // Interopérabilité d'un système d'ORIGINE (équipements propres), pour les
+  // systèmes de zone alimentés par un générateur partagé : une chaudière de
+  // chaufferie non reliée rend non conformes les chauffages de zone qu'elle
+  // dessert (relecture juridique R1 C1).
+  const originInteropCache = new Map();
+  function originInterop(systemId) {
+    if (originInteropCache.has(systemId)) return originInteropCache.get(systemId);
+    const sys = systems.find(x => x.id === systemId);
+    const own = (devicesBySystem.get(systemId) || []).filter(d => !isTrue(d.out_of_service));
+    const r = sys ? systemInteropStatus(own, {
+      noGtb: siteWithoutGtb,
+      category: sys.system_category,
+      outOfScope: (d) => deviceOutOfGtbScope(bms, d, sys.system_category),
+    }) : null;
+    originInteropCache.set(systemId, r);
+    return r;
+  }
+
+  function computeSystemCompliance(s, devs, sharedDevs = []) {
     if (!isBacsKind || !R175_CATS.has(s.system_category)) return null;
     if (isTrue(s.not_concerned)) {
       return {
         verdict: 'na',
-        label: 'Poste déclaré hors périmètre',
+        label: 'Système déclaré non concerné',
         reasons: [s.not_concerned_reason].filter(Boolean),
       };
     }
@@ -382,81 +438,189 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (isTrue(s.marked_negligible_under_5pct)) {
       return {
         verdict: 'exempt',
-        label: 'Poste exempté du décret (consommation < 5 % du total)',
-        reasons: [s.negligible_justification || 'Règle des 5 % (FAQ ministère, juin 2025).'],
+        label: 'Système exempté de raccordement (règle des 5 %)',
+        reasons: [s.negligible_justification
+          ? `Justification relevée lors de l'audit : ${s.negligible_justification}`
+          : 'Consommations d\'énergie effectives et induites de l\'ensemble des équipements régulés par la même fonction estimées à moins de 5 % de la consommation d\'énergie totale du bâtiment (FAQ ministérielle n° 16, non opposable).'],
       };
     }
-    const active = devs.filter(d => !isTrue(d.out_of_service) && !isTrue(d.is_backup));
+    // Équipements PROPRES au système, comme le plan d'actions : un équipement
+    // partagé est évalué avec son système d'origine (relecture juridique R1
+    // M2 : verdict et actions calculés sur le même ensemble d'équipements).
+    const buildSharedNote = (list) => {
+      if (!list.length) return null;
+      const origins = [...new Set(list.map(d => d.sharedFromLabel).filter(Boolean))];
+      return `${list.length > 1 ? 'Les équipements partagés' : 'L\'équipement partagé'} (${listDeviceNames(list)}) ${list.length > 1 ? 'sont évalués' : 'est évalué'} avec ${list.length > 1 ? (origins.length > 1 ? 'leurs systèmes' : 'leur système') : 'son système'} d'origine${origins.length ? ` (${origins.join(', ')})` : ''}.`;
+    };
+    const sharedNote = buildSharedNote(sharedDevs);
+    // Les générateurs partagés non reliés ont leur propre motif : la note
+    // générale ne les répète pas.
+    let failingShared = [];
+    // Équipements déclarés « non concernés par l'intégration à la GTB » :
+    // décision de l'auditeur, toujours rappelée (R3 n6).
+    const excludedOwn = devs.filter(d => !isTrue(d.out_of_service) && deviceExcludedByAuditor(d));
+    const excludedNote = excludedOwn.length
+      ? `${excludedOwn.length > 1 ? 'Équipements déclarés' : 'Équipement déclaré'} non concerné${excludedOwn.length > 1 ? 's' : ''} par l'intégration à la GTB par l'auditeur : ${listDeviceNames(excludedOwn)}.`
+      : null;
+    const withShared = (reasons) => {
+      const failingIds = new Set(failingShared.map(d => d.id));
+      const note = buildSharedNote(sharedDevs.filter(d => !failingIds.has(d.id)));
+      return [...reasons, ...(note ? [note] : []), ...(excludedNote ? [excludedNote] : [])];
+    };
+    const active = devs.filter(d => !isTrue(d.out_of_service));
     if (!active.length) {
+      if (sharedDevs.length) {
+        return { verdict: 'shared', label: 'Évalué avec le système d\'origine de ses équipements', reasons: [sharedNote] };
+      }
       return {
         verdict: 'pending',
         label: 'Aucun équipement actif inventorié',
-        reasons: ['Le poste est déclaré présent mais aucun équipement actif (hors secours et hors service) n\'a été inventorié — la conformité ne peut donc pas être statuée.'],
+        reasons: ['Le système est déclaré présent, mais aucun équipement actif (hors service exclu) n\'a été inventorié : la conformité ne peut pas être déterminée.'],
       };
     }
-    // R175-3 §3 — interopérabilité évaluée au NIVEAU SYSTÈME (source unique
-    // _interop.js, alignée sur le générateur d'actions). L'ancienne lecture
-    // `d.meets_r175_3_p3` portait sur une colonne inexistante côté device.
-    const interop = systemInteropStatus(active);
-    const failComm  = active.filter(d => isFalse(d.is_communicating));
-    const failStop  = active.filter(d => isFalse(d.meets_r175_3_p4));
-    const failAuto  = active.filter(d => isFalse(d.meets_r175_3_p4_autonomous));
-    const iopFail   = interop.verdict === 'fail';
-    const pending   = active.filter(d =>
-      d.is_communicating == null
-      || d.meets_r175_3_p4 == null || d.meets_r175_3_p4_autonomous == null);
+    // R175-3 3° et 4° évalués au NIVEAU SYSTÈME, avec la règle du générateur
+    // d'actions (source unique _interop.js) : chaque générateur communique
+    // avec la GTB, directement ou par un régulateur raccordé ; site sans GTB
+    // et usages que la GTB ne traite pas = « non relié ». 4° : un équipement
+    // qui répond « oui » suffit ; écart seulement si TOUS répondent « non ».
+    const conditional = connectionScope ? connectionScope.systemIsConditional(s) : false;
+    const interop = systemInteropStatus(active, {
+      noGtb: siteWithoutGtb,
+      category: s.system_category,
+      outOfScope: (d) => deviceOutOfGtbScope(bms, d, s.system_category),
+    });
+    const relevant = interop.relevant;
+    // « Générateur » : chauffage, climatisation, eau chaude sanitaire et
+    // production d'électricité seulement — jamais pour un luminaire ou une
+    // VMC (R3 N-M5).
+    const generatorWording = interop.basis === 'producers'
+      && ['heating', 'cooling', 'dhw', 'electricity_production'].includes(s.system_category);
+    // Générateur partagé, non relié, qui alimente ce système.
+    failingShared = siteWithoutGtb ? [] : sharedDevs.filter(d => {
+      if (isTrue(d.out_of_service) || isTrue(d.is_backup)) return false;
+      const o = originInterop(d.system_id);
+      return !!o && o.verdict === 'fail' && o.targets.some(t => t.id === d.id);
+    });
+    const interopFailed = interop.verdict === 'fail' || failingShared.length > 0;
+    const stopOk = relevant.some(d => isTrue(d.meets_r175_3_p4));
+    const autoOk = relevant.some(d => isTrue(d.meets_r175_3_p4_autonomous));
+    // Système non relié : le raccordement porte aussi le 4° (pas d'écart 4°
+    // distinct, comme au plan d'actions).
+    // 4° évalué sur les équipements propres, comme le générateur (qui ne
+    // l'écarte que si le système lui-même n'est pas relié).
+    const ownInteropFailed = interop.verdict === 'fail';
+    const stopFail = !siteWithoutGtb && !ownInteropFailed && relevant.length > 0 && relevant.every(d => isFalse(d.meets_r175_3_p4));
+    const autoFail = !siteWithoutGtb && !ownInteropFailed && relevant.length > 0 && relevant.every(d => isFalse(d.meets_r175_3_p4_autonomous));
     const reasons = [];
-    if (failComm.length) {
-      reasons.push(`Ne remonte${failComm.length > 1 ? 'nt' : ''} pas ${failComm.length > 1 ? 'leurs' : 'ses'} données à une GTB — donc ni pilotable${failComm.length > 1 ? 's' : ''}, ni mesurable${failComm.length > 1 ? 's' : ''} : ${listDeviceNames(failComm)} (R175-3 §1°).`);
+    if (siteWithoutGtb) {
+      reasons.push('Aucune GTB n\'est présente sur le site : le système n\'est relié à aucun système d\'automatisation et de contrôle (R175-2, R175-3).');
+      if (interopFailed) reasons.push(`Équipements à relier à la future GTB : ${listDeviceNames(interop.targets)}.`);
+    } else if (interop.verdict === 'fail') {
+      const targets = interop.targets;
+      const noInterface = targets.filter(d => deviceCommState(d) === 'no');
+      const outOfGtbScope = targets.filter(d => deviceCommState(d) !== 'no' && deviceOutOfGtbScope(bms, d, s.system_category));
+      const notLinked = targets.filter(d => !noInterface.includes(d) && !outOfGtbScope.includes(d));
+      const parts = [];
+      if (noInterface.length) parts.push(`${listDeviceNames(noInterface)} : aucune interface de communication`);
+      if (outOfGtbScope.length) parts.push(`${listDeviceNames(outOfGtbScope)} : usage que la GTB en place ne traite pas`);
+      if (notLinked.length) parts.push(`${listDeviceNames(notLinked)} : non relié${notLinked.length > 1 ? 's' : ''} à la GTB`);
+      reasons.push(generatorWording
+        ? `Le système n'est pas relié à la GTB : son générateur ne communique avec elle ni directement ni par un régulateur raccordé. ${parts.join(' ; ')} (R175-3 3°).`
+        : `Le système n'est pas relié à la GTB : aucun de ses équipements ne communique avec elle. ${parts.join(' ; ')} (R175-3 3°).`);
     }
-    if (iopFail) {
-      reasons.push(`Aucun équipement de production, distribution ou régulation ne communique avec la GTB via un protocole ouvert — le système n'est pas interopérable (R175-3 §3°).`);
+    if (failingShared.length) {
+      const failOrigins = [...new Set(failingShared.map(d => d.sharedFromLabel).filter(Boolean))];
+      reasons.push(`Le système est alimenté par un générateur partagé qui n'est pas relié à la GTB : ${listDeviceNames(failingShared)}${failOrigins.length ? ` (voir ${failOrigins.join(', ')} et son action de raccordement au plan)` : ''} (R175-3 3°).`);
     }
-    if (failStop.length) {
-      reasons.push(`Pas d'arrêt manuel à proximité — l'occupant ne peut pas couper rapidement en cas d'inconfort ou de problème : ${listDeviceNames(failStop)} (R175-3 §4°).`);
+    if (stopFail) {
+      reasons.push(`Arrêt manuel impossible depuis la GTB : ${listDeviceNames(relevant)} (R175-3 4°).`);
     }
-    if (failAuto.length) {
-      reasons.push(`S'arrête${failAuto.length > 1 ? 'nt' : ''} si la GTB tombe en panne — pas de mode dégradé autonome, le service est interrompu : ${listDeviceNames(failAuto)} (R175-3 §4° dernier alinéa).`);
+    if (autoFail) {
+      reasons.push(`${relevant.length > 1 ? 'Ne fonctionnent' : 'Ne fonctionne'} plus normalement si la GTB est arrêtée ou si la communication est coupée (pas de gestion autonome) : ${listDeviceNames(relevant)} (R175-3 4°).`);
     }
     if (reasons.length) {
-      // Bloquant = §1° (non communicant) ou §3° (non interopérable) :
-      // sans ça, la GTB ne peut littéralement pas voir/parler à
-      // l'équipement → non_compliant. §4° (arrêt manuel) et §4° alinéa
-      // (autonomie au défaut) sont graves mais ne bloquent pas
-      // l'intégration → partial.
-      const verdict = (failComm.length > 0 || iopFail) ? 'non_compliant' : 'partial';
+      if (conditional) {
+        return {
+          verdict: 'conditional',
+          label: 'Raccordement exigé sous condition de temps de retour sur investissement',
+          // Condition expliquée une fois en tête du chapitre 3
+          // (hasConditionalSystems) au lieu d'être répétée par système.
+          reasons: withShared([...reasons, 'Bâtiment existant : raccordement exigé seulement sous condition de temps de retour sur investissement (R175-2 II, voir l\'encadré en tête de chapitre) ; les écarts figurent au plan d\'actions en actions mineures.']),
+        };
+      }
+      // Chaud ou froid tenu pour obligatoire sans franchir le seuil d'après le
+      // cumul (puissance manquante…) : même explication qu'au plan d'actions.
+      const mandatoryNote = connectionScope ? connectionScope.systemMandatoryNote(s) : null;
+      if (mandatoryNote) reasons.push(`Portée à confirmer : ${mandatoryNote.charAt(0).toLowerCase()}${mandatoryNote.slice(1)}`);
+      // Unités réversibles reliées au titre de l'autre usage (R3 N-M1).
+      const reversibleNote = connectionScope && connectionScope.systemReversibleNote ? connectionScope.systemReversibleNote(s) : null;
+      if (reversibleNote) reasons.push(`Portée du raccordement : ${reversibleNote.charAt(0).toLowerCase()}${reversibleNote.slice(1)}`);
+      if (siteWithoutGtb) {
+        return { verdict: 'non_compliant', label: 'Non conforme — aucune GTB sur le site', reasons: withShared(reasons) };
+      }
       return {
-        verdict,
-        label: verdict === 'non_compliant'
-          ? 'Non conforme au décret BACS — actions correctives requises'
-          : 'Presque conforme — quelques équipements à reprendre',
-        reasons,
+        verdict: interopFailed ? 'non_compliant' : 'partial',
+        label: interopFailed ? 'Non conforme — actions correctives requises' : 'Écarts sur une partie des exigences',
+        reasons: withShared(reasons),
       };
     }
-    if (pending.length || interop.verdict === 'pending') {
-      const reasonsPending = [];
-      if (pending.length) {
-        reasonsPending.push(`La remontée GTB, l'arrêt manuel local ou l'autonomie au défaut n'${pending.length === 1 ? 'a' : 'ont'} pas été qualifié${pending.length === 1 ? '' : 's'} sur le terrain pour ${pending.length === 1 ? 'cet équipement' : 'ces équipements'} : ${listDeviceNames(pending)}.`);
+    const reasonsPending = [];
+    if (interop.verdict === 'na') {
+      // Équipements déclarés non concernés par l'intégration à la GTB :
+      // décision de l'auditeur, rapportée comme telle.
+      const excluded = active.filter(deviceExcludedByAuditor);
+      if (excluded.length) {
+        return {
+          verdict: 'exempt',
+          excludedByAuditor: true,
+          label: 'Non évalué — équipements déclarés non concernés par l\'intégration à la GTB',
+          reasons: [`L'auditeur a déclaré ${excluded.length > 1 ? 'les équipements' : 'l\'équipement'} ${listDeviceNames(excluded)} non concerné${excluded.length > 1 ? 's' : ''} par l'intégration à la GTB (par exemple, équipement piloté par un autre équipement raccordé) : le raccordement de ce système n'est pas évalué.`,
+            ...(sharedNote ? [sharedNote] : [])],
+        };
       }
-      if (interop.verdict === 'pending') {
-        reasonsPending.push(`Le raccordement à la GTB (câblage / intégration) des équipements de production, distribution ou régulation n'a pas encore été renseigné — l'interopérabilité R175-3 §3° ne peut donc pas être statuée.`);
+      if (sharedDevs.length) {
+        return { verdict: 'shared', label: 'Évalué avec le système d\'origine de ses équipements', reasons: [sharedNote] };
       }
+      reasonsPending.push('Aucun équipement de production, de distribution ou de régulation n\'est inventorié : l\'interopérabilité (R175-3 3°) ne peut pas être évaluée.');
+    } else if (interop.verdict === 'pending') {
+      const contradictory = relevant.filter(deviceInteropContradiction);
+      reasonsPending.push(contradictory.length
+        ? `Données contradictoires pour ${listDeviceNames(contradictory)} : la fiche indique une intégration à la GTB, mais aucune interface de communication ; le mode de raccordement est à préciser (R175-3 3°).`
+        : 'Le raccordement à la GTB des équipements de production, de distribution ou de régulation n\'est pas entièrement renseigné : l\'interopérabilité (R175-3 3°) ne peut pas être établie.');
+    }
+    const stopPending = relevant.length > 0 && !stopOk && !stopFail;
+    const autoPending = relevant.length > 0 && !autoOk && !autoFail;
+    if (stopPending || autoPending) {
+      reasonsPending.push(`${stopPending && autoPending ? 'L\'arrêt manuel depuis la GTB et le fonctionnement autonome n\'ont' : stopPending ? 'L\'arrêt manuel depuis la GTB n\'a' : 'Le fonctionnement autonome n\'a'} pas été renseigné${stopPending && autoPending ? 's' : ''} pour : ${listDeviceNames(relevant)} (R175-3 4°).`);
+    }
+    if (reasonsPending.length) {
       return {
         verdict: 'pending',
-        label: 'Conformité non statuée — qualification incomplète',
-        reasons: reasonsPending,
+        label: 'Conformité non déterminée — informations manquantes',
+        reasons: withShared(reasonsPending),
       };
     }
     return {
       verdict: 'compliant',
-      label: 'Conforme au décret BACS',
-      reasons: ['Tous les équipements actifs cochent les 4 critères : ils remontent à la GTB, parlent un protocole ouvert, ont un arrêt manuel local et continuent à fonctionner en mode dégradé si la GTB tombe.'],
+      label: 'Conforme aux exigences R175-3 examinées pour ce système',
+      reasons: withShared([generatorWording
+        ? 'Le générateur communique avec la GTB (directement ou par un régulateur raccordé qui le pilote) ; le système peut être arrêté manuellement depuis la GTB et continue de fonctionner si elle est arrêtée.'
+        : 'Un équipement du système communique avec la GTB ; le système peut être arrêté manuellement depuis la GTB et continue de fonctionner si elle est arrêtée.']),
     };
   }
 
   const enrichedSystems = systems.map(s => {
     const devs = devicesBySystem.get(s.id) || [];
     const sharedDevs = sharedDevicesBySystem.get(s.id) || [];
+    // Arrêt manuel « depuis la GTB » et gestion autonome : sans objet pour un
+    // équipement relié à aucune GTB (site sans GTB, aucune interface, usage
+    // non traité) — relecture clarté R2 M17.
+    for (const d of [...devs, ...sharedDevs]) {
+      d.p4NotApplicable = isBacsKind && deviceInteropState(d, {
+        noGtb: siteWithoutGtb,
+        outOfScope: (x) => deviceOutOfGtbScope(bms, x, d.system_category || s.system_category),
+      }) === 'ko';
+    }
     const totalKw = Math.round(devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0) * 100) / 100;
     const derivedSubstation = (substationTplId
       ? devs.some(d => d.equipment_template_id === substationTplId)
@@ -505,7 +669,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
       // Puissance des seuls équipements propres (les partagés sont comptés
       // dans leur système d'origine).
       total_power_kw: totalKw,
-      compliance: computeSystemCompliance(s, [...devs, ...sharedDevs]),
+      compliance: computeSystemCompliance(s, devs, sharedDevs),
     };
   });
   // Group systems par zone
@@ -518,6 +682,25 @@ async function buildBacsAuditExportData(af, opts = {}) {
     systemsByZoneMap.get(k).items.push(s);
   }
   const systemsByZone = [...systemsByZoneMap.values()];
+  for (const g of systemsByZone) {
+    g.allAbsent = g.items.length > 0 && g.items.every(x => isTrue(x.not_concerned) || x.present === 0);
+    // Usages non présents de la zone, cités sur une seule ligne sous le titre
+    // de zone (au lieu d'une boîte « Absent » par usage, qui pouvait finir
+    // seule sur une page — relecture PDF 2026-09-24).
+    const notPresent = g.items.filter(x => !isTrue(x.present));
+    g.absentLabels = notPresent.filter(x => isTrue(x.not_concerned) || x.present === 0)
+      .map(x => ({ system_category: x.system_category, categoryLabel: x.categoryLabel }));
+    g.unansweredLabels = notPresent.filter(x => !(isTrue(x.not_concerned) || x.present === 0))
+      .map(x => ({ system_category: x.system_category, categoryLabel: x.categoryLabel }));
+  }
+  // Tableau A3 des systèmes : colonnes Localisation et GTB masquées quand
+  // elles ne contiendraient que des « — » (aucune localisation saisie, site
+  // sans GTB).
+  const synthesisDevices = systemsByZone.flatMap(g => g.items.filter(x => x.present === 1)
+    .flatMap(x => [...(x.devices || []), ...(x.shared_devices || [])]));
+  const synthesisShowLocation = synthesisDevices.some(d => d.location && String(d.location).trim());
+  const synthesisShowGtb = !siteWithoutGtb;
+  const synthesisSystemsColspan = 12 - (synthesisShowLocation ? 0 : 1) - (synthesisShowGtb ? 0 : 1);
 
   // Zones fonctionnelles ne portant AUCUN système technique concerné par le
   // décret (chauffage, clim, ECS, ventilation, éclairage, production) → elles
@@ -557,6 +740,26 @@ async function buildBacsAuditExportData(af, opts = {}) {
   });
   for (const sys of enrichedSystems) {
     sys.liability = liabilityMap.get(sys.id) || null;
+  }
+  // Assujetti « par défaut » : celui de la plupart des systèmes présents. Il
+  // est mentionné une fois en tête du chapitre 3 ; seuls les systèmes qui
+  // s'en écartent portent leur propre mention (relecture clarté R2 m7).
+  const defaultLiability = (() => {
+    const counts = new Map();
+    for (const sys of enrichedSystems) {
+      if (sys.present !== 1 || sys.is_bacs === 0 || !sys.liability) continue;
+      const key = `${sys.liability.label}|${sys.liability.explanation}`;
+      const cur = counts.get(key) || { n: 0, liability: sys.liability };
+      cur.n += 1;
+      counts.set(key, cur);
+    }
+    const best = [...counts.values()].sort((a, b) => b.n - a.n)[0];
+    return best && best.n >= 2 ? best.liability : null;
+  })();
+  for (const sys of enrichedSystems) {
+    sys.liabilityIsDefault = !!(defaultLiability && sys.liability
+      && sys.liability.label === defaultLiability.label
+      && sys.liability.explanation === defaultLiability.explanation);
   }
   // Y a-t-il au moins une affectation d'assujetti à montrer dans le PDF ?
   const hasLiabilityData = !!(site && site.ownership_structure) || siteParties.length > 0;
@@ -601,6 +804,73 @@ async function buildBacsAuditExportData(af, opts = {}) {
     const usageLabel = METER_USAGE_LABEL[m.usage];
     return usageLabel && m.usage !== 'other' ? `Système ${usageLabel}` : null;
   };
+  // Zones fonctionnelles de suivi (chapitre 2) calculées une fois : elles
+  // servent aussi au comptage unique des zones regroupées (même règle que le
+  // générateur d'actions, lib/bacs-functional-zones.js).
+  const functionalZones = computeFunctionalZones(devices, systems, { SYSTEM_LABEL });
+  // Compteurs d'un usage entièrement exempté (règle des 5 %) ou déclaré non
+  // concerné par l'intégration à la GTB : non requis (même règle que le
+  // générateur d'actions, R3 N-M3).
+  const METER_USAGE_OF_CATEGORY = {
+    heating: 'heating', cooling: 'cooling', ventilation: 'ventilation', dhw: 'dhw',
+    lighting_indoor: 'lighting', lighting_outdoor: 'lighting', electricity_production: 'pv',
+  };
+  const exemptMeterKeys = new Set();
+  const excludedMeterKeys = new Set();
+  const evaluatedMeterKeys = new Set();
+  const exemptSystemIds = new Set(enrichedSystems
+    .filter(x => x.present === 1 && isTrue(x.marked_negligible_under_5pct)).map(x => x.id));
+  for (const sys of enrichedSystems) {
+    if (sys.is_bacs === 0 || sys.present !== 1) continue;
+    const usage = METER_USAGE_OF_CATEGORY[sys.system_category];
+    if (!usage) continue;
+    const k = `${sys.zone_id ?? ''}|${usage}`;
+    // Système alimenté uniquement par des équipements partagés depuis des
+    // systèmes exemptés : exempté lui aussi pour le comptage.
+    const exemptByOrigin = !(sys.devices || []).length && (sys.shared_devices || []).length > 0
+      && sys.shared_devices.every(d => exemptSystemIds.has(d.system_id));
+    if (isTrue(sys.marked_negligible_under_5pct) || exemptByOrigin) exemptMeterKeys.add(k);
+    // Un système qui reçoit un équipement partagé reste évalué pour le
+    // comptage : son usage consomme par ce générateur (même règle que le
+    // générateur du plan).
+    else if (sys.compliance && sys.compliance.excludedByAuditor && !(sys.shared_devices || []).length) excludedMeterKeys.add(k);
+    else evaluatedMeterKeys.add(k);
+  }
+  const meterNotRequiredReason = (m) => {
+    const k = `${m.zone_id ?? ''}|${m.usage}`;
+    if (evaluatedMeterKeys.has(k)) return null;
+    if (exemptMeterKeys.has(k)) return 'système exempté de raccordement (règle des 5 %)';
+    if (excludedMeterKeys.has(k)) return 'équipements déclarés non concernés par l\'intégration à la GTB';
+    return null;
+  };
+  const meterRoles = mergedMeterRoles(functionalZones, meters.filter(m => m.meter_type === 'water' || !meterNotRequiredReason(m)));
+  // Zone regroupée « comptage séparé non réalisable » alors que plusieurs de
+  // ses zones ont leur propre compteur présent : le chapitre 2 le signale
+  // (regroupement à confirmer ; précheck ZONE-002 — R2 M10).
+  {
+    const presentByGroup = new Map();
+    for (const m of meters) {
+      const r = meterRoles.get(m.id);
+      if (!r || r.role !== 'present') continue;
+      const k = `${r.group.category}|${r.group.label}|${m.usage}`;
+      if (!presentByGroup.has(k)) presentByGroup.set(k, new Set());
+      presentByGroup.get(k).add(m.zone_id);
+    }
+    for (const [k, zonesSet] of presentByGroup) {
+      if (zonesSet.size < 2) continue;
+      const [cat, label] = k.split('|');
+      const entry = functionalZones.byCategory.find(c => c.category === cat);
+      const g = entry && entry.groups.find(x => x.label === label);
+      if (g) g.separateMetersPresent = true;
+    }
+  }
+  const meterZoneNameById = new Map(meters.map(m => [m.id, m.zone_name]));
+  // Libellés automatiques des anciens plans de comptage (« Compteur gaz en
+  // zone « Cellule A » (chauffage) ») : figés à la création, parfois périmés,
+  // ils s'affichaient comme des notes de l'auditeur (relecture clarté R2 M19).
+  // (y compris les variantes « zonal » et suffixées « — fallback … », R3.)
+  const AUTO_METER_NOTE_RE = /^Compteur (?:électrique de production|électrique|gaz|thermique|eau|autre)(?: zonal)? en zone « [^»]* » \([^)]*\)(?: — .*)?\.?$|^Compteur général (?:électrique|gaz|fioul|thermique)(?: du bâtiment| \(réseau de chaleur\))(?: — .*)?\.?$/;
+  const isAutoMeterNote = (t) => !!t && AUTO_METER_NOTE_RE.test(String(t).trim());
   const enrichedMeters = meters.map(m => {
     // Décodage des protocoles communiquant (JSON array TEXT) → libellés FR.
     let protocolsList = [];
@@ -623,10 +893,24 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // Indique au lecteur PDF quelles lignes méritent action immédiate.
     const compliantPresent = isTrue(m.present_actual);
     const compliantComm = isTrue(m.communicating);
-    const reqFailed = !!m.required && !isTrue(m.out_of_service)
+    const merged = meterRoles.get(m.id) || null;
+    // Couvert par le comptage unique de sa zone regroupée : ni manquant ni
+    // en écart (aucune action au plan).
+    const coveredByGroup = merged && merged.role === 'covered' ? merged.group.label : null;
+    const notRequiredReason = m.meter_type === 'water' ? null : meterNotRequiredReason(m);
+    const reqFailed = !!m.required && !isTrue(m.out_of_service) && !coveredByGroup && !notRequiredReason
       && (!compliantPresent || !compliantComm);
     return {
       ...m,
+      notes: isAutoMeterNote(m.notes) ? null : m.notes,
+      isPresent: compliantPresent,
+      // Présent / absent / non vérifié : une seule cellule explicite remplace
+      // les quatre « — » d'un compteur non présent (relecture PDF 2026-09-24).
+      presenceState: compliantPresent ? 'yes' : (isFalse(m.present_actual) ? 'no' : 'unknown'),
+      notRequiredReason,
+      coveredByGroup,
+      coveredLeadZone: coveredByGroup && merged.leadId ? (meterZoneNameById.get(merged.leadId) || null) : null,
+      mergedLeadGroup: merged && merged.role === 'lead' ? merged.group.label : null,
       typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
       usageLabel: m.zone_id ? (METER_USAGE_LABEL[m.usage] || m.usage) : '—',
       zoneLabel: m.zone_name || 'Compteur général',
@@ -691,6 +975,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
       }
     }
     for (const z of zones) z.photos = zonePhotos.get(z.zone_id) || [];
+    zonesFunctionalHaveNotes = zonesFunctional.some(hasZoneNotes);
+    zonesTechnicalHaveNotes = zonesTechnical.some(hasZoneNotes);
     for (const m of enrichedMeters) m.photos = meterPhotos.get(m.id) || [];
     for (const d of devices) d.photos = devicePhotos.get(d.id) || [];
     for (const sys of enrichedSystems) sys.photos = systemPhotos.get(sys.id) || [];
@@ -707,35 +993,30 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ...d,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   });
-  // Périmètre GTB : la question « intégré ? » n'a de sens que pour un usage que
-  // la GTB est CENSÉE piloter (flags bms.manages_*). Aligne le PDF sur l'UI
-  // (BmsSection.vue gtbManagesCategory). Sans ce filtre, le PDF chiffrait
-  // « à intégrer » (donc à facturer dans le devis) des équipements
-  // ventilation/ECS que l'auditeur a explicitement exclus du scope GTB.
-  const gtbManagesCategory = (cat) => {
-    if (!bms) return false;
-    switch (cat) {
-      case 'heating': return !!bms.manages_heating;
-      case 'cooling': return !!bms.manages_cooling;
-      case 'ventilation': return !!bms.manages_ventilation;
-      case 'dhw': return !!bms.manages_dhw;
-      case 'lighting_indoor':
-      case 'lighting_outdoor': return !!bms.manages_lighting;
-      default: return false;
-    }
-  };
-  // Périmètre GTB par ÉQUIPEMENT : le défaut suit l'usage (gtbManagesCategory),
-  // mais gtb_scope_override le surcharge sur un équipement précis
-  // (1 = forcé dans le périmètre, 0 = forcé hors périmètre, null = défaut usage).
-  const gtbInScope = (d) => {
-    if (d.gtb_scope_override === 1) return true;
-    if (d.gtb_scope_override === 0) return false;
-    return gtbManagesCategory(d.system_category);
-  };
-  const gtbScopedDevices = devices.filter(gtbInScope);
-  const bmsManagedDevices = gtbScopedDevices.filter(d => isTrue(d.managed_by_bms)).map(withCatLabel);
-  const bmsUnmanagedDevices = gtbScopedDevices.filter(d => isFalse(d.managed_by_bms) && !isTrue(d.out_of_service)).map(withCatLabel);
-  const bmsUnansweredDevices = gtbScopedDevices.filter(d => d.managed_by_bms == null && !isTrue(d.out_of_service)).map(withCatLabel);
+  // Périmètre GTB déclaré (flags bms.manages_* + gtb_scope_override par
+  // équipement, lib/bacs-gtb-scope.js) : il qualifie le statut de chaque
+  // équipement, sans le retirer du tableau.
+  // Relectures finales (2026-09-24) : le périmètre de la GTB ne réduit pas
+  // celui du décret. Le tableau liste donc TOUS les équipements présents :
+  // un équipement d'un usage que la GTB ne traite pas est « à intégrer »
+  // (outOfGtbScope), un émetteur à régulation locale n'est pas visé
+  // (interopNotTargeted, même règle que _interop.js) — R2 M16, m18.
+  const THERMAL_CATS = new Set(['heating', 'cooling']);
+  const presentDevices = devices.filter(d => !isTrue(d.out_of_service)).map(d => {
+    const e = withCatLabel(d);
+    e.excludedByAuditor = deviceExcludedByAuditor(d);
+    e.interopNotTargeted = !e.excludedByAuditor && THERMAL_CATS.has(d.system_category) && !isInteropRelevant(d);
+    e.outOfGtbScope = !e.excludedByAuditor && !e.interopNotTargeted && deviceOutOfGtbScope(bms, d, d.system_category);
+    return e;
+  });
+  const bmsManagedDevices = presentDevices.filter(d => !d.excludedByAuditor && !d.interopNotTargeted && !d.outOfGtbScope
+    && isTrue(d.managed_by_bms) && !isTrue(d.bms_integration_out_of_service));
+  const bmsUnmanagedDevices = presentDevices.filter(d => !d.excludedByAuditor && !d.interopNotTargeted
+    && (d.outOfGtbScope || isFalse(d.managed_by_bms)));
+  const bmsUnansweredDevices = presentDevices.filter(d => !d.excludedByAuditor && !d.interopNotTargeted && !d.outOfGtbScope
+    && d.managed_by_bms == null);
+  const bmsNotTargetedDevices = presentDevices.filter(d => d.interopNotTargeted || d.excludedByAuditor);
+  const bmsOutOfScopeDevices = presentDevices.filter(d => d.outOfGtbScope);
   // Vue regroupée par zone pour le tableau « Équipements intégrés à la GTB »
   // du PDF chapitre 6. Évite les lignes plates « Nom · Usage · Zone · Marque »
   // qui sont peu lisibles et redondent la zone à chaque ligne.
@@ -754,10 +1035,12 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Vue UNIFIÉE (tableau unique du PDF) : tous les équipements pertinents
   // (hors service exclus), groupés par zone, chacun portant son statut
   // d'intégration ternaire (managed_by_bms : 1=Oui / 0=Non / null=à qualifier).
-  const bmsDevicesByZone = groupDevicesByZone(
-    gtbScopedDevices.filter(d => !isTrue(d.out_of_service)).map(withCatLabel)
-  );
-  const bmsManagedMeters = enrichedMeters.filter(m => isTrue(m.managed_by_bms));
+  const bmsDevicesByZone = groupDevicesByZone(presentDevices);
+  // Liaison GTB interrompue : ni « relevé par la GTB » ni « non intégré »,
+  // compté à part (relecture clarté R2 M15).
+  const bmsBrokenLinkMeters = enrichedMeters.filter(m =>
+    isTrue(m.managed_by_bms) && isTrue(m.bms_integration_out_of_service) && !isTrue(m.out_of_service));
+  const bmsManagedMeters = enrichedMeters.filter(m => isTrue(m.managed_by_bms) && !isTrue(m.bms_integration_out_of_service));
   const bmsUnmanagedMeters = enrichedMeters.filter(m =>
     isFalse(m.managed_by_bms) && isTrue(m.present_actual) && !isTrue(m.out_of_service));
   const bmsUnansweredMeters = enrichedMeters.filter(m =>
@@ -778,12 +1061,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }
     metersByZoneMap.get(key).items.push(m);
   }
-  // Ordre : zones avec id en premier (suivant l'ordre d'apparition), puis general
+  // Ordre : zones dans l'ordre du chapitre 2 (comme les tableaux Systèmes et
+  // Régulation — relecture PDF 2026-09-24), puis « Général bâtiment ».
+  const meterZoneRank = new Map(zones.map((z, i) => [z.zone_id, i]));
   const metersByZone = [...metersByZoneMap.values()].sort((a, b) => {
     if (a.zone_id == null) return 1;
     if (b.zone_id == null) return -1;
-    return 0;
+    return (meterZoneRank.get(a.zone_id) ?? Number.MAX_SAFE_INTEGER) - (meterZoneRank.get(b.zone_id) ?? Number.MAX_SAFE_INTEGER);
   });
+  // Colonnes facultatives des tableaux (PDF) : masquées quand elles ne
+  // contiendraient que des « — ».
+  const metersAnyOutOfService = enrichedMeters.some(m => isTrue(m.out_of_service));
 
   // ── Matrice de couverture + sections par énergie du plan de comptage
   // (logique partagée avec la preview-fixture via `_meter-coverage.js`).
@@ -833,16 +1121,27 @@ async function buildBacsAuditExportData(af, opts = {}) {
       || distDevice?.regulation_type_distribution
       || prodDevice?.regulation_type_production
       || (t.regulation_type && t.regulation_type !== 'none'));
+    // Régulation automatique en 3 états : « non » seulement si un équipement
+    // relié déclare explicitement ne pas en avoir ; sans information, « non
+    // renseignée » (jamais ✗ déduit d'une absence de donnée).
+    const linkedDevices = [prodDevice, distDevice, emitDevice].filter(Boolean);
+    const autoRegState = hasAutoReg ? 'yes'
+      : linkedDevices.some(d => isFalse(d.has_regulation)) ? 'no' : 'unknown';
+    const categoryLabel = SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating');
+    const customLabel = (t.system_label && t.system_label.trim()) || (t.label && t.label.trim()) || null;
     return {
     ...t,
     category: t.category || 'heating',
-    categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
+    categoryLabel,
+    // R175-6 ne vise que le chauffage : les lignes de refroidissement sont
+    // présentées pour information, marquées « hors champ R175-6 ».
+    outOfR175_6: (t.category || 'heating') === 'cooling',
+    autoRegState,
     // Mig 180 : nom affichable = custom_label du système, fallback legacy
-    // sur t.label (mig 170), puis catégorie par défaut.
-    displayLabel: (t.system_label && t.system_label.trim())
-      || (t.label && t.label.trim())
-      || SYSTEM_LABEL[t.category || 'heating']
-      || (t.category || 'heating'),
+    // sur t.label (mig 170). Masqué s'il répète la catégorie (« Chauffage
+    // Chauffage »).
+    displayLabel: customLabel && customLabel.toLowerCase() !== String(categoryLabel).toLowerCase()
+      ? customLabel : null,
     // Mig 180 : libellé de granularité dérivée (ex. "Par pièce", "Par zone",
     // "Centralisée"). On garde regulationLabel pour compat templates PDF.
     regulationLabel: REGULATION_LABEL[granularityKey] || granularityKey,
@@ -936,9 +1235,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
       thermalPresentCats.get(s.zone_id).add(s.system_category);
     }
   }
+  // Ordre des zones du chapitre 2 (comme les tableaux Systèmes et Compteurs),
+  // chauffage avant refroidissement (relecture PDF 2026-09-24 : ordre des
+  // zones différent d'un tableau à l'autre).
+  const thermalZoneRank = new Map(zones.map((z, i) => [z.zone_id, i]));
+  const THERMAL_CAT_RANK = { heating: 0, cooling: 1 };
   const thermal = thermalAll.filter(t =>
     !thermalTechnicalZoneIds.has(t.zone_id)
     && thermalPresentCats.get(t.zone_id)?.has(t.category || 'heating')
+  ).sort((a, b) =>
+    ((thermalZoneRank.get(a.zone_id) ?? Number.MAX_SAFE_INTEGER) - (thermalZoneRank.get(b.zone_id) ?? Number.MAX_SAFE_INTEGER))
+    || ((THERMAL_CAT_RANK[a.category || 'heating'] ?? 9) - (THERMAL_CAT_RANK[b.category || 'heating'] ?? 9))
   );
 
   // Plan de mise en conformite groupe par severite
@@ -955,11 +1262,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Helper local : on construit les lookups au passage si pas deja fait.
   const zonesByIdLocal = new Map((zones || []).map(z => ({ id: z.id, name: z.name })).map(z => [z.id, z]));
   const systemsByIdLocal = new Map((systems || []).map(s => [s.id, s]));
-  const SYSTEM_LABEL_FR_LOCAL = {
-    heating: 'chauffage', cooling: 'refroidissement', ventilation: 'ventilation',
-    dhw: 'eau chaude sanitaire', lighting_indoor: 'éclairage intérieur',
-    lighting_outdoor: 'éclairage extérieur', electricity_production: 'production photovoltaïque',
-  };
+  const SYSTEM_LABEL_FR_LOCAL = SYSTEM_LABEL_FR;
   // Decor (icone FontAwesome + couleur) par categorie de systeme, aligne
   // sur CATEGORY_ICON de pdf.js et SystemCategoryIcon.vue.
   const { renderFaIconSvg } = require('../../lib/pdf');
@@ -980,16 +1283,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (type === 'zone') {
       const z = zonesByIdLocal.get(n);
       const label = z?.name || `Zone ${n}`;
-      return `<span class="tag-pill tag-pill-zone">${renderFaIconSvg("location-dot", "#4f46e5", "10")} ${escHtml(label)}</span>`;
+      return `<span class="tag-pill tag-pill-zone">${renderFaIconSvg("location-dot", "#1b2842", "10")} ${escHtml(label)}</span>`;
     }
     if (type === 'system') {
       const s = systemsByIdLocal.get(n);
       if (!s) return `<span class="tag-pill tag-pill-system">Système ${n}</span>`;
       const label = s.custom_label || SYSTEM_LABEL_FR_LOCAL[s.system_category] || s.system_category || 'Système';
       const decor = SYSTEM_DECOR_PDF[s.system_category];
-      const sty = decor ? ` style="color:${decor.color};border-color:${decor.color}66;background-color:${decor.color}1A"` : '';
+      // Pastille neutre ; seule l'icône garde la couleur de la catégorie (un
+      // chauffage en rouge se lisait comme une action bloquante — charte PDF).
       const zname = s.zone_name ? `<span class="tag-pill-meta"> · ${escHtml(s.zone_name)}</span>` : '';
-      return `<span class="tag-pill tag-pill-system"${sty}>${decor ? renderFaIconSvg(decor.icon, decor.color, "10") + " " : ""}${escHtml(label)}${zname}</span>`;
+      return `<span class="tag-pill tag-pill-system">${decor ? renderFaIconSvg(decor.icon, decor.color, "10") + " " : ""}${escHtml(label)}${zname}</span>`;
     }
     if (type === 'device') {
       const d = devicesById.get(n);
@@ -1011,48 +1315,42 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // balises {{zone:id}} / {{system:id}} / {{device:id}} par juste le
   // libellé entité, sans chip ni SVG ni couleur. Sinon le HTML produit
   // par stripActionTags() apparaît brut dans le tableau récap quand on
-  // le rend via {{title}} (handlebars escape par défaut).
-  function resolveTagAsPlain(type, n) {
-    const id = Number(n);
-    if (type === 'zone') {
-      const z = zones.find(zz => zz.id === id);
-      return z ? (z.name || `Zone #${id}`) : `Zone #${id}`;
-    }
-    if (type === 'system') {
-      const s = systems.find(ss => ss.id === id);
-      if (!s) return `Système #${id}`;
-      const label = s.custom_label || SYSTEM_LABEL_FR_LOCAL[s.system_category] || s.system_category || 'Système';
-      return s.zone_name ? `${label} · ${s.zone_name}` : label;
-    }
-    if (type === 'device') {
-      const d = devicesById.get(id);
-      return d ? (d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || `Équipement #${id}`)
-               : `Équipement ${id}`;
-    }
-    return '';
-  }
-  function stripActionTagsToPlain(text) {
-    if (!text) return text;
-    return String(text).replace(/\{\{(zone|system|device):(\d+)\}\}/g,
-      (_m, type, id) => resolveTagAsPlain(type, id));
+  // le rend via {{title}} (handlebars escape par défaut). Résolveur partagé
+  // avec la vue commerciale et l'export CSV (_action-tags.js).
+  const plainTags = makePlainTagResolver({ zones, systems, devices });
+  const resolveTagAsPlain = plainTags.label;
+  const stripActionTagsToPlain = plainTags.strip;
+  // Lignes « • … » saisies dans le texte → vraies lignes à puce (retrait
+  // suspendu : la 2e ligne ne repart plus sous la puce — relecture PDF
+  // 2026-09-24). Le rendu reste en `white-space: pre-line` : pas de saut de
+  // ligne ajouté autour d'une ligne à puce (bloc).
+  function bulletsToHtml(html) {
+    if (!html || !String(html).includes('•')) return html;
+    const lines = String(html).split('\n');
+    const isLi = (l) => /^\s*•\s?/.test(l);
+    return lines.map((line, i) => {
+      const cur = isLi(line) ? `<span class="acd-li">${line.replace(/^\s*•\s?/, '')}</span>` : line;
+      const sep = i > 0 && !isLi(line) && !isLi(lines[i - 1]) ? '\n' : '';
+      return sep + cur;
+    }).join('');
   }
   // Convertit une description multi-sections en HTML avec sous-titres.
   // Format en entree : « Titre\nContenu\n\nTitre\nContenu... ». Si pas
   // de structure detectee (pas de \n\n), retombe sur le rendu inline.
   function descriptionToHtml(text) {
     if (!text) return text;
-    if (!text.includes('\n\n')) return stripActionTags(text);
+    if (!text.includes('\n\n')) return bulletsToHtml(stripActionTags(text));
     const blocks = text.split('\n\n').map(block => {
       const idx = block.indexOf('\n');
-      if (idx < 0) return `<div class="acd-body">${stripActionTags(block)}</div>`;
+      if (idx < 0) return `<div class="acd-body">${bulletsToHtml(stripActionTags(block))}</div>`;
       const candidate = block.slice(0, idx).trim();
       const body = block.slice(idx + 1);
       const looksLikeTitle = candidate.length > 0 && candidate.length < 80 &&
         !candidate.includes('{{') && !candidate.startsWith('•') && !candidate.startsWith('  •');
       if (looksLikeTitle) {
-        return `<div class="acd-section"><div class="acd-title">${escHtml(candidate)}</div><div class="acd-body">${stripActionTags(body)}</div></div>`;
+        return `<div class="acd-section"><div class="acd-title">${escHtml(candidate)}</div><div class="acd-body">${bulletsToHtml(stripActionTags(body))}</div></div>`;
       }
-      return `<div class="acd-body">${stripActionTags(block)}</div>`;
+      return `<div class="acd-body">${bulletsToHtml(stripActionTags(block))}</div>`;
     });
     return blocks.join('');
   }
@@ -1080,7 +1378,21 @@ async function buildBacsAuditExportData(af, opts = {}) {
       // pas leur place dans un tableau récap scannable.
       title_plain: stripActionTagsToPlain(a.title),
       description: descriptionToHtml(a.description),
+      // Section « Condition d'application » (portée R175-2 II sous condition
+      // de TRI) : reprise telle quelle sur les cartes groupées.
+      scope_condition: (/(?:^|\n\n)Condition d'application\n([\s\S]*?)(?=\n\n|$)/.exec(a.description || '') || [])[1] || null,
+      // « Portée à confirmer » (chaud/froid tenu pour obligatoire faute de
+      // puissance relevée) : reprise sur la carte groupée (relecture R2 C3).
+      scope_note: (/(?:^|\n\n)Portée à confirmer\n([\s\S]*?)(?=\n\n|$)/.exec(a.description || '') || [])[1] || null,
+      // Éditeur riche vide (« <p></p> ») : pas de rubrique « Préconisations
+      // Buildy » sans contenu.
+      alternative_solutions_html: String(a.alternative_solutions_html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+        ? a.alternative_solutions_html : null,
       display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
+      // Réserve (contrat de maintenance, export des données) : obligation à
+      // respecter, étiquetée « Réserve » — ne dégrade pas le verdict.
+      is_reserve: isReserveAction(a),
+      severity_display: isReserveAction(a) ? 'reserve' : a.severity,
       card_key:         cardOfAction(a).card,
       card_subsection:  cardOfAction(a).subsection,
       meter_usage: meterUsage,
@@ -1088,13 +1400,46 @@ async function buildBacsAuditExportData(af, opts = {}) {
       device_system_category: deviceSystemCategory,
     };
   });
-  const actionItems = { blocking: [], major: [], minor: [] };
-  for (const a of numberedItems) actionItems[a.severity]?.push(a);
+  // Exemptions « règle des 5 % » regroupées par usage (une ligne par usage,
+  // zones listées) : la part s'apprécie sur l'ensemble des équipements de la
+  // fonction, pas zone par zone (relecture clarté R2 m19).
+  const exemptionItems = (() => {
+    const sysById = new Map(systems.map(x => [x.id, x]));
+    const byCat = new Map();
+    for (const a of exemptionRaw.filter(x => x.source_subtype === 'negligible_5pct')) {
+      const sys = sysById.get(a.source_system_id) || {};
+      const cat = sys.system_category || 'other';
+      if (!byCat.has(cat)) byCat.set(cat, { label: SYSTEM_LABEL[cat] || 'Autre usage', zones: [], justifications: [] });
+      const e = byCat.get(cat);
+      if (a.zone_name && !e.zones.includes(a.zone_name)) e.zones.push(a.zone_name);
+      const j = (sys.negligible_justification || '').trim();
+      if (j && !e.justifications.includes(j)) e.justifications.push(j);
+    }
+    return [...byCat.values()].map(e => ({
+      title: e.label,
+      zones_label: e.zones.length
+        ? `${e.zones.length} zone${e.zones.length > 1 ? 's' : ''} : ${e.zones.join(', ')}`
+        : null,
+      justification: e.justifications.join(' ; ') || null,
+    }));
+  })();
+  const vigilanceItems = exemptionRaw.filter(a => a.source_subtype !== 'negligible_5pct' && a.source_subtype !== 'data_export_capability').map(a => ({
+    title: stripActionTagsToPlain(a.title),
+    description: stripActionTagsToPlain(a.description || ''),
+  }));
+  // Recommandations hors décret (non comptées dans le plan).
+  const outOfDecreeItems = exemptionRaw.filter(a => a.source_subtype === 'data_export_capability').map(a => ({
+    title: stripActionTagsToPlain(a.title),
+    description: stripActionTagsToPlain(a.description || ''),
+  }));
+  const actionItems = { blocking: [], major: [], minor: [], reserves: [] };
+  for (const a of numberedItems) (a.is_reserve ? actionItems.reserves : actionItems[a.severity])?.push(a);
   const actionStats = {
     blocking: actionItems.blocking.length,
     major: actionItems.major.length,
     minor: actionItems.minor.length,
-    total: actionItems.blocking.length + actionItems.major.length + actionItems.minor.length,
+    reserves: actionItems.reserves.length,
+    total: actionItems.blocking.length + actionItems.major.length + actionItems.minor.length + actionItems.reserves.length,
   };
 
   // ── Groupement des actions repetitives par type (refonte v2.x) ──
@@ -1108,46 +1453,43 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // tête de chaque carte groupée (à parité avec les cartes individuelles qui
   // portent Constat/Recommandation). Sans elle, les actions BLOQUANTES — les
   // plus graves — étaient les seules du plan sans explication.
+  const METER_REQUIREMENT = 'Le décret demande que la GTB suive, enregistre et analyse en continu, par zone fonctionnelle et au pas horaire, les données de production et de consommation énergétique des systèmes techniques, et qu\'elle conserve ces données à l\'échelle mensuelle pendant cinq ans (R175-3 1°).';
   const GROUP_LABELS = {
     meter_addition: {
-      label: 'Ajouter les compteurs manquants pour le suivi continu',
+      label: 'Installer les compteurs manquants pour le suivi des consommations',
       columns: ['zone', 'usage', 'meter_type'],
-      justification: 'Le décret (R175-3 1°) impose de mesurer en continu, usage par usage et zone par zone, les consommations d\'énergie du bâtiment, et de conserver ces relevés cinq ans. Chaque usage listé ci-dessous n\'a pas de compteur dédié : sa consommation ne peut être ni suivie ni optimisée. Un compteur communicant est à installer pour chacun.',
+      justification: `${METER_REQUIREMENT} Les consommations listées ci-dessous ne sont mesurées par aucun compteur : un compteur communicant est à installer pour chacune.`,
     },
     meter_connection: {
-      label: 'Raccorder les compteurs présents mais non communicants',
+      label: 'Rendre communicants les compteurs présents',
       columns: ['zone', 'usage', 'meter_type'],
-      justification: 'Ces compteurs existent mais ne transmettent pas leurs données à la supervision : la mesure est là, mais reste invisible pour le suivi continu exigé par le décret (R175-3 1°). Chacun doit être raccordé (liaison bus ou passerelle) pour que sa consommation remonte automatiquement.',
+      justification: 'Ces compteurs sont présents mais ne transmettent pas leurs relevés : la consommation est mesurée, mais ne peut être ni suivie au pas horaire ni archivée par la GTB (R175-3 1°). Un raccordement de chacun (liaison filaire ou passerelle) permet la remontée automatique des relevés.',
     },
-    r175_3_p4: {
-      label: 'Permettre l\'arrêt manuel des équipements',
-      columns: ['zone', 'system', 'device'],
-      justification: 'Le décret (R175-3 4°) exige que chaque équipement technique puisse être arrêté manuellement depuis la supervision. Les équipements ci-dessous n\'offrent pas encore cette commande à distance — à ajouter pour la conformité.',
+    meter_bms_integration: {
+      label: 'Intégrer à la GTB les compteurs communicants',
+      columns: ['zone', 'usage', 'meter_type'],
+      justification: 'Ces compteurs sont communicants mais ne sont pas relevés par la GTB : leur consommation n\'est ni suivie au pas horaire ni archivée (R175-3 1°). Leur intégration à la GTB est à prévoir.',
     },
-    r175_3_p4_autonomous: {
-      label: 'Activer le fonctionnement autonome des équipements',
+    // Raccordements système identiques (souvent l'éclairage ou l'ECS de
+    // chaque zone) : une carte et un tableau plutôt que N fiches répétées.
+    system_connection: {
+      label: 'Raccorder à la GTB les systèmes qui n\'y sont pas reliés',
       columns: ['zone', 'system', 'device'],
-      justification: 'Le décret (R175-3 4°) exige que les équipements s\'ajustent automatiquement aux besoins (arrêt et relance selon l\'occupation, la température…). Les équipements ci-dessous ne disposent pas encore de ce fonctionnement autonome.',
+      justification: 'Les systèmes d\'automatisation et de contrôle « sont interopérables avec les différents systèmes techniques du bâtiment » (R175-3 3°). Les équipements listés ci-dessous ne communiquent pas avec la GTB. Le décret n\'impose ni solution ni composant particulier : un protocole normalisé, une interface de programmation (API) ou une passerelle conviennent — en général un module de communication sur le régulateur existant ou, à défaut, une passerelle. Le raccordement permet aussi l\'arrêt manuel depuis la GTB et préserve le fonctionnement autonome des systèmes (R175-3 4°).',
     },
-    r175_3_p3_replace: {
-      label: 'Prévoir le remplacement des équipements non communicants',
-      columns: ['zone', 'system', 'device'],
-      justification: 'Le décret (R175-3 3°) impose des équipements interopérables, capables de dialoguer avec la supervision. Les équipements ci-dessous ne sont pas communicants et ne peuvent pas être raccordés en l\'état : leur remplacement est à prévoir lors du prochain renouvellement.',
-    },
-    r175_3_p3_connect: {
-      label: 'Raccorder les équipements communicants à la GTB',
-      columns: ['zone', 'system', 'device'],
-      justification: 'Ces équipements sont communicants mais pas encore reliés à la supervision. Les raccorder permet le pilotage centralisé exigé par le décret (R175-3 3°), sans remplacer le matériel.',
+    meter_out_of_service: {
+      label: 'Remettre en service ou remplacer les compteurs hors service',
+      columns: ['zone', 'usage', 'meter_type'],
+      justification: `Ces compteurs sont hors service : les consommations correspondantes ne sont plus mesurées. ${METER_REQUIREMENT} Les éléments défaillants sont à réparer ou à remplacer rapidement (R175-4).`,
     },
   };
   function deriveGroupKey(item) {
-    // Compteurs : clé par category (subtype rarement set)
-    if (item.source_meter_id && item.category === 'meter_addition') return 'meter_addition';
-    if (item.source_meter_id && item.category === 'meter_connection') return 'meter_connection';
-    // Devices : subtype explicite
-    if (item.source_device_id && item.source_subtype) {
-      if (GROUP_LABELS[item.source_subtype]) return item.source_subtype;
-    }
+    if (item.source_subtype === 'system_not_interoperable') return 'system_connection';
+    if (!item.source_meter_id) return null; // sinon, seuls les compteurs sont groupés
+    if (item.source_subtype === 'meter_bms_integration') return 'meter_bms_integration';
+    if (item.source_subtype === 'meter_out_of_service') return 'meter_out_of_service';
+    if (item.category === 'meter_addition') return 'meter_addition';
+    if (item.category === 'meter_connection') return 'meter_connection';
     return null; // non groupable
   }
   function enrichItemForGroup(item) {
@@ -1163,8 +1505,15 @@ async function buildBacsAuditExportData(af, opts = {}) {
       device_brand: '',
       system_label: '',
     };
+    if (item.source_subtype === 'system_not_interoperable') {
+      const sys = systems.find(x => x.id === item.source_system_id);
+      out.system_label = sys ? (SYSTEM_LABEL[sys.system_category] || sys.system_category) : '—';
+      out.device_name = String(item.title_plain || '').replace(/^Raccorder à la GTB : /, '');
+    }
     if (item.source_meter_id) {
       const m = metersById.get(item.source_meter_id);
+      const em = enrichedMeters.find(x => x.id === item.source_meter_id);
+      if (em && em.mergedLeadGroup) out.zone_name = `${em.mergedLeadGroup} (zone regroupée)`;
       if (m) {
         out.meter_type = m.meter_type || null;
         out.meter_type_label = METER_TYPE_LABEL[m.meter_type] || m.meter_type || '—';
@@ -1187,17 +1536,22 @@ async function buildBacsAuditExportData(af, opts = {}) {
     const buckets = new Map();
     const result = [];
     // Étape 1 : remplir les buckets
+    // Un groupe ne réunit que des actions de même type, de même sévérité et
+    // de même portée (obligatoire / sous condition de TRI) : sinon la carte
+    // affichait la sévérité la plus haute et perdait la « Condition
+    // d'application » des actions mineures (relecture juridique R1 M1).
     for (const it of items) {
       const key = deriveGroupKey(it);
       if (!key) {
         result.push({ kind: 'single', item: it });
         continue;
       }
-      if (!buckets.has(key)) buckets.set(key, []);
-      buckets.get(key).push(it);
+      const bucketKey = `${key}|${it.severity}|${it.scope_condition ? 'conditional' : 'mandatory'}|${it.scope_note || ''}`;
+      if (!buckets.has(bucketKey)) buckets.set(bucketKey, { key, list: [] });
+      buckets.get(bucketKey).list.push(it);
     }
     // Étape 2 : décider grouper ou aplatir
-    for (const [key, list] of buckets) {
+    for (const { key, list } of buckets.values()) {
       if (list.length >= 3) {
         const cfg = GROUP_LABELS[key];
         // Severite = celle du 1er item du bucket (homogene pour un meme
@@ -1209,14 +1563,31 @@ async function buildBacsAuditExportData(af, opts = {}) {
           key,
           label: cfg.label,
           justification: cfg.justification || null,
+          // Bâtiment existant, systèmes raccordés sous condition de TRI
+          // (R175-2 II) : la condition, portée par chaque action, est
+          // rappelée une fois sur la carte groupée.
+          condition: list[0].scope_condition || null,
+          scope_note: list[0].scope_note || null,
           columns: cfg.columns,
           count: list.length,
           r175_article: list[0].r175_article,
           severity: sev,
-          severity_label: sev === 'blocking' ? 'Bloquantes' : sev === 'major' ? 'Majeures' : 'Optimisations',
+          severity_label: sev === 'blocking' ? 'Bloquantes' : sev === 'major' ? 'Majeures' : 'Mineures',
           severity_class: 'sev-' + sev,
           first_number: list[0].display_number,
           last_number: list[list.length - 1].display_number,
+          // Numéros du groupe : plages continues « BACS-009 → BACS-012 »,
+          // sinon énumération (un groupe n'est pas toujours d'un seul tenant).
+          numbers_label: (() => {
+            const nums = list.map(x => Number(String(x.display_number).replace(/\D/g, ''))).sort((x, y) => x - y);
+            const fmt = (n) => 'BACS-' + String(n).padStart(3, '0');
+            const runs = [];
+            for (const n of nums) {
+              const last = runs[runs.length - 1];
+              if (last && n === last[1] + 1) last[1] = n; else runs.push([n, n]);
+            }
+            return runs.map(([a, b]) => (a === b ? fmt(a) : b === a + 1 ? `${fmt(a)}, ${fmt(b)}` : `${fmt(a)} à ${fmt(b)}`)).join(', ');
+          })(),
           items: list.map(enrichItemForGroup),
         });
       } else {
@@ -1261,12 +1632,18 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // On résout les ids internes en noms d'équipement/système/zone — un
   // « #10818 » n'a aucun sens pour un property/asset manager.
   function actionSourceLabel(a) {
-    if (a.source_system_id)        return resolveTagAsPlain('system', a.source_system_id);
+    if (a.source_system_id) {
+      const label = resolveTagAsPlain('system', a.source_system_id) || '';
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
     if (a.source_meter_id) {
       const m = enrichedMeters.find(mm => mm.id === a.source_meter_id);
+      // Compteur unique d'une zone regroupée : l'origine est la zone regroupée
+      // entière, pas sa seule zone de rattachement (relecture PDF 2026-09-24).
+      const where = m && m.mergedLeadGroup ? `zone regroupée ${m.mergedLeadGroup}` : m?.zoneLabel;
       return m
         ? `Compteur ${m.usageLabel && m.usageLabel !== '—' ? m.usageLabel : (m.typeLabel || '')}`.trim()
-          + (m.zoneLabel ? ` · ${m.zoneLabel}` : '')
+          + (where ? ` · ${where}` : '')
         : 'Compteur';
     }
     if (a.source_thermal_id) {
@@ -1283,15 +1660,27 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Annexe C — on RÉSOUT les balises {{system:NNNN}} / {{zone:...}} / {{device:...}}
   // en libellé lisible (« ventilation · Plot Bureaux »), comme le chapitre 7.
   // Sans ça, un property/asset manager voyait « Raccorder {{system:10818}} au BACS ».
-  const justifications = actionItemsRaw.map(a => ({
-    title: stripActionTagsToPlain(a.title),
-    article: a.r175_article || '—',
-    source: actionSourceLabel(a),
-    // Structure la description en sous-sections HTML (Constat / Exigence /
-    // Recommandation…) comme le chapitre 7, au lieu d'un pavé aplati. Les
-    // balises {{system:…}} sont d'abord résolues en libellé lisible.
-    description: descriptionToHtml(stripActionTagsToPlain(a.description || a.title)),
-  }));
+  // Même ordre et mêmes numéros BACS-NNN que le plan (D-40) : le lecteur
+  // relie chaque justification à son action.
+  const rawActionById = new Map(actionItemsRaw.map(a => [a.id, a]));
+  // Origine lisible du constat, reprise par le tableau A3 du plan.
+  for (const a of numberedItems) a.source_label = actionSourceLabel(rawActionById.get(a.id) || a);
+  const justifications = numberedItems.map(a => {
+    const raw = rawActionById.get(a.id) || a;
+    return {
+      number: a.display_number,
+      title: stripActionTagsToPlain(raw.title),
+      article: raw.r175_article || '—',
+      source: actionSourceLabel(raw),
+      manual: raw.auto_generated === 0 || raw.auto_generated === false,
+      // Structure la description en sous-sections HTML (Constat / Exigence /
+      // Recommandation…) comme le plan, au lieu d'un pavé aplati. Les
+      // balises {{system:…}} sont d'abord résolues en libellé lisible.
+      description: descriptionToHtml(stripActionTagsToPlain(raw.description || raw.title)),
+    };
+  });
+  // Annexe C : justifications identiques regroupées (cf. _action-cards.js).
+  const justificationGroups = groupJustifications(justifications);
 
   // Articles BACS (Annexe A). Le texte riche vient du seed, mais la
   // TRAÇABILITÉ (version du décret + lien Légifrance + date d'effet) est
@@ -1312,6 +1701,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
       code: a.code,
       title: a.title,
       html: meta.body_html || a.full_html,
+      // Repère de lecture Buildy (dates calculées, report 2030…) : toujours
+      // issu du seed, jamais de bacs_knowledge — il n'est pas opposable et
+      // s'affiche à part du texte officiel.
+      reading_note_html: a.reading_note_html || null,
       source_url: meta.source_url || null,
       version_label: meta.version_label || null,
       effective_from: meta.effective_from || null,
@@ -1331,34 +1724,74 @@ async function buildBacsAuditExportData(af, opts = {}) {
     `).get(documentId).c;
     version = `bacs-v${previousCount + 1}`;
   }
+  // Libellé lisible de la version (couverture, en-tête) : le code interne
+  // « bacs-vN » reste celui des exports et du journal.
+  const versionLabel = previewMode ? 'Aperçu — document provisoire' : `Version ${version.replace(/^bacs-v/, '')}`;
 
-  const exportDate = new Date().toLocaleDateString('fr-FR', {
+  const exportDate = frLongDate(new Date().toISOString()) || new Date().toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
+
+  // Bouton « Devis » de la page de clôture : l'objet de l'e-mail cite le
+  // site et la date du rapport, pour rattacher la demande à cet audit.
+  const quoteClient = site?.customer_name || af.client_name || '';
+  const quoteSubject = `Devis de mise en conformité BACS — ${auditShortName(af)}`
+    + `${quoteClient ? ` (${quoteClient})` : ''} — rapport du ${exportDate}`;
+  const quoteMailto = `mailto:contact@buildy.fr?subject=${encodeURIComponent(quoteSubject)}`;
 
   // R175-6 applicabilite : declencheur (PC > 21/07/2021 OU travaux generateur)
   const R175_6_TRIGGER = '2021-07-21';
   const pcAfter = af.bacs_building_permit_date && af.bacs_building_permit_date > R175_6_TRIGGER;
-  const worksAfter = af.bacs_generator_works_date && af.bacs_generator_works_date > R175_6_TRIGGER;
+  // Travaux « engagés à compter d'un an après la publication » du décret du
+  // 20 juillet 2020 : le 21/07/2021 inclus (R175-6 II 2°).
+  const worksAfter = af.bacs_generator_works_date && af.bacs_generator_works_date >= R175_6_TRIGGER;
   // Formatage français des dates pour l'encart didactique du PDF
   // (« 15 mars 2018 » plutôt que « 2018-03-15 »).
   function frDate(isoDate) {
-    if (!isoDate) return null;
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
-    if (!m) return null;
-    return `${m[3]}/${m[2]}/${m[1]}`;
+    return frLongDate(isoDate);
   }
-  const r175_6_applicable = pcAfter || worksAfter
-    ? { applies: true,
-        reason: pcAfter && worksAfter
-          ? 'permis de construire postérieur au 21/07/2021 et travaux générateur récents'
-          : (pcAfter ? 'permis de construire postérieur au 21/07/2021' : 'travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021'),
-        permitDateFr: frDate(af.bacs_building_permit_date),
-        worksDateFr: frDate(af.bacs_generator_works_date) }
-    : { applies: false,
-        reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)',
-        permitDateFr: frDate(af.bacs_building_permit_date),
-        worksDateFr: frDate(af.bacs_generator_works_date) };
+  // R175-6 en 3 états (jamais « non applicable » déduit d'une date absente) :
+  //  - applies:true  → permis déposé ou travaux sur le générateur de chaleur
+  //                    après le 21/07/2021 ;
+  //  - applies:false → aucun chauffage, OU permis antérieur ET (date des
+  //                    derniers travaux antérieure, OU tous les générateurs de
+  //                    chaleur installés avant 2021 d'après leur âge) ;
+  //  - undetermined  → une date manque : « à confirmer » (verdict à qualifier).
+  const r175_6_dates = {
+    permitDateFr: frDate(af.bacs_building_permit_date),
+    worksDateFr: frDate(af.bacs_generator_works_date),
+  };
+  const r175_6_heating = thermal.filter(t => (t.category || 'heating') === 'heating');
+  const r175_6_genAges = r175_6_heating
+    .filter(t => t.generator_device_id != null)
+    .map(t => Number(t.generator_age_years));
+  const r175_6_currentYear = new Date().getFullYear();
+  const r175_6_generatorsOld = r175_6_genAges.length > 0
+    && r175_6_genAges.every(a => Number.isFinite(a) && a > 0 && r175_6_currentYear - a <= 2020);
+  let r175_6_applicable;
+  if (!r175_6_heating.length) {
+    r175_6_applicable = { applies: false, noHeating: true,
+      reason: 'aucun système de chauffage relevé sur le site', ...r175_6_dates };
+  } else if (pcAfter || worksAfter) {
+    r175_6_applicable = { applies: true,
+      reason: pcAfter && worksAfter
+        ? 'permis de construire déposé après le 21 juillet 2021 et travaux sur le générateur de chaleur engagés depuis cette date'
+        : (pcAfter ? 'permis de construire déposé après le 21 juillet 2021' : 'travaux d\'installation ou de remplacement d\'un générateur de chaleur engagés depuis le 21 juillet 2021'),
+      byWorks: !!worksAfter && !pcAfter,
+      ...r175_6_dates };
+  } else if (af.bacs_building_permit_date && (af.bacs_generator_works_date || r175_6_generatorsOld)) {
+    r175_6_applicable = { applies: false, basisAges: !af.bacs_generator_works_date,
+      reason: af.bacs_generator_works_date
+        ? 'permis de construire déposé au plus tard le 21 juillet 2021 et derniers travaux sur le générateur de chaleur antérieurs à cette date'
+        : 'permis de construire déposé au plus tard le 21 juillet 2021 et générateurs de chaleur installés avant 2021, d\'après leur âge',
+      ...r175_6_dates };
+  } else {
+    r175_6_applicable = { applies: false, undetermined: true,
+      reason: !af.bacs_building_permit_date
+        ? 'date du permis de construire non communiquée'
+        : 'permis de construire déposé au plus tard le 21 juillet 2021, mais date des derniers travaux sur le générateur de chaleur non communiquée',
+      ...r175_6_dates };
+  }
   // Réconciliation âge générateur ↔ applicabilité (point de vigilance ciblé) :
   // quand aucun déclencheur document-level n'est renseigné mais qu'un générateur
   // PRÉSENT est assez récent pour avoir été installé vers/après le 21/07/2021,
@@ -1385,13 +1818,21 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // sont ajoutees plus bas apres computeAutoPower() pour pouvoir afficher
   // dans le PDF page 7 ce que CHAQUE device apporte vraiment au cumul
   // R175-2 (ex : un radiateur eau chaude « hors cumul » a contrib = 0).
+  // Équipements de chauffage et de climatisation dont une puissance est
+  // saisie, plus les équipements de production SANS puissance (« Non
+  // renseignée — non comptée ») : le lecteur voit ce qui manque au cumul
+  // (relecture clarté R2 M5).
   const heatingCoolingBreakdown = devices
-    .filter(d => ['heating','cooling'].includes(d.system_category) && d.power_kw != null)
+    .filter(d => ['heating','cooling'].includes(d.system_category)
+      && (d.power_kw != null || d.power_kw_cooling != null
+        || (!isTrue(d.out_of_service) && !isTrue(d.is_backup) && parseRoles(d.device_role).includes('production'))))
     .map(d => ({
       id: d.id,
       name: d.name, brand: d.brand, model_reference: d.model_reference,
       power_kw: d.power_kw, quantity: d.quantity,
       total_power_kw: d.total_power_kw, has_multiple: d.has_multiple,
+      power_kw_cooling: d.power_kw_cooling, total_power_kw_cooling: d.total_power_kw_cooling,
+      power_missing: d.power_kw == null && d.power_kw_cooling == null,
       zone_name: d.zone_name,
       category: d.system_category,
       categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
@@ -1416,6 +1857,28 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // un bacs_audit. On garde isBacs/isSiteAudit en sortie pour compat des
   // templates existants — les `{{#if isBacs}}` continuent à s'appliquer.
   const isBacs = true;
+
+  // Chapitre « Inspections » (R175-5-1) : UNE règle d'affichage partagée par
+  // le sommaire, le titre et la numérotation du plan (sinon deux chapitres
+  // « 7 » : le chapitre s'affichait aussi sur « rien à tracer » alors que
+  // le sommaire ne le listait qu'avec une inspection saisie).
+  const hasInspectionData = !!(inspections && (inspections.last_inspection_date
+    || inspections.last_inspection_inspector || inspections.last_inspection_anomalies_html
+    || inspections.last_inspection_recommendations_html || inspections.next_inspection_due_date
+    || inspections.notes));
+  const showInspectionsChapter = isBacs && (hasInspectionData || isTrue(af.inspection_not_applicable));
+  const planChapterNumber = showInspectionsChapter ? 8 : 7;
+  // Encadré « aucune inspection tracée » : le texte dépend de
+  // l'assujettissement (l'inspection vise la GTB des bâtiments assujettis).
+  const applicabilityStatus = af.bacs_applicability_status || null;
+  const inspectionNotice = applicabilityStatus === 'not_subject'
+    ? { title: 'Inspection périodique sans objet.',
+        body: 'Le bâtiment n\'est pas assujetti au décret BACS : l\'inspection périodique de la GTB (R175-5-1) ne s\'applique pas.' }
+    : applicabilityStatus
+      ? { title: 'Aucune inspection tracée dans l\'audit.',
+          body: 'Pour ce bâtiment assujetti, l\'inspection périodique de la GTB est obligatoire : au plus tard le 1er janvier 2025 pour une GTB déjà en place au 8 avril 2023, sinon dans les deux ans qui suivent son installation, puis au moins tous les cinq ans. Elle relève de l\'initiative du propriétaire et reste distincte du présent audit.' }
+      : { title: 'Aucune inspection à déclarer.',
+          body: 'L\'inspection périodique de la GTB (R175-5-1) relève de l\'initiative du propriétaire ; elle est distincte du présent audit.' };
 
   // ── Charts (lot B2) ──
   // Donut severite : 3 segments des actions correctives.
@@ -1463,7 +1926,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
         : u === 'dhw' ? 'dhw'
         : 'lighting'],
     }));
-  const barUsagePowerDataUrl = barItems.length ? await getCharts().barUsagePower({ items: barItems }) : null;
+  // Graphique « puissance par usage » retiré du rapport (relecture PDF
+  // 2026-09-24) : il additionnait les puissances brutes de tous les
+  // équipements, émetteurs compris, et contredisait la puissance retenue du
+  // tableau de calcul juste au-dessus. `barItems` reste exposé pour le débogage.
+  const barUsagePowerDataUrl = null;
 
   // Recap chiffre pour le PDF tableaux de synthese (4 tuiles d'en-tete)
   // ATTENTION : les champs *Integrated agregent historiquement null + false.
@@ -1489,7 +1956,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // (metersPresenceUnanswered). Les hors-service sont exclus (existent
     // physiquement, seront remplacés). Aligne avec _meter-coverage et le MCP.
     metersMissing: enrichedMeters.filter(m => m.required && isFalse(m.present_actual) && !m.out_of_service).length,
-    metersPresenceUnanswered: enrichedMeters.filter(m => m.required && m.present_actual == null && !m.out_of_service).length,
+    metersPresenceUnanswered: enrichedMeters.filter(m => m.required && m.present_actual == null && !m.out_of_service && !m.coveredByGroup && !m.notRequiredReason).length,
+    // Compteurs requis ET présents (tuile A3 « requis présents / requis ») :
+    // metersPresent compte aussi les compteurs non requis (eau, etc.).
+    metersRequiredPresent: enrichedMeters.filter(m => m.required && isTrue(m.present_actual) && !m.out_of_service).length,
+    // Tuile A3 alignée sur le plan d'actions (relecture clarté R2 M9) : les
+    // compteurs « à installer » sont ceux du plan ; ceux couverts par le
+    // comptage unique d'une zone regroupée sont comptés à part.
+    metersCoveredByGroup: enrichedMeters.filter(m => m.coveredByGroup && !isTrue(m.present_actual)).length,
+    metersRequiredEffective: enrichedMeters.filter(m => m.required && !m.notRequiredReason && !(m.coveredByGroup && !isTrue(m.present_actual))).length,
+    metersToInstall: numberedItems.filter(a => a.category === 'meter_addition' && !['done', 'declined'].includes(a.status)).length,
+    metersToInstallConditional: numberedItems.filter(a => a.category === 'meter_addition' && !['done', 'declined'].includes(a.status) && a.scope_condition).length,
   };
 
   // ── Items 5 + 8 — cumul automatique des puissances ──
@@ -1508,10 +1985,30 @@ async function buildBacsAuditExportData(af, opts = {}) {
       reasonLabel: d._power.reason ? (POWER_EXCLUSION_REASON_LABEL[d._power.reason] || null) : null,
     });
   }
+  // Puissance RETENUE par système (chauffage, climatisation, ventilation) :
+  // l'en-tête de la carte affichait la somme brute (secours et émetteurs
+  // compris), près du double de la puissance retenue du site (relecture
+  // clarté R2 M4). Les équipements partagés portent aussi leur calcul.
   for (const sys of enrichedSystems) {
+    let retained = 0;
     for (const d of sys.devices) {
       const pc = powerCalcByDeviceId.get(d.id);
+      if (!pc) continue;
+      d.powerCalc = pc;
+      if (sys.system_category === 'heating') retained += pc.heat || 0;
+      else if (sys.system_category === 'cooling') retained += pc.cool || 0;
+      else if (sys.system_category === 'ventilation') retained += Math.max(pc.heat || 0, pc.cool || 0);
+    }
+    for (const d of sys.shared_devices || []) {
+      const pc = powerCalcByDeviceId.get(d.id);
       if (pc) d.powerCalc = pc;
+    }
+    sys.display_power_kw = sys.total_power_kw;
+    if (['heating', 'cooling', 'ventilation'].includes(sys.system_category)) {
+      sys.retained_power_kw = Math.round(retained * 10) / 10;
+      // Installé > retenu (secours, émetteurs, aval) : on affiche les deux.
+      sys.power_differs = (sys.total_power_kw || 0) > sys.retained_power_kw + 0.05;
+      if (!sys.power_differs && sys.retained_power_kw > 0) sys.display_power_kw = sys.retained_power_kw;
     }
   }
   // Enrichi le breakdown avec les contributions effectives R175-2 : un
@@ -1546,7 +2043,6 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Regroupe, par catégorie technique, les zones desservies par un
   // équipement partagé non séparable (metering_separable='no'). Chaque
   // regroupement est accompagné de sa justification écrite pour le PDF.
-  const functionalZones = computeFunctionalZones(devices, systems, { SYSTEM_LABEL });
 
   // Synthese de conformite (cover + page L'essentiel + tableau de bord R175)
   // La puissance affichée dans le calcul d'assujettissement R175-2 suit le
@@ -1569,9 +2065,56 @@ async function buildBacsAuditExportData(af, opts = {}) {
       effectiveKw: powerSummary.effectiveKw,
       autoHeatKw: autoPower.heatKw,
       autoCoolKw: autoPower.coolKw,
+      // Puissances non saisies → statut « présumé » (jamais présenté
+      // comme un constat « entre 70 et 290 kW »).
+      incompletePowerCount: powerSummary.incompletePowerCount || 0,
     },
     recapStats,
   });
+
+  // Site sans GTB : les exigences R175-3 à R175-5 sont non conformes sans
+  // action propre — toutes relèvent de « Mettre en place une GTB ». La
+  // colonne des actions y renvoie au lieu d'un « — » (relecture clarté R2 m27).
+  {
+    const noGtbAction = numberedItems.find(a => a.source_subtype === 'no_gtb' && !['done', 'declined'].includes(a.status));
+    if (noGtbAction && compliance?.r175Dashboard) {
+      for (const row of compliance.r175Dashboard) {
+        if (row.verdict === 'non_compliant' && !row.actionsCount && row.axis !== 'r175_2') {
+          row.seeActionNumber = noGtbAction.display_number;
+        }
+      }
+    }
+  }
+
+  // Constat identique sur plusieurs exigences (site sans GTB, GTB hors
+  // service, présence non renseignée) : imprimé une seule fois au-dessus du
+  // tableau de bord au lieu d'être répété ligne par ligne, pour que le
+  // tableau tienne sur une page (relecture PDF 2026-09-24). Présentation PDF
+  // seulement : `note` reste intact pour les autres consommateurs.
+  let r175DashboardCommonNote = null;
+  if (compliance?.r175Dashboard) {
+    const SHARED_NOTE_PLURAL = {
+      'Aucune GTB sur le site — exigence non satisfaite.':
+        'aucune GTB sur le site, ces exigences ne sont pas satisfaites.',
+      'GTB hors service — exigence non satisfaite tant qu\'elle n\'est pas remise en service.':
+        'GTB hors service, ces exigences ne sont pas satisfaites tant qu\'elle n\'est pas remise en service.',
+      'Présence d\'une GTB non renseignée lors de l\'audit : cette exigence reste à qualifier.':
+        'présence d\'une GTB non renseignée lors de l\'audit, ces exigences restent à qualifier.',
+    };
+    const rows = compliance.r175Dashboard;
+    for (const [note, plural] of Object.entries(SHARED_NOTE_PLURAL)) {
+      const idx = rows.map((r, i) => (r.note === note ? i : -1)).filter(i => i >= 0);
+      if (idx.length < 2) continue;
+      const codeOf = (i) => rows[i].displayCode || rows[i].code;
+      const contiguous = idx.every((v, k) => k === 0 || v === idx[k - 1] + 1);
+      const codes = contiguous
+        ? `${codeOf(idx[0])} à ${codeOf(idx[idx.length - 1])}`
+        : idx.map(codeOf).join(', ');
+      for (const i of idx) rows[i].noteShared = true;
+      r175DashboardCommonNote = { codes, text: plural };
+      break;
+    }
+  }
 
   // Lien Légifrance par axe du tableau de bord R175 : chaque exigence renvoie
   // au texte officiel de son article parent (source unique bacs_knowledge).
@@ -1591,6 +2134,44 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Vue satellite statique du site (Google Static Maps) embarquée en data
   // URL. Best-effort : null si la clé/API est indisponible → PDF sans vue.
   // `zones` sert de repli de centrage quand le site n'a pas de coordonnées.
+  // ── Annexe « Documents joints » : documents du site cochés « Inclure dans
+  // le rapport » (décochés par défaut). Vignettes pour les images qui ne sont
+  // pas déjà imprimées dans un chapitre.
+  let reportAttachments = [];
+  if (site) {
+    const attachmentRows = db.db.prepare(`
+      SELECT * FROM site_documents
+      WHERE site_id = ? AND include_in_report = 1
+    `).all(site.site_id);
+    if (attachmentRows.length) {
+      const devLabel = (d) => d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || `Équipement ${d.id}`;
+      reportAttachments = buildReportAttachments(attachmentRows, {
+        documentId,
+        zonesById: new Map(zones.map(z => [z.zone_id, { label: z.name }])),
+        systemsById: new Map(enrichedSystems.map(x => [x.id, {
+          label: [x.displayLabel || x.categoryLabel, x.zone_name].filter(Boolean).join(' · '),
+        }])),
+        devicesById: new Map(devices.map(d => [d.id, { label: devLabel(d) }])),
+        metersById: new Map(enrichedMeters.map(m => [m.id, {
+          label: [m.typeLabel, m.usageLabel, m.zone_id ? m.zone_name : 'Général bâtiment'].filter(Boolean).join(' · '),
+        }])),
+        actionsById: new Map(numberedItems.map(a => [a.id, { label: a.display_number }])),
+        checklistById: new Map(db.db.prepare(`
+          SELECT c.id, cat.label FROM bacs_audit_checklist c
+          LEFT JOIN bacs_checklist_catalog cat ON cat.key = c.catalog_key
+          WHERE c.document_id = ?
+        `).all(documentId).filter(r => r.label).map(r => [r.id, { label: r.label }])),
+        chapters: { zones: 2, systems: 3, meters: 4, bms: 6 },
+      });
+      const attachmentsRoot = path.resolve(config.attachmentsDir, '..', 'site-documents', site.site_uuid);
+      await Promise.all(reportAttachments.filter(a => a.needsThumbnail).map(async (a) => {
+        a.dataUrl = await optimizeFileToDataUrl(path.join(attachmentsRoot, a.filename)).catch(() => null);
+      }));
+    }
+  }
+  const reportAttachmentImages = reportAttachments.filter(a => a.dataUrl);
+  const reportAttachmentTranscripts = reportAttachments.filter(a => a.transcript);
+
   const siteMapDataUrl = await buildSiteStaticMap({ site, zones });
   // Vue satellite annotée pour le chapitre 2 « Zones fonctionnelles ».
   // Apparaît uniquement si au moins une zone a des coordonnées GPS.
@@ -1646,6 +2227,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
   return {
     document: auditDocument,
     isBacs,
+    showInspectionsChapter,
+    planChapterNumber,
+    inspectionNotice,
     isSiteAudit: !isBacs,
     site,
     siteMapDataUrl,
@@ -1681,16 +2265,59 @@ async function buildBacsAuditExportData(af, opts = {}) {
     systemsByZoneForSynthesis: systemsByZone
       .map(g => ({ ...g, items: g.items.filter(s => s.present === 1 && (s.device_count || 0) > 0) }))
       .filter(g => g.items.length),
+    synthesisShowLocation,
+    synthesisShowGtb,
+    synthesisSystemsColspan,
     // Zones fonctionnelles sans système thermique présent (hors R175-2).
     zonesOutOfBacsScope,
     // Item 7d/7e — zones fonctionnelles de suivi (regroupement + justification).
     functionalZones,
     // Item 4 — structure juridique + assujettissement par périmètre.
     ownershipStructureLabel,
+    defaultLiability,
+    // Chapitre 3 : un encadré unique explique le raccordement « sous
+    // condition de TRI » (bâtiment existant), au lieu d'une répétition par système.
+    hasConditionalSystems: enrichedSystems.some(s => s.compliance && s.compliance.verdict === 'conditional'),
+    siteWithoutGtb,
+    // Bandeau GTB des tableaux A3 : marque et modèle non répétés s'ils
+    // figurent déjà dans le nom de la solution (R2 m18).
+    gtbBanner: (() => {
+      if (!bms) return null;
+      const name = String(bms.existing_solution || '').trim();
+      const has = (part) => !!part && name.toLowerCase().includes(String(part).trim().toLowerCase());
+      const brand = String(bms.existing_solution_brand || '').trim();
+      const model = String(bms.model_reference || '').trim();
+      return {
+        name: name || 'Solution non renseignée',
+        brand: brand && !has(brand) ? brand : null,
+        model: model && !has(model) ? model : null,
+      };
+    })(),
+    // « Points à qualifier » de L'essentiel : exigences dont le verdict reste
+    // indéterminé faute d'information, et compteurs requis dont la présence
+    // n'est pas vérifiée (relecture clarté R2 m31, juridique R1 m10).
+    pointsToQualify: [
+      ...(compliance.r175Dashboard || [])
+        .filter(r => r.verdict === 'unknown')
+        .map(r => {
+          const note = (r.note || '').replace(/^Information non communiquée lors de l'audit : /, '');
+          return `${r.label} (${r.displayCode})${note ? ` : ${note.charAt(0).toLowerCase()}${note.slice(1)}` : ' : à qualifier.'}`;
+        }),
+      ...(recapStats.metersPresenceUnanswered
+        ? [recapStats.metersPresenceUnanswered > 1
+          ? `La présence de ${recapStats.metersPresenceUnanswered} compteurs requis n'a pas été vérifiée lors de l'audit (chapitre 4).`
+          : 'La présence d\'un compteur requis n\'a pas été vérifiée lors de l\'audit (chapitre 4).']
+        : []),
+    ],
+    maintenanceReserveNumber: (numberedItems.find(a => a.source_subtype === 'maintenance' && !['done', 'declined'].includes(a.status)) || {}).display_number || null,
     ownershipNotes: site?.ownership_notes || null,
     siteParties: sitePartiesEnriched,
     hasLiabilityData,
     compliance,
+    r175DashboardCommonNote,
+    reportAttachments,
+    reportAttachmentImages,
+    reportAttachmentTranscripts,
     meters: enrichedMeters,
     // Vue filtrée pour le tableau du chapitre 4 (sans les compteurs ni
     // requis ni présents — bruit pour l'intégrateur).
@@ -1698,6 +2325,25 @@ async function buildBacsAuditExportData(af, opts = {}) {
     metersWithDetails,
     thermal,
     bms,
+    // Ligne « Accès du gestionnaire et des exploitants aux données » dérivée
+    // des deux questions détaillées quand elles sont répondues (sinon le
+    // champ global) : plus de « Partiel » contredit par deux « Non » (R2 M14).
+    dataAccessRow: (() => {
+      if (!bms) return null;
+      const m = bms.data_provision_to_manager;
+      const o = bms.data_provision_to_operators;
+      const yn = (v) => (isTrue(v) ? 'oui' : 'non');
+      if ((isTrue(m) || isFalse(m)) && (isTrue(o) || isFalse(o))) {
+        if (isTrue(m) && isTrue(o)) return { state: 'yes', label: 'Oui' };
+        if (isFalse(m) && isFalse(o)) return { state: 'no', label: 'Non' };
+        return { state: 'partial', label: `Partiel (gestionnaire : ${yn(m)} ; exploitants : ${yn(o)})` };
+      }
+      const g = bms.gestionnaire_exploitant_access;
+      if (g === 'yes') return { state: 'yes', label: 'Oui' };
+      if (g === 'no') return { state: 'no', label: 'Non' };
+      if (g === 'partial') return { state: 'partial', label: 'Partiel' };
+      return { state: null, label: 'Non renseigné' };
+    })(),
     bmsComponents,
     inspections,
     bmsManagedDevices,
@@ -1706,14 +2352,19 @@ async function buildBacsAuditExportData(af, opts = {}) {
     bmsUnmanagedDevicesByZone,
     bmsUnansweredDevices,
     bmsUnansweredDevicesByZone,
+    bmsNotTargetedDevices,
+    bmsOutOfScopeDevices,
     bmsDevicesByZone,
     bmsManagedMeters,
+    bmsBrokenLinkMeters,
     bmsUnmanagedMeters,
     bmsUnansweredMeters,
     bmsMetersByEnergy,
     metersByZone,
+    metersAnyOutOfService,
     meterCoverageMatrix,
     meterEnergyGroups,
+    meterCoveredCount: enrichedMeters.filter(m => m.coveredByGroup && !isTrue(m.present_actual)).length,
     recapStats,
     buildySolution,
     actionItems,
@@ -1725,6 +2376,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // Cf. _action-cards.js. La carte 'bms' contient des sous-sections.
     actionItemsByCard,
     actionStats,
+    exemptionItems,
+    vigilanceItems,
+    outOfDecreeItems,
     bmsTopicNotes,
     bmsTopicOpportunities,
     // actionItemsRaw expose en realite les items NUMEROTES (BACS-XXX) pour
@@ -1733,6 +2387,28 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // depuis numberedItems.
     actionItemsRaw: numberedItems,
     synthesisHtml: af.audit_synthesis_html || null,
+    // Note de synthèse (rédigée par l'IA) : datée, et signalée si le plan
+    // d'actions a changé après sa rédaction (le tableau de bord et le plan
+    // font alors foi).
+    ...(() => {
+      if (!af.audit_synthesis_html || !af.audit_synthesis_generated_at) return { synthesisDateFr: null, synthesisStale: false };
+      const generated = new Date(af.audit_synthesis_generated_at);
+      if (isNaN(generated)) return { synthesisDateFr: null, synthesisStale: false };
+      const last = db.db.prepare(
+        'SELECT MAX(updated_at) AS m FROM bacs_audit_action_items WHERE document_id = ? AND auto_generated = 1'
+      ).get(documentId)?.m;
+      const lastDate = last ? new Date(String(last).replace(' ', 'T') + 'Z') : null;
+      const stale = !!(lastDate && !isNaN(lastDate) && lastDate > generated);
+      const dateFr = generated.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      return {
+        synthesisDateFr: generated.getDate() === 1 ? dateFr.replace(/^1 /, '1er ') : dateFr,
+        synthesisStale: stale,
+        // Note périmée (plan modifié depuis sa rédaction) : jamais imprimée,
+        // elle contredirait L'essentiel et le plan (relectures R1 M5, R2 C1) ;
+        // le précheck demande de la régénérer (SYN-001).
+        ...(stale ? { synthesisHtml: null } : {}),
+      };
+    })(),
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
     // Vue récapitulative R175-2 (chaud retenu, froid retenu, max retenu).
@@ -1751,17 +2427,32 @@ async function buildBacsAuditExportData(af, opts = {}) {
       `).get();
       if (!row?.dt) return null;
       const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(row.dt);
-      return m ? `R175 version applicable au ${m[3]}/${m[2]}/${m[1]}` : `R175 version du ${row.dt}`;
+      return m ? `Articles R175-1 à R175-6, version du ${new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).replace(/^1 /, '1er ')}` : `Articles R175-1 à R175-6, version du ${row.dt}`;
     })(),
     r175_6_applicable,
     complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
     applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,
+    closingDeadlinePhrase: CLOSING_DEADLINE_PHRASE[af.bacs_applicability_status] || '',
+    // Actions et réserves comptées à part sur la page de clôture (R2 m13).
+    closingActionCount: actionStats.blocking + actionStats.major + actionStats.minor,
+    closingConditionalCount: numberedItems.filter(a => a.scope_condition && !a.is_reserve).length,
+    closingInspectionNote: showInspectionsChapter && bms && isTrue(bms.present)
+      ? `L'inspection de la GTB en place suit l'échéance propre de l'article R175-5-1 (chapitre 7).`
+      : '',
     bacsArticles,
     methodology,
     disclaimers,
     justifications,
-    authorName: user?.display_name || 'Buildy Docs',
+    justificationGroups,
+    // Auditeur = créateur de l'audit (pas la personne qui exporte) ; repli
+    // sur l'utilisateur courant, puis « Buildy » (jamais un nom interne).
+    authorName: (() => {
+      const creator = af.created_by ? db.users.getById(af.created_by) : null;
+      return creator?.display_name || user?.display_name || 'Buildy';
+    })(),
     exportDate,
+    quoteMailto,
+    versionLabel,
     version,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
     logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),

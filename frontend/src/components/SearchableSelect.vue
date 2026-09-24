@@ -50,6 +50,9 @@ const props = defineProps({
   multiple: { type: Boolean, default: false },
   // Si true : habillage rouge pâle pour signaler une info manquante.
   invalid: { type: Boolean, default: false },
+  // Teinte de `invalid` : 'red' (défaut) ou 'amber' (« à compléter »,
+  // ambre en pointillés — réserve le rouge aux non-conformités).
+  invalidTone: { type: String, default: 'red' },
   // Si true : groupe visuellement les options par le champ `hint` (sous-titre
   // saillant avant chaque nouveau groupe). Le hint disparaît alors de la
   // ligne d'option (déjà porté par le sous-titre). Pratique pour grouper les
@@ -77,7 +80,9 @@ const triggerCls = computed(() => [
   props.autoWidth
     ? 'inline-flex max-w-full items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9'
     : 'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9',
-  props.invalid ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
+  props.invalid
+    ? (props.invalidTone === 'amber' ? 'bg-amber-50 border-amber-300 border-dashed' : 'bg-red-50 border-red-300')
+    : 'bg-white border-gray-200',
   props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
   props.disabled ? 'opacity-50 cursor-not-allowed' : '',
 ])
@@ -315,18 +320,22 @@ function clear() {
 <template>
   <div ref="rootRef" class="relative" @keydown="onKeydown">
     <button ref="triggerRef" type="button" @click="toggle" :disabled="disabled"
+            data-select-trigger
             :class="triggerCls">
       <!-- Mode multi : chips. Click sur ✕ retire la valeur sans ouvrir le popover. -->
       <template v-if="multiple">
         <span v-if="!selectedOptions.length"
               class="flex-1 text-left truncate text-gray-400 italic">{{ placeholder }}</span>
-        <span v-else class="flex-1 flex flex-nowrap items-center gap-1">
+        <!-- min-w-0 : dans une case étroite, les chips se tronquent (…) au
+             lieu de déborder sur la case voisine. -->
+        <span v-else class="flex-1 min-w-0 flex flex-nowrap items-center gap-1">
           <!-- Mig 187 v13 — Si `chipLimit > 0` et que la sélection dépasse,
                on affiche les N premières chips suivies d'un badge compact
                « + M équipements » au lieu de toutes les chips wrap qui
                cassaient la ligne (multiselect 1ʳᵉ ligne dans card 06). -->
           <span v-for="o in visibleChips" :key="o.value"
-                class="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]">
+                class="inline-flex min-w-0 items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]"
+                v-tooltip="o.chipLabel || o.label">
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
                              :style="{ color: o.color || '#6b7280' }"
                              class="w-3 h-3 shrink-0" />

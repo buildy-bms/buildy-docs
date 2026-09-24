@@ -10,16 +10,18 @@
 
   Arguments passés via {{> _action-group sev="..." sevLabel="..." sevClass="..."}} :
     sevClass = sev-blocking | sev-major | sev-minor
-    sevLabel = "Bloquantes" | "Majeures" | "Optimisations"
+    sevLabel = "Bloquantes" | "Majeures" | "Mineures"
 --}}
 <div class="action-card action-card-grouped {{#if (eq sev "minor")}}action-card-minor{{/if}}">
   <div class="action-card-head">
-    <span class="action-num action-num-range">{{first_number}} → {{last_number}}</span>
+    <span class="action-num action-num-range">{{#if numbers_label}}{{numbers_label}}{{else}}{{first_number}} à {{last_number}}{{/if}}</span>
     <span class="sev {{sevClass}}">{{sevLabel}} × {{count}}</span>
     {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
   </div>
   <div class="action-card-title"><strong>{{label}}</strong></div>
   {{#if justification}}<div class="action-group-justif">{{justification}}</div>{{/if}}
+  {{#if condition}}<div class="action-group-justif action-group-condition"><strong>Condition d'application.</strong> {{condition}}</div>{{/if}}
+  {{#if scope_note}}<div class="action-group-justif action-group-condition"><strong>Portée à confirmer.</strong> {{scope_note}}</div>{{/if}}
   <table class="action-group-table">
     <thead>
       <tr>

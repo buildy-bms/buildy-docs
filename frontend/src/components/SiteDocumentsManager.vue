@@ -10,6 +10,8 @@ import {
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { meterUsageLabel } from '@/lib/meter-options'
+import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 
 /**
  * Manager des fichiers DOE rattachés à un site (visibles depuis l'audit BACS).
@@ -23,6 +25,13 @@ const props = defineProps({
   meters: { type: Array, default: () => [] },
   devices: { type: Array, default: () => [] },
   bms: { type: Object, default: () => ({}) },
+  // Points de check-list et actions de l'audit : nomment le rattachement
+  // des documents déposés depuis la check-list ou une action.
+  checklist: { type: Array, default: () => [] },
+  actions: { type: Array, default: () => [] },
+  // Zone de dépôt sur une seule ligne (étape Documents de l'audit à onglets) :
+  // mêmes textes, hauteur divisée par ~4.
+  compact: { type: Boolean, default: false },
 })
 
 const { success, error } = useNotification()
@@ -114,6 +123,29 @@ async function patchDoc(d, patch) {
   }
 }
 
+// Case « Inclure dans le rapport » (annexe E « Documents joints » du PDF),
+// décochée par défaut. Mise à jour immédiate à l'écran, puis enregistrement.
+const includedCount = computed(() => documents.value.filter(d => d.include_in_report).length)
+function setInReport(d, value) {
+  const before = d.include_in_report
+  d.include_in_report = value ? 1 : 0
+  updateSiteDocument(d.id, { include_in_report: !!value }).catch(() => {
+    d.include_in_report = before
+    error('Sauvegarde impossible')
+  })
+}
+async function setSelectionInReport(value) {
+  const docs = documents.value.filter(d => selectedIds.value.has(d.id))
+  if (!docs.length) return
+  const results = await Promise.allSettled(docs.map(d => {
+    d.include_in_report = value ? 1 : 0
+    return updateSiteDocument(d.id, { include_in_report: !!value })
+  }))
+  const failed = results.filter(r => r.status === 'rejected').length
+  if (failed) { error('Sauvegarde partielle — recharge la page'); refresh(); return }
+  success(`${docs.length} document${docs.length > 1 ? 's' : ''} ${value ? 'inclus dans le' : 'retiré' + (docs.length > 1 ? 's' : '') + ' du'} rapport`)
+}
+
 async function removeDoc(d) {
   const ok = await confirm({
     title: 'Supprimer ce document ?',
@@ -133,8 +165,8 @@ async function removeDoc(d) {
 function fmtSize(b) {
   if (!b) return ''
   if (b < 1024) return b + ' B'
-  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' Ko'
-  return (b / 1024 / 1024).toFixed(1) + ' Mo'
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1).replace('.', ',') + ' Ko'
+  return (b / 1024 / 1024).toFixed(1).replace('.', ',') + ' Mo'
 }
 
 // EXIF helpers — `taken_at` est une string ISO, `gps_latitude/longitude`
@@ -188,20 +220,43 @@ function attachmentLabel(d) {
   }
   if (d.bacs_audit_meter_id) {
     const m = props.meters.find(x => x.id === d.bacs_audit_meter_id)
-    return { kind: 'Compteur', label: m ? `${m.usage} ${m.zone_name ? '/ ' + m.zone_name : ''}`.trim() : `Compteur #${d.bacs_audit_meter_id}` }
+    return { kind: 'Compteur', label: m ? `${meterUsageLabel(m.usage)} ${m.zone_name ? '/ ' + m.zone_name : ''}`.trim() : `Compteur #${d.bacs_audit_meter_id}` }
   }
   if (d.bacs_audit_bms_document_id) {
     return { kind: 'GTB', label: props.bms?.existing_solution || 'GTB' }
   }
-  return { kind: 'Site', label: '— non rattaché' }
+  if (d.bacs_audit_checklist_id) {
+    const c = props.checklist.find(x => x.id === d.bacs_audit_checklist_id)
+    return { kind: 'Check-list', label: c?.label || '' }
+  }
+  if (d.bacs_audit_action_item_id) {
+    const a = props.actions.find(x => x.id === d.bacs_audit_action_item_id)
+    return { kind: 'Action', label: a?.display_number || '' }
+  }
+  if (d.bacs_audit_inspection_id) {
+    return { kind: 'Inspection', label: 'périodique' }
+  }
+  // Document de l'ensemble du site (plan, schéma, manuel…), sans élément
+  // précis : il EST rattaché au site. L'ancien libellé « Site — non
+  // rattaché », sous l'en-tête « Rattaché à », se contredisait.
+  return {
+    kind: 'Site', label: '',
+    tooltip: 'Document de l\'ensemble du site, sans élément précis (zone, système, compteur ou GTB).',
+  }
 }
 
 const previewDoc = ref(null)
+// Aperçu d'un PDF dans une fenêtre de l'appli (plus de téléchargement forcé).
+const viewerDoc = ref(null)
 function isImage(d) {
   return (d.mime_type || '').startsWith('image/') || d.category === 'photo'
 }
+function isPdf(d) {
+  return d.mime_type === 'application/pdf' || /\.pdf$/i.test(d.original_name || '')
+}
 function openPreview(d) {
   if (isImage(d)) previewDoc.value = d
+  else if (isPdf(d)) viewerDoc.value = d
   else window.open(getSiteDocumentDownloadUrl(d.id), '_blank')
 }
 
@@ -270,7 +325,8 @@ onBeforeUnmount(() => {
     <!-- Drop zone — pleine largeur, point d'entrée principal -->
     <div
       :class="[
-        'w-full border-2 border-dashed rounded-xl px-6 py-12 text-center transition-all cursor-pointer',
+        'w-full border-2 border-dashed rounded-xl text-center transition-all cursor-pointer',
+        compact ? 'px-4 py-3 flex items-center justify-center gap-3 flex-wrap' : 'px-6 py-12',
         dragOver
           ? 'border-indigo-500 bg-indigo-50 scale-[1.01] shadow-sm'
           : 'border-gray-300 bg-gray-50/40 hover:border-indigo-400 hover:bg-indigo-50/30',
@@ -282,14 +338,14 @@ onBeforeUnmount(() => {
     >
       <input ref="fileInput" type="file" class="hidden" @change="onPick"
              accept=".pdf,.dwg,.png,.jpg,.jpeg,.webp,.xls,.xlsx,.doc,.docx,.txt" />
-      <PaperClipIcon :class="['w-12 h-12 mx-auto transition', dragOver ? 'text-indigo-500' : 'text-gray-400']" />
-      <p class="mt-3 text-base font-medium text-gray-700">
+      <PaperClipIcon :class="['transition', compact ? 'w-6 h-6 shrink-0' : 'w-12 h-12 mx-auto', dragOver ? 'text-indigo-500' : 'text-gray-400']" />
+      <p :class="compact ? 'text-sm font-medium text-gray-700' : 'mt-3 text-base font-medium text-gray-700'">
         Glisser-déposer un fichier ici
       </p>
-      <p class="mt-1 text-sm text-gray-500">
+      <p :class="compact ? 'text-sm text-gray-500' : 'mt-1 text-sm text-gray-500'">
         ou <span class="text-indigo-600 font-semibold underline-offset-2 hover:underline">parcourir l'ordinateur</span>
       </p>
-      <p class="mt-3 text-[11px] text-gray-400">PDF, DWG, images, Office… 25 Mo max</p>
+      <p :class="compact ? 'text-[11px] text-gray-400' : 'mt-3 text-[11px] text-gray-400'">PDF, DWG, images, Office… 25 Mo max</p>
     </div>
 
     <!-- Liste -->
@@ -304,7 +360,15 @@ onBeforeUnmount(() => {
       <span class="text-xs text-indigo-800 font-medium">
         {{ selectedIds.size }} document{{ selectedIds.size > 1 ? 's' : '' }} sélectionné{{ selectedIds.size > 1 ? 's' : '' }}
       </span>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap justify-end">
+        <button @click="setSelectionInReport(true)"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 rounded-lg">
+          Inclure dans le rapport
+        </button>
+        <button @click="setSelectionInReport(false)"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg">
+          Retirer du rapport
+        </button>
         <button @click="downloadSelection"
                 class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm">
           <ArrowDownTrayIcon class="w-3.5 h-3.5" /> Télécharger
@@ -320,7 +384,14 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="!loading && documents.length" class="mt-4 overflow-x-auto">
+    <p v-if="!loading && documents.length" class="mt-4 text-xs text-gray-500">
+      <span class="font-semibold text-gray-700">{{ includedCount }}</span>
+      document{{ includedCount > 1 ? 's' : '' }} sur {{ documents.length }}
+      inclus dans le rapport PDF (annexe « Documents joints »). Coche « Inclure » pour ajouter un document ;
+      les photos rattachées à une zone, un système, un équipement, un compteur ou la GTB figurent déjà dans leur chapitre.
+    </p>
+
+    <div v-if="!loading && documents.length" class="mt-2 overflow-x-auto">
     <table class="w-full text-sm table-fixed">
       <colgroup>
         <col class="w-10" />
@@ -328,6 +399,7 @@ onBeforeUnmount(() => {
         <col />
         <col class="w-48" />
         <col class="w-60" />
+        <col class="w-24" />
         <col class="w-24" />
         <col class="w-28" />
       </colgroup>
@@ -341,6 +413,7 @@ onBeforeUnmount(() => {
           <th class="text-left px-3 py-2">Catégorie</th>
           <th class="text-left px-3 py-2">Rattaché à</th>
           <th class="text-right px-3 py-2">Taille</th>
+          <th class="text-center px-3 py-2">Rapport</th>
           <th class="text-center px-3 py-2">Actions</th>
         </tr>
       </thead>
@@ -355,6 +428,9 @@ onBeforeUnmount(() => {
               <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title || d.original_name || 'Document'"
                    loading="lazy" decoding="async"
                    class="w-12 h-12 object-cover rounded border border-gray-200 hover:border-indigo-400 transition" />
+            </button>
+            <button v-else-if="isPdf(d)" @click="openPreview(d)" class="inline-block" v-tooltip="'Aperçu du PDF'">
+              <DocumentIcon class="w-6 h-6 text-gray-400 hover:text-indigo-600 mx-auto transition" />
             </button>
             <DocumentIcon v-else class="w-6 h-6 text-gray-400 mx-auto" />
           </td>
@@ -389,15 +465,25 @@ onBeforeUnmount(() => {
           <td class="px-3 py-2 align-middle">
             <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border max-w-full whitespace-nowrap',
               attachmentLabel(d).kind === 'Site'
-                ? 'border-gray-200 text-gray-500 bg-gray-50 italic'
-                : 'border-indigo-200 text-indigo-700 bg-indigo-50']">
+                ? 'border-gray-200 text-gray-600 bg-gray-50'
+                : 'border-indigo-200 text-indigo-700 bg-indigo-50']"
+                  v-tooltip="attachmentLabel(d).tooltip || (attachmentLabel(d).label ? `${attachmentLabel(d).kind} : ${attachmentLabel(d).label}` : '')">
               <span class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
-              <span class="truncate">{{ attachmentLabel(d).label }}</span>
+              <span v-if="attachmentLabel(d).label" class="truncate">{{ attachmentLabel(d).label }}</span>
             </span>
           </td>
           <td class="px-3 py-2 text-right text-xs text-gray-500 tabular-nums align-middle whitespace-nowrap">{{ fmtSize(d.size_bytes) }}</td>
+          <td class="px-3 py-2 text-center align-middle">
+            <label class="inline-flex items-center gap-1.5 text-xs leading-5 text-gray-600 cursor-pointer select-none align-middle"
+                   v-tooltip="'Inclure ce document dans le rapport PDF (annexe « Documents joints »)'">
+              <input type="checkbox" :checked="!!d.include_in_report"
+                     @change="e => setInReport(d, e.target.checked)"
+                     class="rounded accent-emerald-600" />
+              Inclure
+            </label>
+          </td>
           <td class="px-3 py-2 text-center whitespace-nowrap align-middle">
-            <button v-if="isImage(d)" @click="openPreview(d)"
+            <button v-if="isImage(d) || isPdf(d)" @click="openPreview(d)"
                     class="text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Aperçu'">
               <EyeIcon class="w-4 h-4" />
             </button>
@@ -414,6 +500,9 @@ onBeforeUnmount(() => {
     </table>
     </div>
 
+    <!-- Aperçu PDF dans l'appli -->
+    <DocumentViewerModal :doc="viewerDoc" @close="viewerDoc = null" />
+
     <!-- Modal lightbox preview -->
     <div v-if="previewDoc"
          class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
@@ -423,7 +512,7 @@ onBeforeUnmount(() => {
           <div class="min-w-0 flex-1">
             <h3 class="text-base font-semibold truncate">{{ previewDoc.title }}</h3>
             <p class="text-xs opacity-70 truncate">
-              {{ attachmentLabel(previewDoc).kind }} : {{ attachmentLabel(previewDoc).label }}
+              {{ attachmentLabel(previewDoc).kind }}{{ attachmentLabel(previewDoc).label ? ' : ' + attachmentLabel(previewDoc).label : '' }}
               · {{ fmtSize(previewDoc.size_bytes) }}
             </p>
             <div v-if="previewDoc.taken_at || gpsMapUrl(previewDoc) || previewDoc.camera_make || previewDoc.camera_model"
@@ -483,7 +572,7 @@ onBeforeUnmount(() => {
                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
               <option :value="null">— rattaché au site uniquement</option>
               <option v-for="s in systems" :key="s.id" :value="s.id">
-                {{ s.system_category }} / {{ s.zone_name }}
+                {{ SYSTEM_LABEL_FR[s.system_category] || s.custom_label || s.system_category }} / {{ s.zone_name }}
               </option>
             </select>
           </div>

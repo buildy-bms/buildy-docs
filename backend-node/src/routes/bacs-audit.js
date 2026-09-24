@@ -9,7 +9,7 @@
 const { z } = require('zod');
 const db = require('../database');
 const log = require('../lib/logger').system;
-const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const { regenerateActionItems, computeMeterPlanStatus } = require('../lib/bacs-audit-action-generator');
 const { recomputeAndPersistAuditPower } = require('../lib/bacs-audit-power');
 const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const { computeSystemLiability } = require('../lib/bacs-liability');
@@ -245,7 +245,7 @@ async function routes(fastify) {
       : (row.negligible_justification || '').trim();
     if (nextNegligible === true && !nextJustification) {
       return reply.code(400).send({
-        detail: 'Une justification est obligatoire pour marquer un poste négligeable < 5 % (R175-2 §5, FAQ ministère juin 2025).',
+        detail: 'Une justification est obligatoire pour marquer un système négligeable (règle des 5 %, FAQ ministérielle n° 16).',
       });
     }
 
@@ -505,6 +505,15 @@ async function routes(fastify) {
     `).all(id);
   });
 
+  // Statut des compteurs au regard du plan (zone regroupée, usage exempté ou
+  // exclu) : l'onglet Compteurs l'affiche pour rester aligné sur le plan
+  // d'actions et le chapitre 4 du PDF, sans recopier leurs règles.
+  fastify.get('/bacs-audit/:documentId/meters/plan-status', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, request, reply)) return;
+    return computeMeterPlanStatus(id);
+  });
+
   fastify.post('/bacs-audit/:documentId/meters', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(documentId, request, reply)) return;
@@ -691,6 +700,8 @@ async function routes(fastify) {
       data_access_notes: z.string().nullable().optional(),
       // Mig 205 — niveau d'offre de la supervision Buildy Cloud.
       buildy_offer_level: z.enum(BUILDY_OFFER_LEVELS).nullable().optional(),
+      // Mig 206 — la GTB en place est-elle une supervision Buildy ? (ternaire)
+      is_buildy_supervision: boolish,
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -1076,32 +1087,23 @@ async function routes(fastify) {
     if (status) { sql += ' AND a.status = ?'; args.push(status); }
     if (zone_id) { sql += ' AND a.zone_id = ?'; args.push(parseInt(zone_id, 10)); }
     const rows = db.db.prepare(sql).all(...args);
-    // Tri canonique par carte de l'audit (Identification → Systèmes →
-    // Compteurs → GTB → Régulation → Inspections → Divers) puis sous-section
-    // GTB puis severite puis article puis id. Le backend calcule aussi
-    // `display_number` (BACS-001..NNN) pour que UI desktop, PWA mobile, PDF
-    // et MCP partagent EXACTEMENT la meme numerotation — pas de recalcul
-    // local cote consommateur.
-    //
-    // Numerotation : seuls les items VISIBLES (status != done/declined)
-    // recoivent un numero, identique au filtre du PDF (cf. _export-data.js
-    // ligne ~165 — WHERE status NOT IN ('done','declined')). Les items
-    // resolus / ecartes restent dans la reponse pour les vues "Toutes" /
-    // "Faites" cote PWA, mais sans numero (display_number=null).
-    const { sortActions, cardOfAction } = require('./bacs-audit/_action-cards');
-    const sorted = sortActions(rows);
-    let nbr = 0;
-    return sorted.map(r => {
-      const c = cardOfAction(r);
-      const visible = r.status !== 'done' && r.status !== 'declined';
-      if (visible) nbr++;
-      return {
-        ...r,
-        display_number: visible ? 'BACS-' + String(nbr).padStart(3, '0') : null,
-        card_key: c.card,
-        card_subsection: c.subsection,
-      };
-    });
+    // Tri canonique + `display_number` (BACS-001..NNN) partagés avec le PDF,
+    // la PWA, le MCP et l'export CSV (_action-numbering.js). Les items
+    // résolus / écartés restent dans la réponse pour les vues « Toutes » /
+    // « Faites » côté PWA, mais sans numéro (display_number=null).
+    // `?plain=1` (vue commerciale, sans le store de l'audit) : ajoute
+    // `title_plain` / `description_plain`, repères {{system:…}} remplacés par
+    // les libellés. Pas par défaut : la PWA relit cette liste souvent (4G).
+    const { numberActionItems } = require('./bacs-audit/_action-numbering');
+    const numbered = numberActionItems(rows);
+    if (request.query.plain !== '1') return numbered;
+    const { loadPlainTagResolver } = require('./bacs-audit/_action-tags');
+    const { strip } = loadPlainTagResolver(id);
+    return numbered.map(r => ({
+      ...r,
+      title_plain: strip(r.title),
+      description_plain: strip(r.description),
+    }));
   });
 
   fastify.post('/bacs-audit/:documentId/action-items', async (request, reply) => {

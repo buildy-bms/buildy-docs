@@ -59,12 +59,23 @@ const QUEUEABLE_PREFIXES = [
   '/sections',
 ]
 
+// Opérations longues ou à effet unique (livraison, génération Claude,
+// resynchronisation, clonage, versions) : jamais mises en file. Au-delà du
+// délai de 12 s, elles passaient pour « hors-ligne » puis repartaient à
+// chaque retour sur la fenêtre (livraisons et synthèses en double). Sans
+// réseau, l'appelant reçoit maintenant une vraie erreur.
+const NEVER_QUEUE = /\/(deliver|resync|clone|sync-library|generate-[a-z-]+|suggestions|versions\/(restore|checkpoint))$/
+
 export function isQueueable(method, url, contentType) {
   if (!method || !url) return false
   if (!QUEUEABLE_METHODS.has(method.toLowerCase())) return false
   // Multipart (upload fichier) : trop volumineux pour localStorage,
   // contraintes de sérialisation. Au caller de gérer.
   if (contentType && /multipart\/form-data/i.test(contentType)) return false
+  // Exports (PDF, ZIP) : longs à produire, sans intérêt à rejouer plus tard
+  // — jamais mis en file ni soumis au délai de 12 s des petites écritures.
+  if (/\/export(-pdf|s\/)/.test(url)) return false
+  if (NEVER_QUEUE.test(url.split('?')[0])) return false
   return QUEUEABLE_PREFIXES.some(p => url.startsWith(p))
 }
 
@@ -123,15 +134,26 @@ export function onQueueChange(handler) {
  * passe (2xx) on la retire. Si elle échoue par erreur réseau on stop
  * (on reprendra au prochain trigger). Si elle échoue par 4xx on la
  * retire et on log (le serveur l'aurait refusée même en ligne — pas
- * la peine de bloquer le reste de la queue).
+ * la peine de bloquer le reste de la queue). Exceptions : 401 (session
+ * expirée), 408 et 429 arrêtent le drain SANS retirer la mutation — elle
+ * repartira après reconnexion au lieu d'être perdue.
  *
- * Retourne `{ replayed, failed, skipped }`.
+ * Les entrées devenues non éligibles (ex. une livraison mise en file par
+ * une version précédente de l'appli) sont retirées sans être rejouées.
+ *
+ * Retourne `{ replayed, failed, skipped, dropped }`.
  */
 export async function drain(axiosInstance, { onMutationFailed } = {}) {
-  const stats = { replayed: 0, failed: 0, skipped: 0 }
+  const stats = { replayed: 0, failed: 0, skipped: 0, dropped: 0 }
   let items = readQueue()
   while (items.length > 0) {
     const next = items[0]
+    if (!isQueueable(next.method, next.url)) {
+      items.shift()
+      writeQueue(items)
+      stats.dropped += 1
+      continue
+    }
     try {
       await axiosInstance.request({
         method: next.method,
@@ -150,6 +172,12 @@ export async function drain(axiosInstance, { onMutationFailed } = {}) {
       const isNetwork = !err?.response // pas de réponse = erreur réseau
       if (isNetwork) {
         // Toujours hors-ligne : on stop le drain, on reprendra plus tard.
+        stats.skipped = items.length
+        break
+      }
+      if (status === 401 || status === 408 || status === 429) {
+        // Session expirée ou serveur momentanément saturé : la mutation
+        // reste en tête de file, le drain reprendra après reconnexion.
         stats.skipped = items.length
         break
       }

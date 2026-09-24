@@ -2,6 +2,69 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.267",
+      "date": "2026-09-24",
+      "title": "Conformité BACS revue, audit par étapes, rapport PDF refait",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Conformité BACS : analyse revue contre le décret, la FAQ et le guide du ministère",
+          "what": "Nouveau verdict « Conforme sous réserves » : l'absence de contrat de maintenance ou de personnel compétent (R175-4), une inspection périodique non tracée (R175-5-1) et l'export des données en supervision Buildy Essentials sont des réserves à respecter, pas des non-conformités. Le « niveau Premium requis » disparaît. Dans un bâtiment existant, seuls les systèmes de chauffage ou de climatisation au-delà du seuil sont reliés d'office (R175-2 II) ; les autres usages sont proposés sous condition de rentabilité. Les textes du décret sont cités mot à mot et les annexes B et D du rapport sont réalignées (les textes modifiés dans l'admin sont conservés).",
+          "where": "Plan de mise en conformité, étape Synthèse, rapport PDF (L'essentiel, tableau de bord R175, annexes).",
+          "how_to_test": "Exporter le rapport d'un audit : les réserves apparaissent à part des actions, et le verdict les mentionne."
+        },
+        {
+          "kind": "ux",
+          "title": "L'audit se parcourt étape par étape",
+          "what": "Sur ordinateur, les étapes sont des onglets groupés en 4 phases (Site, Équipements, Supervision, Dossier). Une seule étape s'affiche à la fois, avec un guide « Reste à faire » et « Valider et continuer ». Systèmes : tableau de présence zones × usages et fiche équipement à droite. Compteurs : un onglet par énergie. Les champs de saisie ont un fond gris, plus lisible. La version mobile ne change pas.",
+          "where": "Audit BACS ouvert sur ordinateur.",
+          "how_to_test": "Ouvrir un audit : il s'ouvre sur la première étape non validée."
+        },
+        {
+          "kind": "improvement",
+          "title": "Rapport PDF plus clair et plus court",
+          "what": "Mise en page refaite : L'essentiel et le tableau de bord R175 tiennent chacun sur une page, pastilles neutres, actions prioritaires en tête, constats communs regroupés. 5 à 10 pages de moins par audit. La matrice « Plan de comptage » est retirée (comme à l'écran). Les photos de zone sont désormais imprimées même sans note écrite.",
+          "where": "Exports « Rapport » (A4) et « Synthèse » (tableaux A3).",
+          "how_to_test": "Exporter le rapport d'un audit et le comparer à l'ancien."
+        },
+        {
+          "kind": "feature",
+          "title": "Documents joints au rapport, dossier complet, aperçu des PDF",
+          "what": "Chaque document du site a une case « Inclure dans le rapport », décochée par défaut : les documents cochés sont listés en annexe E « Documents joints ». Le menu Plus propose « Dossier complet (ZIP) » : rapport, tableaux et pièces jointes cochées dans une seule archive. Les PDF joints s'ouvrent dans une fenêtre d'aperçu, sans téléchargement.",
+          "where": "Étape Documents ; menu Plus de l'audit.",
+          "how_to_test": "Cocher un document puis exporter le rapport : il apparaît en annexe E. Puis Plus → « Dossier complet (ZIP) »."
+        },
+        {
+          "kind": "fix",
+          "title": "Compteurs et note de synthèse : des états plus justes",
+          "what": "L'onglet Compteurs affiche le statut calculé par le plan : une présence non vérifiée est « à vérifier », jamais « manquant » par défaut. Une note de synthèse plus ancienne que l'audit est signalée et n'est pas imprimée tant qu'elle n'est pas relue (« Note relue et à jour »). Dans « Vérifier », un bouton « Voir » mène au point à corriger.",
+          "where": "Étapes Compteurs et Synthèse, fenêtre « Vérifier ».",
+          "how_to_test": "Modifier l'audit après avoir rédigé la note : un bandeau signale la note à relire."
+        },
+        {
+          "kind": "fix",
+          "title": "« Livrer » et « Générer la synthèse » ne se relancent plus tout seuls",
+          "what": "Au-delà de 12 secondes, l'appli se croyait hors-ligne et relançait l'opération à chaque retour sur la fenêtre (synthèses et livraisons en double). Elle attend maintenant le vrai résultat ; sans réseau, un message clair s'affiche. Session expirée : les saisies en attente sont gardées et partent après reconnexion. Si la vérification avant livraison plante, la livraison est suspendue et « Livrer sans vérification » est proposé (tracé dans l'activité).",
+          "where": "Livrer, Générer la synthèse (ordinateur et mobile).",
+          "how_to_test": "Générer la synthèse puis changer plusieurs fois de fenêtre : Plus → Activité ne montre qu'une génération."
+        },
+        {
+          "kind": "ux",
+          "title": "Vue commerciale et export CSV lisibles",
+          "what": "Colonne N° avec les mêmes numéros que le PDF, noms des équipements à la place des repères techniques, table qui ne déborde plus (Zone, Effort et Statut visibles). La colonne « Notes commerciales », qui n'enregistrait plus rien, est retirée. L'export CSV est en français et s'ouvre directement dans Excel, plan numéroté en tête.",
+          "where": "Plan de mise en conformité → « Vue commerciale → ».",
+          "how_to_test": "« Export CSV » puis ouvrir le fichier dans Excel."
+        },
+        {
+          "kind": "fix",
+          "title": "Petits correctifs",
+          "what": "Liste des audits : l'avancement compte les 12 étapes (11 sans GTB). Mobile : statut « En rédaction » au lieu d'un code brut. Rapport : le bouton « Devis » ouvre un e-mail qui cite le site et la date du rapport. Une image SVG déposée se télécharge au lieu de s'ouvrir dans l'appli. Un export PDF ne peut plus échouer au moment où le moteur PDF se relance.",
+          "where": "Liste des audits, accueil mobile, rapport PDF, documents du site.",
+          "how_to_test": "Liste des audits : un audit sans note de synthèse n'affiche plus 100 %."
+        }
+      ]
+    },
+    {
       "version": "0.1.266",
       "date": "2026-09-23",
       "title": "Nouveau : modèle « Supervision Buildy Cloud » dans la carte GTB",

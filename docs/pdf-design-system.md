@@ -65,10 +65,16 @@ Quatre publics à servir simultanément (audit BACS) :
 | `--verdict-warn` | `#d97706` | ⚠ Partiellement conforme / Couverture partielle |
 | `--verdict-bad` | `#dc2626` | ✗ Non conforme / Couverture insuffisante |
 | `--verdict-na` | `#9ca3af` | – Non applicable |
+| `--verdict-reserve` | `#1b2842` | Conforme sous réserve / réserve : contour navy, fond blanc (jamais d'ambre : une réserve n'est pas un écart) |
+| `--verdict-unknown` | `#475569` | Non déterminé / à qualifier : ardoise |
+
+Les symboles ✓ ✗ ⚠ ? ! → ↗ ne sont **jamais** écrits en caractères : le sous-ensemble Inter embarqué ne les contient pas (repli sur une police système, rendu différent selon le poste). Ils passent par le helper `{{{glyph "✓" "9"}}}` (SVG FontAwesome). Contrôle : aucun caractère hors police embarquée dans le PDF (script `odd-chars`).
 
 ### Couleurs catégorie de système (alignées UI)
 
 Source de vérité partagée entre PDF (`backend-node/src/lib/pdf.js:52-60` `CATEGORY_ICON`) et UI Vue (`frontend/src/components/SystemCategoryIcon.vue`).
+
+Dans le PDF d'audit, ces couleurs ne colorent plus que **l'icône** — et la même partout : cartes du chapitre 3, pastilles d'usage de compteur (`usageIconColor()` dans `pdf.js`), matrice de comptage (`COVERAGE_USAGE_ICONS` de `_meter-coverage.js`). Les pastilles système, énergie et compteur (`systemCategoryPill`, `energyPill`, `meterTypePill`, `meterUsagePill`) sont neutres (`NEUTRAL_PILL` : fond `#f8fafc`, texte `#374151`, bord `#e2e8f0`, via `neutralPill(cfg)` dans `pdf.js`). Une page chargée de pastilles multicolores noyait les couleurs de gravité et de verdict (relecture 2026-09-24).
 
 | Catégorie | Icône FA | Couleur |
 |---|---|---|
@@ -104,6 +110,8 @@ Source de vérité partagée : `backend-node/src/lib/pdf.js` charge les WOFF2 vi
 
 ### Échelle de tailles avec contexte d'usage
 
+**Échelle resserrée (audit BACS, 2026-09-24)** : 6.5 / 7.5 / 8.5 / 9.5 / 11 / 13 pt pour le texte, 16 / 18 / 22 pt pour l'affichage (titres de page, chiffres clés, page de garde). Aucune taille hors de cette liste, et rien sous 6.5 pt (y compris en A3).
+
 | Élément | Taille | Famille | Poids | Contexte |
 |---|---|---|---|---|
 | `.cover-title` | 22pt | Poppins | 700 | Titre projet sur cover, grand mais sobre |
@@ -120,7 +128,9 @@ Source de vérité partagée : `backend-node/src/lib/pdf.js` charge les WOFF2 vi
 | Corps tableau A3 paysage dense | 7.5-7.8pt | Inter | 400 | Tableaux de synthèse |
 | Têtière table | 6.5-7pt | Inter | 600 uppercase letterspacing 0.05-0.08em | `<th>` |
 | Eyebrow uppercase | 6.5-8pt | Inter ou Poppins | 600 letterspacing 0.18-0.28em | "L'ESSENTIEL", "TABLEAU DE BORD", "TABLEAU 1 / 4" |
-| Réf monospace | 7-8pt | SFMono | 600-700 | E-001 / M-001 / BACS-001 / R175-3 1° |
+| Références | 7.5-9.5pt | Inter + `font-variant-numeric: tabular-nums` | 600-700 | E-001 / M-001 / BACS-001 / R175-3 1°. **Jamais de police monospace** (non embarquée : Menlo, Courier ou SF Mono selon le poste). |
+
+L'en-tête et le pied de page Puppeteer sont rendus hors du document : Inter y est injectée à part (`headerFooterFontCss()` dans `pdf.js`), sinon Helvetica / Menlo selon le poste. Contrôle : `pdffonts` ne doit lister que Poppins et Inter.
 
 ### Line-height
 
@@ -180,16 +190,21 @@ Pour tout nouveau template PDF Buildy, **réutiliser les composants existants** 
 | **System-card** | `.system-card` + `.system-card-{category}` (+ head / body / notes) | `styles-bacs-audit.css` | Carte par catégorie de système (chauffage rouge à gauche, etc.) avec icône + label + power + nb équipements + tableau devices imbriqué. |
 | **m-pill** (compteur) | `.m-pill` + helpers `meterTypePill` / `meterUsagePill` | `pdf.js:73-99` (helpers) + `styles-bacs-audit.css` (CSS) | Pastilles compteurs alignées sur UI `MeterTypePill.vue` / `MeterUsagePill.vue`. Couleurs et icônes synchronisées strictement. |
 | **usage-pill** (GTB) | `.usage-pill` + `.usage-pill-{category}` + variante `.usage-pill-off` | `styles-bacs-audit.css` | Pastilles "usages couverts par la GTB" — colorées si couvert, grisées + barré si non couvert. |
-| **Headline** (action phare) | `.headline` + `.headline-num` + `.headline-meta` | `styles-bacs-audit.css` | Action phare sur la page L'essentiel : numéro BACS-XXX + titre + sévérité + R175 + zone. |
-| **Stat** (chiffre clé) | `.stats-grid` + `.stat` + `.stat-num` + `.stat-label` + variantes `stat-blocking/major/minor` | `styles-bacs-audit.css` | Grosses pastilles colorées (5 Bloquantes / 6 Majeures / 4 Mineures) sur la page L'essentiel. |
+| **Headline** (action prioritaire) | `.essential-headlines` + `.headline` + `.headline-num` + `.headline-title` + `.headline-meta` | `styles-bacs-audit.css` | Bloc « Actions prioritaires » de L'essentiel : les 3 premières actions du plan (`compliance.headlineActions`), **une ligne par action** (numéro · intitulé · sévérité · article). Renvoi « Plan complet au chapitre N » dans le titre du bloc (`.essential-block-aside`). |
+| **Stat** (chiffre clé) | `.stats-grid` + `.stat` + `.stat-num` + `.stat-label` + variantes `stat-blocking/major/minor/reserve` + `stat-zero` | `styles-bacs-audit.css` | Grille 2 × 2 sans cadre sur L'essentiel : seul le chiffre porte la couleur du niveau ; un zéro reste gris. |
+| **Notes de contexte** | `.essential-notes` + `.callout` | `styles-bacs-audit.css` | Structure juridique et décret tertiaire côte à côte (pleine largeur si une seule), corps 7.5 pt. |
 | **Recap-tile** (récap chiffré) | `.recap-tiles` + `.tile` + `.tile-label` + `.tile-value` + `.tile-unit` + `.tile-of` + `.tile-sub` + `.sev-dot` | `styles-bacs-audit-tables.css` | 4 tuiles d'en-tête sur le PDF tableaux de synthèse paysage (puissance / équipements / compteurs / plan). |
 | **GTB summary** | `.gtb-summary` + head + cells (`.gtb-cell-label` / `.gtb-cell-value` / `.gtb-checks` / `.check`) | `styles-bacs-audit-tables.css` | Bandeau compact GTB existante avec 5 colonnes (usages / R175-3 / R175-3 mise à dispo / R175-4 / R175-5). |
-| **R175 dashboard row** | `.r175-row` + variantes verdict + `.r175-row-code` + `.r175-row-verdict` | `styles-bacs-audit.css` | Ligne du tableau de bord conformité R175 (8 lignes par exigence). |
+| **R175 dashboard row** | `.r175-rows-head` (têtière unique) + `.r175-row` + variantes verdict + `.r175-row-code` + `.r175-row-content` (libellé + lien Légifrance + exigence + constat) + `.r175-row-status` (verdict + nombre d'actions) | `styles-bacs-audit.css` | Ligne du tableau de bord conformité R175 (10 lignes). Grille `19mm / 1fr / 33mm`. Le verdict peut passer sur 2 lignes, jamais déborder de sa colonne. |
+| **Constat commun** | `.dashboard-common-note` | `styles-bacs-audit.css` + `r175DashboardCommonNote` (`_export-data.js`) | Constat identique sur plusieurs exigences (site sans GTB, GTB hors service, présence non renseignée) : imprimé une fois au-dessus du tableau de bord au lieu d'être répété ligne par ligne. |
+| **Justification regroupée** | `.justif-card-group` + `table.justif-items` | `styles-bacs-audit.css` + `groupJustifications()` (`_action-cards.js`) | Annexe C : actions consécutives de même article et même justification regroupées (« BACS-011 à BACS-014 — 4 actions de même justification »), texte commun une fois. Fiche courte (`isShort`) : d'un seul tenant ; les autres se coupent entre deux lignes. |
+| **Documents joints (annexe E)** | `table.attachments-table` + `.attachment-transcript` + `.attachment-gallery` / `.attachment-figure` | `styles-bacs-audit.css` + `buildReportAttachments()` (`_report-attachments.js`) | Documents du site cochés « Inclure dans le rapport » (`site_documents.include_in_report`, décoché par défaut) : liste numérotée « PJ n » (type, rattachement, date, taille), transcription des notes vocales, vignettes des images non déjà imprimées dans un chapitre. Annexe absente si aucun document coché. |
+| **Usages absents d'une zone** | `.zone-absent-line` + `absentLabels` / `unansweredLabels` (`_export-data.js`) | `styles-bacs-audit.css` | Chapitre 3 : une ligne sous le titre de zone (« Usages absents : … · Présence non renseignée : … ») au lieu d'une boîte « Absent » par usage. |
 | **Action card** (vertical) | `.action-card` + `.action-card-minor` + head/title/desc + alt-solutions | `styles-bacs-audit.css` | Carte action en plan d'action vertical (chapitre 7 BACS). |
 | **Action row** (table) | `.action-row` + `.action-row-{severity}` + cellules `.col-ref/sev/r175/zone/title/source/status` | `styles-bacs-audit-tables.css` | Ligne table en plan d'action récapitulatif paysage (tableau 4). |
 | **Callout** | `.callout` + `.callout-info/warn/reco/r175` + `.callout-icon` + `.callout-body` | `styles-bacs-audit.css` | Bloc d'avertissement/info avec icône emoji + texte. |
 | **bms-list / bms-row** | `.bms-list` + `.bms-row` + `.bms-row-name/meta/icon/pwr/pills` + `.bms-section-head` | `styles-bacs-audit.css` | Listes plates compactes (équipements/compteurs intégrés vs à intégrer dans la GTB), avec section heads ✓/⚠ pour le gap. |
-| **Photo grid + placeholder** | `.photo-grid` + `<img>` data URL | `styles-bacs-audit.css` + générateur placeholder `data/fixtures/photos/_generate.js` | Grille photos terrain. Placeholder skeleton gris hachuré pour le fixture (regenérable). |
+| **Photo grid + placeholder** | `.photo-grid` + `<img>` data URL | `styles-bacs-audit.css` + générateur placeholder `data/fixtures/photos/_generate.js` | Grille photos terrain : 3 vignettes égales par ligne (format 4:3), coupure possible entre deux rangées, jamais dans une photo. Placeholder skeleton gris hachuré pour le fixture (regenérable). Photos rattachées à une zone, un système, un équipement, un compteur ou la GTB : imprimées d'office dans leur chapitre. |
 | **Sévérité pill** | `.sev` + `.sev-blocking/major/minor` | `styles-bacs-audit.css` + `styles-bacs-audit-tables.css` | Badge sévérité d'action. Texte adapté par kind (Bloquante/Essentielle, Majeure/Recommandée, Mineure/Optimisation). |
 | **Status pill commercial** | `.status-pill` + `.status-pill-{open/quoted/in_progress}` | `styles-bacs-audit-tables.css` | Statut commercial d'une action dans la table récap. |
 | **TOC** | `.toc-row.lvl-1` + `.toc-link` + `.toc-num` + `.toc-title` + `.toc-dots` + `.toc-page` | `styles-bacs-audit.css` (charte AF/Synthèse) | Sommaire compact avec dots, pagination via `populateToc` dans `pdf.js`. |
@@ -203,15 +218,20 @@ Pour tout nouveau template PDF Buildy, **réutiliser les composants existants** 
 
 Structure 3 niveaux : header (logo + eyebrow uppercase) + main (titre projet + client + adresse) + verdict bandeau (BACS = État de conformité, classique = Couverture GTB) + footer 3 colonnes (date / auditeur / version pill verte). Fond navy full-bleed. Trait vert vertical à gauche.
 
+Titre, client et verdict forment **un seul bloc**, centré optiquement entre le logo et le pied de page (`margin-top: auto` sur `.cover-main` et `.cover-footer`, `margin-bottom: 30mm` sur le verdict). Le verdict n'est plus calé en bas de page.
+
 ### Page « L'essentiel » (page 2)
 
-Synthèse en 1 page :
+Synthèse en **1 page, impérativement** (hauteur utile A4 : 263 mm) :
 1. Eyebrow vert "L'essentiel" + titre 16pt.
-2. Bandeau verdict colorié (vert/orange/rouge) avec icône ronde + label + détail explicatif.
+2. Bandeau verdict colorié (vert/orange/rouge) avec icône ronde + label + détail explicatif + obligations à respecter en outre (réserves).
 3. Grille 2 colonnes :
-   - **BACS** : Calcul d'assujettissement R175-2 (3 étapes numérotées) + 3 pastilles chiffres.
-   - **Classique** : Couverture GTB (3 étapes) + 3 pastilles préconisations.
-4. 3 actions phares (BACS-001/002/003) avec sévérité + R175 + zone.
+   - **BACS** : Calcul d'assujettissement R175-2 (3 étapes numérotées) + chiffres en grille 2 × 2.
+   - **Classique** : Couverture GTB (3 étapes) + pastilles préconisations.
+4. Actions prioritaires : 3 actions, une ligne chacune (voir composant Headline).
+5. Points à qualifier (s'il y en a), puis notes de contexte côte à côte.
+
+Toute addition sur cette page se mesure : mesurer la hauteur de `section.essential` dans la largeur utile (174 mm) sur les audits réels les plus chargés avant de valider.
 
 ### Sommaire (page 3)
 
@@ -219,7 +239,7 @@ Compact, charte AF/Synthèse. Une ligne par chapitre numéroté : numéro mono +
 
 ### Tableau de bord conformité R175 (page 4, BACS uniquement)
 
-Une page synoptique : 8 lignes pour chaque exigence du décret (R175-2 / R175-3 1° / R175-3 3° / R175-3 4° / R175-3 D.A. / R175-4 / R175-5 / R175-6). Chaque ligne : code en pastille navy + libellé + résumé + verdict pastillé + nombre d'actions associées. Bordure gauche colorée par verdict.
+Une page synoptique (**une seule page**) : 10 lignes, une par exigence du décret (R175-2 / R175-3 1° à 4° / R175-3 D.A. / R175-4 / R175-5 / R175-5-1 / R175-6). Têtière unique « Article · Ce que le décret exige · Situation constatée ». Chaque ligne : code en pastille navy + libellé et lien Légifrance + exigence + constat propre au site s'il diffère + verdict pastillé + nombre d'actions associées. Bordure gauche colorée par verdict. Un constat commun à plusieurs lignes est imprimé une seule fois au-dessus (`.dashboard-common-note`).
 
 ### Opener de chapitre
 
@@ -227,7 +247,7 @@ Une page synoptique : 8 lignes pour chaque exigence du décret (R175-2 / R175-3 
 
 ### Annexes
 
-**Pas de wrapper card global** (décision PO mai 2026 — trop lourd). Les sous-éléments (`.article-card`, `.method-card`, `.justif-card`, `.callout`, `.disclaimer-list`) portent leur propre visuel. Page break avant chaque annexe.
+A — décret, B — méthodologie, C — justifications, D — mentions légales (obligatoires), puis E — documents joints (seulement si des documents sont cochés « Inclure dans le rapport »). **Pas de wrapper card global** (décision PO mai 2026 — trop lourd). Les sous-éléments (`.article-card`, `.method-card`, `.justif-card`, `.callout`, `.disclaimer-list`) portent leur propre visuel. Page break avant chaque annexe.
 
 ---
 
@@ -256,6 +276,14 @@ Définis dans `backend-node/src/lib/pdf.js`. À utiliser systématiquement plut�
 | `{{eq a b}}` | Égalité stricte | `{{#if (eq severity "blocking")}}…{{/if}}` |
 | `{{or a b ...}}` / `{{and a b ...}}` | Composition logique | `{{#if (or notes_html photos.length)}}…{{/if}}` |
 | `{{boolLabel v}}` | 1/true → "Oui", 0/false → "Non", null → "—" | `{{boolLabel meets_r175_3_p1}}` |
+| `{{{boolPill v "sm" "neutral"}}}` | Pastille Oui / Non / — ; variante `"neutral"` sans vert ni rouge pour une information qui n'est pas un verdict (ex. « Requis ») | `{{{boolPill required "sm" "neutral"}}}` |
+| `{{{boolPill v "sm" "" "À qualifier"}}}` / `"dash"` | Réponse manquante (null) : pastille libellée au lieu d'une pastille « — » muette ; `"dash"` = simple tiret, sans pastille (sans objet dans un tableau dense) | `{{{boolPill present_actual "sm" "" "À vérifier"}}}` |
+| `{{{glyph "✓" "9"}}}` | Symbole en SVG (✓ ✗ ✕ ⚠ ? i – ↗ →) : jamais le caractère Unicode, absent de la police embarquée | `{{{glyph verdictIcon "9"}}}` |
+| `{{frNum v}}` | Nombre au format français (virgule, espace insécable des milliers) | `{{frNum retained_power_kw}} kW` |
+| `{{#if (anyOf list "champ" …)}}` / `(anyItemOf groupes "champ" …)` | Vrai si au moins un élément (ou un élément d'un groupe) porte l'un des champs : sert à n'afficher une colonne optionnelle (notes, détails techniques) que si elle a du contenu | `{{#if (anyOf devices "notes")}}<th>Notes</th>{{/if}}` |
+| `(anyTrue list "champ")` / `(anyItemTrue groupes "champ")` | Idem, mais seules les valeurs VRAIES comptent (0, false et '' ne comptent pas) : colonne « Statut » seulement si un compteur est hors service, « Âge » seulement si un âge est connu | `{{#if (anyItemTrue metersByZone "out_of_service")}}` |
+
+Typographie française automatique (gabarits `bacs-audit*`, nœuds texte seulement — `frenchTypography()` dans `pdf.js`) : espace insécable avant `: ; ! ? »` et après `«`, entre un nombre et son unité (kW, kWh, MWh, m², °C, %, unités, équipements, ans), entre groupes de milliers (« 1 000 m² »), après « n° », avant un nombre en fin de parenthèse (« Cellule 1) ») et avant un tiret d'incise (« — » jamais en début de ligne) ; références d'articles (R175-3, L. 174-3) jamais coupées au trait d'union ni séparées de leur alinéa (« R175-1 6° ») ; « 1er » / « 1re » en exposant. En CSS : `text-wrap: pretty` sur les paragraphes (pas de mot seul en dernière ligne), `text-wrap: balance` sur les titres et accroches courtes.
 
 ---
 
@@ -332,6 +360,15 @@ Tous les templates exposent les mêmes tokens dans `:root` (palette, typo, espac
 - **Pour tout nouveau composant PDF**, vérifier d'abord s'il existe déjà côté UI Vue (`MeterTypePill`, `SystemCategoryIcon`, `R175Tooltip`, etc.) et porter les mêmes couleurs/icônes/libellés.
 - **Pas de `border-radius` asymétrique** — toujours les 4 coins.
 - **Pas de `box-shadow` lourd** dans le PDF — préférer `border` 0.4pt + `background` teinté pastel.
+- **Rien ne dépasse la largeur utile** (174 mm en A4, 392 mm en A3) hors page de garde et page de clôture. Un seul élément trop large, même de 0,5 mm, fait réduire **tout le document** à l'impression par Chromium (constaté : −3 % sur tout le rapport à cause d'une pastille de verdict en `nowrap`). Pastilles longues : autoriser le retour à la ligne. Image bordée à `max-width: 100%` : `box-sizing: border-box`.
+- **Pas de titre seul en bas de page** : `break-after: avoid` sur les titres (`h2.zone-heading`, `h2.subheading`, en-têtes de carte, de panneau, de section d'énergie, de fiche d'annexe). Ne pas étendre à des blocs longs : une chaîne de blocs insécables ajoute des demi-pages blanches.
+- **Couper entre les éléments, jamais dedans** : les blocs longs (panneaux, cartes d'action, cartes système, fiches d'annexe A et C, tableaux par énergie) peuvent se poursuivre sur la page suivante, mais seulement entre leurs lignes ou rubriques (`break-inside: avoid` sur `tr`, `.kv-row`, `.acd-section`…). Un titre sur plusieurs lignes n'est jamais coupé (`h1–h4 { break-inside: avoid }`). La dernière ligne d'un tableau n'arrive jamais seule sur une page (`tbody tr:last-child { break-before: avoid }`). Repousser un bloc entier laissait des tiers de page blancs.
+- **En-têtes de colonnes centrés** dans tous les tableaux (`thead th`), comme dans l'UI ; les libellés de ligne des fiches clé / valeur restent à gauche.
+- **Tableaux A3** : bandeaux de thème, de sous-thème et de zone jamais seuls en bas de page (`break-after: avoid`) ; petits tableaux (zones regroupées) d'un seul tenant ; filet sous la dernière ligne ; colonnes Localisation / GTB / Statut / Âge masquées quand elles ne contiendraient que des « — ».
+- **Texte dans un conteneur flex** : toujours dans un `<span>` (la typographie insère des éléments — `<sup>` de « 1er », références insécables — qui deviendraient sinon des éléments flex séparés, avec des espaces parasites).
+- **Colonnes de largeur fixe** (`<colgroup>` ou largeur par classe) quand plusieurs tableaux de même structure s'empilent (compteurs par énergie) ou qu'une colonne de valeurs écrase le texte (calcul de puissance) ; une colonne qui ne contient que des « — » est masquée (`anyTrue` / `anyOf`).
+- **Couleur = sens** : l'orange et l'ambre sont réservés aux niveaux de gravité (et à l'avertissement sanitaire ECS bouclée). Informations, caractéristiques (« Multi-bâtiments », « Secours »), réserves et constats neutres : gris ardoise ou bleu marine. Une même énergie ou un même usage garde la même icône et la même couleur partout (pastilles, matrice de comptage, cartes).
+- **Contrôles avant validation** : `pdffonts` (Poppins + Inter uniquement), aucun caractère hors police embarquée, une page pour L'essentiel et pour le tableau de bord, aucun débordement horizontal, puis ouverture dans Safari / Aperçu.
 - **Toujours `white-space: nowrap` par défaut sur les `<td>`** des tableaux denses (paysage A3) avec `overflow: hidden; text-overflow: ellipsis;` ; ouvrir `white-space: normal` ponctuellement sur la colonne notes.
 - **Refactor préventif** : toute valeur magique répétée 3 fois doit devenir un token dans `:root` ou un helper.
 - **Migration Manrope → Inter mai 2026** : Manrope reste embed dans `pdf.js` 30 jours pour compatibilité descendante. Après cette période, retirer les 4 lignes `Manrope` du `FONT_FILES` si aucune régression.

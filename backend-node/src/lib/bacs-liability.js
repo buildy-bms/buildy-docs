@@ -163,12 +163,12 @@ function computeSystemLiability(input = {}) {
       if (responsibleTenants.length) {
         // Travaux preneurs : le preneur devient assujetti pour ce système.
         partyIds = responsibleTenants;
-        explanation = 'Le preneur à bail a réalisé des travaux preneurs sur '
-          + 'ce système : il en devient l\'assujetti.';
+        explanation = 'Le preneur à bail a installé ce système (travaux '
+          + 'preneurs) : propriétaire du système, il est assujetti (R175-2 I).';
       } else {
         partyIds = ownerParties.map(p => p.id);
-        explanation = 'Aucuns travaux preneurs sur ce système — le propriétaire '
-          + 'bailleur est assujetti.';
+        explanation = 'Pas de travaux réalisés par un preneur sur ce système : '
+          + 'le propriétaire bailleur est assujetti.';
       }
     }
     // Cas D — preneurs indépendants.
@@ -188,8 +188,8 @@ function computeSystemLiability(input = {}) {
       explanation = caseCode === 'A'
         ? 'Propriétaire unique occupant — il est l\'assujetti pour l\'ensemble '
           + 'des systèmes du bâtiment.'
-        : 'Structure juridique du site non renseignée — assujetti par défaut : '
-          + 'le(s) propriétaire(s) saisi(s).';
+        : 'Structure juridique du site non renseignée : par défaut, le ou les '
+          + 'propriétaires déclarés sont considérés comme assujettis.';
     }
 
     // Dédoublonnage en conservant l'ordre.
@@ -199,6 +199,13 @@ function computeSystemLiability(input = {}) {
       ? `Assujetti : ${partyNames.join(', ')}`
       : 'Assujetti : à déterminer (aucune partie prenante renseignée)';
 
+    // Formulation valable pour l'ensemble du chapitre, quand ce cas est
+    // celui de la plupart des systèmes (mention unique en tête du chapitre 3
+    // au lieu d'une répétition par système — relecture clarté R2 m7).
+    const generalExplanation = caseCode === 'C' && !responsibleTenants.length
+      ? 'Aucun système n\'est déclaré comme installé par un preneur : le propriétaire bailleur est assujetti.'
+      : explanation;
+
     result.set(sys.id, {
       case: caseCode,
       caseLabel: caseCode ? CASE_LABEL[caseCode] : null,
@@ -206,6 +213,7 @@ function computeSystemLiability(input = {}) {
       partyNames,
       label,
       explanation,
+      generalExplanation,
     });
   }
 

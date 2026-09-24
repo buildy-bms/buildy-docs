@@ -35,8 +35,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif;
+  font-size: 7.5pt;
   color: var(--neutral-800);
   line-height: 1.4;
   -webkit-print-color-adjust: exact;
@@ -70,7 +70,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 }
 .doc-header-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 14pt;
+  font-size: 13pt;
   font-weight: 700;
   color: var(--buildy-navy);
   letter-spacing: -0.01em;
@@ -83,8 +83,8 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 }
 .doc-header-right { display: flex; flex-direction: column; gap: 1.5mm; align-items: flex-end; flex-shrink: 0; }
 .doc-header-tag {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+  font-size: 7.5pt;
   color: var(--neutral-600);
   background: var(--neutral-100);
   padding: 0.8mm 2.5mm;
@@ -115,7 +115,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
   page-break-inside: avoid;
 }
 .tile-label {
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -130,8 +130,8 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
   letter-spacing: -0.02em;
 }
 .tile-unit { font-size: 11pt; font-weight: 500; color: var(--neutral-500); margin-left: 1mm; }
-.tile-of   { font-size: 14pt; font-weight: 500; color: var(--neutral-400); }
-.tile-sub  { font-size: 8pt; color: var(--neutral-600); margin-top: 0.5mm; display: flex; align-items: center; gap: 1.5mm; flex-wrap: wrap; }
+.tile-of   { font-size: 13pt; font-weight: 500; color: var(--neutral-400); }
+.tile-sub  { font-size: 7.5pt; color: var(--neutral-600); margin-top: 0.5mm; display: flex; align-items: center; gap: 1.5mm; flex-wrap: wrap; }
 .sev-dot {
   display: inline-block;
   width: 2mm; height: 2mm;
@@ -141,6 +141,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 .sev-dot-blocking { background: var(--sev-blocking); }
 .sev-dot-major    { background: var(--sev-major); }
 .sev-dot-minor    { background: var(--sev-minor); }
+.sev-dot-reserve  { background: #1b2842; }
 
 /* ── Bandeau GTB existante en synthèse ────────────────────────────── */
 .gtb-summary {
@@ -162,7 +163,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
   border-bottom: 0.4pt solid var(--neutral-200);
 }
 .gtb-summary-eyebrow {
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.18em;
@@ -175,7 +176,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
   font-weight: 600;
   color: var(--buildy-navy);
 }
-.gtb-summary-brand { font-size: 9pt; color: var(--neutral-600); }
+.gtb-summary-brand { font-size: 9.5pt; color: var(--neutral-600); }
 .gtb-summary-model { font-size: 8.5pt; color: var(--neutral-500); }
 
 .gtb-summary-body {
@@ -185,27 +186,29 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 }
 .gtb-summary-cell { display: flex; flex-direction: column; gap: 1.5mm; min-width: 0; }
 .gtb-cell-label {
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--neutral-500);
 }
-.gtb-cell-value { font-size: 8pt; }
+.gtb-cell-value { font-size: 7.5pt; }
 .gtb-checks { display: flex; flex-direction: column; gap: 1mm; }
 .check {
   display: inline-flex;
   align-items: center;
   gap: 1.5mm;
-  font-size: 8pt;
+  font-size: 7.5pt;
   font-weight: 500;
   white-space: nowrap;
 }
 .check-ok { color: var(--verdict-ok); }
 .check-ko { color: var(--sev-blocking); }
 .check-na { color: #9ca3af; }
+/* Réserve (obligation du propriétaire, offre Buildy) : navy, jamais rouge. */
+.check-reserve { color: var(--buildy-navy); font-weight: 600; white-space: normal; }
 .gtb-meta {
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: var(--neutral-500);
   font-style: italic;
 }
@@ -213,7 +216,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 /* Variante compacte des usage-pills pour le bandeau GTB */
 .usage-pills-compact { gap: 1mm; }
 .usage-pills-compact .usage-pill {
-  font-size: 7pt;
+  font-size: 7.5pt;
   padding: 0.5mm 1.8mm 0.5mm 1.5mm;
   gap: 0.8mm;
 }
@@ -233,7 +236,7 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
 }
 .section-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 14pt;
+  font-size: 13pt;
   font-weight: 700;
   color: var(--buildy-navy);
   letter-spacing: -0.01em;
@@ -252,7 +255,7 @@ table.syn {
   width: 100%;
   border-collapse: collapse;
   margin-top: 3mm;
-  font-size: 7.8pt;
+  font-size: 7.5pt;
   table-layout: fixed;
   border: 0.4pt solid var(--neutral-200);
   border-radius: 2mm;
@@ -264,7 +267,7 @@ table.syn thead {
 table.syn thead th {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
-  font-size: 7pt;
+  font-size: 7.5pt;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: white;
@@ -307,7 +310,9 @@ table.syn tbody td {
   word-break: normal;
   line-height: 1.3;
 }
-table.syn tbody tr:nth-child(odd) td { background: #fafbfc; }
+/* Zébrage visible à l'impression (#fafbfc disparaissait), recalculé à
+   chaque zone : un <tbody> par zone, la ligne de zone ouvre le bloc. */
+table.syn tbody tr:nth-child(even) td { background: var(--neutral-100); }
 table.syn tbody tr.zone-row + tr td,
 table.syn tbody tr.zone-row + tr + tr td { /* reset alternance après zone-row */ }
 table.syn tbody tr:last-child td { border-bottom: none; }
@@ -319,17 +324,15 @@ table.syn tbody tr.row-hs td {
 table.syn tbody tr.liability-row td {
   background: #f8fafc !important;
   color: var(--neutral-700);
-  font-size: 7.2pt;
+  font-size: 7.5pt;
   padding: 1.4mm 3mm;
   white-space: normal;
   border-bottom: 0.3pt solid var(--neutral-100);
 }
 table.syn tbody tr.liability-row td strong { color: var(--buildy-navy); }
 /* Ligne "compteur requis mais absent" : fond rouge pâle pour signaler le gap */
-table.syn tbody tr.row-missing td {
-  background: #fff1f2;
-}
-table.syn tbody tr.row-missing:nth-child(odd) td { background: #ffe4e6; }
+/* Compteur requis absent : pas de fond rose (la pastille « Non » et la
+   mention « à installer » signalent déjà l'écart). */
 
 table.syn tbody td strong {
   color: var(--buildy-navy);
@@ -341,7 +344,7 @@ table.syn td.col-bool { text-align: center; }
 .bool-yes, .bool-no, .bool-na {
   display: inline-block;
   font-weight: 700;
-  font-size: 9pt;
+  font-size: 9.5pt;
   line-height: 1;
 }
 .bool-yes { color: var(--verdict-ok); }
@@ -353,7 +356,7 @@ table.syn td.col-bool { text-align: center; }
   display: inline-block;
   background: #fee2e2;
   color: #991b1b;
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   font-weight: 700;
   padding: 0.3mm 1.5mm;
   border-radius: 1.5mm;
@@ -363,12 +366,13 @@ table.syn td.col-bool { text-align: center; }
 }
 /* Badge nominatif + ligne d'un équipement partagé vers ce système (mig 143). */
 .shared-badge.shared-badge-wrap { white-space: normal; }
-tr.row-shared td { background: #f0fdf4; }
+/* Équipement partagé : repéré par son badge, sans teinte de fond (la
+   teinte cassait l'alternance des lignes). */
 /* Item 7f — badge « Partagé entre N zones » sur équipement multi-zones */
 .shared-badge {
   display: inline-block;
-  background: #d1fae5;
-  color: #047857;
+  background: #f1f5f9;
+  color: var(--buildy-navy);
   font-size: 6.5pt;
   font-weight: 700;
   padding: 0.3mm 1.4mm;
@@ -415,7 +419,7 @@ tr.row-shared td { background: #f0fdf4; }
   align-items: center;
   padding: 0.6mm 1.8mm;
   border-radius: 999px;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   white-space: nowrap;
   line-height: 1.2;
@@ -429,7 +433,7 @@ tr.row-shared td { background: #f0fdf4; }
 }
 .role-pill-sm {
   padding: 0.3mm 1.2mm;
-  font-size: 6.4pt;
+  font-size: 6.5pt;
   line-height: 1.15;
   border-radius: 3mm;
   white-space: nowrap;
@@ -440,7 +444,7 @@ tr.row-shared td { background: #f0fdf4; }
 .bool-pill {
   display: inline-block;
   padding: 0.6mm 2.2mm;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   line-height: 1.15;
   border-radius: 3mm;
@@ -448,19 +452,22 @@ tr.row-shared td { background: #f0fdf4; }
 }
 .bool-pill-sm {
   padding: 0.3mm 1.6mm;
-  font-size: 6.4pt;
+  font-size: 6.5pt;
   border-radius: 2.6mm;
 }
 /* Colonne Puissance : la valeur principale et le détail du calcul
    (qty × unitaire) sur 2 lignes max, jamais de wrap parasite type
    « 22.5 (15×1.5\n) ». No-wrap sur chaque morceau. */
-table.syn td.col-power .pwr-main,
-table.syn td.col-power .pwr-detail {
+table.syn td.col-power .pwr-main {
   display: block;
   white-space: nowrap;
 }
 table.syn td.col-power .pwr-detail {
-  font-size: 6.4pt;
+  display: block;
+  white-space: normal;
+}
+table.syn td.col-power .pwr-detail {
+  font-size: 6.5pt;
   color: var(--neutral-500, #6b7280);
   margin-top: 0.3mm;
 }
@@ -491,17 +498,17 @@ table.syn tbody td.col-status { text-align: center; }
 /* ── Largeurs colonnes — Tableau Systèmes (A3 paysage utile ~390mm) ─
    Total = 14+30+42+22+32+18+12+18+26+40+(15×4) = 314mm. Marge confortable
    pour respirer côté droit, eviter le sentiment de débordement. */
-table.syn-systems .col-ref    { width: 14mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; font-weight: 600; }
+table.syn-systems .col-ref    { width: 14mm; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; font-weight: 600; }
 table.syn-systems tbody td.col-ref { color: var(--neutral-600); }
 table.syn-systems .col-usage  { width: 30mm; }
 table.syn-systems .col-name   { width: 42mm; }
 table.syn-systems .col-brand  { width: 22mm; }
 table.syn-systems .col-model  { width: 32mm; }
 table.syn-systems .col-energy { width: 18mm; }
-table.syn-systems .col-power  { width: 12mm; text-align: right; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.5pt; }
+table.syn-systems .col-power  { width: 32mm; text-align: right; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; }
 table.syn-systems .col-role   { width: 18mm; }
 table.syn-systems .col-comm   { width: 26mm; }
-table.syn-systems .col-loc    { width: 40mm; }
+table.syn-systems .col-loc    { width: 30mm; }
 table.syn-systems tbody td.col-loc { color: var(--neutral-600); }
 table.syn-systems .col-bool   { width: 17mm; text-align: center; }
 
@@ -514,61 +521,77 @@ table.syn-actions .col-comm-notes,
 table.syn-actions .col-title { white-space: normal; }
 
 /* ── Largeurs colonnes — Tableau Zones (référence court) ─────────── */
-table.syn-zones .col-ref     { width: 16mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; font-weight: 600; }
+table.syn-zones .col-ref     { width: 16mm; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; font-weight: 600; }
 table.syn-zones tbody td.col-ref { color: var(--neutral-600); }
 table.syn-zones .col-name    { width: 60mm; }
 table.syn-zones .col-nature  { width: 36mm; }
-table.syn-zones .col-surface { width: 24mm; text-align: right; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; }
-table.syn-zones thead th.col-notes { width: auto; font-size: 7.4pt; }
-table.syn-zones tbody td.col-notes { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+table.syn-zones .col-surface { width: 24mm; text-align: right; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+table.syn-zones thead th.col-notes { width: auto; font-size: 7.5pt; }
+table.syn-zones tbody td.col-notes { width: auto; color: var(--neutral-600); font-size: 7.5pt; }
 table.syn-zones .col-notes p { margin: 0; }
+/* Sans colonne Notes, le tableau se limite à son contenu au lieu de
+   s'étirer sur 39 cm (nom sur 37 % de la largeur, surface rejetée au bord). */
+table.syn-zones:not(:has(th.col-notes)) { width: auto; }
+table.syn-zones:not(:has(th.col-notes)) .col-name { width: 65mm; }
+table.syn-zones:not(:has(th.col-notes)) .col-nature { width: 55mm; }
+/* Zones regroupées : la zone de suivi (souvent longue) n'est plus écrasée
+   par la justification. */
+table.syn-merged .col-nature { width: 40mm; }
+table.syn-merged .col-name { width: 120mm; }
 
 /* ── Largeurs colonnes — Tableau Régulation thermique ────────────── */
-table.syn-thermal .col-ref    { width: 14mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; font-weight: 600; }
+table.syn-thermal .col-ref    { width: 14mm; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; font-weight: 600; }
 table.syn-thermal tbody td.col-ref { color: var(--neutral-600); }
-table.syn-thermal .col-zone   { width: 36mm; }
+table.syn-thermal .col-zone   { width: 50mm; }
 table.syn-thermal .col-usage  { width: 30mm; }
 table.syn-thermal .col-bool   { width: 18mm; text-align: center; }
-table.syn-thermal .col-type   { width: 32mm; }
-table.syn-thermal .col-gen    { width: 36mm; }
-table.syn-thermal .col-age    { width: 16mm; text-align: right; }
+/* Tableau à sa largeur utile (colonnes fixes) : ni le type de régulation
+   ni le générateur ne sont étirés sur 39 cm. */
+table.syn-thermal { width: auto; }
+table.syn-thermal .col-type   { width: 95mm; }
+table.syn-thermal .col-gen    { width: 45mm; }
+table.syn-thermal .col-age    { width: 18mm; text-align: center; }
 table.syn-thermal .col-sensor { width: 32mm; }
 table.syn-thermal tbody td.col-sensor { color: var(--neutral-600); }
 table.syn-thermal .col-thermo { width: 26mm; }
 table.syn-thermal tbody td.col-thermo { color: var(--neutral-600); }
-table.syn-thermal thead th.col-notes { width: auto; font-size: 7.4pt; }
-table.syn-thermal tbody td.col-notes { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+table.syn-thermal thead th.col-notes { width: auto; font-size: 7.5pt; }
+table.syn-thermal tbody td.col-notes { width: auto; color: var(--neutral-600); font-size: 7.5pt; }
 table.syn-thermal .col-notes p { margin: 0; }
 
 /* ── Largeurs colonnes — Tableau Plan d'action récap ─────────────── */
-table.syn-actions .col-ref         { width: 18mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; font-weight: 700; }
+table.syn-actions .col-ref         { width: 18mm; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; font-weight: 700; }
 table.syn-actions tbody td.col-ref { color: var(--buildy-navy); }
-table.syn-actions .col-sev         { width: 20mm; }
-table.syn-actions .col-r175        { width: 22mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7pt; }
+table.syn-actions .col-sev         { width: 22mm; }
+table.syn-actions .col-r175        { width: 24mm; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; }
 table.syn-actions tbody td.col-r175 { color: var(--neutral-600); }
-table.syn-actions .col-zone        { width: 36mm; }
-table.syn-actions .col-title       { width: 110mm; }
-table.syn-actions .col-source      { width: 18mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; font-weight: 600; }
+/* Origine du constat : texte (« Compteur Ventilation · zone regroupée… »),
+   pas un code — colonne large ; le titre prend le reste (relecture PDF
+   2026-09-24 : origine sur 5 lignes, titre à moitié vide). */
+table.syn-actions .col-zone        { width: 45mm; }
+table.syn-actions .col-title       { width: auto; }
+table.syn-actions .col-source      { width: 105mm; font-size: 7.5pt; }
 table.syn-actions tbody td.col-source { color: var(--neutral-700); }
 table.syn-actions .col-status      { width: 22mm; }
-table.syn-actions thead th.col-comm-notes { width: auto; font-size: 7.4pt; }
-table.syn-actions tbody td.col-comm-notes { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+table.syn-actions thead th.col-comm-notes { width: auto; font-size: 7.5pt; }
+table.syn-actions tbody td.col-comm-notes { width: auto; color: var(--neutral-600); font-size: 7.5pt; }
 
 /* Ligne de regroupement par CARTE de l'audit (Tableau 4 — refonte
    plan par cartes 2026-05-29 v2). Bandeau vert saillant pour rester
    coherent avec la card desktop / PWA / chap 7 PDF. */
 table.syn-actions tbody tr.theme-row th {
-  background: #ecfdf5;            /* emerald-50 */
-  color: #064e3b;                 /* emerald-900 */
+  /* Neutre, comme les bandeaux de thème du rapport A4. */
+  background: #f1f5f9;
+  color: var(--buildy-navy);
   font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
+  font-size: 9.5pt;
   font-weight: 700;
   text-transform: none;
   letter-spacing: -0.01em;
   padding: 2.5mm 3mm;
   border-top: 0.6pt solid var(--neutral-200);
-  border-bottom: 0.4pt solid #a7f3d0; /* emerald-200 */
-  border-left: 3pt solid var(--buildy-green);
+  border-bottom: 0.4pt solid #cbd5e1;
+  border-left: 3pt solid var(--buildy-navy);
   text-align: left;
 }
 table.syn-actions tbody tr.theme-row th .theme-row-meta {
@@ -601,13 +624,19 @@ table.syn-actions tbody tr.action-row td:first-child { border-left: 2pt solid tr
 table.syn-actions tbody tr.action-row-blocking td:first-child { border-left-color: var(--sev-blocking); }
 table.syn-actions tbody tr.action-row-major td:first-child    { border-left-color: var(--sev-major); }
 table.syn-actions tbody tr.action-row-minor td:first-child    { border-left-color: var(--sev-minor); }
+/* Réserve : filet navy, jamais la couleur d'une gravité. */
+table.syn-actions tbody tr.action-row-reserve td:first-child  { border-left-color: var(--buildy-navy); }
+/* Alternance comptée sur les seules lignes d'action (les bandeaux de thème
+   la décalaient). */
+table.syn-actions tbody tr.action-row td { background: transparent; }
+table.syn-actions tbody tr:nth-child(even of .action-row) td { background: var(--neutral-100); }
 
 /* Pastilles sévérité dans le tableau plan d'action */
 .sev {
   display: inline-block;
   padding: 0.4mm 1.8mm;
   border-radius: 999px;
-  font-size: 6.8pt;
+  font-size: 6.5pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -616,13 +645,14 @@ table.syn-actions tbody tr.action-row-minor td:first-child    { border-left-colo
 .sev-blocking { background: #fee2e2; color: #991b1b; }
 .sev-major    { background: #ffedd5; color: #9a3412; }
 .sev-minor    { background: #fef3c7; color: #854d0e; }
+.sev-reserve  { background: #ffffff; color: #1b2842; border: 0.6pt solid #1b2842; }
 
 /* Pastilles statut commercial */
 .status-pill {
   display: inline-block;
   padding: 0.4mm 1.8mm;
   border-radius: 999px;
-  font-size: 7pt;
+  font-size: 7.5pt;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -655,16 +685,72 @@ table.syn-actions tbody tr.action-row-minor td:first-child    { border-left-colo
   border-color: var(--neutral-200);
 }
 .usage-pill-off svg { opacity: 0.45; }
+/* « Non traité » lisible sans la couleur : libellé barré, contour en
+   tirets (la ventilation, grise par nature, se confondait avec « non
+   traité » — relecture PDF 2026-09-24). */
+.usage-pill-off { text-decoration: line-through; border-style: dashed; opacity: 0.75; }
 .usage-pills { display: flex; flex-wrap: wrap; gap: 1.5mm; }
 
 /* ── Largeurs colonnes — Tableau Compteurs (A3 paysage utile ~390mm) ─ */
-table.syn-meters .col-ref   { width: 16mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; font-weight: 600; }
+table.syn-meters .col-ref   { width: 16mm; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; font-size: 7.5pt; font-weight: 600; }
 table.syn-meters tbody td.col-ref { color: var(--neutral-600); }
 table.syn-meters .col-type  { width: 36mm; }
 table.syn-meters .col-usage { width: 30mm; }
 table.syn-meters .col-bool  { width: 22mm; text-align: center; }
 /* Colonne Présent un peu plus large pour accueillir le tag "à installer" */
-table.syn-meters thead th.col-bool:nth-of-type(5),
-table.syn-meters tbody td.col-bool:nth-of-type(5) { width: 32mm; }
-table.syn-meters thead th.col-notes { width: auto; font-size: 7.4pt; }
-table.syn-meters tbody td.col-notes { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+table.syn-meters thead th:nth-of-type(4),
+table.syn-meters tbody td:nth-of-type(4) { width: 45mm; }
+table.syn-meters thead th.col-notes { width: auto; font-size: 7.5pt; }
+table.syn-meters tbody td.col-notes { width: auto; color: var(--neutral-600); font-size: 7.5pt; }
+
+/* Unités dans des en-têtes en capitales : « (m²) », « (kW) » gardent leur
+   casse (relecture clarté R2 m4). */
+.unit-nocase { text-transform: none; }
+
+/* Légende des pastilles « Usages couverts » (relecture clarté R2 m18). */
+.gtb-cell-legend {
+  display: block;
+  margin-top: 1mm;
+  font-size: 6.5pt;
+  color: #6b7280;
+}
+
+/* Sous-titre d'un tableau secondaire (zones regroupées pour le suivi). */
+.syn-subtitle {
+  /* Jamais seul en bas de page : reste avec son tableau. */
+  break-after: avoid;
+  page-break-after: avoid;
+  margin: 5mm 0 2mm;
+  font-family: 'Poppins', sans-serif;
+  font-size: 9.5pt;
+  font-weight: 600;
+  color: var(--buildy-navy);
+}
+
+/* En-têtes de colonnes toujours centrés (règle Buildy, UI comme PDF —
+   relecture 2026-09-24) : prime sur l'alignement des colonnes de chiffres
+   (.col-power, .col-surface, .col-age), qui ne vaut que pour les cellules. */
+table.syn thead th { text-align: center !important; }
+
+/* Pas de dernière ligne seule en haut d'une page : elle part avec la
+   précédente (relecture PDF 2026-09-24 : page A3 remplie à 4 %). */
+table.syn tbody tr:last-child { break-before: avoid; page-break-before: avoid; }
+
+/* Bandeaux de thème, de sous-thème et de zone : jamais seuls en bas de page,
+   ils partent avec leur première ligne (relecture PDF 2026-09-24). */
+table.syn tr.theme-row,
+table.syn tr.theme-sub-row,
+table.syn tr.zone-row { break-after: avoid; page-break-after: avoid; }
+/* Petit tableau des zones regroupées : d'un seul tenant. */
+table.syn-merged { break-inside: avoid; page-break-inside: avoid; }
+/* En-têtes des colonnes étroites (Oui / Non) : sur deux lignes plutôt que
+   de déborder de leur colonne (« Régulation automatique »). */
+table.syn thead th.col-bool { white-space: normal; }
+/* Filet de fin : un tableau qui se termine sur une ligne blanche ne semble
+   plus continuer. */
+table.syn > tbody:last-of-type > tr:last-child > td { border-bottom: 0.8pt solid #cbd5e1; }
+/* Site sans GTB : bandeau réduit à son titre (pas de corps vide). */
+.gtb-summary.gtb-summary-none { padding-bottom: 3mm; }
+.gtb-summary.gtb-summary-none .gtb-summary-head { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+/* Ordinal « 1er » en exposant (typographie du PDF). */
+sup.ord { font-size: 0.72em; line-height: 0; vertical-align: super; }

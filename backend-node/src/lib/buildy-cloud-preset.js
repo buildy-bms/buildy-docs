@@ -8,15 +8,24 @@
  * « comptes nominatifs » de la carte Credentials (chaque utilisateur a son
  * compte Buildy ID : aucun identifiant partagé n'est stocké).
  *
- * Couverture par niveau = catalogue seeds/service-levels.js :
- *  - R175-3 1° : retention_mensuelles E=12 mois / S=5 ans / P=10 ans,
- *    dashboards_consommations S/P ;
- *  - R175-3 2° : notifications_push S/P ;
- *  - R175-4    : maintenance_infra_gtb S/P ;
- *  - R175-5    : gestion_comptes E=option payante, S/P ;
- *  - R175-3 dernier alinéa (transmission structurée aux exploitants) :
- *    api_cloud (API Buildy Connect) Premium uniquement, sur devis.
- * → la conformité BACS complète exige le niveau Premium.
+ * Doctrine (validée par Kévin le 2026-09-23) : une supervision Buildy, quel
+ * que soit le niveau d'offre, est considérée CONFORME au décret BACS — jamais
+ * « non conforme » à cause du niveau souscrit — SOUS RÉSERVE des obligations
+ * de BUILDY_RESERVES_BY_LEVEL, mises en évidence dans le rapport :
+ *  - Essentials conserve 12 mois de données (retention_mensuelles) : le
+ *    client exporte et sauvegarde régulièrement ses consommations depuis
+ *    Hyperveez pour les garder 5 ans (R175-3 1°) ;
+ *  - la maintenance (maintenance_infra_gtb) n'est incluse qu'en Smart /
+ *    Premium : en Essentials, la maintenance de la GTB DOIT être organisée
+ *    (contrat de maintenance ou personnel interne compétent, vérifications
+ *    périodiques encadrées par des consignes écrites, R175-4) si aucune
+ *    n'est déclarée.
+ * La formation de l'exploitant (R175-5) n'est jamais présumée : l'assistance
+ * intégrée ne remplace pas une formation attestée (feuille d'émargement,
+ * FAQ n° 30) — la question reste à l'auditeur.
+ * L'API Buildy Connect (Premium, sur devis) automatise la transmission aux
+ * exploitants ; les comptes Hyperveez et les exports CSV suffisent au
+ * dernier alinéa de R175-3.
  *
  * Règles d'application : les champs qui DÉCOULENT du niveau sont toujours
  * réécrits (changer de niveau met la fiche en cohérence) ; les autres ne
@@ -25,7 +34,6 @@
 
 const BUILDY_OFFER_LEVELS = ['essentials', 'smart', 'premium'];
 const BUILDY_OFFER_LEVEL_LABEL = { essentials: 'Essentials', smart: 'Smart', premium: 'Premium' };
-const BUILDY_REQUIRED_LEVEL = 'premium';
 
 const BUILDY_CLOUD_URL = 'https://app.buildy.fr';
 const BUILDY_CLOUD_CREDENTIAL = {
@@ -35,26 +43,43 @@ const BUILDY_CLOUD_CREDENTIAL = {
   notes: 'Chaque utilisateur se connecte avec son compte personnel (Buildy ID). Aucun identifiant partagé n\'est stocké ici.',
 };
 
-// Exigences du décret NON couvertes par un niveau (affichées à l'écran, au
-// PDF et dans l'action « passer en Premium »).
-const API_REQ = {
-  article: 'R175-3 dernier alinéa',
-  label: 'transmission structurée des données aux exploitants des systèmes techniques (API Buildy Connect)',
-};
-const BUILDY_UNCOVERED_BY_LEVEL = {
+// Réserves de conformité liées au niveau d'offre (affichées à l'écran, au
+// PDF et dans le plan). `key` = source_subtype de l'action générée ; la
+// réserve « maintenance » ne vaut que si aucune maintenance n'est déclarée
+// (has_maintenance_procedures ≠ 1, cf. buildyReserves).
+const BUILDY_RESERVES_BY_LEVEL = {
   essentials: [
-    { article: 'R175-3 1°', label: 'conservation des consommations mensuelles pendant 5 ans (12 mois en Essentials)' },
-    { article: 'R175-3 2°', label: 'détection et notification des pertes d\'efficacité énergétique' },
-    { article: 'R175-4', label: 'maintenance et vérifications périodiques de la GTB' },
-    { article: 'R175-5', label: 'gestion des comptes et accompagnement des utilisateurs (option payante en Essentials)' },
-    API_REQ,
+    { key: 'data_export_backup', article: 'R175-3 1°',
+      label: 'exporter et sauvegarder régulièrement les données de consommation depuis Hyperveez, pour les conserver 5 ans (la solution les conserve 12 mois en Essentials)' },
+    { key: 'maintenance', article: 'R175-4',
+      label: 'mettre en place la maintenance de la GTB, par un contrat de maintenance ou un personnel interne compétent (vérifications périodiques encadrées par des consignes écrites) : elle n\'est pas incluse en Essentials' },
   ],
-  smart: [API_REQ],
+  smart: [],
   premium: [],
 };
 
 function isBuildyOfferLevel(level) {
   return BUILDY_OFFER_LEVELS.includes(level);
+}
+
+/** Réserves applicables à une fiche GTB Buildy (liste vide sinon). */
+function buildyReserves(bms) {
+  const list = (bms && BUILDY_RESERVES_BY_LEVEL[bms.buildy_offer_level]) || [];
+  return list.filter(r => r.key !== 'maintenance'
+    || !(bms.has_maintenance_procedures === 1 || bms.has_maintenance_procedures === true));
+}
+
+/**
+ * Fiche GTB « effective » : pour une supervision Buildy, les champs qui
+ * DÉCOULENT du niveau (valeurs `fixed` du modèle) priment sur la valeur
+ * stockée — une fiche pré-remplie avant un changement de doctrine (ex. audit
+ * Sénas, pré-rempli quand Essentials valait « non couvert ») ne doit pas
+ * contredire le rapport. Les autres champs restent ceux saisis.
+ */
+function effectiveBuildyBms(bms) {
+  if (!bms || !isBuildyOfferLevel(bms.buildy_offer_level)) return bms;
+  const { fixed } = buildBuildyCloudPreset(bms.buildy_offer_level);
+  return { ...bms, ...fixed };
 }
 
 /**
@@ -68,25 +93,27 @@ function buildBuildyCloudPreset(level) {
   const premium = level === 'premium';
   const fixed = {
     present: 1,
+    is_buildy_supervision: 1, // mig 206 — question préalable « supervision Buildy ? »
     buildy_offer_level: level,
     provided_protocols: JSON.stringify(premium ? ['rest', 'mqtt'] : ['mqtt']),
-    // R175-3 1°
-    meets_r175_3_p1: essentials ? 0 : 1,
-    data_storage_5y_compliant: essentials ? 'no' : 'yes',
+    // R175-3 1° — en Essentials, conservation 5 ans assurée par les exports
+    // réguliers du client (réserve « data_export_backup »).
+    meets_r175_3_p1: 1,
+    data_storage_5y_compliant: 'yes',
     r175_3_p1_retention_verified: essentials ? null : 1,
     // R175-3 2°
-    meets_r175_3_p2: essentials ? 0 : 1,
+    meets_r175_3_p2: 1,
     r175_3_p2_anomaly_rules_html: essentials
-      ? '<p>Essentials : surveillance de la communication des équipements. Les notifications de dérive et les tableaux de bord de consommation sont inclus à partir du niveau Smart.</p>'
+      ? '<p>Essentials : console d\'alarmes multi-sites sur Hyperveez (anomalies et défauts des équipements) et consultation des consommations. Les notifications push d\'anomalie et les tableaux de bord de consommation mensuels et annuels sont inclus à partir du niveau Smart.</p>'
       : '<p>Seuils paramétrables compteur par compteur (occupation, inoccupation, global), notifications de dérive, tableaux de bord de consommation avec normalisation DJU / DHU.</p>',
-    // R175-3 dernier alinéa
-    data_provision_to_operators: premium ? 1 : 0,
+    // R175-3 dernier alinéa — comptes nominatifs Hyperveez + exports CSV.
+    data_provision_to_operators: 1,
     data_provision_format: premium
       ? 'Portail web Hyperveez, exports CSV, API Buildy Connect'
       : 'Portail web Hyperveez, exports CSV',
     notes_data_provision: premium
       ? 'Le gestionnaire et les exploitants consultent les données sur la supervision Buildy avec leurs comptes nominatifs et peuvent les exporter en CSV. Transmission structurée et automatique aux exploitants des systèmes techniques par l\'API Buildy Connect.'
-      : `Le gestionnaire et les exploitants consultent les données sur la supervision Buildy avec leurs comptes nominatifs et peuvent les exporter en CSV. La transmission structurée aux exploitants (API Buildy Connect) n'est disponible qu'en niveau Premium.`,
+      : 'Le gestionnaire et les exploitants consultent les données sur la supervision Buildy avec leurs comptes nominatifs et peuvent les exporter en CSV. En option (niveau Premium), l\'API Buildy Connect automatise la transmission aux exploitants des systèmes techniques.',
   };
   // R175-4 : maintenance incluse en Smart / Premium. En Essentials, laissée à
   // l'auditeur (un tiers peut assurer la maintenance) — non réécrite.
@@ -107,7 +134,8 @@ function buildBuildyCloudPreset(level) {
     data_provision_to_manager: 1,
     data_provision_frequency: 'Temps réel (pas infra-horaire)',
     r175_3_p1_archival_format: 'Base de données cloud Buildy (valeurs brutes, horaires, journalières, mensuelles), exports CSV',
-    operator_trained: 1,
+    // operator_trained volontairement absent : la formation R175-5 se
+    // constate (attestation, feuille d'émargement), elle ne se présume pas.
     operator_training_provider: 'Buildy',
     operator_training_topics: 'Navigation dans la supervision, lecture des alarmes, consultation et export des consommations, gestion des comptes utilisateurs',
   };
@@ -154,11 +182,12 @@ function applyBuildyCloudPreset(db, { documentId, siteId, level, userId }) {
 module.exports = {
   BUILDY_OFFER_LEVELS,
   BUILDY_OFFER_LEVEL_LABEL,
-  BUILDY_REQUIRED_LEVEL,
-  BUILDY_UNCOVERED_BY_LEVEL,
+  BUILDY_RESERVES_BY_LEVEL,
   BUILDY_CLOUD_URL,
   BUILDY_CLOUD_CREDENTIAL,
   isBuildyOfferLevel,
+  buildyReserves,
+  effectiveBuildyBms,
   buildBuildyCloudPreset,
   applyBuildyCloudPreset,
 };

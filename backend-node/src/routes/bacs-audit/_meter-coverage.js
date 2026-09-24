@@ -7,22 +7,29 @@
 // `bolt` côté PDF — le helper Handlebars `faIcon` ne supporte pas le
 // préfixe `fa-`).
 
+// Icônes et couleurs identiques à celles des pastilles du PDF
+// (METER_TYPE_PILL / METER_USAGE_PILL de lib/pdf.js, elles-mêmes alignées
+// sur MeterTypePill / MeterUsagePill de l'UI) : une même énergie ou un même
+// usage garde la même icône et la même couleur d'un tableau à l'autre
+// (relecture PDF 2026-09-24 : thermomètre rouge ici, violet ailleurs).
 const COVERAGE_ENERGY_ORDER = [
-  { value: 'electric',            label: 'Élec.',           icon: 'bolt',                color: '#eab308' },
-  { value: 'gas',                 label: 'Gaz',             icon: 'fire-flame-curved',   color: '#f97316' },
-  { value: 'thermal',             label: 'Thermique',       icon: 'temperature-half',    color: '#dc2626' },
-  { value: 'electric_production', label: 'Élec. prod.',     icon: 'solar-panel',         color: '#facc15' },
-  { value: 'water',               label: 'Eau',             icon: 'droplet',             color: '#0ea5e9' },
+  { value: 'electric',            label: 'Élec.',           icon: 'bolt',                color: '#92400e' },
+  { value: 'gas',                 label: 'Gaz',             icon: 'fire',                color: '#991b1b' },
+  { value: 'thermal',             label: 'Thermique',       icon: 'temperature-half',    color: '#5b21b6' },
+  { value: 'electric_production', label: 'Élec. prod.',     icon: 'solar-panel',         color: '#065f46' },
+  { value: 'water',               label: 'Eau',             icon: 'droplet',             color: '#075985' },
 ];
 
+// Usages : couleurs des catégories de système (CATEGORY_ICON de lib/pdf.js
+// = SystemCategoryIcon de l'UI), comme dans les pastilles d'usage du PDF.
 const COVERAGE_USAGE_ICONS = {
   heating:     { icon: 'fire',         color: '#dc2626' },
-  cooling:     { icon: 'snowflake',    color: '#0ea5e9' },
-  ventilation: { icon: 'fan',          color: '#0f766e' },
-  dhw:      { icon: 'faucet-drip',     color: '#0891b2' },
-  pv:       { icon: 'solar-panel',     color: '#facc15' },
-  lighting: { icon: 'lightbulb',       color: '#eab308' },
-  other:    { icon: 'circle-question', color: '#6b7280' },
+  cooling:     { icon: 'snowflake',    color: '#0891b2' },
+  ventilation: { icon: 'fan',          color: '#64748b' },
+  dhw:      { icon: 'faucet',          color: '#0284c7' },
+  pv:       { icon: 'solar-panel',     color: '#16a34a' },
+  lighting: { icon: 'lightbulb',       color: '#f59e0b' },
+  other:    { icon: 'gauge',           color: '#64748b' },
 };
 
 // États ternaires stricts (incident Communay) : un compteur requis dont la
@@ -32,6 +39,10 @@ const COVERAGE_USAGE_ICONS = {
 function coverageMeterState(m) {
   if (m.out_of_service === 1 || m.out_of_service === true) return 'hs';
   if (m.present_actual === 1 || m.present_actual === true) return 'present';
+  // Zone fonctionnelle regroupée : couvert par le comptage unique du groupe.
+  if (m.coveredByGroup) return 'covered';
+  // Usage exempté (règle des 5 %) ou déclaré non concerné : non requis.
+  if (m.notRequiredReason) return 'neutral';
   if (m.present_actual == null) {
     return (m.required === 1 || m.required === true) ? 'unanswered' : 'neutral';
   }
@@ -75,14 +86,21 @@ function buildMeterCoverage(enrichedMeters, zones) {
         byZone.get(key).items.push(m);
       }
       const allKeys = [...byZone.keys()];
-      const orderedKeys = allKeys.includes('__general__')
-        ? ['__general__', ...allKeys.filter(k => k !== '__general__')]
-        : allKeys;
+      // Compteur général en tête, puis les zones dans l'ordre du chapitre 2
+      // (même ordre d'un tableau à l'autre — relecture PDF 2026-09-24).
+      const zoneRank = new Map(zones.map((z, i) => [z.zone_id, i]));
+      const rank = (k) => (zoneRank.has(k) ? zoneRank.get(k) : Number.MAX_SAFE_INTEGER);
+      const orderedKeys = [
+        ...(allKeys.includes('__general__') ? ['__general__'] : []),
+        ...allKeys.filter(k => k !== '__general__').sort((a, b) => rank(a) - rank(b)),
+      ];
       const stats = {
         total: list.length,
         present: list.filter(m => coverageMeterState(m) === 'present').length,
         missing: list.filter(m => coverageMeterState(m) === 'missing').length,
         unanswered: list.filter(m => coverageMeterState(m) === 'unanswered').length,
+        covered: list.filter(m => coverageMeterState(m) === 'covered').length,
+        hs: list.filter(m => coverageMeterState(m) === 'hs').length,
       };
       return {
         energy: et,

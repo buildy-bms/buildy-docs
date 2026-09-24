@@ -326,13 +326,24 @@ async function routes(fastify) {
     const total = fs.statSync(fullPath).size;
     const mime = doc.mime_type || 'application/octet-stream';
     // Médias (audio/vidéo/image) servis inline ; les autres en téléchargement.
+    // Images : seulement les formats matriciels connus. Un SVG peut contenir
+    // du script : il ne s'ouvre jamais depuis l'origine de l'appli (une
+    // balise <img> l'affiche quand même, sans exécuter de script).
+    const isInlineImage = IMAGE_MIMES.has(mime) || mime === 'image/gif';
     const isMedia = doc.media_type === 'audio'
-      || mime.startsWith('audio/') || mime.startsWith('video/') || mime.startsWith('image/');
-    reply.header('Content-Type', mime);
+      || mime.startsWith('audio/') || mime.startsWith('video/') || isInlineImage;
+    // ?inline=1 : aperçu d'un PDF dans l'appli (fenêtre d'aperçu). Réservé
+    // aux PDF : jamais de HTML ou de SVG servi inline depuis l'origine de
+    // l'appli.
+    const wantInline = (request.query?.inline === '1' || request.query?.inline === 'true')
+      && (mime === 'application/pdf' || /\.pdf$/i.test(doc.original_name || doc.filename || ''));
+    const safeName = String(doc.original_name || doc.filename).replace(/["\r\n]/g, '');
+    const asciiName = safeName.normalize('NFD').replace(/[^\x20-\x7e]/g, '');
+    reply.header('Content-Type', wantInline ? 'application/pdf' : mime);
     reply.header('Accept-Ranges', 'bytes');
     reply.header('Content-Disposition', isMedia
       ? 'inline'
-      : `attachment; filename="${String(doc.original_name || doc.filename).replace(/"/g, '')}"`);
+      : `${wantInline ? 'inline' : 'attachment'}; filename="${asciiName || 'document'}"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
 
     const range = request.headers.range;
     const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
@@ -367,6 +378,8 @@ async function routes(fastify) {
       bacs_audit_zone_id: z.number().int().nullable().optional(),
       bacs_audit_meter_id: z.number().int().nullable().optional(),
       bacs_audit_action_item_id: z.number().int().nullable().optional(),
+      // Case « Inclure dans le rapport » (annexe « Documents joints »).
+      include_in_report: z.boolean().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -374,7 +387,8 @@ async function routes(fastify) {
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       if (v === undefined) continue;
-      sets.push(`${k} = ?`); args.push(v);
+      // SQLite ne lie pas les booléens : 1 / 0.
+      sets.push(`${k} = ?`); args.push(typeof v === 'boolean' ? (v ? 1 : 0) : v);
     }
     if (sets.length) {
       args.push(id);

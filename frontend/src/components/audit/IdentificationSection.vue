@@ -92,7 +92,12 @@ const showPowerDetail = ref(false)
         {{ document?.client_name || 'Client à renseigner' }}
       </span>
     </template>
-    <div v-if="audit.isBacs" class="px-5 py-3.5 space-y-3">
+    <!-- Mode BACS : 4 cartes sur fond gris léger. Le verdict d'applicabilité
+         est affiché à côté de la puissance et du permis qui le déterminent. -->
+    <div v-if="audit.isBacs" class="p-4 space-y-4 bg-slate-50/70">
+      <div id="ident-applicability" class="audit-subcard">
+        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Applicabilité du décret (R175-2)</h3>
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-4 items-start">
       <!-- Applicabilité R175-2 : puissance + permis sur une ligne -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2">
         <div class="md:col-span-2">
@@ -142,9 +147,31 @@ const showPowerDetail = ref(false)
                  v-tooltip="'Postérieur au 8 avril 2024 : bâtiment soumis dès la livraison.'" />
         </div>
       </div>
+          <!-- Verdict d'applicabilité (auparavant en bas de la carte) -->
+          <div>
+            <template v-if="document?.bacs_applicability_status">
+              <div :class="['rounded-lg border p-3 flex items-start gap-3', applicabilityLabels[document.bacs_applicability_status].cls]">
+                <ExclamationTriangleIcon class="w-5 h-5 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="font-medium text-sm">{{ applicabilityLabels[document.bacs_applicability_status].label }}</div>
+                </div>
+              </div>
+              <p v-if="document?.bacs_applicability_status !== 'not_subject'" class="mt-2 text-[11px] text-gray-500 leading-relaxed">
+                <em>À titre informatif :</em> l'article R175-2 prévoit une clause de dispense applicable lorsque le temps de retour
+                sur investissement de la mise en conformité dépasse 10 ans. Ce calcul ne relève pas du périmètre de l'audit
+                (cf. Annexe D, point 4).
+              </p>
+            </template>
+            <div v-else class="rounded-lg border border-dashed border-gray-300 p-3 text-xs text-gray-500">
+              Verdict en attente : renseigne la puissance et la date du permis de construire.
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Déclencheurs réglementaires : Oui / Non, conditionnels en dessous -->
-      <div class="border-t border-gray-100 pt-2.5">
+      <div id="ident-triggers" class="audit-subcard">
+        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Déclencheurs réglementaires</h3>
         <div class="qa-grid text-sm">
           <div class="qa-question">
             Des travaux d'installation ou de remplacement d'un générateur de chaleur ont-ils été réalisés ?
@@ -182,11 +209,11 @@ const showPowerDetail = ref(false)
       </div>
 
       <!-- Item 4 — Structure juridique & parties prenantes -->
-      <div v-if="audit.document?.site_uuid" class="border-t border-gray-100 pt-2.5">
+      <div v-if="audit.document?.site_uuid" id="ident-parties" class="audit-subcard">
         <SitePartiesCard flush @open-notes="emit('open-notes', $event)" />
       </div>
       <!-- Item 13 — Base de consommations mensuelles de référence -->
-      <div v-if="audit.document?.site_uuid" class="border-t border-gray-100 pt-2.5">
+      <div v-if="audit.document?.site_uuid" id="ident-energy-history" class="audit-subcard">
         <EnergyHistoryCard flush />
       </div>
     </div>
@@ -197,18 +224,7 @@ const showPowerDetail = ref(false)
         concentrent sur l'inventaire technique nécessaire au chiffrage.
       </p>
     </div>
-    <div v-if="audit.isBacs && document?.bacs_applicability_status" class="px-5 pb-4">
-      <div :class="['rounded-lg border p-3 flex items-start gap-3', applicabilityLabels[document.bacs_applicability_status].cls]">
-        <ExclamationTriangleIcon class="w-5 h-5 shrink-0 mt-0.5" />
-        <div class="flex-1">
-          <div class="font-medium text-sm">{{ applicabilityLabels[document.bacs_applicability_status].label }}</div>
-        </div>
-      </div>
-      <p v-if="document?.bacs_applicability_status !== 'not_subject'" class="mt-2 text-[11px] text-gray-500 leading-relaxed">
-        <em>À titre informatif :</em> l'article R175-2 prévoit une clause de dispense applicable lorsque le temps de retour
-        sur investissement de la mise en conformité dépasse 10 ans. Ce calcul ne relève pas du périmètre de l'audit
-        (cf. Annexe D, point 4).
-      </p>
-    </div>
+    <!-- Verdict d'applicabilité : désormais dans la carte « Applicabilité du
+         décret (R175-2) », à côté de la puissance et du permis. -->
   </CollapsibleSection>
 </template>

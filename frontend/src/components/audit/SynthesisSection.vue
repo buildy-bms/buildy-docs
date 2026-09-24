@@ -1,8 +1,12 @@
 <script setup>
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
+import { useAuditStore } from '@/stores/audit'
+import { isSynthesisStale } from '@/lib/synthesis-staleness'
 
 // Section 12 — Note de synthèse (rédigée à la main ou pré-remplie via
 // Claude). Affichée en tête du PDF d'audit livré au client.
@@ -16,9 +20,16 @@ const props = defineProps({
   active: { type: Boolean, default: false },
 })
 const emit = defineEmits([
-  'generate', 'update:synthesis-html',
+  'generate', 'update:synthesis-html', 'confirm-current',
   'validate-step', 'invalidate-step',
 ])
+
+// Note périmée (lib/synthesis-staleness.js, même règle que le serveur) : elle
+// n'est PAS imprimée dans le rapport — on le dit ici, là où on la rédige.
+const { actionItems } = storeToRefs(useAuditStore())
+const isStale = computed(() => isSynthesisStale({
+  html: props.synthesisHtml, generatedAt: props.generatedAt, actionItems: actionItems.value,
+}))
 </script>
 
 <template>
@@ -32,18 +43,32 @@ const emit = defineEmits([
                      @invalidate="emit('invalidate-step', $event)">
         <template v-if="generatedAt" #subtitle-extra>
           <span class="text-[11px] text-violet-700 italic">
-            ✨ Générée le {{ new Date(generatedAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
+            ✨ Note datée du {{ new Date(generatedAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
+            <span v-if="isStale" class="not-italic font-medium text-amber-700"> · périmée, non imprimée</span>
           </span>
         </template>
       </SectionHeader>
     </template>
     <template #summary>
       <span v-if="synthesisHtml">
-        ✨ Note rédigée<span v-if="generatedAt"> · générée le {{ new Date(generatedAt).toLocaleDateString('fr-FR') }}</span>
+        ✨ Note rédigée<span v-if="generatedAt"> · datée du {{ new Date(generatedAt).toLocaleDateString('fr-FR') }}</span>
+        <span v-if="isStale" class="text-amber-700 font-medium"> · périmée, non imprimée</span>
       </span>
       <span v-else class="italic">Pas encore de note de synthèse</span>
     </template>
     <div class="px-5 py-4 space-y-3">
+      <div v-if="isStale"
+           class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 flex items-start justify-between gap-3">
+        <div class="text-xs text-amber-900 leading-snug">
+          <p class="font-semibold">Le plan d'actions a changé depuis cette note : elle ne sera pas imprimée dans le rapport.</p>
+          <p class="mt-0.5">Une note périmée contredirait le tableau de bord et le plan. Régénère-la avec Claude, ou corrige-la à la main puis confirme qu'elle est à jour.</p>
+        </div>
+        <button type="button" @click="emit('confirm-current')"
+                v-tooltip="'Date la note du jour : elle sera de nouveau imprimée dans le rapport.'"
+                class="shrink-0 inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-amber-900 bg-white border border-amber-300 hover:bg-amber-100 rounded-lg transition">
+          Note relue et à jour
+        </button>
+      </div>
       <div class="flex items-center gap-2">
         <button
           @click="emit('generate')"

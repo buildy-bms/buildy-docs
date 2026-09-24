@@ -13,7 +13,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { generateBacsAuditSynthesis, updateBacsAuditSynthesis } from '@/api'
+import { useConfirm } from '@/composables/useConfirm'
+import { generateBacsAuditSynthesis, updateBacsAuditSynthesis, updateAf } from '@/api'
+import { isSynthesisStale } from '@/lib/synthesis-staleness'
 import MobileSheet from './MobileSheet.vue'
 
 const props = defineProps({
@@ -22,8 +24,9 @@ const props = defineProps({
 defineEmits(['close'])
 
 const audit = useAuditStore()
-const { document, synthesisHtml } = storeToRefs(audit)
+const { document, synthesisHtml, actionItems } = storeToRefs(audit)
 const { error, success } = useNotification()
+const { confirm } = useConfirm()
 
 const generating = ref(false)
 const localHtml = ref('')
@@ -34,9 +37,37 @@ watch(() => props.open, (v) => {
 
 const generatedAt = computed(() => document.value?.audit_synthesis_generated_at || null)
 
+// Note périmée (même règle que le serveur) : pas imprimée dans le rapport.
+const isStale = computed(() => isSynthesisStale({
+  html: synthesisHtml.value, generatedAt: generatedAt.value, actionItems: actionItems.value,
+}))
+// Note relue par l'auditeur : datée du jour, elle est de nouveau imprimée.
+const confirming = ref(false)
+async function confirmCurrent() {
+  if (confirming.value || !document.value) return
+  confirming.value = true
+  const now = new Date().toISOString()
+  try {
+    await updateAf(audit.docId, { audit_synthesis_generated_at: now })
+    document.value.audit_synthesis_generated_at = now
+    success('Note de synthèse confirmée : elle sera imprimée dans le rapport')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Confirmation impossible')
+  } finally {
+    confirming.value = false
+  }
+}
+
 async function generate() {
   if (generating.value) return
-  if (synthesisHtml.value && !window.confirm('Une synthese existe deja. Re-generer va ecraser le texte actuel — continuer ?')) return
+  if (synthesisHtml.value) {
+    const ok = await confirm({
+      title: 'Régénérer la note de synthèse ?',
+      message: 'Le texte actuel sera remplacé par une nouvelle note rédigée par Claude.',
+      confirmLabel: 'Régénérer',
+    })
+    if (!ok) return
+  }
   generating.value = true
   try {
     const { data } = await generateBacsAuditSynthesis(audit.docId)
@@ -47,17 +78,23 @@ async function generate() {
         document.value.audit_synthesis_html = data.html
         document.value.audit_synthesis_generated_at = data.generated_at
       }
-      success('Synthese generee')
+      success('Note de synthèse générée')
     }
   } catch (e) {
-    error(e.response?.data?.detail || 'Echec generation Claude')
+    error(e.response?.data?.detail || 'Échec de la génération par Claude')
   } finally {
     generating.value = false
   }
 }
 
 async function clearSynthesis() {
-  if (!window.confirm('Supprimer la synthese ?')) return
+  const ok = await confirm({
+    title: 'Supprimer la note de synthèse ?',
+    message: 'La note ne figurera plus en tête du rapport.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await updateBacsAuditSynthesis(audit.docId, null)
     audit.setSynthesisHtml('')
@@ -94,8 +131,23 @@ async function clearSynthesis() {
       </button>
 
       <div v-if="generatedAt" class="text-xs text-gray-500 text-center">
-        Dernière génération :
+        Note datée du
         {{ new Date(generatedAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
+      </div>
+
+      <!-- Note périmée : non imprimée tant qu'elle n'est pas régénérée ou
+           confirmée (même bandeau que l'étape Synthèse desktop). -->
+      <div v-if="isStale" class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 space-y-2">
+        <p class="text-sm font-medium text-amber-900 leading-snug">
+          Le plan d'actions a changé depuis cette note : elle ne sera pas imprimée dans le rapport.
+        </p>
+        <p class="text-xs text-amber-800 leading-relaxed">
+          Une note périmée contredirait le tableau de bord et le plan. Régénère-la avec Claude, ou relis-la puis confirme qu'elle est à jour.
+        </p>
+        <button type="button" @click="confirmCurrent" :disabled="confirming"
+                class="pwa-button w-full border border-amber-300 bg-white text-amber-900 active:bg-amber-100 disabled:opacity-50">
+          {{ confirming ? 'Enregistrement…' : 'Note relue et à jour' }}
+        </button>
       </div>
 
       <div v-if="synthesisHtml" class="space-y-2">

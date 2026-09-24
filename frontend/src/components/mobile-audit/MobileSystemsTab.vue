@@ -1489,7 +1489,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           </MobileField>
           <MobileYesNo
             label="L'équipement est-il relié à la GTB par une liaison câblée ?"
-            description="Liaison câblée dédiée vers la supervision — la base de l'interopérabilité exigée par le décret (R175-3 §3)."
+            description="Liaison câblée dédiée vers la supervision — la base de l'interopérabilité exigée par le décret (R175-3 3°)."
             :model-value="deviceForm.wired"
             @update:model-value="v => deviceForm.wired = v"
           />
@@ -1499,21 +1499,21 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         <div class="space-y-2">
           <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">État &amp; conformité</p>
           <MobileYesNo
-            label="Peut-on arrêter l'équipement manuellement, sur place ?"
-            description="R175-3 §4 — coupure directe sur place, sans passer par la supervision."
+            label="La GTB permet-elle d'arrêter l'équipement manuellement ?"
+            description="R175-3 4° — depuis la GTB : arrêt, remise en marche ou mise en hors gel."
             :model-value="deviceForm.meets_r175_3_p4"
             @update:model-value="v => deviceForm.meets_r175_3_p4 = v"
           />
           <MobileYesNo
-            label="L'équipement redémarre-t-il de façon autonome après une coupure ?"
-            description="R175-3 §4 — reprise seule après coupure de courant, sans intervention d'un technicien."
+            label="L'équipement fonctionne-t-il seul si la GTB est arrêtée ?"
+            description="R175-3 4° — il continue avec sa régulation locale et repart seul après une coupure."
             :model-value="deviceForm.meets_r175_3_p4_autonomous"
             @update:model-value="v => deviceForm.meets_r175_3_p4_autonomous = v"
           />
           <!-- Ordre desktop : is_backup AVANT out_of_service. -->
           <MobileYesNo
             label="Est-ce un équipement de secours ?"
-            description="Relève qui ne tourne qu'en cas de panne, pointe extrême ou maintenance (typique : 2ᵉ chaudière en cascade quelques heures par an). Puissance exclue du cumul BACS (seuils 70 / 290 kW). Si elle tourne en permanence en complément, laisser sur Non."
+            description="Normalement à l'arrêt, démarre seulement après un défaut de l'équipement principal (FAQ BACS n° 8). Un générateur en cascade ou en appoint n'est pas un secours : sa puissance est comptée. Seul un vrai secours est exclu du cumul (seuils 70 / 290 kW)."
             :model-value="deviceForm.is_backup"
             @update:model-value="v => deviceForm.is_backup = v"
           />

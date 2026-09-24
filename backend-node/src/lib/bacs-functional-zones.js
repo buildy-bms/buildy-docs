@@ -119,6 +119,16 @@ function computeFunctionalZones(devices, systems, labels = {}) {
     }
   }
 
+  // Zones des systèmes présents sans équipement propre (équipements partagés
+  // depuis un système d'une autre catégorie, ex. unités réversibles) : elles
+  // font aussi partie du découpage de leur catégorie (R3 n4).
+  for (const s of systems || []) {
+    if (!s.system_category || s.zone_id == null) continue;
+    if ('present' in s && s.present !== 1 && s.present !== true) continue;
+    if (s.is_bacs === 0) continue;
+    ensureZone(catEntry(s.system_category), s.zone_id, s.zone_name);
+  }
+
   // Matérialise les groupes par catégorie.
   const byCategory = [];
   let mergedCount = 0;
@@ -132,7 +142,10 @@ function computeFunctionalZones(devices, systems, labels = {}) {
       groupsByRoot.get(root).push(zid);
     }
     const groups = [];
-    for (const zoneIds of groupsByRoot.values()) {
+    for (const rawIds of groupsByRoot.values()) {
+      // Ordre alphabétique stable : même libellé de groupe partout (plan,
+      // annexe C, tableaux) quel que soit l'ordre de saisie (R3 n16).
+      const zoneIds = rawIds.slice().sort((a, b) => String(entry.zones.get(a)).localeCompare(String(entry.zones.get(b)), 'fr'));
       const zoneNames = zoneIds.map(z => entry.zones.get(z));
       const merged = zoneIds.length > 1;
       if (merged) mergedCount++;
@@ -148,7 +161,9 @@ function computeFunctionalZones(devices, systems, labels = {}) {
           ? notes[0]
           : 'comptage séparé non réalisable';
         const catLabel = (SYSTEM_LABEL[cat] || cat).toLowerCase();
-        justification = `${zoneNames.join(' et ')} regroupées en une zone fonctionnelle ${catLabel} : ${reason}.`;
+        // Les noms des zones sont déjà affichés à côté (label) : la
+        // justification ne les répète pas (relecture clarté R2 m16).
+        justification = `Regroupées en une seule zone fonctionnelle de suivi pour l'usage ${catLabel} : ${reason}. Un compteur unique suffit pour l'ensemble.`;
       }
       groups.push({
         zone_ids: zoneIds,
@@ -170,4 +185,79 @@ function computeFunctionalZones(devices, systems, labels = {}) {
   return { byCategory, mergedCount };
 }
 
-module.exports = { computeFunctionalZones };
+// Usage de compteur → catégories de système dont il suit la consommation.
+const METER_USAGE_TO_CATEGORIES = {
+  heating: ['heating'],
+  cooling: ['cooling'],
+  ventilation: ['ventilation'],
+  dhw: ['dhw'],
+  lighting: ['lighting_indoor', 'lighting_outdoor'],
+  pv: ['electricity_production'],
+};
+
+function isYes(v) { return v === 1 || v === true; }
+function isNo(v) { return v === 0 || v === false; }
+
+/**
+ * Rôle des compteurs situés dans une zone fonctionnelle REGROUPÉE (comptage
+ * séparé non réalisable) : un comptage unique suffit pour le groupe
+ * (relectures R1 M3 et R2 C2 : le rapport regroupait les zones puis exigeait
+ * un compteur par zone, en actions bloquantes).
+ *
+ *  - 'present' : compteur physiquement présent — il mesure une part du
+ *                groupe, ses propres actions restent ;
+ *  - 'lead'    : aucun compteur présent dans le groupe — ce compteur porte
+ *                l'action du groupe (le premier requis constaté absent, à
+ *                défaut le premier) ;
+ *  - 'covered' : absent ou non vérifié, couvert par le comptage du groupe
+ *                (aucune action propre).
+ *
+ * @param {{byCategory: Array}} functionalZones  sortie de computeFunctionalZones
+ * @param {Array} meters  compteurs (id, zone_id, usage, meter_type,
+ *                        present_actual, required)
+ * @returns {Map<number, {role: string, group: object, leadId: number|null}>}
+ *   (les compteurs hors zone regroupée n'y figurent pas)
+ */
+function mergedMeterRoles(functionalZones, meters) {
+  const groups = [];
+  for (const c of (functionalZones && functionalZones.byCategory) || []) {
+    for (const g of c.groups || []) {
+      if (g.merged) groups.push({ ...g, category: c.category });
+    }
+  }
+  const byKey = new Map();
+  for (const m of meters || []) {
+    if (m.meter_type === 'water' || m.zone_id == null) continue;
+    const cats = METER_USAGE_TO_CATEGORIES[m.usage];
+    if (!cats) continue;
+    const g = groups.find(gr => cats.includes(gr.category) && gr.zone_ids.includes(m.zone_id));
+    if (!g) continue;
+    // Un seul comptage par zone regroupée ET par usage, quel que soit le type
+    // de compteur (gaz en entrée de chaudière OU énergie thermique) — R3 N-M4.
+    const key = `${g.category}|${g.zone_ids.slice().sort((a, b) => a - b).join(',')}|${m.usage}`;
+    if (!byKey.has(key)) byKey.set(key, { group: g, list: [] });
+    byKey.get(key).list.push(m);
+  }
+  // Préférence : compteur d'énergie en entrée du générateur (gaz, électricité)
+  // plutôt qu'un compteur d'énergie thermique.
+  const rank = (m) => ((m.meter_type === 'gas' || m.meter_type === 'electric') ? 0 : 1);
+  const byPreference = (a, b) => rank(a) - rank(b) || a.id - b.id;
+  const roles = new Map();
+  for (const { group, list } of byKey.values()) {
+    const present = list.filter(m => isYes(m.present_actual));
+    if (present.length) {
+      for (const m of list) roles.set(m.id, { role: present.includes(m) ? 'present' : 'covered', group, leadId: null });
+      continue;
+    }
+    // Présence d'un compteur non vérifiée : il porte le comptage du groupe
+    // (à vérifier sur place) ; on ne conclut pas à un compteur manquant.
+    const unknown = list.filter(m => m.present_actual == null).sort(byPreference);
+    const lead = unknown[0]
+      || list.filter(m => isYes(m.required) && isNo(m.present_actual)).sort(byPreference)[0]
+      || list.slice().sort(byPreference)[0];
+    for (const m of list) roles.set(m.id, { role: m === lead ? 'lead' : 'covered', group, leadId: lead.id });
+  }
+  return roles;
+}
+
+module.exports = { computeFunctionalZones, mergedMeterRoles, METER_USAGE_TO_CATEGORIES };

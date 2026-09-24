@@ -21,6 +21,9 @@ import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import { meterUsageLabel, METER_USAGES, getMeterUsageMeta } from '@/lib/meter-options'
 import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
+import { storeToRefs } from 'pinia'
+import { useAuditStore } from '@/stores/audit'
+import { isMeterMissing, isMeterUnanswered, meterPlanNote, presentToggleValue } from '@/lib/meter-plan-state'
 
 const props = defineProps({
   energy: { type: Object, required: true }, // { value, label, icon, color }
@@ -31,7 +34,17 @@ const props = defineProps({
   protocolOptions: { type: Array, required: true },
   meterUsages: { type: Array, required: true }, // pour le contextLabel des notes
   highlightId: { type: Number, default: null }, // surligne temporairement une ligne
+  // Page audit à onglets : une énergie affichée à la fois (sous-onglets de
+  // MetersSection) → groupe toujours déplié, en-tête non repliable.
+  tabMode: { type: Boolean, default: false },
 })
+
+// Statut des compteurs au regard du plan (zone regroupée, usage exempté…),
+// calculé par le serveur : « requis manquant » = même décompte que le PDF.
+const { meterPlanStatus } = storeToRefs(useAuditStore())
+const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
+const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
+const planNote = (m) => meterPlanNote(m, meterPlanStatus.value)
 
 // Mapping usage compteur → catégorie(s) de système. Source unique dans
 // `lib/audit-options.js` pour éviter la divergence entre composants.
@@ -174,7 +187,8 @@ const stats = computed(() => {
   return {
     total: arr.length,
     present: arr.filter(m => m.present_actual).length,
-    missing: arr.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+    missing: arr.filter(isMissing).length,
+    unanswered: arr.filter(isUnanswered).length,
   }
 })
 
@@ -197,7 +211,7 @@ function teardownSortable() {
 function setupSortable() {
   teardownSortable()
   const el = tbodyRef.value
-  if (!el || collapsed.value || !dragEnabled.value) return
+  if (!el || (collapsed.value && !props.tabMode) || !dragEnabled.value) return
   sortable = Sortable.create(el, {
     draggable: 'tr.meter-row',
     handle: '.drag-handle',
@@ -212,7 +226,7 @@ function setupSortable() {
     },
   })
 }
-watch([() => props.meters, collapsed, groupBy], async () => {
+watch([() => props.meters, collapsed, groupBy, () => props.tabMode], async () => {
   await nextTick()
   setupSortable()
 }, { immediate: true, flush: 'post' })
@@ -223,8 +237,8 @@ onBeforeUnmount(teardownSortable)
   <div :class="['bg-white rounded-2xl border overflow-hidden transition',
                 meters.length === 0 ? 'border-gray-200 opacity-80' : 'border-gray-200']">
     <!-- Header énergie : couleur + KPI + toggle -->
-    <button type="button" @click="toggle"
-            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition">
+    <button type="button" @click="toggle" :disabled="tabMode"
+            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition disabled:cursor-default disabled:hover:bg-transparent">
       <span class="w-10 h-10 rounded-xl inline-flex items-center justify-center shrink-0"
             :style="{ background: energy.color + '1a', color: energy.color }">
         <FontAwesomeIcon :icon="['fas', energy.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
@@ -241,15 +255,21 @@ onBeforeUnmount(teardownSortable)
               <span class="mx-1 text-gray-300">·</span>
               <span class="text-red-700 font-medium">{{ stats.missing }} requis manquant{{ stats.missing > 1 ? 's' : '' }}</span>
             </template>
+            <template v-if="stats.unanswered > 0">
+              <span class="mx-1 text-gray-300">·</span>
+              <span class="text-amber-700 font-medium"
+                    v-tooltip="'Compteurs requis dont la présence n\'a pas été vérifiée : le rapport les indique « à qualifier »'">{{ stats.unanswered }} présence{{ stats.unanswered > 1 ? 's' : '' }} à vérifier</span>
+            </template>
           </template>
         </p>
       </div>
-      <ChevronDownIcon :class="['w-5 h-5 text-gray-400 transition-transform shrink-0',
+      <ChevronDownIcon v-if="!tabMode" :class="['w-5 h-5 text-gray-400 transition-transform shrink-0',
                                 collapsed ? '-rotate-90' : '']" />
     </button>
 
-    <!-- Table compacte des compteurs (visible si déplié) -->
-    <div v-show="!collapsed" class="border-t border-gray-100">
+    <!-- Table compacte des compteurs (visible si déplié ; toujours en mode
+         onglet, sinon une énergie vide masquerait son bouton « Ajouter ») -->
+    <div v-show="tabMode || !collapsed" class="border-t border-gray-100">
       <!-- Mini toolbar : groupage interne -->
       <div v-if="meters.length > 1" class="px-3 py-2 bg-gray-50/60 border-b border-gray-100 flex items-center gap-2 text-xs">
         <span class="text-gray-500">Grouper&nbsp;:</span>
@@ -315,7 +335,7 @@ onBeforeUnmount(teardownSortable)
                 :enabled="!!document?.site_uuid"
                 :row-class="['meter-row',
                   row.meter.out_of_service ? 'opacity-50' : '',
-                  row.meter.required && !row.meter.present_actual && !row.meter.out_of_service ? 'bg-red-50/40' : '',
+                  isMissing(row.meter) ? 'bg-red-50/40' : '',
                   highlightId === row.meter.id ? 'ring-2 ring-amber-300 bg-amber-50/40' : '']"
                 @changed="$emit('photos-changed')">
               <td class="align-middle">
@@ -329,21 +349,47 @@ onBeforeUnmount(teardownSortable)
                    (le sous-en-tête EST l'usage → doublon). -->
               <td v-if="groupBy !== 'usage'">
                 <div class="flex items-center gap-1">
-                  <span v-if="row.meter.required && !row.meter.present_actual && !row.meter.out_of_service"
+                  <span v-if="isMissing(row.meter)"
                         class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
+                  <span v-else-if="isUnanswered(row.meter)"
+                        class="text-amber-600 font-semibold shrink-0" v-tooltip="'Présence à vérifier : le rapport indique ce compteur « à qualifier »'">?</span>
                   <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
                   <span v-else class="text-xs text-gray-400 italic">—</span>
                 </div>
+                <!-- Statut au regard du plan (zone regroupée, usage exempté…) :
+                     même lecture que le chapitre 4 du PDF. -->
+                <p v-if="planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
+                   class="mt-0.5 text-[11px] text-slate-500 italic text-left">
+                  {{ planNote(row.meter).label }}
+                </p>
+                <!-- Nom du système desservi (ex. « Chaudière principale »),
+                     auparavant visible seulement dans la matrice « Plan de comptage ». -->
+                <p v-if="systemNameForMeter(row.meter)" v-truncate-tooltip
+                   class="mt-0.5 text-[11px] text-gray-500 truncate max-w-56 text-left">
+                  {{ systemNameForMeter(row.meter) }}
+                </p>
               </td>
               <!-- Colonne Zone — masquée quand on groupe déjà par zone (le
                    sous-en-tête EST la zone → doublon). Le ⚠ n'est repris ici que
                    lorsque la colonne Usage est masquée (groupé par usage). -->
               <td v-if="groupBy !== 'zone'" class="text-gray-700">
                 <div class="flex items-center gap-1">
-                  <span v-if="groupBy === 'usage' && row.meter.required && !row.meter.present_actual && !row.meter.out_of_service"
+                  <span v-if="groupBy === 'usage' && isMissing(row.meter)"
                         class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
+                  <span v-else-if="groupBy === 'usage' && isUnanswered(row.meter)"
+                        class="text-amber-600 font-semibold shrink-0" v-tooltip="'Présence à vérifier : le rapport indique ce compteur « à qualifier »'">?</span>
                   <span v-truncate-tooltip class="truncate max-w-60">{{ row.meter.zone_name || 'Compteur général' }}</span>
                 </div>
+                <p v-if="groupBy === 'usage' && planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
+                   class="mt-0.5 text-[11px] text-slate-500 italic text-left">
+                  {{ planNote(row.meter).label }}
+                </p>
+                <!-- Groupé par usage : la colonne Usage est masquée, le nom du
+                     système desservi passe sous la zone. -->
+                <p v-if="groupBy === 'usage' && systemNameForMeter(row.meter)" v-truncate-tooltip
+                   class="mt-0.5 text-[11px] text-gray-500 truncate max-w-60 text-left">
+                  {{ systemNameForMeter(row.meter) }}
+                </p>
               </td>
               <td class="whitespace-nowrap">
                 <SegmentedToggle compact :model-value="!!row.meter.required"
@@ -351,7 +397,7 @@ onBeforeUnmount(teardownSortable)
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { required: v } })" />
               </td>
               <td class="whitespace-nowrap">
-                <SegmentedToggle compact :model-value="!!row.meter.present_actual"
+                <SegmentedToggle compact :model-value="presentToggleValue(row.meter)"
                                  tooltip="Compteur présent sur site ?"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { present_actual: v } })" />
               </td>

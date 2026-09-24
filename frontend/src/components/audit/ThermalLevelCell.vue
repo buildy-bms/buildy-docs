@@ -3,8 +3,10 @@
  * Cellule d'un niveau (Production / Distribution / Émission) dans la card 06
  * « Régulation thermique automatique » (mig 187 v3).
  *
- * Layout COMPACT 1 ligne :
- *   [MultiSelect device(s)] [chip type] [chip Intégrée] [bouton notes]
+ * Layout COMPACT 1 ligne, en grille partagée avec l'en-tête du tableau
+ * (`.thermal-level-grid`, main.css) pour que les colonnes s'alignent d'une
+ * ligne à l'autre ; les libellés sont portés une seule fois par l'en-tête :
+ *   [MultiSelect device(s)] [pastille + type] [granularité (émission)] [note]
  *
  * Le MultiSelect regroupe en UNE seule liste l'équipement principal et son
  * régulateur déporté éventuel (au lieu de 2 lists séparées comme avant).
@@ -19,7 +21,12 @@
  * découpée en sous-cards par zone.
  */
 import { computed } from 'vue'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faPenToSquare } from '@fortawesome/pro-solid-svg-icons'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+
+library.add(faPenToSquare)
 
 const props = defineProps({
   thermal: { type: Object, required: true },
@@ -30,8 +37,27 @@ const props = defineProps({
   // Mig 187 v10 — Type de régulation : options + handler d'édition.
   regulationTypeOptions: { type: Array, default: () => [] },
   integrated: { type: Boolean, default: false },
+  // Note du niveau (production_notes_html / distribution_notes_html /
+  // emission_notes_html) : éditée via la modale de notes partagée (la vue),
+  // reprise dans le PDF et sur la PWA.
+  noteHtml: { type: String, default: '' },
 })
-const emit = defineEmits(['patch-thermal', 'patch-device'])
+const emit = defineEmits(['patch-thermal', 'patch-device', 'open-notes'])
+
+const LEVEL_SHORT = { production: 'production', distribution: 'distribution', emission: 'émission' }
+// Aperçu texte de la note (DOMParser : n'exécute aucun script, ne charge
+// aucune image, contrairement à innerHTML sur un élément détaché).
+const noteText = computed(() => {
+  if (!props.noteHtml) return ''
+  const doc = new DOMParser().parseFromString(props.noteHtml, 'text/html')
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
+})
+const noteTooltip = computed(() => {
+  const lvl = LEVEL_SHORT[props.level] || props.level
+  if (!noteText.value) return `Ajouter une note (${lvl})`
+  const t = noteText.value.length > 160 ? noteText.value.slice(0, 157) + '…' : noteText.value
+  return `Note ${lvl} :\n${t}`
+})
 
 const LEVEL_DEVICE_FIELD = {
   production:   'generator_device_id',
@@ -129,15 +155,6 @@ function setRegulationType(v) {
 // (`regulator_brand`, `regulator_model_reference`, `regulator_location_X`).
 const isDeported = computed(() =>
   props.device && (props.device.regulation_integrated === 0 || props.device.regulation_integrated === false))
-// Libellé floatlabel "Équipements de <fonction>" (production / distribution /
-// émission). « d'émission » avec apostrophe sur émission.
-const LEVEL_LABEL = {
-  production:   'Équipements de production',
-  distribution: 'Équipements de distribution',
-  emission:     "Équipements d'émission",
-}
-const devicesLabel = computed(() => LEVEL_LABEL[props.level] || 'Équipements')
-
 const deportedTooltip = computed(() => {
   if (!isDeported.value || !props.device) return ''
   const lines = ['Régulation déportée']
@@ -154,48 +171,57 @@ const deportedTooltip = computed(() => {
 </script>
 
 <template>
-  <!-- Mig 187 v16 — ligne unique compacte avec mini-floatlabels au-dessus
-       de chaque liste déroulante (lecture rapide du rôle de chaque champ
-       sans ambiguïté). Chaque "groupe" (label + select) reste sur sa
-       colonne flex. -->
-  <div class="flex items-end gap-2 flex-nowrap">
-    <div class="flex flex-col gap-0.5 shrink-0">
-      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">{{ devicesLabel }}</span>
+  <!-- Une ligne alignée sur l'en-tête du tableau : équipement(s) · type de
+       régulation · [granularité, slot « after », pour l'émission] · note.
+       Info manquante = ambre « à compléter » (le rouge reste réservé aux
+       non-conformités, ex. granularité centralisée). -->
+  <div :class="['thermal-level-grid', level === 'emission' ? 'is-emission' : '']">
+    <SearchableSelect
+      class="tl-eq"
+      :model-value="selectedDevices"
+      :options="allOptions"
+      :multiple="true"
+      :invalid="!deviceId"
+      invalid-tone="amber"
+      :clearable="false"
+      :chip-limit="1"
+      chip-label="équipement"
+      chip-label-plural="équipements"
+      size="sm"
+      placeholder="Équipement…"
+      search-placeholder="Rechercher…"
+      @update:modelValue="setLevelDevices" />
+    <!-- Type de régulation (porté par l'équipement) — pastille bleue si la
+         régulation est intégrée, violette si déportée (détails au survol). -->
+    <div v-if="device" class="tl-type flex items-center gap-1.5">
+      <span v-if="integrated"
+            class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
+            v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
+      <span v-else-if="isDeported"
+            class="inline-block w-2 h-2 rounded-full shrink-0"
+            :style="{ background: '#7033d9' }"
+            v-tooltip="deportedTooltip"></span>
       <SearchableSelect
-        :model-value="selectedDevices"
-        :options="allOptions"
-        :multiple="true"
-        :invalid="!deviceId"
-        :auto-width="true"
-        :chip-limit="1"
-        chip-label="équipement"
-        chip-label-plural="équipements"
-        size="sm"
-        placeholder="Ajouter un équipement…"
-        search-placeholder="Rechercher…"
-        @update:modelValue="setLevelDevices" />
+        class="flex-1 min-w-0"
+        :model-value="regulationTypeValue"
+        :options="regulationTypeOptions"
+        :invalid="!regulationTypeValue"
+        invalid-tone="amber"
+        :clearable="true" :creatable="true"
+        size="sm" placeholder="Type…"
+        @update:modelValue="setRegulationType" />
     </div>
-    <!-- Type de régulation — icône bleue préfixe si la régulation est
-         intégrée à l'équipement. -->
-    <div v-if="device" class="flex flex-col gap-0.5 shrink-0">
-      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Type de régulation</span>
-      <div class="flex items-center gap-1">
-        <span v-if="integrated"
-              class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
-              v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
-        <span v-else-if="isDeported"
-              class="inline-block w-2 h-2 rounded-full shrink-0"
-              :style="{ background: '#7033d9' }"
-              v-tooltip="deportedTooltip"></span>
-        <SearchableSelect
-          :model-value="regulationTypeValue"
-          :options="regulationTypeOptions"
-          :invalid="!regulationTypeValue"
-          :clearable="true" :creatable="true" :auto-width="true"
-          size="sm" placeholder="Type de régulation…"
-          @update:modelValue="setRegulationType" />
-      </div>
-    </div>
+    <span v-else class="tl-type px-2 text-xs text-gray-300"
+          v-tooltip="`Choisis d'abord l'équipement (${LEVEL_SHORT[level] || level})`">—</span>
     <slot name="after" />
+    <!-- Note du niveau (ex. « sonde d'ambiance à déplacer ») -->
+    <button type="button"
+            :class="['tl-note inline-flex items-center justify-center w-7 h-7 rounded-md transition',
+                     noteText ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100' : 'text-gray-300 hover:text-gray-600 hover:bg-slate-100']"
+            v-tooltip="noteTooltip"
+            :aria-label="noteTooltip"
+            @click="emit('open-notes')">
+      <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3.5 h-3.5" />
+    </button>
   </div>
 </template>

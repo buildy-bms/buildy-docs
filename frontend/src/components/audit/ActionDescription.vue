@@ -20,6 +20,7 @@ import { useAuditStore } from '@/stores/audit'
 import { storeToRefs } from 'pinia'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
+import { requestAuditReveal } from '@/lib/audit-reveal'
 
 const props = defineProps({
   text: { type: String, required: true },
@@ -68,15 +69,21 @@ function deviceLabel(id) {
   return d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || `Équipement #${id}`
 }
 
+// Page desktop à onglets : `requestAuditReveal` ouvre la bonne étape (zone,
+// énergie…) puis fait défiler. Ailleurs (PWA, aucun écouteur) : comportement
+// historique ci-dessous, inchangé.
 function gotoZone(id) {
+  if (requestAuditReveal({ kind: 'zone', id, block: 'start' })) return
   const el = document.querySelector(`[data-zone-id="${id}"]`)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 function gotoSystem(id) {
+  if (requestAuditReveal({ kind: 'system', id, block: 'start' })) return
   const el = document.querySelector(`[data-system-id="${id}"]`)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 function gotoDevice(id) {
+  if (requestAuditReveal({ kind: 'device', id })) return
   const el = document.querySelector(`[data-device-id="${id}"]`)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }

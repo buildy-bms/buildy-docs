@@ -16,6 +16,7 @@ import BaseModal from '../BaseModal.vue'
 import { useNotification } from '@/composables/useNotification'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { resolveFaIconName } from '@/lib/equipment-icons'
+import { requestAuditReveal } from '@/lib/audit-reveal'
 
 // Lot 9 — décor par catégorie d'usage (chauffage/refroidissement/etc.) +
 // décor par type d'entité (système/équipement/compteur/etc.). Aligne la
@@ -38,6 +39,7 @@ const ENTITY_DECOR = {
   thermal:  { icon: 'fa-sliders',        color: '#a855f7' },
   bms:      { icon: 'fa-microchip',      color: '#0ea5e9' },
   zone:     { icon: 'fa-map-pin',        color: '#6b7280' },
+  synthesis: { icon: 'fa-sparkles',      color: '#1b2842' },
 }
 function decorFor(f) {
   // Priorité à la catégorie d'usage (chauffage/refroidissement/…) si fournie.
@@ -118,8 +120,40 @@ const ENTITY_LABEL = {
   thermal:  'Régulation thermique',
   bms:      'GTB',
   zone:     'Zones',
+  synthesis: 'Note de synthèse',
 }
 function entityLabel(e) { return ENTITY_LABEL[e] || e }
+
+// Bouton « Voir » : ouvre l'élément concerné (zone, système, équipement,
+// compteur, ligne de régulation) ou, à défaut, le bloc / l'étape où le
+// corriger. Passe par l'événement `audit:reveal` de la page d'audit.
+const REVEAL_BY_CODE = {
+  'IDENT-001': { kind: 'step', step: 'identification' },
+  'IDENT-002': { kind: 'step', step: 'identification', selector: '#ident-applicability' },
+  'SITE-002': { kind: 'step', step: 'identification', selector: '#ident-parties' },
+  'BMS-001': { kind: 'step', step: 'bms', selector: '#bms-block-presence' },
+  'BMS-002': { kind: 'step', step: 'bms', selector: '#bms-block-identification' },
+  // Règle des 5 % appliquée à une partie seulement d'une fonction.
+  'SYS-003': { kind: 'step', step: 'systems' },
+  // Zones regroupées contredites par des compteurs présents.
+  'ZONE-002': { kind: 'step', step: 'meters' },
+  'SYN-001': { kind: 'step', step: 'synthesis' },
+}
+const REVEAL_ENTITIES = new Set(['zone', 'system', 'device', 'meter', 'thermal'])
+function revealTarget(f) {
+  if (REVEAL_BY_CODE[f.code]) return REVEAL_BY_CODE[f.code]
+  if (REVEAL_ENTITIES.has(f.entity) && f.entity_id != null) return { kind: f.entity, id: f.entity_id }
+  if (f.entity === 'bms') return { kind: 'bms' }
+  return null
+}
+function reveal(f) {
+  const target = revealTarget(f)
+  if (!target) return
+  // La modale se ferme pour laisser voir l'élément mis en surbrillance.
+  if (requestAuditReveal(target)) emit('close')
+  else notifyError('Élément introuvable : il a peut-être été supprimé, ou son étape est sans objet.')
+}
+const plural = (n, one, many) => (n > 1 ? many : one)
 </script>
 
 <template>
@@ -135,7 +169,7 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
         <div>
           <div class="font-semibold">Aucune incohérence bloquante détectée</div>
           <div class="text-sm text-emerald-700 mt-1">
-            L'audit peut être livré. {{ data.summary.warnings_count }} point(s) d'attention à parcourir si possible.
+            L'audit peut être livré.<template v-if="data.summary.warnings_count"> {{ data.summary.warnings_count }} {{ plural(data.summary.warnings_count, 'point d\'attention', 'points d\'attention') }} à parcourir si possible : « Voir » ouvre directement l'élément concerné.</template>
           </div>
         </div>
       </div>
@@ -143,10 +177,10 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
            class="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-3">
         <span class="text-2xl">⚠</span>
         <div>
-          <div class="font-semibold">{{ data.summary.blocking_count }} point(s) bloquant(s) — la livraison est suspendue</div>
+          <div class="font-semibold">{{ data.summary.blocking_count }} {{ plural(data.summary.blocking_count, 'point bloquant', 'points bloquants') }} — la livraison est suspendue</div>
           <div class="text-sm text-rose-700 mt-1">
-            Corrige les points ci-dessous avant de cliquer « Livrer ». Chaque finding indique comment et où corriger.
-            Une fois tout résolu, reviens dans cette modale et clique « Re-vérifier » pour confirmer.
+            Corrige les points ci-dessous avant de cliquer « Livrer ». Chaque point indique comment le corriger, et « Voir » ouvre directement l'élément concerné.
+            Une fois tout résolu, relance « Vérifier » pour confirmer.
           </div>
         </div>
       </div>
@@ -167,13 +201,20 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
                 <div v-if="f.fix_hint" class="text-xs text-rose-800 bg-rose-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
                   <strong>Comment corriger :</strong> {{ f.fix_hint }}
                 </div>
-                <button v-if="f.auto_fix_action" type="button"
-                        :disabled="fixing[f.code + '-' + f.entity_id]"
-                        @click="autoFix(f)"
-                        class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
-                  <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
-                  <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
-                </button>
+                <div v-if="revealTarget(f) || f.auto_fix_action" class="mt-2 flex flex-wrap items-center gap-2">
+                  <button v-if="revealTarget(f)" type="button" @click="reveal(f)"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-800 bg-white border border-rose-300 hover:bg-rose-50 rounded-lg transition">
+                    Voir
+                    <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="w-3 h-3" />
+                  </button>
+                  <button v-if="f.auto_fix_action" type="button"
+                          :disabled="fixing[f.code + '-' + f.entity_id]"
+                          @click="autoFix(f)"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
+                    <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                    <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+                  </button>
+                </div>
               </div>
             </li>
           </ul>
@@ -196,13 +237,20 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
                 <div v-if="f.fix_hint" class="text-xs text-amber-800 bg-amber-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
                   <strong>Comment corriger :</strong> {{ f.fix_hint }}
                 </div>
-                <button v-if="f.auto_fix_action" type="button"
-                        :disabled="fixing[f.code + '-' + f.entity_id]"
-                        @click="autoFix(f)"
-                        class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
-                  <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
-                  <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
-                </button>
+                <div v-if="revealTarget(f) || f.auto_fix_action" class="mt-2 flex flex-wrap items-center gap-2">
+                  <button v-if="revealTarget(f)" type="button" @click="reveal(f)"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-900 bg-white border border-amber-300 hover:bg-amber-50 rounded-lg transition">
+                    Voir
+                    <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="w-3 h-3" />
+                  </button>
+                  <button v-if="f.auto_fix_action" type="button"
+                          :disabled="fixing[f.code + '-' + f.entity_id]"
+                          @click="autoFix(f)"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
+                    <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                    <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+                  </button>
+                </div>
               </div>
             </li>
           </ul>

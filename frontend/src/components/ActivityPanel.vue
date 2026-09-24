@@ -51,6 +51,7 @@ const ACTION_LABELS = computed(() => ({
   'bacs_audit.alternatives.generate': { label: 'a généré des préconisations Claude', color: 'text-violet-700' },
   'bacs_audit.fixture.create': { label: 'a créé un audit de démonstration', color: 'text-emerald-700' },
   'document.delivered': { label: 'a livré l\'audit', color: 'text-emerald-700' },
+  'bacs_audit.deliver.forced': { label: 'a forcé la livraison malgré la vérification', color: 'text-amber-700' },
   'site_document.upload': { label: 'a ajouté un document', color: 'text-blue-700' },
   'site_document.delete': { label: 'a supprimé un document', color: 'text-red-700' },
   'credential.create': { label: 'a ajouté un credential', color: 'text-blue-700' },

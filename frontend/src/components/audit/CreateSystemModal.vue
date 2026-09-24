@@ -153,7 +153,7 @@ async function save() {
                class="h-9 px-2.5 w-full border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
                @keydown.enter="save" />
         <p class="text-[11px] text-gray-500 mt-1">
-          Ce nom sera affiché dans la card 06 (Régulation thermique) et le PDF chapitre 5.
+          Ce nom sera affiché à l'étape 4 · Régulation et dans le PDF (chapitre 5).
         </p>
       </div>
     </div>

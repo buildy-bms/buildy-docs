@@ -66,13 +66,17 @@ watch([sortBy, sortDir, groupBy], () => {
   localStorage.setItem('afs-sort-dir', sortDir.value)
   localStorage.setItem('afs-group-by', groupBy.value)
 })
-// Progression du stepper BACS (9 etapes a valider) pour la liste
+// Progression du stepper BACS pour la liste : les 12 étapes de l'audit
+// (mêmes clés que le stepper et que lifecycle.js AUDIT_STEPS). Sans GTB
+// sur site, l'inspection périodique sort de la progression, comme dans le
+// stepper (bms_present fourni par GET /afs).
+const BACS_STEPS = ['identification','zones','systems','meters','thermal','bms','inspections','docs-checklist','documents','credentials','review','synthesis']
 function bacsProgress(af) {
   let progress = {}
   try { progress = JSON.parse(af.audit_progress || '{}') } catch { progress = {} }
-  const STEPS = ['identification','zones','systems','meters','thermal','bms','documents','credentials','review']
-  const count = STEPS.filter(s => progress[s]?.validated).length
-  return { count, percent: Math.round((count / STEPS.length) * 100) }
+  const steps = af.bms_present === 0 ? BACS_STEPS.filter(s => s !== 'inspections') : BACS_STEPS
+  const count = steps.filter(s => progress[s]?.validated).length
+  return { count, total: steps.length, percent: Math.round((count / steps.length) * 100) }
 }
 
 function toggleSort(col) {
@@ -544,7 +548,7 @@ onMounted(refresh)
                          :style="{ width: bacsProgress(row.af).percent + '%' }"></div>
                   </div>
                   <span class="text-[10px] font-medium text-gray-600 whitespace-nowrap">
-                    {{ bacsProgress(row.af).count }} / 9
+                    {{ bacsProgress(row.af).count }} / {{ bacsProgress(row.af).total }}
                   </span>
                 </div>
                 <span v-else class="text-gray-300 italic text-xs">—</span>

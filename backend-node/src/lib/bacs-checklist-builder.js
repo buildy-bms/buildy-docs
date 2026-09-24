@@ -109,14 +109,15 @@ function buildChecklistData(documentId) {
     // Pieces a recuperer aupres de l'exploitant — formulation terrain,
     // pas de jargon juridique. Categorie courte pour reperage rapide.
     documentsToRequest: [
-      { tag: 'Maintenance',  label: 'Consignes écrites de maintenance de la GTB (périodicité, points vérifiés, responsable)' },
-      { tag: 'Formation',    label: 'Attestation de formation de l\'exploitant à l\'utilisation de la GTB' },
-      { tag: 'Inspection',   label: 'Rapport de la dernière inspection périodique réalisée par un tiers' },
-      { tag: 'Données',      label: 'Procédure / interface de mise à disposition des données aux exploitants des systèmes' },
+      { tag: 'Maintenance',  label: 'Consignes écrites de vérification périodique de la GTB (périodicité, points à contrôler, réparation ou remplacement des éléments défaillants)' },
+      { tag: 'Formation',    label: 'Feuille d\'émargement ou attestation de formation de l\'exploitant au fonctionnement et au paramétrage de la GTB' },
+      { tag: 'Inspection',   label: 'Rapport de la dernière inspection périodique de la GTB (à l\'initiative du propriétaire)' },
+      { tag: 'Données',      label: 'Modalités de mise à disposition des données au gestionnaire et aux exploitants des systèmes (accès, canal, format)' },
       { tag: 'Données',      label: 'Export type des relevés horaires sur 12 mois (CSV ou capture GTB)' },
       { tag: 'Bâtiment',     label: 'Date du permis de construire et date des derniers travaux sur le générateur' },
       { tag: 'Économie',     label: 'Études de retour sur investissement éventuelles' },
       { tag: 'DOE',          label: 'DOE / plans / schémas / synoptiques GTB et systèmes' },
+      { tag: 'GTB',          label: 'Architecture de la GTB (protocoles, systèmes pilotés), analyse fonctionnelle et listes de points raccordés' },
       { tag: 'Maintenance',  label: 'Contrat de maintenance et historique d\'interventions' },
     ],
   };

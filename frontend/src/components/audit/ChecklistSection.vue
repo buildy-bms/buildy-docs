@@ -31,10 +31,24 @@ import { ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
 import {
   getBacsChecklist, getBacsPhotoCoverage, updateBacsChecklistItem,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
-  getSiteDocumentDownloadUrl,
+  getSiteDocumentDownloadUrl, getSiteDocumentViewUrl,
 } from '@/api'
+import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
+
+// Aperçu d'un PDF ou d'une image dans une fenêtre de l'appli ; Cmd-clic
+// ouvre toujours un nouvel onglet (PDF affiché, pas téléchargé).
+const viewerDoc = ref(null)
+function isPreviewable(f) {
+  return f?.mime_type === 'application/pdf' || /\.pdf$/i.test(f?.original_name || f?.title || '')
+    || String(f?.mime_type || '').startsWith('image/')
+}
+function openViewer(e, f) {
+  if (!isPreviewable(f)) return
+  e.preventDefault()
+  viewerDoc.value = f
+}
 
 const props = defineProps({
   docId: { type: Number, required: true },
@@ -461,7 +475,9 @@ defineExpose({ refresh: load })
         </div>
         <ul v-if="itemFiles.length" class="mt-2 divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
           <li v-for="f in itemFiles" :key="f.id" class="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-gray-50">
-            <a :href="getSiteDocumentDownloadUrl(f.id)" target="_blank" class="flex-1 truncate text-indigo-700 hover:underline">
+            <a :href="isPreviewable(f) ? getSiteDocumentViewUrl(f.id) : getSiteDocumentDownloadUrl(f.id)" target="_blank"
+               @click.exact="e => openViewer(e, f)"
+               class="flex-1 truncate text-indigo-700 hover:underline">
               {{ f.title }}
             </a>
             <span class="text-[11px] text-gray-400 shrink-0">{{ Math.round((f.size_bytes || 0) / 1024) }} ko</span>
@@ -487,4 +503,5 @@ defineExpose({ refresh: load })
       </button>
     </template>
   </BaseModal>
+  <DocumentViewerModal :doc="viewerDoc" @close="viewerDoc = null" />
 </template>

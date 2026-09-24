@@ -28,7 +28,7 @@
  * catégorie du système et l'énergie de l'équipement (heuristique douce).
  */
 
-const { rolesAllowEnergySource } = require('./device-roles');
+const { rolesAllowEnergySource, parseRoles } = require('./device-roles');
 
 // Catégories de systèmes considérées comme « chaud » / « froid » pour le
 // rattachement par défaut d'une puissance device sans cooling explicite.
@@ -119,9 +119,44 @@ const POWER_CALC_TYPE_LABEL = {
 // équipement — parfois le plus gros du site — n'est pas additionné.
 const POWER_EXCLUSION_REASON_LABEL = {
   emitter_no_production: 'émetteur — puissance déjà comptée sur la production amont',
+  distribution_downstream: 'réseau de distribution — puissance déjà comptée sur la production amont',
+  regulation_device: 'organe de régulation, sans puissance de chauffage ou de refroidissement',
+  ventilation_downstream: 'ventilation — la puissance des ventilateurs ne compte pas ; une batterie alimentée par une production amont y est déjà comptée (FAQ BACS n° 9)',
+  no_production_role: 'fonction « production » non déclarée — puissance non comptée',
+  backup: 'équipement de secours (FAQ BACS n° 8)',
+  district_downstream: 'alimenté par un réseau de chaleur ou de froid — seule la puissance de la station d\'échange compte',
+  not_heating_cooling: 'non pris en compte pour le seuil R175-2 : seuls le chauffage et la climatisation comptent',
+  ventilation_no_coil: 'ventilation sans batterie chaude ou froide déclarée — la puissance des ventilateurs ne compte pas (FAQ BACS n° 9)',
+  excluded_by_auditor: 'exclu du cumul par l\'auditeur (secours, process…)',
   excluded_type: 'secours, process ou aval réseau de chaleur',
   out_of_service: 'équipement hors service',
 };
+
+// Motif précis d'une exclusion « out_of_scope » (sinon le PDF imprimait
+// « secours, process ou aval réseau de chaleur » sur un éclairage ou une VMC).
+function outOfScopeReason(device) {
+  if (device.is_backup) return 'backup';
+  if (device.power_calculation_type === 'out_of_scope') return 'excluded_by_auditor';
+  if (device.energy_source === 'district_heating') return 'district_downstream';
+  const cat = device.system_category;
+  if (MIXED_CATEGORIES.has(cat)) return 'ventilation_no_coil';
+  if (!HEAT_CATEGORIES.has(cat) && !COOL_CATEGORIES.has(cat)) return 'not_heating_cooling';
+  return 'excluded_type';
+}
+
+// Motif d'exclusion d'un équipement SANS fonction Production, selon son usage
+// et son rôle (sinon « émetteur » s'imprimait sur un éclairage, une VMC ou un
+// régulateur — relecture clarté R2 M3).
+function nonProducerReason(device) {
+  const cat = device.system_category;
+  if (!HEAT_CATEGORIES.has(cat) && !COOL_CATEGORIES.has(cat) && !MIXED_CATEGORIES.has(cat)) return 'not_heating_cooling';
+  if (MIXED_CATEGORIES.has(cat)) return 'ventilation_downstream';
+  const roles = parseRoles(device.device_role).map(r => r.toLowerCase());
+  if (roles.some(r => /emission|émission/.test(r))) return 'emitter_no_production';
+  if (roles.some(r => /distribution/.test(r))) return 'distribution_downstream';
+  if (roles.some(r => /regulation|régulation/.test(r))) return 'regulation_device';
+  return 'no_production_role';
+}
 
 /**
  * Calcule la puissance retenue d'un device unitaire (× quantité), répartie
@@ -138,7 +173,7 @@ function devicePowerContribution(device) {
   // saisi explicitement. Garantit l'absence de double comptage UE DRV / UI DRV,
   // chiller / FCU, chaudière / radiateurs eau chaude, etc.
   if (!rolesAllowEnergySource(device.device_role)) {
-    return { heat: 0, cool: 0, type: 'out_of_scope', inScope: false, reason: 'emitter_no_production' };
+    return { heat: 0, cool: 0, type: 'out_of_scope', inScope: false, reason: nonProducerReason(device) };
   }
   const type = device.power_calculation_type || inferPowerCalculationType(device);
   const qty = Number(device.quantity) || 1;
@@ -154,7 +189,7 @@ function devicePowerContribution(device) {
   }
 
   if (type === 'out_of_scope') {
-    return { heat: 0, cool: 0, type, inScope: false, reason: 'excluded_type' };
+    return { heat: 0, cool: 0, type, inScope: false, reason: outOfScopeReason(device) };
   }
   if (type === 'thermodynamic_max') {
     // Une machine thermodynamique compte UNE fois, sur sa puissance la plus
@@ -205,6 +240,7 @@ function devicePowerContribution(device) {
 function computeAutoPower(devices) {
   let heat = 0, cool = 0;
   let incompletePowerCount = 0;
+  const incompletePowerNames = [];
   const detailed = [];
   for (const d of devices || []) {
     // Les équipements Hors-Service ne comptent pas dans le cumul.
@@ -226,7 +262,11 @@ function computeAutoPower(devices) {
       const cat = d.system_category;
       const isThermalCat = cat === 'heating' || cat === 'cooling' || cat === 'ventilation' || cat === 'dhw';
       const noPower = (d.power_kw == null || d.power_kw === 0) && (d.power_kw_cooling == null || d.power_kw_cooling === 0);
-      if (isThermalCat && noPower) incompletePowerCount++;
+      if (isThermalCat && noPower) {
+        incompletePowerCount++;
+        const zone = d.zone_name ? ` en zone ${d.zone_name}` : '';
+        incompletePowerNames.push(`${d.name || 'Équipement sans nom'}${zone}`);
+      }
     }
   }
   const round = (n) => Math.round(n * 10) / 10;
@@ -235,6 +275,7 @@ function computeAutoPower(devices) {
     coolKw: round(cool),
     retainedKw: round(Math.max(heat, cool)),
     incompletePowerCount,
+    incompletePowerNames,
     devices: detailed,
   };
 }
@@ -264,11 +305,13 @@ function resolveTotalPower(document, auto) {
   // que sur null (sinon l'applicabilité ne peut plus être calculée).
   const effectiveKw = source === 'manual' && manualKw != null ? manualKw : autoKw;
 
-  // Alerte d'écart : on compare toujours auto vs manuel quand les deux
-  // existent, quel que soit le mode retenu (aide à la décision).
+  // Alerte d'écart : seulement en mode MANUEL (valeur déclarée ≠ cumul des
+  // équipements). En mode auto, la colonne stockée n'est qu'un cache du
+  // cumul : un écart y signifierait un cache périmé, pas une « valeur
+  // saisie » — le PDF l'annonçait à tort comme telle.
   let discrepancy = false;
   let discrepancyPct = null;
-  if (manualKw != null && autoKw > 0) {
+  if (source === 'manual' && manualKw != null && autoKw > 0) {
     discrepancyPct = Math.round(Math.abs(manualKw - autoKw) / autoKw * 100);
     discrepancy = discrepancyPct > 10;
   }
@@ -281,6 +324,22 @@ function resolveTotalPower(document, auto) {
   // l'auditeur n'a pas complété les saisies.
   const incompletePowerCount = auto.incompletePowerCount || 0;
   const presumedSubjectDueToMissingData = incompletePowerCount > 0 && effectiveKw < 70;
+  // Cumul calculé avec des puissances manquantes : c'est un minimum, et le
+  // rapport le dit (relecture clarté R2 M5). Sans objet en valeur déclarée.
+  let incompletePowerNote = null;
+  if (source === 'auto' && incompletePowerCount > 0) {
+    const list = (auto.incompletePowerNames || []).slice(0, 4).join(', ')
+      + ((auto.incompletePowerNames || []).length > 4 ? '…' : '');
+    const head = incompletePowerCount > 1
+      ? `${incompletePowerCount} équipements de production n'ont pas de puissance relevée (${list}) et ne sont pas comptés`
+      : `Un équipement de production n'a pas de puissance relevée (${list}) et n'est pas compté`;
+    const tail = effectiveKw > 290
+      ? 'Le seuil de 290 kW étant déjà dépassé, l\'assujettissement et son échéance n\'en dépendent pas.'
+      : effectiveKw > 70
+        ? 'Le seuil de 70 kW est déjà dépassé ; l\'échéance (seuil de 290 kW) peut dépendre de ces puissances.'
+        : 'L\'assujettissement est présumé tant que ces puissances ne sont pas complétées.';
+    incompletePowerNote = `${head} : la puissance retenue est donc un minimum. ${tail}`;
+  }
   return {
     source,
     effectiveKw,
@@ -297,6 +356,7 @@ function resolveTotalPower(document, auto) {
     discrepancy,
     discrepancyPct,
     incompletePowerCount,
+    incompletePowerNote,
     presumedSubjectDueToMissingData,
   };
 }
@@ -314,7 +374,14 @@ function resolveTotalPower(document, auto) {
  * @param {object} db — instance better-sqlite3 (db.db ou équivalent).
  * @param {number} documentId — id de l'AF.
  */
-function recomputeAndPersistAuditPower(db, documentId) {
+/**
+ * Charge les équipements d'un audit dans la forme attendue par
+ * computeAutoPower (catégorie système, rôle, quantité, partage chauffage).
+ *
+ * @param {object} db — instance better-sqlite3 (db.db ou équivalent).
+ * @param {number} documentId — id de l'AF.
+ */
+function loadPowerDevices(db, documentId) {
   // Lis tous les devices in-scope de l'audit avec leur catégorie système +
   // le slug du modèle bibliothèque (pour que inferPowerCalculationType
   // puisse distinguer sous-station vs émetteur aval — refactor 2026-05-26).
@@ -323,17 +390,22 @@ function recomputeAndPersistAuditPower(db, documentId) {
   // multiplie la puissance par quantity. Les omettre = TOUS les équipements
   // exclus → retenue 0 → bâtiment « non assujetti » à tort (incident #56/#45,
   // 2026-07-04 : chaque recompute mettait la puissance à 0).
-  const devices = db.prepare(`
-    SELECT d.id, d.power_kw, d.power_kw_cooling, d.power_calculation_type,
+  return db.prepare(`
+    SELECT d.id, d.system_id, d.name, d.power_kw, d.power_kw_cooling, d.power_calculation_type,
            d.energy_source, d.is_backup, d.out_of_service,
            d.device_role, d.quantity,
-           s.system_category, t.slug AS equipment_template_slug,
+           s.system_category, z.name AS zone_name, t.slug AS equipment_template_slug,
            ${SHARED_TO_HEATING_SQL}
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
+    LEFT JOIN zones z ON z.id = s.zone_id
     LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
     WHERE s.document_id = ?
   `).all(documentId);
+}
+
+function recomputeAndPersistAuditPower(db, documentId) {
+  const devices = loadPowerDevices(db, documentId);
   const auto = computeAutoPower(devices);
 
   const af = db.prepare('SELECT bacs_total_power_source, bacs_building_permit_date, bacs_total_power_kw FROM afs WHERE id = ?').get(documentId);
@@ -413,6 +485,7 @@ module.exports = {
   devicePowerContribution,
   computeAutoPower,
   resolveTotalPower,
+  loadPowerDevices,
   recomputeAndPersistAuditPower,
   computeBacsApplicabilityFromPower,
 };

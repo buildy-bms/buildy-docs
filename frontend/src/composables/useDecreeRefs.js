@@ -17,7 +17,8 @@ import { getDecreeRefs } from '@/api'
  *   parent (le décret est stocké par article, pas par alinéa).
  */
 
-const CACHE_KEY = 'decree-refs-v1'
+// v2 : texte officiel mot à mot (revue 2026-09-24) — invalide les caches v1.
+const CACHE_KEY = 'decree-refs-v2'
 const TTL_MS = 7 * 24 * 3600 * 1000 // 7 jours
 
 const refs = ref({})              // { 'R175-3': { official_html, source_url, ... } }
