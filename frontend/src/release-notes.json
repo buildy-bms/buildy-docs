@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.268",
+      "date": "2026-09-24",
+      "title": "Analyse fonctionnelle de la GTB : documents visibles dans la carte",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Les documents d'analyse fonctionnelle déposés s'affichent enfin",
+          "what": "La carte « Analyse fonctionnelle de la GTB existante » n'affichait jamais les documents déposés : seul le message « Document téléversé » apparaissait, et l'on pouvait déposer deux fois le même fichier. Les documents d'analyse fonctionnelle du site sont maintenant listés sous la zone de dépôt, avec leur taille et leur date : un clic ouvre l'aperçu, deux boutons permettent de télécharger ou de supprimer. Déposer un document répond « Oui » à la question « existe-t-il ? » si elle était sans réponse.",
+          "where": "Audit BACS → étape GTB → carte « Analyse fonctionnelle de la GTB existante ».",
+          "how_to_test": "Déposer un PDF dans la carte : il apparaît aussitôt dans la liste ; cliquer son nom ouvre l'aperçu."
+        },
+        {
+          "kind": "ux",
+          "title": "La question « existe-t-il ? » passe avant la zone de dépôt",
+          "what": "La question « Le document d'analyse fonctionnelle existe-t-il ? » s'affiche en premier. Sur « Non », la zone de dépôt n'apparaît pas : seul le message indiquant qu'aucun document n'est disponible reste affiché.",
+          "where": "Même carte, étape GTB.",
+          "how_to_test": "Cliquer « Non » : la zone de dépôt disparaît ; cliquer « Oui » : elle revient sous la question."
+        }
+      ]
+    },
+    {
       "version": "0.1.267",
       "date": "2026-09-24",
       "title": "Conformité BACS revue, audit par étapes, rapport PDF refait",

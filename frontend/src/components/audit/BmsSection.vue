@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { WrenchScrewdriverIcon, PencilSquareIcon, DocumentArrowUpIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -21,7 +21,13 @@ import CompactToggle from '@/components/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsDevice, updateBacsMeter, uploadSiteDocument, applyBuildyCloudPreset } from '@/api'
+import {
+  updateBacsDevice, updateBacsMeter, uploadSiteDocument, applyBuildyCloudPreset,
+  listSiteDocuments, deleteSiteDocument, getSiteDocumentDownloadUrl,
+} from '@/api'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons' // enregistre les icônes FA de la liste des documents d'AF
+import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { BUILDY_OFFER_LEVELS, buildyReserves, buildyOfferLabel } from '@/lib/buildy-offer'
 import { flashAuditTarget } from '@/lib/audit-reveal'
 
@@ -146,6 +152,10 @@ async function uploadAfFiles(files) {
       })
     }
     success(files.length > 1 ? `${files.length} documents téléversés` : 'Document téléversé')
+    // Un document déposé prouve que l'AF existe : « Oui » si non répondu.
+    if (document.value?.audit_existing_af_status == null) {
+      emit('save-doc', { audit_existing_af_status: 'present' })
+    }
     window.dispatchEvent(new CustomEvent('site-documents:changed'))
     emit('refresh-audit-data')
   } catch (e) {
@@ -153,6 +163,58 @@ async function uploadAfFiles(files) {
   } finally {
     afUploading.value = false
   }
+}
+
+// Documents d'analyse fonctionnelle déjà déposés (catégorie
+// « analyse_fonctionnelle » des documents du site) : listés sous la zone de
+// dépôt, avec aperçu, téléchargement et suppression. Rechargés à chaque
+// ajout ou suppression de document (événement `site-documents:changed`).
+const afDocs = ref([])
+const afViewerDoc = ref(null)
+async function loadAfDocs() {
+  const uuid = document.value?.site_uuid
+  if (!uuid) { afDocs.value = []; return }
+  try {
+    const { data } = await listSiteDocuments(uuid, { category: 'analyse_fonctionnelle' })
+    afDocs.value = data || []
+  } catch { /* liste indisponible : la zone de dépôt reste utilisable */ }
+}
+watch(() => document.value?.site_uuid, loadAfDocs, { immediate: true })
+onMounted(() => window.addEventListener('site-documents:changed', loadAfDocs))
+onBeforeUnmount(() => window.removeEventListener('site-documents:changed', loadAfDocs))
+
+function afIsPreviewable(d) {
+  return d.mime_type === 'application/pdf' || /^image\//.test(d.mime_type || '')
+}
+function openAfDoc(d) {
+  if (afIsPreviewable(d)) afViewerDoc.value = d
+  else window.location.href = getSiteDocumentDownloadUrl(d.id)
+}
+async function removeAfDoc(d) {
+  const ok = await confirm({
+    title: 'Supprimer ce document ?',
+    message: `« ${d.title} » sera supprimé des documents du site.`,
+    confirmLabel: 'Supprimer', danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteSiteDocument(d.id)
+    success('Document supprimé')
+    window.dispatchEvent(new CustomEvent('site-documents:changed'))
+  } catch (e) {
+    error(e.response?.data?.detail || 'Suppression impossible')
+  }
+}
+function afSize(b) {
+  if (!b) return ''
+  if (b < 1024 * 1024) return `${Math.max(1, Math.round(b / 1024))} Ko`
+  return `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`
+}
+function afDate(s) {
+  if (!s) return ''
+  // SQLite CURRENT_TIMESTAMP = UTC sans fuseau.
+  const d = new Date(/Z|[+-]\d\d:?\d\d$/.test(s) ? s : `${s.replace(' ', 'T')}Z`)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 function onAfDrop(e) {
   afDragOver.value = false
@@ -581,6 +643,12 @@ function hasNotes(html) {
                                   topic-label="Analyse fonctionnelle de la GTB existante"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
+            <!-- La question d'abord : sur « Non », pas de zone de dépôt. -->
+            <div class="flex items-center gap-3 mb-3">
+              <span class="text-xs text-gray-700">Le document d'analyse fonctionnelle existe-t-il ?</span>
+              <SegmentedToggle :model-value="document?.audit_existing_af_status == null ? null : (document?.audit_existing_af_status === 'absent' ? false : true)"
+                               @update:model-value="v => emit('save-doc', { audit_existing_af_status: v === false ? 'absent' : (v === true ? 'present' : null) })" />
+            </div>
             <div v-if="document?.audit_existing_af_status !== 'absent'">
               <div
                 :class="[
@@ -601,12 +669,34 @@ function hasNotes(html) {
                 <p class="mt-2 text-sm text-gray-700">
                   <span v-if="afUploading">Téléversement en cours…</span>
                   <span v-else>
-                    Glisser le document d'AF ici ou
+                    {{ afDocs.length ? 'Glisser un autre document ici ou' : 'Glisser le document d\'AF ici ou' }}
                     <span class="text-indigo-600 font-semibold">parcourir</span>
                   </span>
                 </p>
                 <p class="mt-1 text-[11px] text-gray-400">PDF, Word, schéma, image…</p>
               </div>
+              <ul v-if="afDocs.length" class="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+                <li v-for="d in afDocs" :key="d.id" class="flex items-center gap-2 px-3 py-2">
+                  <FontAwesomeIcon :icon="['fas', d.mime_type === 'application/pdf' ? 'file-pdf' : 'file-lines']"
+                                   class="h-4 w-4 shrink-0 text-gray-400" />
+                  <button type="button" @click="openAfDoc(d)"
+                          class="min-w-0 flex-1 truncate text-left text-sm text-gray-800 hover:text-indigo-700"
+                          v-tooltip="afIsPreviewable(d) ? 'Aperçu' : 'Télécharger'">{{ d.title }}</button>
+                  <span class="shrink-0 text-[11px] text-gray-400">
+                    {{ [afSize(d.size_bytes), afDate(d.uploaded_at)].filter(Boolean).join(' · ') }}
+                  </span>
+                  <a :href="getSiteDocumentDownloadUrl(d.id)"
+                     class="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                     v-tooltip="'Télécharger'">
+                    <FontAwesomeIcon :icon="['fas', 'file-arrow-down']" class="h-3.5 w-3.5" />
+                  </a>
+                  <button type="button" @click="removeAfDoc(d)"
+                          class="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          v-tooltip="'Supprimer'">
+                    <FontAwesomeIcon :icon="['fas', 'trash-can']" class="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              </ul>
               <div v-if="document?.site_uuid" class="mt-2 flex justify-end gap-1">
                 <BacsPhotoButton
                   :site-uuid="document.site_uuid"
@@ -621,11 +711,7 @@ function hasNotes(html) {
             <p v-else class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               ⚠ Aucun document d'<strong>analyse fonctionnelle</strong> n'est disponible pour la GTB existante.
             </p>
-            <div class="flex items-center gap-3 mt-2">
-              <span class="text-xs text-gray-700">Le document d'analyse fonctionnelle existe-t-il ?</span>
-              <SegmentedToggle :model-value="document?.audit_existing_af_status == null ? null : (document?.audit_existing_af_status === 'absent' ? false : true)"
-                               @update:model-value="v => emit('save-doc', { audit_existing_af_status: v === false ? 'absent' : (v === true ? 'present' : null) })" />
-            </div>
+            <DocumentViewerModal :doc="afViewerDoc" @close="afViewerDoc = null" />
           </div>
 
           <div v-if="audit.docId" id="bms-block-components" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
