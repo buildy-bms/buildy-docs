@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.271",
+      "date": "2026-10-12",
+      "title": "Compteurs d'audit : chaque compteur obligatoire dit ce qu'il mesure",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Une description claire sous chaque compteur obligatoire",
+          "what": "Chaque compteur exigé indique maintenant ce qu'il mesure, d'après les systèmes et équipements saisis : « Électricité consommée par : Groupe d'eau glacée — produit le froid de 6 zones », « Chaleur reçue par : Ventilo-convecteurs — eau chaude de Chaudière gaz », « Électricité consommée par : Centrale de traitement d'air — ventile Circulation X et Lot bureau X ». Un compteur couvert par une zone regroupée indique lequel le remplace : « Pas de compteur propre : le compteur Ventilation de Circulation X mesure aussi cette zone ». Les compteurs généraux sont décrits aussi (« Toute l'électricité du bâtiment »). La même description figure dans le rapport PDF, sur une ligne sous chaque compteur.",
+          "where": "Audit BACS → étape Compteurs (bureau et mobile) ; rapport PDF, chapitre 4 ; tableaux de synthèse A3.",
+          "how_to_test": "Ouvrir l'étape Compteurs d'un audit : sous la pastille d'usage de chaque compteur requis, la description cite les équipements mesurés. Générer le rapport : la même phrase apparaît sous chaque compteur du chapitre 4."
+        }
+      ]
+    },
+    {
       "version": "0.1.270",
       "date": "2026-10-12",
       "title": "Compteurs d'audit : calorimètres de la zone qui abrite la production, « Requis » calculé",
@@ -23,9 +37,9 @@
         {
           "kind": "ux",
           "title": "Calorimètres et frigorimètres nommés en toutes lettres",
-          "what": "Les compteurs thermiques s'affichent « Calorimètre » (chauffage, ECS) ou « Frigorimètre » (refroidissement), à l'écran comme dans le rapport PDF. Un compteur qui mesure une chaudière ou un groupe froid desservant plusieurs zones porte la mention « Compteur d'entrée : … — dessert N zones », pour ne pas être lu comme le compteur de la zone où il est déclaré.",
+          "what": "Les compteurs thermiques s'affichent « Calorimètre » (chauffage, ECS) ou « Frigorimètre » (refroidissement), à l'écran comme dans le rapport PDF.",
           "where": "Étape Compteurs, rapport PDF (chapitre 4) et tableaux de synthèse A3.",
-          "how_to_test": "Ouvrir l'onglet Thermique : chaque ligne commence par Calorimètre ou Frigorimètre. Dans l'onglet Électrique, sous le compteur Refroidissement de la zone qui abrite le groupe froid, la mention « Compteur d'entrée » apparaît."
+          "how_to_test": "Ouvrir l'onglet Thermique : chaque ligne commence par Calorimètre ou Frigorimètre."
         }
       ]
     },

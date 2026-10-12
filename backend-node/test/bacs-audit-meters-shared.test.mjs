@@ -72,6 +72,18 @@ function seedAudit(zoneNames) {
   return { docId, system, device, share, meters };
 }
 
+// Description par compteur, indexée « Zone|usage|type » (lib/bacs-meter-purpose).
+function purposesOf(docId) {
+  const { computeMeterPurposes } = require('../src/lib/bacs-meter-purpose');
+  const purposes = computeMeterPurposes(docId);
+  const rows = db.db.prepare(
+    `SELECT m.id, COALESCE(z.name, 'Général') || '|' || m.usage || '|' || m.meter_type AS k
+     FROM bacs_audit_meters m LEFT JOIN zones z ON z.id = m.zone_id WHERE m.document_id = ?`
+  ).all(docId);
+  const byKey = new Map(rows.map(r => [r.k, purposes.get(r.id) ?? null]));
+  return (key) => byKey.get(key);
+}
+
 describe('compteurs requis — équipements partagés', () => {
   it('STEF : VC 4 tubes froid partagé en chauffage → thermique chaud + froid, plus de froid électrique', () => {
     const a = seedAudit(['Lot Bureau X']);
@@ -144,12 +156,26 @@ describe('compteurs requis — équipements partagés', () => {
     // « production et consommation », PROFEEL 3.1.1) : toujours requis.
     expect(m).toContain('Circulation X|heating|gas');
     expect(m).toContain('Circulation X|cooling|electric');
-    // Affiché comme compteur d'entrée du groupe froid (3 zones desservies).
-    const zx = db.db.prepare(`SELECT id FROM zones WHERE name = 'Circulation X'`).get().id;
-    const gens = seeder.meterGeneratorsByKey(a.docId);
-    expect(gens.get(seeder.meterTargetKey({ zone_id: zx, usage: 'cooling', meter_type: 'electric' })))
-      .toEqual([{ name: 'Groupe d\'eau glacée', zones: 3 }]);
-    expect(gens.get(seeder.meterTargetKey({ zone_id: zx, usage: 'cooling', meter_type: 'thermal' }))).toBeUndefined();
+    // Description de ce que mesure chaque compteur (écran + PDF).
+    const purpose = purposesOf(a.docId);
+    expect(purpose('Circulation X|cooling|electric')).toBe('Électricité consommée par : Groupe d\'eau glacée — produit le froid de 3 zones');
+    expect(purpose('Circulation X|heating|gas')).toBe('Gaz consommé par : Chaudière gaz — produit la chaleur de 3 zones');
+    expect(purpose('Circulation Y|heating|thermal')).toBe('Chaleur reçue par : Ventilo-convecteur — eau chaude de Chaudière gaz');
+    expect(purpose('Lot bureau X|cooling|thermal')).toBe('Froid reçu par : Ventilo-convecteur — eau glacée de Groupe d\'eau glacée');
+    expect(purpose('Général|other|gas')).toBe('Tout le gaz du bâtiment — alimente : Chaudière gaz');
+    expect(purpose('Général|other|electric')).toBe('Toute l\'électricité du bâtiment (compteur de tête)');
+  });
+
+  it('description : CTA partagée non séparable → compteur unique + zone couverte renvoyée vers lui', () => {
+    const a = seedAudit(['Circulation A', 'Bureau B']);
+    const va = a.system('Circulation A', 'ventilation');
+    const vb = a.system('Bureau B', 'ventilation');
+    const cta = a.device(va, 'CTA', ['production', 'distribution', 'emission'], { energy: 'electric', separable: 'no' });
+    a.share(cta, vb);
+    a.meters();
+    const purpose = purposesOf(a.docId);
+    expect(purpose('Circulation A|ventilation|electric')).toBe('Électricité consommée par : CTA — ventile Circulation A et Bureau B (compteur unique)');
+    expect(purpose('Bureau B|ventilation|electric')).toBe('Pas de compteur propre : le compteur Ventilation de Circulation A mesure aussi cette zone (même équipement : CTA)');
   });
 
   it('production partagée sans réponse « séparable » : zone hôte inchangée (pas de thermique)', () => {

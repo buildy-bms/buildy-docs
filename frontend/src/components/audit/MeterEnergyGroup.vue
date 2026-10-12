@@ -21,7 +21,7 @@ import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import {
   meterUsageLabel, METER_USAGES, getMeterUsageMeta,
-  REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote,
+  REQUIRED_LOCKED_TIP, thermalMeterName,
 } from '@/lib/meter-options'
 import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
 import { storeToRefs } from 'pinia'
@@ -366,13 +366,14 @@ onBeforeUnmount(teardownSortable)
                   <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
                   <span v-else class="text-xs text-gray-400 italic">—</span>
                 </div>
-                <p v-if="sharedGeneratorNote(row.meter)" v-tooltip="sharedGeneratorNote(row.meter).tooltip"
-                   class="mt-0.5 text-[11px] text-slate-500 text-left">
-                  {{ sharedGeneratorNote(row.meter).label }}
+                <!-- Ce que mesure le compteur obligatoire (équipements, zones —
+                     serveur, lib/bacs-meter-purpose.js), sinon statut au regard
+                     du plan (usage exempté…) : même lecture que le chapitre 4 du PDF. -->
+                <p v-if="row.meter.purpose" v-tooltip="planNote(row.meter)?.tooltip"
+                   class="mt-0.5 text-[11px] text-slate-600 text-left whitespace-normal max-w-md">
+                  {{ row.meter.purpose }}
                 </p>
-                <!-- Statut au regard du plan (zone regroupée, usage exempté…) :
-                     même lecture que le chapitre 4 du PDF. -->
-                <p v-if="planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
+                <p v-else-if="planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
                    class="mt-0.5 text-[11px] text-slate-500 italic text-left">
                   {{ planNote(row.meter).label }}
                 </p>
@@ -396,11 +397,11 @@ onBeforeUnmount(teardownSortable)
                   <span v-if="groupBy === 'usage' && row.meter.zone_id && thermalMeterName(row.meter)"
                         class="text-xs text-gray-500 shrink-0">· {{ thermalMeterName(row.meter) }}</span>
                 </div>
-                <p v-if="groupBy === 'usage' && sharedGeneratorNote(row.meter)" v-tooltip="sharedGeneratorNote(row.meter).tooltip"
-                   class="mt-0.5 text-[11px] text-slate-500 text-left">
-                  {{ sharedGeneratorNote(row.meter).label }}
+                <p v-if="groupBy === 'usage' && row.meter.purpose" v-tooltip="planNote(row.meter)?.tooltip"
+                   class="mt-0.5 text-[11px] text-slate-600 text-left whitespace-normal max-w-md">
+                  {{ row.meter.purpose }}
                 </p>
-                <p v-if="groupBy === 'usage' && planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
+                <p v-else-if="groupBy === 'usage' && planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
                    class="mt-0.5 text-[11px] text-slate-500 italic text-left">
                   {{ planNote(row.meter).label }}
                 </p>

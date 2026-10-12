@@ -11,7 +11,7 @@ import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import MeterEnergyGroup from '@/components/audit/MeterEnergyGroup.vue'
-import { METER_TYPES as ENERGY_METAS, REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote } from '@/lib/meter-options'
+import { METER_TYPES as ENERGY_METAS, REQUIRED_LOCKED_TIP, thermalMeterName } from '@/lib/meter-options'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -344,7 +344,7 @@ function hasNotes(html) {
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
             </div>
-            <p v-if="sharedGeneratorNote(m)" class="mt-1 text-[11px] text-slate-500">{{ sharedGeneratorNote(m).label }}</p>
+            <p v-if="m.purpose" class="mt-1 text-[11px] text-slate-600">{{ m.purpose }}</p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button @click="dupMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg" aria-label="Dupliquer">

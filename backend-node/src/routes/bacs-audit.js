@@ -12,8 +12,9 @@ const log = require('../lib/logger').system;
 const { regenerateActionItems, computeMeterPlanStatus } = require('../lib/bacs-audit-action-generator');
 const { recomputeAndPersistAuditPower } = require('../lib/bacs-audit-power');
 const {
-  resyncBacsAuditWithSiteZones, isMeterRequiredByRules, meterGeneratorsByKey, meterTargetKey,
+  resyncBacsAuditWithSiteZones, isMeterRequiredByRules,
 } = require('../lib/seeder');
+const { computeMeterPurposes } = require('../lib/bacs-meter-purpose');
 const { computeSystemLiability } = require('../lib/bacs-liability');
 const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
@@ -505,12 +506,9 @@ async function routes(fastify) {
       WHERE m.document_id = ?
       ORDER BY z.position NULLS LAST, m.position, m.usage, m.meter_type
     `).all(id);
-    // Générateurs mesurés par le compteur (compteur d'entrée), cf. seeder.
-    const generators = meterGeneratorsByKey(id);
-    return meters.map(m => ({
-      ...m,
-      generators: m.zone_id != null ? (generators.get(meterTargetKey(m)) || []) : [],
-    }));
+    // Ce que mesure chaque compteur obligatoire (cf. lib/bacs-meter-purpose).
+    const purposes = computeMeterPurposes(id);
+    return meters.map(m => ({ ...m, purpose: purposes.get(m.id) || null }));
   });
 
   // Statut des compteurs au regard du plan (zone regroupée, usage exempté ou

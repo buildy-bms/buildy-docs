@@ -84,15 +84,6 @@ function thermalMeterName(m) {
   return null;
 }
 
-// Compteur d'entrée d'un générateur qui dessert plusieurs zones (cf. seeder
-// meterGeneratorsByKey). Miroir de frontend sharedGeneratorNote (label).
-function sharedGeneratorLabel(generators) {
-  const gens = (generators || []).filter(g => g.zones > 1);
-  if (!gens.length) return null;
-  const names = gens.map(g => g.name || 'générateur').join(' + ');
-  return `Compteur d’entrée : ${names} — dessert ${Math.max(...gens.map(g => g.zones))} zones`;
-}
-
 const METER_USAGE_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
@@ -325,7 +316,6 @@ const SYSTEM_TERNARY_LABEL = {
 
 module.exports = {
   thermalMeterName,
-  sharedGeneratorLabel,
   SYSTEM_LABEL,
   SYSTEM_NEGATIVE_LABEL,
   COMM_LABEL,

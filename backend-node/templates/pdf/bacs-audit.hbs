@@ -1152,7 +1152,7 @@
         </tr>
         {{#each items}}
           <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}{{#if complianceFailed}} meter-row-noncompliant{{/if}}">
-            <td>{{#if thermalName}}<span class="meter-thermal-name">{{thermalName}}</span> {{/if}}{{#if isGeneral}}{{{meterUsagePill "other" "sm"}}}{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}{{#if generatorLabel}}<div class="muted meter-generator-note">{{generatorLabel}}</div>{{/if}}</td>
+            <td>{{#if thermalName}}<span class="meter-thermal-name">{{thermalName}}</span> {{/if}}{{#if isGeneral}}{{{meterUsagePill "other" "sm"}}}{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
             <td class="bool-cell">{{#if notRequiredReason}}<span class="muted">Non requis</span>{{else if coveredByGroup}}<span class="muted">Commun</span>{{else}}{{{boolPill required "sm" "neutral"}}}{{/if}}</td>
             <td class="bool-cell">{{{boolPill present_actual "sm"}}}</td>
             <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
@@ -1171,6 +1171,14 @@
             {{/if}}
             {{#if @root.metersAnyOutOfService}}<td class="bool-cell">{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}<span class="bool-na">—</span>{{/if}}</td>{{/if}}
           </tr>
+          {{!-- Ce que mesure le compteur (lib/bacs-meter-purpose.js), sur toute
+               la largeur : la colonne Usage est trop étroite en A4. Un compteur
+               couvert est déjà expliqué par la ligne « Zone regroupée ». --}}
+          {{#if purpose}}{{#unless coveredByGroup}}
+          <tr class="meter-row-recommendation meter-row-purpose">
+            <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}">{{purpose}}</td>
+          </tr>
+          {{/unless}}{{/if}}
           {{#if notRequiredReason}}
           <tr class="meter-row-recommendation">
             <td colspan="{{#if @root.metersAnyOutOfService}}9{{else}}8{{/if}}"><span class="meter-recommendation-label">Non requis :</span> {{notRequiredReason}}.</td>

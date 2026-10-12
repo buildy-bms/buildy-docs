@@ -1358,41 +1358,6 @@ function isMeterRequiredByRules(documentId, meter) {
 }
 
 /**
- * Compteurs d'ENTRÉE de générateur : les générateurs chauffage / froid / ECS
- * (rôle production, énergie renseignée) que mesure chaque compteur zonal
- * créé par l'étape 1 du resync, avec le nombre de zones qu'ils desservent
- * (la leur + celles des systèmes vers lesquels ils sont partagés). Permet
- * d'afficher « compteur d'entrée du groupe d'eau glacée — dessert 6 zones »
- * au lieu de laisser lire le compteur comme celui de la zone hôte (audit
- * STEF #60).
- * @returns {Map<string, Array<{ name: string|null, zones: number }>>} par meterTargetKey
- */
-function meterGeneratorsByKey(documentId) {
-  const rows = db.db.prepare(`
-    SELECT d.name, d.energy_source, s.zone_id, s.system_category,
-      (SELECT COUNT(DISTINCT cs.zone_id) FROM bacs_audit_device_shared_systems css
-        JOIN bacs_audit_systems cs ON cs.id = css.system_id
-        WHERE css.device_id = d.id AND cs.zone_id != s.zone_id) AS other_zones
-    FROM bacs_audit_system_devices d
-    JOIN bacs_audit_systems s ON s.id = d.system_id
-    WHERE s.document_id = ? AND s.zone_id IS NOT NULL
-      AND s.system_category IN ('heating', 'cooling', 'dhw')
-      AND d.energy_source IS NOT NULL
-      AND (d.device_role LIKE '%production%' OR d.device_role LIKE '%generator%')
-    ORDER BY d.position, d.id
-  `).all(documentId);
-  const byKey = new Map();
-  for (const r of rows) {
-    const type = ENERGY_TO_METER_TYPE[r.energy_source];
-    if (!type) continue;
-    const key = meterKeyZonal(r.zone_id, CATEGORY_TO_USAGE[r.system_category], type);
-    if (!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key).push({ name: r.name || null, zones: 1 + r.other_zones });
-  }
-  return byKey;
-}
-
-/**
  * Wrapper public : resync les donnees d'un audit BACS avec les zones
  * actuelles du site rattache. Utilise par l'endpoint POST /bacs-audit/
  * :id/resync apres ajout d'une zone dans la UI.
@@ -1412,7 +1377,7 @@ module.exports = {
   libraryExtendAf,
   seedBacsRequirementsOnBoot, seedBacsMeterRequirementsOnBoot,
   seedBacsAuditStructure, resyncBacsAuditWithSiteZones, isMeterRequiredByRules,
-  meterGeneratorsByKey, meterTargetKey,
+  ENERGY_TO_METER_TYPE,
   seedIso52120OnBoot,
 };
 

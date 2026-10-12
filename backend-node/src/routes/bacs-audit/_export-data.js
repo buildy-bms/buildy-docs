@@ -43,9 +43,9 @@ const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
   APPLICABILITY_LABEL, CLOSING_DEADLINE_PHRASE, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, TECHNICAL_ZONE_NATURES, OCCUPANCY_PROFILE_LABEL,
-  OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL, thermalMeterName, sharedGeneratorLabel,
+  OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL, thermalMeterName,
 } = require('./_labels');
-const { meterGeneratorsByKey, meterTargetKey } = require('../../lib/seeder');
+const { computeMeterPurposes } = require('../../lib/bacs-meter-purpose');
 const { buildComplianceSummary, isReserveAction, isInfoAction, frLongDate } = require('./_compliance-summary');
 // Items 5 + 8 — cumul automatique des puissances chaud / froid.
 const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL, POWER_EXCLUSION_REASON_LABEL, SHARED_TO_HEATING_SQL } = require('../../lib/bacs-audit-power');
@@ -872,8 +872,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // (y compris les variantes « zonal » et suffixées « — fallback … », R3.)
   const AUTO_METER_NOTE_RE = /^Compteur (?:électrique de production|électrique|gaz|thermique|eau|autre)(?: zonal)? en zone « [^»]* » \([^)]*\)(?: — .*)?\.?$|^Compteur général (?:électrique|gaz|fioul|thermique)(?: du bâtiment| \(réseau de chaleur\))(?: — .*)?\.?$/;
   const isAutoMeterNote = (t) => !!t && AUTO_METER_NOTE_RE.test(String(t).trim());
-  // Générateurs mesurés par chaque compteur zonal (compteur d'entrée).
-  const meterGenerators = meterGeneratorsByKey(documentId);
+  // Ce que mesure chaque compteur obligatoire (équipements, zones).
+  const meterPurposes = computeMeterPurposes(documentId);
   const enrichedMeters = meters.map(m => {
     // Décodage des protocoles communiquant (JSON array TEXT) → libellés FR.
     let protocolsList = [];
@@ -917,7 +917,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
       typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
       usageLabel: m.zone_id ? (METER_USAGE_LABEL[m.usage] || m.usage) : '—',
       thermalName: thermalMeterName(m),
-      generatorLabel: m.zone_id != null ? sharedGeneratorLabel(meterGenerators.get(meterTargetKey(m))) : null,
+      purpose: meterPurposes.get(m.id) || null,
       zoneLabel: m.zone_name || 'Compteur général',
       systemLabel: meterSystemLabel(m),
       locationLabel: m.location_zone_name || null,

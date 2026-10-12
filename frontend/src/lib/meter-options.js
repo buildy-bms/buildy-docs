@@ -62,18 +62,3 @@ export function thermalMeterName(meter) {
   if (meter.usage === 'heating' || meter.usage === 'dhw') return 'Calorimètre'
   return null
 }
-
-// Compteur d'entrée d'un générateur qui dessert plusieurs zones (champ
-// `generators` du GET meters, cf. seeder meterGeneratorsByKey) : le compteur
-// électrique « Refroidissement » de la zone qui héberge le groupe froid
-// mesure tout le froid du bâtiment, pas cette zone (audit STEF #60).
-export function sharedGeneratorNote(meter) {
-  const gens = (meter?.generators || []).filter(g => g.zones > 1)
-  if (!gens.length) return null
-  const names = gens.map(g => g.name || 'générateur').join(' + ')
-  const zones = Math.max(...gens.map(g => g.zones))
-  return {
-    label: `Compteur d’entrée : ${names} — dessert ${zones} zones`,
-    tooltip: `Mesure l’énergie consommée par ${names}, qui dessert ${zones} zones : ce n’est pas la consommation propre de cette zone.`,
-  }
-}

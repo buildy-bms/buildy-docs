@@ -4098,7 +4098,6 @@ table.attachments-table td.att-size { text-align: right; }
 .attachment-transcript-head .muted { font-size: inherit; }
 
 /* Compteurs : nom du compteur thermique (calorimètre / frigorimètre) devant
-   la pastille d'usage, et mention « compteur d'entrée » d'un générateur qui
-   dessert plusieurs zones (audit STEF #60). */
+   la pastille d'usage. La description de ce que mesure le compteur est une
+   ligne .meter-row-recommendation pleine largeur (bacs-audit.hbs). */
 .meter-thermal-name { font-weight: 600; color: #374151; }
-.meter-generator-note { font-size: 7.5pt; margin-top: 0.6mm; white-space: normal; }

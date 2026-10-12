@@ -154,14 +154,21 @@ export const useAuditStore = defineStore('audit', {
       // device peut faire bouger la puissance retenue (items 5 & 8).
       // Idem pour le statut des compteurs (zone regroupée, usage exempté…),
       // qui suit le plan.
-      const [a, ps, mps] = await Promise.all([
+      // La description des compteurs (`purpose`) suit aussi le plan : un
+      // compteur couvert renvoie vers celui qui porte le comptage du groupe.
+      const [a, ps, mps, ms] = await Promise.all([
         getBacsActionItems(this.docId),
         getBacsPowerSummary(this.docId).catch(() => null),
         getBacsMeterPlanStatus(this.docId).catch(() => null),
+        getBacsMeters(this.docId).catch(() => null),
       ])
       this.actionItems = a.data
       if (ps) this.powerSummary = ps.data
       if (mps) this.meterPlanStatus = mps.data || {}
+      if (ms) {
+        const purposeById = new Map((ms.data || []).map(m => [m.id, m.purpose ?? null]))
+        for (const m of this.meters) if (purposeById.has(m.id)) m.purpose = purposeById.get(m.id)
+      }
     },
 
     /**

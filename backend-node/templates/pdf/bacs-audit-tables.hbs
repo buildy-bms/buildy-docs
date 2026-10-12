@@ -342,7 +342,7 @@
         {{#each items}}
           <tr class="{{#if out_of_service}}row-hs{{else}}{{#if (or coveredByGroup notRequiredReason)}}{{else}}{{#if (and required (eq present_actual 0))}}row-missing{{/if}}{{/if}}{{/if}}">
             <td class="col-type">{{{meterTypePill meter_type "sm"}}}</td>
-            <td class="col-usage">{{#if thermalName}}<span class="meter-thermal-name">{{thermalName}}</span> {{/if}}{{{meterUsagePill usage "sm"}}}{{#if generatorLabel}}<div class="muted meter-generator-note">{{generatorLabel}}</div>{{/if}}</td>
+            <td class="col-usage">{{#if thermalName}}<span class="meter-thermal-name">{{thermalName}}</span> {{/if}}{{{meterUsagePill usage "sm"}}}{{#if purpose}}<div class="muted meter-purpose">{{purpose}}</div>{{/if}}</td>
             <td class="col-bool">{{#if notRequiredReason}}<span class="muted">Non requis</span>{{else if coveredByGroup}}<span class="muted">Commun</span>{{else}}{{{boolPill required "sm" "neutral"}}}{{/if}}</td>
             <td class="col-bool">
               {{{boolPill present_actual "sm" "" "À vérifier"}}}

@@ -16,7 +16,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import { isMeterMissing, isMeterUnanswered, meterPlanNote, requiredCellLabel } from '@/lib/meter-plan-state'
-import { REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote } from '@/lib/meter-options'
+import { REQUIRED_LOCKED_TIP, thermalMeterName } from '@/lib/meter-options'
 
 const audit = useAuditStore()
 const { document, meters, zones, meterPlanStatus } = storeToRefs(audit)
@@ -596,7 +596,7 @@ function toggleProtocol(p) {
               <span v-if="isUnanswered(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Présence à vérifier</span>
               <span v-if="planNote(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">{{ planNote(m).label }}</span>
             </div>
-            <p v-if="sharedGeneratorNote(m)" class="mt-1.5 text-xs text-slate-500 leading-snug">{{ sharedGeneratorNote(m).label }}</p>
+            <p v-if="m.purpose" class="mt-1.5 text-xs text-slate-600 leading-snug">{{ m.purpose }}</p>
           </div>
           <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
         </button>
