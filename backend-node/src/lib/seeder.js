@@ -973,6 +973,33 @@ function resyncBacsAuditDataForZones(documentId, zones) {
   return { systems_count: systemsCount, thermal_count: thermalCount, meters_count: metersCount };
 }
 
+// Mapping energie -> meter_type (le type physique du compteur)
+// Note : 'other' n'est PAS un meter_type valide (CHECK bacs_audit_meters
+// = electric/electric_production/gas/water/thermal). Les énergies sans
+// compteur dédié (bois, biomasse, fioul) se sous-comptent via un compteur
+// d'énergie thermique sur le circuit.
+const ENERGY_TO_METER_TYPE = {
+  gas: 'gas',
+  electric: 'electric',
+  heat_pump: 'electric',
+  wood: 'thermal',
+  biomass: 'thermal',
+  fuel_oil: 'thermal',
+  district_heating: 'thermal',
+  solar: 'electric_production',
+};
+// Mapping system_category -> usage du compteur (l'usage est porte par la
+// categorie, pas par l'energie). Couvre toutes les valeurs possibles.
+const CATEGORY_TO_USAGE = {
+  heating: 'heating',
+  cooling: 'cooling',
+  ventilation: 'ventilation',
+  dhw: 'dhw',
+  lighting_indoor: 'lighting',
+  lighting_outdoor: 'lighting',
+  electricity_production: 'pv',
+};
+
 /**
  * Pre-remplit les compteurs auto-generes a partir des devices saisis.
  * Logique (cf retour terrain Kevin) :
@@ -993,36 +1020,13 @@ function resyncBacsAuditDataForZones(documentId, zones) {
  *    supprime manuellement (DELETE /bacs-audit/meters/:id).
  *
  * Retourne le nombre de compteurs nouvellement inseres.
+ * `dryRun` : aucune écriture, retourne l'ensemble des clés requises
+ * (meterTargetKey) — le flag `required` d'un audit BACS est calculé ici et
+ * nulle part ailleurs (colonne « Requis » non éditable, cf. isMeterRequiredByRules).
  */
-function resyncBacsAuditMetersForZones(documentId, zones) {
+function resyncBacsAuditMetersForZones(documentId, zones, { dryRun = false } = {}) {
   let inserted = 0;
 
-  // Mapping energie -> meter_type (le type physique du compteur)
-  // Note : 'other' n'est PAS un meter_type valide (CHECK bacs_audit_meters
-  // = electric/electric_production/gas/water/thermal). Les énergies sans
-  // compteur dédié (bois, biomasse, fioul) se sous-comptent via un compteur
-  // d'énergie thermique sur le circuit.
-  const ENERGY_TO_METER_TYPE = {
-    gas: 'gas',
-    electric: 'electric',
-    heat_pump: 'electric',
-    wood: 'thermal',
-    biomass: 'thermal',
-    fuel_oil: 'thermal',
-    district_heating: 'thermal',
-    solar: 'electric_production',
-  };
-  // Mapping system_category -> usage du compteur (l'usage est porte par la
-  // categorie, pas par l'energie). Couvre toutes les valeurs possibles.
-  const CATEGORY_TO_USAGE = {
-    heating: 'heating',
-    cooling: 'cooling',
-    ventilation: 'ventilation',
-    dhw: 'dhw',
-    lighting_indoor: 'lighting',
-    lighting_outdoor: 'lighting',
-    electricity_production: 'pv',
-  };
   // Mapping general (compteur energie primaire au niveau batiment) — libelles FR
   const ENERGY_TO_GENERAL = {
     gas: { meter_type: 'gas', notes: 'Compteur général gaz du bâtiment' },
@@ -1055,12 +1059,13 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // l'auditeur. L'identité du compteur (type / usage / zone) est déjà portée
   // par ses colonnes ; une description auto s'afficherait à tort comme une
   // « note relevée par l'auditeur » dans le PDF.
-  const insZonal = db.db.prepare(`
+  const NO_WRITE = { run() {} };
+  const insZonal = dryRun ? NO_WRITE : db.db.prepare(`
     INSERT INTO bacs_audit_meters
       (document_id, zone_id, usage, meter_type, required, present_actual, communicating)
     VALUES (?, ?, ?, ?, 1, NULL, NULL)
   `);
-  const insGeneral = db.db.prepare(`
+  const insGeneral = dryRun ? NO_WRITE : db.db.prepare(`
     INSERT INTO bacs_audit_meters
       (document_id, zone_id, usage, meter_type, required, present_actual, communicating)
     VALUES (?, NULL, 'other', ?, 1, NULL, NULL)
@@ -1121,8 +1126,8 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // remettre `required=0` sur les compteurs devenus orphelins (energie
   // changee/supprimee) sans les supprimer (tracabilite + saisies terrain).
   const targetKeys = new Set();
-  const keyZonal = (zoneId, usage, type) => `z${zoneId}:${usage}:${type}`;
-  const keyGeneral = (usage, type) => `g:${usage}:${type}`;
+  const keyZonal = meterKeyZonal;
+  const keyGeneral = meterKeyGeneral;
 
   // Devices retenus pour generer des compteurs (cf. isMeterEligible).
   const eligibleDevices = devices.filter(isMeterEligible);
@@ -1194,19 +1199,41 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   //      mig 159). Une chaudière centrale d'une autre zone ne compte pas.
   // (b) n'ajoute que des cas : (a) est inchangé. Rejoué sur les audits
   // réels #40/#43/#45/#56 : aucun compteur ajouté ni retiré.
+  //  (c) production CENTRALE : générateur partagé vers des systèmes d'AUTRES
+  //      zones, comptage déclaré séparable par zone (metering_separable =
+  //      'yes', réponse explicite — non répondu = comportement inchangé).
+  //      Il n'est pas une production locale de la zone qui l'héberge (un
+  //      local technique ne porte pas de système : l'auditeur doit le
+  //      déclarer dans une zone fonctionnelle) → cette zone suit (a) / (b)
+  //      comme les autres zones desservies. Son compteur d'entrée (gaz,
+  //      électrique) reste requis via les devices (étape 1) : R175-3 1°
+  //      « production ET consommation », PROFEEL 3.1.1 / 3.1.4 (compteur
+  //      divisionnaire du groupe froid + compteurs thermiques par zone).
+  //      Audit STEF #60 : chaudière + groupe froid dans « Circulation X ».
+  //      Émetteurs propres comptés hors production : identique à (a) tant
+  //      que le système n'a aucune production.
   const THERMAL_ZONAL_CATEGORIES = ['heating', 'cooling', 'dhw'];
   const ROLE_PROD_SQL = `(d.device_role LIKE '%production%' OR d.device_role LIKE '%generator%')`;
   const ROLE_DOWNSTREAM_SQL = `(d.device_role LIKE '%emission%' OR d.device_role LIKE '%distribution%')`;
+  // Device `d` de production centrale ; `zoneExpr` = zone de son système propre.
+  // COALESCE : un NULL rendrait `NOT (...)` NULL et retirerait le device du
+  // décompte des productions locales.
+  const centralProdSql = (zoneExpr) => `(${ROLE_PROD_SQL} AND COALESCE(d.metering_separable, '') = 'yes'
+    AND EXISTS (SELECT 1 FROM bacs_audit_device_shared_systems css
+      JOIN bacs_audit_systems cs ON cs.id = css.system_id
+      WHERE css.device_id = d.id AND cs.zone_id != ${zoneExpr}))`;
   const systemsWithLocalEmitters = db.db.prepare(`
     SELECT s.id, s.zone_id, s.system_category,
       (SELECT COUNT(*) FROM bacs_audit_system_devices d
-        WHERE d.system_id = s.id AND ${ROLE_PROD_SQL}) AS n_prod,
+        WHERE d.system_id = s.id AND ${ROLE_PROD_SQL}
+          AND NOT ${centralProdSql('s.zone_id')}) AS n_prod,
       (SELECT COUNT(*) FROM bacs_audit_system_devices d
-        WHERE d.system_id = s.id AND ${ROLE_DOWNSTREAM_SQL}) AS n_downstream,
+        WHERE d.system_id = s.id AND ${ROLE_DOWNSTREAM_SQL} AND NOT ${ROLE_PROD_SQL}) AS n_downstream,
       (SELECT COUNT(*) FROM bacs_audit_device_shared_systems ss
         JOIN bacs_audit_system_devices d ON d.id = ss.device_id
         JOIN bacs_audit_systems ps ON ps.id = d.system_id
-        WHERE ss.system_id = s.id AND ps.zone_id = s.zone_id AND ${ROLE_PROD_SQL}) AS n_prod_shared_local,
+        WHERE ss.system_id = s.id AND ps.zone_id = s.zone_id AND ${ROLE_PROD_SQL}
+          AND NOT ${centralProdSql('ps.zone_id')}) AS n_prod_shared_local,
       (SELECT COUNT(*) FROM bacs_audit_device_shared_systems ss
         JOIN bacs_audit_system_devices d ON d.id = ss.device_id
         WHERE ss.system_id = s.id AND ${ROLE_DOWNSTREAM_SQL} AND NOT ${ROLE_PROD_SQL}
@@ -1271,6 +1298,8 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     inserted++;
   }
 
+  if (dryRun) return targetKeys;
+
   // 3. Synchronise le flag `required` : un compteur encore dans la cible
   //    reste requis ; un compteur orphelin (energie changee/supprimee, usage
   //    hors BACS) repasse a required=0. Fix B — pour les orphelins qui
@@ -1290,10 +1319,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   const delMeter = db.db.prepare('DELETE FROM bacs_audit_meters WHERE id = ?');
   let purged = 0;
   for (const m of allMeters) {
-    const k = m.zone_id != null
-      ? keyZonal(m.zone_id, m.usage, m.meter_type)
-      : keyGeneral(m.usage, m.meter_type);
-    const wanted = targetKeys.has(k) ? 1 : 0;
+    const wanted = targetKeys.has(meterTargetKey(m)) ? 1 : 0;
     if (wanted === 1) {
       if ((m.required ? 1 : 0) !== 1) setRequired.run(1, m.id);
       continue;
@@ -1315,6 +1341,57 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   return inserted;
 }
 
+// Clé d'un compteur dans l'ensemble des compteurs requis du resync.
+const meterKeyZonal = (zoneId, usage, type) => `z${zoneId}:${usage}:${type}`;
+const meterKeyGeneral = (usage, type) => `g:${usage}:${type}`;
+const meterTargetKey = (m) => (m.zone_id != null
+  ? meterKeyZonal(m.zone_id, m.usage, m.meter_type)
+  : meterKeyGeneral(m.usage, m.meter_type));
+
+/**
+ * Le compteur { zone_id, usage, meter_type } est-il requis par les règles du
+ * resync (audit BACS) ? Sans écriture. Sert à fixer `required` d'un compteur
+ * ajouté ou modifié à la main, sans attendre le prochain resync.
+ */
+function isMeterRequiredByRules(documentId, meter) {
+  return resyncBacsAuditMetersForZones(documentId, null, { dryRun: true }).has(meterTargetKey(meter));
+}
+
+/**
+ * Compteurs d'ENTRÉE de générateur : les générateurs chauffage / froid / ECS
+ * (rôle production, énergie renseignée) que mesure chaque compteur zonal
+ * créé par l'étape 1 du resync, avec le nombre de zones qu'ils desservent
+ * (la leur + celles des systèmes vers lesquels ils sont partagés). Permet
+ * d'afficher « compteur d'entrée du groupe d'eau glacée — dessert 6 zones »
+ * au lieu de laisser lire le compteur comme celui de la zone hôte (audit
+ * STEF #60).
+ * @returns {Map<string, Array<{ name: string|null, zones: number }>>} par meterTargetKey
+ */
+function meterGeneratorsByKey(documentId) {
+  const rows = db.db.prepare(`
+    SELECT d.name, d.energy_source, s.zone_id, s.system_category,
+      (SELECT COUNT(DISTINCT cs.zone_id) FROM bacs_audit_device_shared_systems css
+        JOIN bacs_audit_systems cs ON cs.id = css.system_id
+        WHERE css.device_id = d.id AND cs.zone_id != s.zone_id) AS other_zones
+    FROM bacs_audit_system_devices d
+    JOIN bacs_audit_systems s ON s.id = d.system_id
+    WHERE s.document_id = ? AND s.zone_id IS NOT NULL
+      AND s.system_category IN ('heating', 'cooling', 'dhw')
+      AND d.energy_source IS NOT NULL
+      AND (d.device_role LIKE '%production%' OR d.device_role LIKE '%generator%')
+    ORDER BY d.position, d.id
+  `).all(documentId);
+  const byKey = new Map();
+  for (const r of rows) {
+    const type = ENERGY_TO_METER_TYPE[r.energy_source];
+    if (!type) continue;
+    const key = meterKeyZonal(r.zone_id, CATEGORY_TO_USAGE[r.system_category], type);
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push({ name: r.name || null, zones: 1 + r.other_zones });
+  }
+  return byKey;
+}
+
 /**
  * Wrapper public : resync les donnees d'un audit BACS avec les zones
  * actuelles du site rattache. Utilise par l'endpoint POST /bacs-audit/
@@ -1334,7 +1411,8 @@ module.exports = {
   backfillNewPlanSections, seedSystemCategoriesOnBoot, seedAfStructure,
   libraryExtendAf,
   seedBacsRequirementsOnBoot, seedBacsMeterRequirementsOnBoot,
-  seedBacsAuditStructure, resyncBacsAuditWithSiteZones,
+  seedBacsAuditStructure, resyncBacsAuditWithSiteZones, isMeterRequiredByRules,
+  meterGeneratorsByKey, meterTargetKey,
   seedIso52120OnBoot,
 };
 

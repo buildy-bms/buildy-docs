@@ -754,3 +754,9 @@ table.syn > tbody:last-of-type > tr:last-child > td { border-bottom: 0.8pt solid
 .gtb-summary.gtb-summary-none .gtb-summary-head { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
 /* Ordinal « 1er » en exposant (typographie du PDF). */
 sup.ord { font-size: 0.72em; line-height: 0; vertical-align: super; }
+
+/* Compteurs : nom du compteur thermique (calorimètre / frigorimètre) devant
+   la pastille d'usage, et mention « compteur d'entrée » d'un générateur qui
+   dessert plusieurs zones (audit STEF #60). */
+.meter-thermal-name { font-weight: 600; color: var(--neutral-700); }
+.meter-generator-note { font-size: 7pt; margin-top: 0.6mm; white-space: normal; }

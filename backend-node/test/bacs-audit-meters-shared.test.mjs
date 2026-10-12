@@ -121,6 +121,78 @@ describe('compteurs requis — équipements partagés', () => {
     expect(m).toContain('Bureaux|heating|gas');
   });
 
+  it('STEF #60 : chaudière + groupe froid déclarés dans une zone et partagés → thermiques dans cette zone aussi, compteurs d\'entrée conservés', () => {
+    const a = seedAudit(['Circulation X', 'Circulation Y', 'Lot bureau X']);
+    const heat = Object.fromEntries(['Circulation X', 'Circulation Y', 'Lot bureau X'].map(z => [z, a.system(z, 'heating')]));
+    const cool = Object.fromEntries(['Circulation X', 'Circulation Y', 'Lot bureau X'].map(z => [z, a.system(z, 'cooling')]));
+    const boiler = a.device(heat['Circulation X'], 'Chaudière gaz', ['production', 'regulation'], { energy: 'gas', separable: 'yes' });
+    const chiller = a.device(cool['Circulation X'], 'Groupe d\'eau glacée', ['production'], { energy: 'electric', separable: 'yes' });
+    const vc = a.device(cool['Circulation X'], 'Ventilo-convecteur', ['emission', 'regulation'], { separable: 'yes' });
+    for (const z of ['Circulation Y', 'Lot bureau X']) {
+      a.share(boiler, heat[z]);
+      a.share(chiller, cool[z]);
+      a.share(vc, cool[z]);
+    }
+    for (const sys of Object.values(heat)) a.share(vc, sys);
+    const m = a.meters();
+    for (const z of ['Circulation X', 'Circulation Y', 'Lot bureau X']) {
+      expect(m).toContain(`${z}|heating|thermal`);
+      expect(m).toContain(`${z}|cooling|thermal`);
+    }
+    for (const z of ['Circulation Y', 'Lot bureau X']) expect(m).not.toContain(`${z}|cooling|electric`);
+    // Compteurs d'entrée de la chaudière et du groupe froid (R175-3 1°
+    // « production et consommation », PROFEEL 3.1.1) : toujours requis.
+    expect(m).toContain('Circulation X|heating|gas');
+    expect(m).toContain('Circulation X|cooling|electric');
+    // Affiché comme compteur d'entrée du groupe froid (3 zones desservies).
+    const zx = db.db.prepare(`SELECT id FROM zones WHERE name = 'Circulation X'`).get().id;
+    const gens = seeder.meterGeneratorsByKey(a.docId);
+    expect(gens.get(seeder.meterTargetKey({ zone_id: zx, usage: 'cooling', meter_type: 'electric' })))
+      .toEqual([{ name: 'Groupe d\'eau glacée', zones: 3 }]);
+    expect(gens.get(seeder.meterTargetKey({ zone_id: zx, usage: 'cooling', meter_type: 'thermal' }))).toBeUndefined();
+  });
+
+  it('production partagée sans réponse « séparable » : zone hôte inchangée (pas de thermique)', () => {
+    const a = seedAudit(['Cellule 1', 'Cellule 2']);
+    const h1 = a.system('Cellule 1', 'heating');
+    const h2 = a.system('Cellule 2', 'heating');
+    const boiler = a.device(h1, 'Chaudière', ['production'], { energy: 'gas' });
+    a.device(h1, 'Aérotherme', ['emission']);
+    a.device(h2, 'Aérotherme', ['emission']);
+    a.share(boiler, h2);
+    const m = a.meters();
+    expect(m).toContain('Cellule 1|heating|gas');
+    expect(m).not.toContain('Cellule 1|heating|thermal');
+    expect(m).toContain('Cellule 2|heating|thermal');
+  });
+
+  it('chaudière partagée déclarée non séparable : comptage d\'entrée conservé dans la zone hôte', () => {
+    const a = seedAudit(['Bureaux 3', 'Atelier 3']);
+    const h1 = a.system('Bureaux 3', 'heating');
+    const h2 = a.system('Atelier 3', 'heating');
+    const boiler = a.device(h1, 'Chaudière', ['production'], { energy: 'gas', separable: 'no' });
+    a.device(h1, 'Radiateur', ['emission']);
+    a.share(boiler, h2);
+    const m = a.meters();
+    expect(m).toContain('Bureaux 3|heating|gas');
+    expect(m).not.toContain('Bureaux 3|heating|thermal');
+  });
+
+  it('« Requis » calculé sans écriture (compteur ajouté à la main)', () => {
+    const a = seedAudit(['Salle 4']);
+    const cooling = a.system('Salle 4', 'cooling');
+    const heating = a.system('Salle 4', 'heating');
+    const vc = a.device(cooling, 'VC 4 tubes', ['emission']);
+    a.share(vc, heating);
+    a.meters();
+    const zoneId = db.db.prepare(`SELECT id FROM zones WHERE name = 'Salle 4'`).get().id;
+    const count = () => db.db.prepare('SELECT COUNT(*) n FROM bacs_audit_meters WHERE document_id = ?').get(a.docId).n;
+    const before = count();
+    expect(seeder.isMeterRequiredByRules(a.docId, { zone_id: zoneId, usage: 'heating', meter_type: 'thermal' })).toBe(true);
+    expect(seeder.isMeterRequiredByRules(a.docId, { zone_id: zoneId, usage: 'cooling', meter_type: 'electric' })).toBe(false);
+    expect(count()).toBe(before);
+  });
+
   it('froid présent sans équipement saisi : repli électrique conservé', () => {
     const a = seedAudit(['Salle']);
     a.system('Salle', 'cooling');

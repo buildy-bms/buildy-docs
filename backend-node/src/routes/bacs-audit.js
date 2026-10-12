@@ -11,7 +11,9 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { regenerateActionItems, computeMeterPlanStatus } = require('../lib/bacs-audit-action-generator');
 const { recomputeAndPersistAuditPower } = require('../lib/bacs-audit-power');
-const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
+const {
+  resyncBacsAuditWithSiteZones, isMeterRequiredByRules, meterGeneratorsByKey, meterTargetKey,
+} = require('../lib/seeder');
 const { computeSystemLiability } = require('../lib/bacs-liability');
 const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
@@ -493,7 +495,7 @@ async function routes(fastify) {
   fastify.get('/bacs-audit/:documentId/meters', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(id, request, reply)) return;
-    return db.db.prepare(`
+    const meters = db.db.prepare(`
       SELECT m.*,
              z.name AS zone_name,
              zl.name AS location_zone_name
@@ -503,6 +505,12 @@ async function routes(fastify) {
       WHERE m.document_id = ?
       ORDER BY z.position NULLS LAST, m.position, m.usage, m.meter_type
     `).all(id);
+    // Générateurs mesurés par le compteur (compteur d'entrée), cf. seeder.
+    const generators = meterGeneratorsByKey(id);
+    return meters.map(m => ({
+      ...m,
+      generators: m.zone_id != null ? (generators.get(meterTargetKey(m)) || []) : [],
+    }));
   });
 
   // Statut des compteurs au regard du plan (zone regroupée, usage exempté ou
@@ -534,6 +542,13 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+    // Audit BACS : « Requis » découle des règles du resync (R175-3 1°), jamais
+    // de la saisie — le resync suivant l'écraserait. Audit GTB classique (pas
+    // de resync) : choix de l'auditeur.
+    if (db.afs.getById(documentId)?.kind === 'bacs_audit') {
+      body.required = isMeterRequiredByRules(documentId,
+        { zone_id: body.zone_id || null, usage: body.usage, meter_type: body.meter_type });
+    }
     const toTernary = v => (v == null ? null : (v ? 1 : 0));
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_meters
@@ -579,6 +594,20 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+
+    // Audit BACS : « Requis » n'est pas éditable (calculé par le resync, cf.
+    // POST). Un client qui l'envoie encore (ancien outil MCP) est ignoré ; un
+    // changement de zone / usage / type le recalcule aussitôt.
+    if (db.afs.getById(row.document_id)?.kind === 'bacs_audit') {
+      delete body.required;
+      if (['zone_id', 'usage', 'meter_type'].some(k => k in body)) {
+        body.required = isMeterRequiredByRules(row.document_id, {
+          zone_id: 'zone_id' in body ? body.zone_id : row.zone_id,
+          usage: body.usage ?? row.usage,
+          meter_type: body.meter_type ?? row.meter_type,
+        });
+      }
+    }
 
     // Regle : un compteur non present ne peut pas etre integre a la GTB
     // (cf retour Kevin v2.5). Auto-decoche managed_by_bms si on passe a non present.

@@ -2035,6 +2035,7 @@ onBeforeUnmount(() => {
       :usages="METER_USAGES"
       :types="METER_TYPES"
       :prefill="meterAddPrefill"
+      :required-locked="isBacs"
       @close="showAddMeterModal = false; meterAddPrefill = null"
       @submit="addMeter"
     />

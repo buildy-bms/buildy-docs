@@ -74,6 +74,25 @@ const METER_TYPE_LABEL = {
   thermal: 'Thermique',
 };
 
+// Nom courant d'un compteur d'énergie thermique : calorimètre (chaleur :
+// chauffage, ECS) ou frigorimètre (froid). Miroir de
+// frontend/src/lib/meter-options.js thermalMeterName — garder alignés.
+function thermalMeterName(m) {
+  if (!m || m.meter_type !== 'thermal' || m.zone_id == null) return null;
+  if (m.usage === 'cooling') return 'Frigorimètre';
+  if (m.usage === 'heating' || m.usage === 'dhw') return 'Calorimètre';
+  return null;
+}
+
+// Compteur d'entrée d'un générateur qui dessert plusieurs zones (cf. seeder
+// meterGeneratorsByKey). Miroir de frontend sharedGeneratorNote (label).
+function sharedGeneratorLabel(generators) {
+  const gens = (generators || []).filter(g => g.zones > 1);
+  if (!gens.length) return null;
+  const names = gens.map(g => g.name || 'générateur').join(' + ');
+  return `Compteur d’entrée : ${names} — dessert ${Math.max(...gens.map(g => g.zones))} zones`;
+}
+
 const METER_USAGE_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
@@ -305,6 +324,8 @@ const SYSTEM_TERNARY_LABEL = {
 };
 
 module.exports = {
+  thermalMeterName,
+  sharedGeneratorLabel,
   SYSTEM_LABEL,
   SYSTEM_NEGATIVE_LABEL,
   COMM_LABEL,

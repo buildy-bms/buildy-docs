@@ -1152,7 +1152,7 @@
         </tr>
         {{#each items}}
           <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}{{#if complianceFailed}} meter-row-noncompliant{{/if}}">
-            <td>{{#if isGeneral}}{{{meterUsagePill "other" "sm"}}}{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
+            <td>{{#if thermalName}}<span class="meter-thermal-name">{{thermalName}}</span> {{/if}}{{#if isGeneral}}{{{meterUsagePill "other" "sm"}}}{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}{{#if generatorLabel}}<div class="muted meter-generator-note">{{generatorLabel}}</div>{{/if}}</td>
             <td class="bool-cell">{{#if notRequiredReason}}<span class="muted">Non requis</span>{{else if coveredByGroup}}<span class="muted">Commun</span>{{else}}{{{boolPill required "sm" "neutral"}}}{{/if}}</td>
             <td class="bool-cell">{{{boolPill present_actual "sm"}}}</td>
             <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
@@ -1214,7 +1214,7 @@
     <div class="detail-card-head">
       {{{meterTypePill meter_type "sm"}}}
       {{{meterUsagePill usage "sm"}}}
-      <span class="detail-card-title">{{zoneLabel}}</span>
+      <span class="detail-card-title">{{zoneLabel}}{{#if thermalName}} — {{thermalName}}{{/if}}</span>
     </div>
     <div class="detail-card-body">
       {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}

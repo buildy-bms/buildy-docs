@@ -11,7 +11,7 @@ import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import MeterEnergyGroup from '@/components/audit/MeterEnergyGroup.vue'
-import { METER_TYPES as ENERGY_METAS } from '@/lib/meter-options'
+import { METER_TYPES as ENERGY_METAS, REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote } from '@/lib/meter-options'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -41,6 +41,8 @@ const { confirm } = useConfirm()
 // (zone regroupée, usage exempté, ternaires stricts — lib/meter-plan-state.js).
 const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
 const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
+// Audit BACS : « Requis » calculé par le serveur (non éditable).
+const requiredLocked = computed(() => document.value?.kind === 'bacs_audit')
 
 // ── Plan de comptage : agrégations par énergie pour les 5 sections ──
 function metersOfEnergy(energy) {
@@ -338,9 +340,11 @@ function hasNotes(html) {
               </span>
             </div>
             <div class="flex items-center gap-1.5 mt-1">
+              <span v-if="m.zone_id && thermalMeterName(m)" class="text-xs font-medium text-gray-700">{{ thermalMeterName(m) }}</span>
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
             </div>
+            <p v-if="sharedGeneratorNote(m)" class="mt-1 text-[11px] text-slate-500">{{ sharedGeneratorNote(m).label }}</p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button @click="dupMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg" aria-label="Dupliquer">
@@ -355,7 +359,10 @@ function hasNotes(html) {
         <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
           <label class="flex items-center justify-between gap-2">
             <span class="text-gray-700">Requis ?</span>
-            <SegmentedToggle compact :model-value="!!m.required"
+            <span v-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
+              <SegmentedToggle compact disabled neutral-no :model-value="!!m.required" />
+            </span>
+            <SegmentedToggle v-else compact :model-value="!!m.required"
                              @update:model-value="v => patchMeter(m, { required: v })" />
           </label>
           <label class="flex items-center justify-between gap-2">

@@ -16,6 +16,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import { isMeterMissing, isMeterUnanswered, meterPlanNote } from '@/lib/meter-plan-state'
+import { REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote } from '@/lib/meter-options'
 
 const audit = useAuditStore()
 const { document, meters, zones, meterPlanStatus } = storeToRefs(audit)
@@ -24,6 +25,9 @@ const { document, meters, zones, meterPlanStatus } = storeToRefs(audit)
 const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
 const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
 const planNote = (m) => meterPlanNote(m, meterPlanStatus.value)
+// Audit BACS : « Requis » est calculé par le serveur (non éditable) ; audit
+// GTB classique : choix de l'auditeur.
+const requiredLocked = computed(() => document.value?.kind === 'bacs_audit')
 // Oui / Non / non répondu : null reste null (jamais « Non » par défaut).
 const tri = (v) => (v == null ? null : !!v)
 const { error, success } = useNotification()
@@ -288,7 +292,7 @@ async function save() {
         zone_id: editForm.value.zone_id || null,
         usage,
         meter_type: editForm.value.meter_type,
-        required: !!editForm.value.required,
+        ...(requiredLocked.value ? {} : { required: !!editForm.value.required }),
       })
       await audit.refreshAuditCore()
       success('Compteur ajouté')
@@ -297,7 +301,7 @@ async function save() {
         zone_id: editForm.value.zone_id || null,
         usage,
         meter_type: editForm.value.meter_type,
-        required: !!editForm.value.required,
+        ...(requiredLocked.value ? {} : { required: !!editForm.value.required }),
         // Ternaires : une question laissée sans réponse reste « non
         // répondue » (sinon un compteur non vérifié devenait « absent » et
         // générait « Installer un compteur »).
@@ -583,6 +587,7 @@ function toggleProtocol(p) {
           <div class="flex-1 min-w-0">
             <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
             <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span v-if="m.zone_id && thermalMeterName(m)" class="text-sm font-medium text-gray-700">{{ thermalMeterName(m) }}</span>
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
               <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
@@ -591,6 +596,7 @@ function toggleProtocol(p) {
               <span v-if="isUnanswered(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Présence à vérifier</span>
               <span v-if="planNote(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">{{ planNote(m).label }}</span>
             </div>
+            <p v-if="sharedGeneratorNote(m)" class="mt-1.5 text-xs text-slate-500 leading-snug">{{ sharedGeneratorNote(m).label }}</p>
           </div>
           <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
         </button>
@@ -676,11 +682,16 @@ function toggleProtocol(p) {
             <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
               <div class="flex-1 min-w-0">
                 <p class="text-base font-medium text-gray-700">Requis par R175 ?</p>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                <p v-if="requiredLocked" class="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {{ editing?.mode === 'create' ? 'Déterminé à l’enregistrement. ' : '' }}{{ REQUIRED_LOCKED_TIP }}
+                </p>
+                <p v-else class="text-xs text-gray-500 mt-1 leading-relaxed">
                   Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Répondre Oui si ce compteur EST requis par le décret.
                 </p>
               </div>
-              <SegmentedToggle size="lg" :model-value="!!editForm.required"
+              <SegmentedToggle v-if="requiredLocked && editing?.mode === 'edit'" size="lg" disabled neutral-no
+                               :model-value="!!editForm.required" class="mt-1 shrink-0" />
+              <SegmentedToggle v-else-if="!requiredLocked" size="lg" :model-value="!!editForm.required"
                                @update:model-value="v => (editForm.required = v)" class="mt-1 shrink-0" />
             </div>
             <template v-if="editing?.mode === 'edit'">

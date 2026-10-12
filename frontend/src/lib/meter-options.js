@@ -49,3 +49,31 @@ export function meterTypeLabel(value) {
 export function meterUsageLabel(value) {
   return getMeterUsageMeta(value)?.label || value || '—'
 }
+
+// Audit BACS : « Requis » est calculé par le serveur (resync) et recalculé à
+// chaque modification des systèmes — la colonne n'est pas éditable.
+export const REQUIRED_LOCKED_TIP = 'Calculé d’après les systèmes et équipements saisis (R175-3 1°). Pour le changer, corrige l’étape Systèmes.'
+
+// Nom courant d'un compteur d'énergie thermique : calorimètre (chaleur :
+// chauffage, ECS) ou frigorimètre (froid). Null pour les autres compteurs.
+export function thermalMeterName(meter) {
+  if (meter?.meter_type !== 'thermal') return null
+  if (meter.usage === 'cooling') return 'Frigorimètre'
+  if (meter.usage === 'heating' || meter.usage === 'dhw') return 'Calorimètre'
+  return null
+}
+
+// Compteur d'entrée d'un générateur qui dessert plusieurs zones (champ
+// `generators` du GET meters, cf. seeder meterGeneratorsByKey) : le compteur
+// électrique « Refroidissement » de la zone qui héberge le groupe froid
+// mesure tout le froid du bâtiment, pas cette zone (audit STEF #60).
+export function sharedGeneratorNote(meter) {
+  const gens = (meter?.generators || []).filter(g => g.zones > 1)
+  if (!gens.length) return null
+  const names = gens.map(g => g.name || 'générateur').join(' + ')
+  const zones = Math.max(...gens.map(g => g.zones))
+  return {
+    label: `Compteur d’entrée : ${names} — dessert ${zones} zones`,
+    tooltip: `Mesure l’énergie consommée par ${names}, qui dessert ${zones} zones : ce n’est pas la consommation propre de cette zone.`,
+  }
+}

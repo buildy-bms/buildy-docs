@@ -19,7 +19,10 @@ import SearchableSelect from '@/components/SearchableSelect.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
-import { meterUsageLabel, METER_USAGES, getMeterUsageMeta } from '@/lib/meter-options'
+import {
+  meterUsageLabel, METER_USAGES, getMeterUsageMeta,
+  REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote,
+} from '@/lib/meter-options'
 import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
@@ -42,6 +45,7 @@ const props = defineProps({
 // Statut des compteurs au regard du plan (zone regroupée, usage exempté…),
 // calculé par le serveur : « requis manquant » = même décompte que le PDF.
 const { meterPlanStatus } = storeToRefs(useAuditStore())
+const requiredLocked = computed(() => props.document?.kind === 'bacs_audit')
 const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
 const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
 const planNote = (m) => meterPlanNote(m, meterPlanStatus.value)
@@ -244,7 +248,10 @@ onBeforeUnmount(teardownSortable)
         <FontAwesomeIcon :icon="['fas', energy.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
       </span>
       <div class="flex-1 min-w-0">
-        <p class="text-base font-semibold text-gray-900 leading-tight">{{ energy.label }}</p>
+        <p class="text-base font-semibold text-gray-900 leading-tight">
+          {{ energy.label }}
+          <span v-if="energy.value === 'thermal'" class="text-sm font-normal text-gray-500">— calorimètres et frigorimètres</span>
+        </p>
         <p class="text-xs text-gray-500 mt-0.5">
           <span v-if="!stats.total">Aucun compteur</span>
           <template v-else>
@@ -353,9 +360,15 @@ onBeforeUnmount(teardownSortable)
                         class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
                   <span v-else-if="isUnanswered(row.meter)"
                         class="text-amber-600 font-semibold shrink-0" v-tooltip="'Présence à vérifier : le rapport indique ce compteur « à qualifier »'">?</span>
+                  <span v-if="row.meter.zone_id && thermalMeterName(row.meter)"
+                        class="text-xs font-medium text-gray-700 shrink-0">{{ thermalMeterName(row.meter) }}</span>
                   <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
                   <span v-else class="text-xs text-gray-400 italic">—</span>
                 </div>
+                <p v-if="sharedGeneratorNote(row.meter)" v-tooltip="sharedGeneratorNote(row.meter).tooltip"
+                   class="mt-0.5 text-[11px] text-slate-500 text-left">
+                  {{ sharedGeneratorNote(row.meter).label }}
+                </p>
                 <!-- Statut au regard du plan (zone regroupée, usage exempté…) :
                      même lecture que le chapitre 4 du PDF. -->
                 <p v-if="planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
@@ -379,7 +392,13 @@ onBeforeUnmount(teardownSortable)
                   <span v-else-if="groupBy === 'usage' && isUnanswered(row.meter)"
                         class="text-amber-600 font-semibold shrink-0" v-tooltip="'Présence à vérifier : le rapport indique ce compteur « à qualifier »'">?</span>
                   <span v-truncate-tooltip class="truncate max-w-60">{{ row.meter.zone_name || 'Compteur général' }}</span>
+                  <span v-if="groupBy === 'usage' && row.meter.zone_id && thermalMeterName(row.meter)"
+                        class="text-xs text-gray-500 shrink-0">· {{ thermalMeterName(row.meter) }}</span>
                 </div>
+                <p v-if="groupBy === 'usage' && sharedGeneratorNote(row.meter)" v-tooltip="sharedGeneratorNote(row.meter).tooltip"
+                   class="mt-0.5 text-[11px] text-slate-500 text-left">
+                  {{ sharedGeneratorNote(row.meter).label }}
+                </p>
                 <p v-if="groupBy === 'usage' && planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
                    class="mt-0.5 text-[11px] text-slate-500 italic text-left">
                   {{ planNote(row.meter).label }}
@@ -392,8 +411,14 @@ onBeforeUnmount(teardownSortable)
                 </p>
               </td>
               <td class="whitespace-nowrap">
-                <SegmentedToggle compact :model-value="!!row.meter.required"
-                                 tooltip="Compteur requis par le décret R175"
+                <!-- Audit BACS : « Requis » est calculé (systèmes et
+                     équipements saisis) et recalculé à chaque modification —
+                     non éditable. Audit GTB classique : choix de l'auditeur. -->
+                <span v-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
+                  <SegmentedToggle compact disabled neutral-no :model-value="!!row.meter.required" />
+                </span>
+                <SegmentedToggle v-else compact :model-value="!!row.meter.required"
+                                 tooltip="Compteur requis ?"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { required: v } })" />
               </td>
               <td class="whitespace-nowrap">

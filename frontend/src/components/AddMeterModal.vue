@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import BaseModal from './BaseModal.vue'
 import MeterUsagePill from './MeterUsagePill.vue'
 import MeterTypePill from './MeterTypePill.vue'
+import { REQUIRED_LOCKED_TIP } from '@/lib/meter-options'
 
 const props = defineProps({
   zones: { type: Array, required: true },
@@ -12,6 +13,8 @@ const props = defineProps({
   // « + Ajouter un compteur <énergie> » d'une section). Le formulaire reste
   // entièrement éditable — c'est juste un raccourci de saisie.
   prefill: { type: Object, default: null },
+  // Audit BACS : « Requis » est calculé par le serveur (non éditable).
+  requiredLocked: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'submit'])
 
@@ -31,6 +34,7 @@ async function submit() {
     // n'a pas de sens pour un compteur de tête de site).
     const payload = { ...form.value }
     if (payload.zone_id === null) payload.usage = 'other'
+    if (props.requiredLocked) delete payload.required
     await emit('submit', payload)
     emit('close')
   } finally {
@@ -71,9 +75,12 @@ async function submit() {
           <div class="mt-2"><MeterTypePill :type="form.meter_type" /></div>
         </div>
       </div>
-      <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+      <p v-if="requiredLocked" class="text-xs text-gray-500">
+        Requis par le décret : déterminé à l’enregistrement. {{ REQUIRED_LOCKED_TIP }}
+      </p>
+      <label v-else class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
         <input type="checkbox" v-model="form.required" class="rounded" />
-        <span>Compteur requis par le décret BACS (R175-3 1°)</span>
+        <span>Compteur requis</span>
       </label>
       <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
         <button type="button" @click="emit('close')"
