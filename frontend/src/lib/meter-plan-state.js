@@ -53,6 +53,18 @@ export function meterPlanNote(m, planStatus) {
   return null
 }
 
+// Colonne « Requis » d'un audit BACS (non éditable) : même lecture que le
+// chapitre 4 du PDF. Un compteur couvert par le comptage unique d'une zone
+// regroupée affiche « Commun », un usage exempté « Non requis » — le flag
+// `required` du resync, lui, reste zone par zone et disait « Oui » sous la
+// mention « Ce compteur n'est pas exigé ». Null = afficher le flag.
+export function requiredCellLabel(m, planStatus) {
+  const status = planStatus?.[m.id]?.status
+  if (status === 'not_required') return 'Non requis'
+  if (status === 'covered') return 'Commun'
+  return null
+}
+
 // Valeur du bouton Oui / Non « Présent » : null tant que la présence n'a pas
 // été vérifiée (les deux boutons restent neutres).
 export const presentToggleValue = (m) => (m.present_actual == null ? null : isTrue(m.present_actual))

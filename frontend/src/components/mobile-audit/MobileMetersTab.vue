@@ -15,7 +15,7 @@ import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
-import { isMeterMissing, isMeterUnanswered, meterPlanNote } from '@/lib/meter-plan-state'
+import { isMeterMissing, isMeterUnanswered, meterPlanNote, requiredCellLabel } from '@/lib/meter-plan-state'
 import { REQUIRED_LOCKED_TIP, thermalMeterName, sharedGeneratorNote } from '@/lib/meter-options'
 
 const audit = useAuditStore()
@@ -682,14 +682,20 @@ function toggleProtocol(p) {
             <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
               <div class="flex-1 min-w-0">
                 <p class="text-base font-medium text-gray-700">Requis par R175 ?</p>
-                <p v-if="requiredLocked" class="text-xs text-gray-500 mt-1 leading-relaxed">
+                <p v-if="requiredLocked && editing?.mode === 'edit' && requiredCellLabel(editing.meter, meterPlanStatus)"
+                   class="text-xs text-gray-500 mt-1 leading-relaxed">
+                  {{ meterPlanNote(editing.meter, meterPlanStatus)?.tooltip }}
+                </p>
+                <p v-else-if="requiredLocked" class="text-xs text-gray-500 mt-1 leading-relaxed">
                   {{ editing?.mode === 'create' ? 'Déterminé à l’enregistrement. ' : '' }}{{ REQUIRED_LOCKED_TIP }}
                 </p>
                 <p v-else class="text-xs text-gray-500 mt-1 leading-relaxed">
                   Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Répondre Oui si ce compteur EST requis par le décret.
                 </p>
               </div>
-              <SegmentedToggle v-if="requiredLocked && editing?.mode === 'edit'" size="lg" disabled neutral-no
+              <span v-if="requiredLocked && editing?.mode === 'edit' && requiredCellLabel(editing.meter, meterPlanStatus)"
+                    class="mt-1 shrink-0 text-base text-slate-500 italic">{{ requiredCellLabel(editing.meter, meterPlanStatus) }}</span>
+              <SegmentedToggle v-else-if="requiredLocked && editing?.mode === 'edit'" size="lg" disabled neutral-no
                                :model-value="!!editForm.required" class="mt-1 shrink-0" />
               <SegmentedToggle v-else-if="!requiredLocked" size="lg" :model-value="!!editForm.required"
                                @update:model-value="v => (editForm.required = v)" class="mt-1 shrink-0" />

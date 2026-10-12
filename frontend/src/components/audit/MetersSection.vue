@@ -19,7 +19,7 @@ import { updateBacsMeter, deleteBacsMeter, duplicateBacsMeter, reorderBacsMeters
 import AuditSubTabs from '@/components/audit/AuditSubTabs.vue'
 import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
 import { flashAuditTarget } from '@/lib/audit-reveal'
-import { isMeterMissing, isMeterUnanswered, presentToggleValue } from '@/lib/meter-plan-state'
+import { isMeterMissing, isMeterUnanswered, presentToggleValue, requiredCellLabel, meterPlanNote } from '@/lib/meter-plan-state'
 
 // Section 4 — Compteurs et mesurage (R175-3 1°).
 const props = defineProps({
@@ -359,7 +359,10 @@ function hasNotes(html) {
         <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
           <label class="flex items-center justify-between gap-2">
             <span class="text-gray-700">Requis ?</span>
-            <span v-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
+            <span v-if="requiredLocked && requiredCellLabel(m, meterPlanStatus)"
+                  v-tooltip="meterPlanNote(m, meterPlanStatus)?.tooltip"
+                  class="text-slate-500 italic">{{ requiredCellLabel(m, meterPlanStatus) }}</span>
+            <span v-else-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
               <SegmentedToggle compact disabled neutral-no :model-value="!!m.required" />
             </span>
             <SegmentedToggle v-else compact :model-value="!!m.required"

@@ -2,7 +2,7 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.269",
+      "version": "0.1.270",
       "date": "2026-10-12",
       "title": "Compteurs d'audit : calorimètres de la zone qui abrite la production, « Requis » calculé",
       "highlights": [
@@ -16,7 +16,7 @@
         {
           "kind": "ux",
           "title": "« Requis » n'est plus modifiable à la main sur un audit BACS",
-          "what": "La colonne « Requis » des compteurs était modifiable, mais l'outil la recalculait à chaque modification des systèmes et effaçait le choix sans prévenir. Elle est maintenant grisée, avec une infobulle qui explique d'où vient la valeur : pour la changer, il faut corriger les systèmes et équipements saisis. Un compteur ajouté à la main reçoit aussitôt la bonne valeur. Sur un audit GTB classique, la colonne reste modifiable.",
+          "what": "La colonne « Requis » des compteurs était modifiable, mais l'outil la recalculait à chaque modification des systèmes et effaçait le choix sans prévenir. Elle est maintenant grisée, avec une infobulle qui explique d'où vient la valeur : pour la changer, il faut corriger les systèmes et équipements saisis. Un compteur ajouté à la main reçoit aussitôt la bonne valeur. Comme dans le rapport PDF, la colonne affiche « Commun » pour un compteur couvert par le compteur unique d'une zone regroupée, et « Non requis » pour un usage exempté. Sur un audit GTB classique, la colonne reste modifiable.",
           "where": "Audit BACS → étape Compteurs (bureau et mobile), fenêtre « Ajouter un compteur ».",
           "how_to_test": "Survoler une case « Requis » : l'infobulle s'affiche ; un clic ne change rien."
         },

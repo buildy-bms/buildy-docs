@@ -26,7 +26,7 @@ import {
 import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
-import { isMeterMissing, isMeterUnanswered, meterPlanNote, presentToggleValue } from '@/lib/meter-plan-state'
+import { isMeterMissing, isMeterUnanswered, meterPlanNote, presentToggleValue, requiredCellLabel } from '@/lib/meter-plan-state'
 
 const props = defineProps({
   energy: { type: Object, required: true }, // { value, label, icon, color }
@@ -49,6 +49,7 @@ const requiredLocked = computed(() => props.document?.kind === 'bacs_audit')
 const isMissing = (m) => isMeterMissing(m, meterPlanStatus.value)
 const isUnanswered = (m) => isMeterUnanswered(m, meterPlanStatus.value)
 const planNote = (m) => meterPlanNote(m, meterPlanStatus.value)
+const requiredLabel = (m) => requiredCellLabel(m, meterPlanStatus.value)
 
 // Mapping usage compteur → catégorie(s) de système. Source unique dans
 // `lib/audit-options.js` pour éviter la divergence entre composants.
@@ -414,7 +415,9 @@ onBeforeUnmount(teardownSortable)
                 <!-- Audit BACS : « Requis » est calculé (systèmes et
                      équipements saisis) et recalculé à chaque modification —
                      non éditable. Audit GTB classique : choix de l'auditeur. -->
-                <span v-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
+                <span v-if="requiredLocked && requiredLabel(row.meter)" v-tooltip="planNote(row.meter)?.tooltip"
+                      class="text-xs text-slate-500 italic">{{ requiredLabel(row.meter) }}</span>
+                <span v-else-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
                   <SegmentedToggle compact disabled neutral-no :model-value="!!row.meter.required" />
                 </span>
                 <SegmentedToggle v-else compact :model-value="!!row.meter.required"
