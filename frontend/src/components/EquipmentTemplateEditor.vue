@@ -30,6 +30,12 @@ import {
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
 import SearchableSelect from './SearchableSelect.vue'
+import Tooltip from './Tooltip.vue'
+import HelpTip from './HelpTip.vue'
+import {
+  iconChoiceLabel, colorLabel, CUSTOM_COLOR_LABEL, EQUIPMENT_SLUG_HELP, GRANULARITY_HELP,
+  bacsReferenceTip, suggestTitleTip, validateBlockedTip, saveTip,
+} from '@/lib/library-tips'
 import { ENERGY_OPTIONS, ROLE_OPTIONS, GRANULARITY_OPTIONS, bacsCategoryForLibraryCategory, regulationDefaultsForCategory } from '@/lib/audit-options'
 import RegulationTypesEditor from './RegulationTypesEditor.vue'
 import { getValidationStatus } from '@/lib/content-validation'
@@ -468,24 +474,30 @@ async function destroy() {
             <input v-model="form.name" type="text" required autocomplete="off" data-1p-ignore="true"
                    placeholder="Ex : Pompe à chaleur air/eau"
                    class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-            <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.name.trim()"
-                    v-tooltip="form.name.trim() ? 'Proposer un meilleur nom avec Claude' : 'Saisir d\'abord un nom'"
-                    class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
-              <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
-            </button>
+            <!-- Bulle portée par l'enveloppe (bouton grisé sans nom) ; le positionnement absolu
+                 passe sur l'enveloppe pour garder la mise en page. -->
+            <Tooltip class="absolute right-1.5 top-1/2 -translate-y-1/2"
+                     :text="suggestTitleTip({ busy: suggestingTitle, empty: !form.name.trim(), noun: 'nom' })">
+              <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.name.trim()"
+                      aria-label="Proposer un meilleur nom avec Claude"
+                      class="inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
+                <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
+              </button>
+            </Tooltip>
           </div>
           <div v-if="suggestedTitle"
                class="mt-1 flex items-center gap-2 px-2 py-1 bg-violet-50 border border-violet-200 rounded-md text-[11px]">
             <SparklesIcon class="w-3.5 h-3.5 text-violet-600 shrink-0" />
-            <span class="text-violet-900 truncate flex-1">
+            <span class="text-violet-900 truncate flex-1" v-tooltip.overflow>
               Claude propose : <span class="font-medium">« {{ suggestedTitle }} »</span>
             </span>
             <button type="button" @click="applySuggestedTitle"
-                    class="px-2 py-0.5 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded transition shrink-0">
+                    class="px-2 py-0.5 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded transition shrink-0"
+                    v-tooltip="'Remplacer le nom par celui de Claude'">
               Appliquer
             </button>
             <button type="button" @click="dismissSuggestedTitle"
-                    class="text-violet-400 hover:text-violet-700 shrink-0" v-tooltip="'Ignorer'">
+                    class="text-violet-400 hover:text-violet-700 shrink-0" v-tooltip="'Ignorer la proposition de Claude'">
               <XMarkIcon class="w-3.5 h-3.5" />
             </button>
           </div>
@@ -496,7 +508,7 @@ async function destroy() {
             <button type="button" @click="toggleCategory"
                     class="w-full flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
               <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: selectedCategory.icon, icon_color: selectedCategory.color }" size="sm" />
-              <span class="flex-1 text-left text-gray-800 truncate">{{ selectedCategory.label }}</span>
+              <span class="flex-1 text-left text-gray-800 truncate" v-tooltip.overflow>{{ selectedCategory.label }}</span>
               <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0 transition-transform" :class="categoryOpen ? 'rotate-180' : ''" />
             </button>
             <div v-if="categoryOpen"
@@ -513,7 +525,7 @@ async function destroy() {
                         :class="['w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition',
                                  form.category === c.value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50']">
                   <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: c.icon, icon_color: c.color }" size="sm" />
-                  <span class="truncate">{{ c.label }}</span>
+                  <span class="truncate" v-tooltip.overflow>{{ c.label }}</span>
                 </button>
                 <div v-if="!filteredCategories.length" class="px-3 py-3 text-xs text-gray-400 italic text-center">
                   Aucune catégorie
@@ -527,6 +539,7 @@ async function destroy() {
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
           Slug
+          <HelpTip size="xs" :tip="EQUIPMENT_SLUG_HELP" />
           <span v-if="!isEdit" class="text-gray-400 font-normal">— auto si vide</span>
           <span v-else class="text-gray-400 font-normal">— identifiant technique stable</span>
         </label>
@@ -630,7 +643,7 @@ async function destroy() {
                  devices créés depuis ce modèle. -->
             <div class="mt-3">
               <label class="block text-[11px] font-medium text-gray-600 mb-1">
-                Granularité par défaut R175-6 <span class="text-gray-400 font-normal">(optionnel)</span>
+                Granularité par défaut R175-6 <HelpTip size="xs" :tip="GRANULARITY_HELP" /> <span class="text-gray-400 font-normal">(optionnel)</span>
               </label>
               <SearchableSelect v-model="form.default_regulation_granularity"
                                 :options="GRANULARITY_OPTIONS"
@@ -667,7 +680,7 @@ async function destroy() {
         <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
           <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
                   :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
-                  v-tooltip="name">
+                  v-tooltip="iconChoiceLabel(name)">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
           </button>
           <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
@@ -679,8 +692,8 @@ async function destroy() {
           <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
           <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
                   :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
-                  :style="{ background: c }" v-tooltip="c"></button>
-          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" v-tooltip="'Couleur personnalisée'" />
+                  :style="{ background: c }" v-tooltip="colorLabel(c)"></button>
+          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" v-tooltip="CUSTOM_COLOR_LABEL" />
         </div>
       </div>
       </fieldset>
@@ -696,7 +709,7 @@ async function destroy() {
             <ScaleIcon class="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
             <div class="min-w-0">
               <p class="text-gray-700">
-                <span class="font-medium">{{ template.bacs_articles || '— (catégorie sans BACS)' }}</span>
+                <span class="font-medium" v-tooltip="bacsReferenceTip(template.bacs_articles)">{{ template.bacs_articles || '— (catégorie sans BACS)' }}</span>
               </p>
               <p v-if="template.bacs_inherited_from" class="text-[11px] text-gray-500 mt-0.5">
                 Hérité de la catégorie « {{ template.bacs_inherited_from.label }} » — édité dans Catégories de systèmes.
@@ -722,13 +735,14 @@ async function destroy() {
               placeholder="+ Ajouter un protocole…"
               class="w-44 px-2 py-1 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
             />
-            <button
-              type="button"
-              @click="addCustomProtocol"
-              :disabled="!customProtocol.trim()"
-              class="px-2 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed"
-              v-tooltip="'Ajouter ce protocole à la liste'"
-            >Ajouter</button>
+            <Tooltip :text="customProtocol.trim() ? 'Ajouter ce protocole à la liste' : 'Tape d’abord le nom du protocole'">
+              <button
+                type="button"
+                @click="addCustomProtocol"
+                :disabled="!customProtocol.trim()"
+                class="px-2 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              >Ajouter</button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -813,31 +827,38 @@ async function destroy() {
               class="mr-auto px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition inline-flex items-center gap-1.5">
         <TrashIcon class="w-4 h-4" /> Supprimer
       </button>
-      <button v-if="isEdit && currentStatus === 'validated'"
-              @click="toggleValidation" :disabled="!canValidate || validating || submitting"
-              class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
-        Repasser en brouillon
-      </button>
-      <button v-else-if="isEdit"
-              @click="toggleValidation" :disabled="!canValidate || validating || submitting"
-              v-tooltip="canValidate ? '' : 'Aucune description à valider'"
-              class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
-        <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider la description' }}
-      </button>
+      <!-- Boutons grisés : la bulle (portée par <Tooltip>) dit pourquoi, seulement quand ils le sont. -->
+      <Tooltip v-if="isEdit && currentStatus === 'validated'"
+               :text="validating || submitting ? 'Enregistrement en cours…' : null">
+        <button @click="toggleValidation" :disabled="!canValidate || validating || submitting"
+                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+          Repasser en brouillon
+        </button>
+      </Tooltip>
+      <Tooltip v-else-if="isEdit"
+               :text="validateBlockedTip({ canValidate, busy: validating || submitting, what: 'description' })">
+        <button @click="toggleValidation" :disabled="!canValidate || validating || submitting"
+                class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+          <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider la description' }}
+        </button>
+      </Tooltip>
       <button @click="emit('close')"
               class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
         Annuler
       </button>
-      <button v-if="isEdit"
-              @click="submitKeepOpen" :disabled="submitting || !form.name.trim()"
-              v-tooltip="'Enregistrer sans fermer'"
-              class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
-        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
-      </button>
-      <button @click="submit" :disabled="submitting || !form.name.trim()"
-              class="px-4 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
-        {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer et fermer' : 'Créer le modèle') }}
-      </button>
+      <Tooltip v-if="isEdit"
+               :text="saveTip({ busy: submitting, missing: form.name.trim() ? null : 'un nom', label: 'Enregistrer sans fermer' })">
+        <button @click="submitKeepOpen" :disabled="submitting || !form.name.trim()"
+                class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
+          {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </Tooltip>
+      <Tooltip :text="saveTip({ busy: submitting, missing: form.name.trim() ? null : 'un nom' })">
+        <button @click="submit" :disabled="submitting || !form.name.trim()"
+                class="px-4 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
+          {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer et fermer' : 'Créer le modèle') }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

@@ -23,7 +23,7 @@ watch(() => props.open, (open) => {
 })
 
 const placeholder = computed(() => {
-  return 'Notes terrain : marque, reference, etat, defaut constate, position GTB...'
+  return 'Notes terrain : marque, référence, état, défaut constaté, position GTB…'
 })
 
 function handleSave() {
@@ -46,7 +46,7 @@ function handleCancel() {
           <h3 class="text-base font-semibold text-gray-900">{{ title }}</h3>
           <p v-if="contextLabel" class="text-xs text-gray-500 mt-0.5">{{ contextLabel }}</p>
         </div>
-        <button @click="handleCancel" class="p-1 rounded hover:bg-gray-100 text-gray-500" v-tooltip="'Fermer'">
+        <button @click="handleCancel" class="p-1 rounded hover:bg-gray-100 text-gray-500" v-tooltip="'Fermer sans enregistrer'">
           <XMarkIcon class="w-5 h-5" />
         </button>
       </header>
@@ -59,7 +59,7 @@ function handleCancel() {
           :assist-context="assistContext"
         />
         <p class="mt-3 text-[11px] text-gray-500 italic">
-          Astuce : redige tes observations brutes puis clique sur ✨ <strong>Reformuler avec Claude</strong>
+          Astuce : rédige tes observations brutes puis clique sur ✨ <strong>Reformuler avec Claude</strong>
           pour les transformer en note professionnelle.
         </p>
       </div>

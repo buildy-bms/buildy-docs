@@ -11,6 +11,10 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { addYearsIso, todayIso as todayIsoLocal } from '@/lib/date-helpers'
+import {
+  inspectionStatusTip, nextInspectionLabel, NEXT_INSPECTION_TIP, REPORT_RETENTION_TIP,
+  PLUS_5_YEARS_TIP, PLUS_10_YEARS_TIP,
+} from '@/lib/audit-tips-site'
 
 // Section "Inspection périodique" (R175-5-1).
 // Refonte compacte : chaque inspection = ligne accordéon. Pré-calc auto
@@ -129,7 +133,7 @@ function statusFor(ins) {
   inSixMonths.setMonth(inSixMonths.getMonth() + 6)
   const sixIso = inSixMonths.toISOString().slice(0, 10)
   if (ins.next_inspection_due_date < sixIso) {
-    return { tone: 'amber', label: 'Échéance < 6 mois' }
+    return { tone: 'amber', label: 'Échéance sous 6 mois' }
   }
   return { tone: 'emerald', label: 'À jour' }
 }
@@ -139,7 +143,7 @@ function statusFor(ins) {
   <CollapsibleSection storage-key="inspections" section-id="section-inspections" :active="active">
     <template #header>
       <SectionHeader number="7" :title="'Inspection périodique de la GTB'"
-                     subtitle="R175-5-1 — rapport conservé 10 ans"
+                     subtitle="Inspection régulière de la GTB, rapport gardé 10 ans"
                      :icon="ClockIcon" icon-color="text-amber-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"
@@ -186,25 +190,28 @@ function statusFor(ins) {
                class="input-base text-sm py-1.5 w-full" />
       </div>
       <p v-if="!inspections.length && !notApplicable" class="text-xs text-gray-500 italic">
-        Trace ici les inspections périodiques de la GTB, réalisées à l'initiative de son propriétaire (R175-5-1). La FAQ ministérielle n° 30 (non opposable) indique qu'il « peut être pertinent » de la confier à un tiers indépendant des fabricants et installateurs ; le décret ne l'impose pas. L'audit Buildy ne remplace pas cette inspection.
+        Trace ici les inspections périodiques de la GTB, faites à l’initiative de son propriétaire. Le ministère suggère de les confier à un tiers indépendant des fabricants et des installateurs, sans l’imposer. L’audit Buildy ne remplace pas cette inspection.
       </p>
 
       <!-- Liste compacte des inspections : 1 ligne d'accroche + détails repliables -->
       <div v-for="ins in inspections" :key="ins.id" class="border border-gray-200 rounded-lg overflow-hidden">
         <button type="button" @click="toggleOpen(ins.id)"
+                v-tooltip="isOpen(ins.id) ? 'Replier cette inspection' : 'Déplier cette inspection'"
                 class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 transition">
           <ClockIcon class="w-4 h-4 text-amber-600 shrink-0" />
           <span class="text-sm font-medium text-gray-900">
             {{ fmtDate(ins.last_inspection_date) || 'Date à renseigner' }}
           </span>
-          <span class="text-xs text-gray-500 truncate">
+          <span class="text-xs text-gray-500 truncate" v-tooltip.overflow>
             {{ ins.last_inspection_inspector || '—' }}
           </span>
           <div class="ml-auto flex items-center gap-2 shrink-0">
-            <span v-if="ins.next_inspection_due_date" class="text-xs text-gray-500">
+            <span v-if="ins.next_inspection_due_date" class="text-xs text-gray-500"
+                  v-tooltip="nextInspectionLabel(ins.next_inspection_due_date)">
               → {{ fmtDate(ins.next_inspection_due_date) }}
             </span>
             <span v-if="statusFor(ins)"
+                  v-tooltip="inspectionStatusTip(statusFor(ins).tone, ins.next_inspection_due_date)"
                   :class="[
                     'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border',
                     statusFor(ins).tone === 'red' && 'bg-red-50 text-red-700 border-red-200',
@@ -225,6 +232,7 @@ function statusFor(ins) {
               <label class="text-[11px] text-gray-600 mb-1 flex items-center justify-between gap-2">
                 <span>Date de l'inspection</span>
                 <button type="button" @click="setToday(ins)"
+                        v-tooltip="{ label: 'Mettre la date du jour', icon: 'calendar' }"
                         class="text-[10px] text-indigo-600 hover:text-indigo-800 whitespace-nowrap">
                   Aujourd'hui
                 </button>
@@ -242,8 +250,9 @@ function statusFor(ins) {
             </div>
             <div>
               <label class="text-[11px] text-gray-600 mb-1 flex items-center justify-between gap-2">
-                <span>Prochaine échéance</span>
+                <span v-tooltip="NEXT_INSPECTION_TIP">Prochaine échéance</span>
                 <button type="button" @click="setPlusYears(ins, 'next_inspection_due_date', 5)"
+                        v-tooltip="PLUS_5_YEARS_TIP"
                         class="text-[10px] text-indigo-600 hover:text-indigo-800 whitespace-nowrap">
                   +5 ans
                 </button>
@@ -254,8 +263,9 @@ function statusFor(ins) {
             </div>
             <div>
               <label class="text-[11px] text-gray-600 mb-1 flex items-center justify-between gap-2">
-                <span>Conserver jusqu'au</span>
+                <span v-tooltip="REPORT_RETENTION_TIP">Rapport à garder jusqu’au</span>
                 <button type="button" @click="setPlusYears(ins, 'retained_until_date', 10)"
+                        v-tooltip="PLUS_10_YEARS_TIP"
                         class="text-[10px] text-indigo-600 hover:text-indigo-800 whitespace-nowrap">
                   +10 ans
                 </button>
@@ -271,14 +281,14 @@ function statusFor(ins) {
             <div>
               <label class="block text-[11px] text-gray-600 mb-1">Anomalies identifiées</label>
               <textarea :value="ins.last_inspection_anomalies_html || ''" rows="2"
-                        placeholder="ex : sonde extérieure défectueuse, défaut de programmation V3V…"
+                        placeholder="ex : sonde extérieure défectueuse, défaut de programmation d’une vanne 3 voies…"
                         @input="e => patchInspectionDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
                         class="input-base text-xs py-1.5 w-full resize-y"></textarea>
             </div>
             <div>
               <label class="block text-[11px] text-gray-600 mb-1">Recommandations à reprendre</label>
               <textarea :value="ins.last_inspection_recommendations_html || ''" rows="2"
-                        placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3V…"
+                        placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3 voies…"
                         @input="e => patchInspectionDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
                         class="input-base text-xs py-1.5 w-full resize-y"></textarea>
             </div>
@@ -296,6 +306,7 @@ function statusFor(ins) {
                      class="input-base text-xs py-1.5 w-full" />
             </div>
             <button type="button" @click="removeInspection(ins)"
+                    v-tooltip="'Supprimer cette inspection'"
                     class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition shrink-0">
               <TrashIcon class="w-3.5 h-3.5 shrink-0" />
               Supprimer

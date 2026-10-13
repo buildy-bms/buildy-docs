@@ -26,31 +26,20 @@ import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
+import { ZONE_NATURES } from '@/lib/audit-options'
+import { coverageTileTip, CHECKLIST_STATUS_TIPS } from '@/lib/audit-tips-site'
 const emit = defineEmits(['navigate'])
 
-// Labels FR des natures de zone (pour le sheet KPI). Reste minimaliste :
-// pour les natures absentes du mapping, on retombe sur la valeur brute.
-const ZONE_NATURE_LABEL = {
-  offices: 'Bureaux',
-  meeting_rooms: 'Salles de réunion',
-  open_space: 'Open space',
-  reception: 'Accueil',
-  retail: 'Commerce',
-  it_room: 'Local informatique',
-  technical_room: 'Local technique',
-  warehouse: 'Stockage',
-  logistic_cell: 'Cellule logistique',
-  parking_indoor: 'Parking intérieur',
-  parking_outdoor: 'Parking extérieur',
-  circulation: 'Circulation',
-  basement: 'Sous-sol',
-  rooftop: 'Toiture',
-}
+// Labels FR des natures de zone (pour le sheet KPI), repris de la liste
+// partagée (lib/audit-options). L'ancienne table locale avait des clés qui
+// ne correspondaient à aucune nature enregistrée (« offices », « open_space »…) :
+// la valeur brute (« office », « open-space »…) s'affichait.
+const ZONE_NATURE_LABEL = Object.fromEntries(ZONE_NATURES.map(n => [n.value, n.label]))
 const SYSTEM_CAT_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
   ventilation: 'Ventilation',
-  dhw: 'ECS',
+  dhw: 'Eau chaude sanitaire',
   lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur',
   electricity_production: 'Production photovoltaïque',
@@ -189,7 +178,7 @@ async function onFileSelected(e) {
         category: 'autre',
         bacs_audit_checklist_id: editing.value.id,
       })
-    } catch { error(`Upload « ${file.name} » impossible`) }
+    } catch { error(`Envoi de « ${file.name} » impossible`) }
   }
   await refreshFiles()
   await load()
@@ -242,7 +231,7 @@ async function quickToggleNotAvailable(it) {
         <p class="text-2xl font-medium text-gray-900 leading-none">
           {{ totalScore }}<span class="text-sm text-gray-500"> / {{ totalPossible }}</span>
         </p>
-        <p class="text-xs text-gray-500 mt-1">Documents & photos collectés ({{ completionPct }}%)</p>
+        <p class="text-xs text-gray-500 mt-1">Documents et photos collectés ({{ completionPct }} %)</p>
       </div>
     </div>
 
@@ -251,13 +240,14 @@ async function quickToggleNotAvailable(it) {
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
         <FontAwesomeIcon :icon="['fas', 'camera']" class="w-5 h-5 text-emerald-600" />
-        <h3 class="text-base font-medium text-gray-900">Couverture photo des entités</h3>
+        <h3 class="text-base font-medium text-gray-900">Photos par élément de l’audit</h3>
       </div>
       <div class="grid grid-cols-2 divide-x divide-y divide-gray-100">
         <button
           v-for="kind in ['site', 'zones', 'systems', 'meters', 'bms']" :key="kind"
           type="button"
           @click="openCoverage(kind)"
+          v-tooltip="coverageTileTip(kind, coverage[kind])"
           class="p-4 text-left tap-target active:bg-gray-50 transition"
         >
           <p class="text-xs uppercase tracking-wider text-gray-500">
@@ -329,13 +319,13 @@ async function quickToggleNotAvailable(it) {
 
         <!-- Site / GTB sans entité (cas vide impossible normalement) -->
         <p v-else-if="coverageDetail.total === 0" class="text-sm text-gray-500 text-center py-6">
-          Aucune entité de ce type dans l'audit.
+          Rien de ce type dans l’audit pour l’instant.
         </p>
 
         <!-- Toutes les entités sont couvertes : message + raccourci vers l'onglet -->
         <template v-else-if="coverageDetail.covered === coverageDetail.total">
           <p class="text-sm text-emerald-700 text-center py-3">
-            ✓ Toutes les entités ont au moins une photo.
+            ✓ Chaque élément a au moins une photo.
           </p>
           <button
             type="button"
@@ -372,13 +362,13 @@ async function quickToggleNotAvailable(it) {
                 <div class="flex-1 min-w-0">
                   <!-- Zones : nom + nature -->
                   <template v-if="coverageDetail.kind === 'zones'">
-                    <p class="text-base text-gray-900 font-medium truncate">{{ m.name }}</p>
-                    <p v-if="m.nature" class="text-xs text-gray-500 truncate">{{ ZONE_NATURE_LABEL[m.nature] || m.nature }}</p>
+                    <p v-tooltip.overflow class="text-base text-gray-900 font-medium truncate">{{ m.name }}</p>
+                    <p v-if="m.nature" v-tooltip.overflow class="text-xs text-gray-500 truncate">{{ ZONE_NATURE_LABEL[m.nature] || m.nature }}</p>
                   </template>
                   <!-- Systèmes : catégorie + zone -->
                   <template v-else-if="coverageDetail.kind === 'systems'">
-                    <p class="text-base text-gray-900 font-medium truncate">{{ SYSTEM_CAT_LABEL[m.category] || m.category }}</p>
-                    <p v-if="m.zone_name" class="text-xs text-gray-500 truncate">📍 {{ m.zone_name }}</p>
+                    <p v-tooltip.overflow class="text-base text-gray-900 font-medium truncate">{{ SYSTEM_CAT_LABEL[m.category] || m.category }}</p>
+                    <p v-if="m.zone_name" v-tooltip.overflow class="text-xs text-gray-500 truncate">📍 {{ m.zone_name }}</p>
                   </template>
                   <!-- Compteurs : pills usage + type, zone en sous-titre -->
                   <template v-else-if="coverageDetail.kind === 'meters'">
@@ -386,12 +376,12 @@ async function quickToggleNotAvailable(it) {
                       <MeterUsagePill :usage="m.usage" />
                       <MeterTypePill :type="m.meter_type" />
                     </div>
-                    <p class="text-xs text-gray-500 mt-0.5 truncate">
+                    <p v-tooltip.overflow class="text-xs text-gray-500 mt-0.5 truncate">
                       📍 {{ m.zone_name || 'Compteur général' }}
                     </p>
                   </template>
                   <!-- Fallback (jamais utilisé en pratique) -->
-                  <p v-else class="text-base text-gray-900 truncate">{{ m.name }}</p>
+                  <p v-else v-tooltip.overflow class="text-base text-gray-900 truncate">{{ m.name }}</p>
                 </div>
                 <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-500 shrink-0" />
               </button>
@@ -412,7 +402,7 @@ async function quickToggleNotAvailable(it) {
       </div>
       <div v-if="loading" class="px-4 py-6 text-sm text-gray-500 text-center">Chargement…</div>
       <div v-else-if="!items.length" class="px-4 py-6 text-sm text-gray-500 italic text-center">
-        Aucun item dans le catalogue.
+        Aucune pièce dans le catalogue.
       </div>
       <div v-else class="divide-y divide-gray-100">
         <div v-for="it in items" :key="it.catalog_key"
@@ -424,7 +414,7 @@ async function quickToggleNotAvailable(it) {
               <p :class="['text-base font-medium leading-tight', it.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-900']">
                 {{ it.label }}
               </p>
-              <p class="text-xs mt-0.5 flex items-center gap-1">
+              <p class="text-xs mt-0.5 flex items-center gap-1" v-tooltip="CHECKLIST_STATUS_TIPS[it.status] || null">
                 <FontAwesomeIcon :icon="['fas', 'check']" v-if="it.status === 'available'" class="w-3.5 h-3.5 text-emerald-600" />
                 <FontAwesomeIcon :icon="['fas', 'ban']" v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-500" />
                 <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" v-else class="w-3.5 h-3.5 text-amber-500" />
@@ -444,6 +434,7 @@ async function quickToggleNotAvailable(it) {
           <!-- Bouton Non dispo inline (ne ouvre pas le sheet) — gabarit
                tactile PWA 48px aligné sur .pwa-button. -->
           <button type="button" @click.stop="quickToggleNotAvailable(it)"
+                  v-tooltip="it.status === 'not_available' ? 'Rétablir en « À collecter »' : { label: 'Marquer ce document non disponible', icon: 'ban' }"
                   :class="['shrink-0 inline-flex items-center justify-center min-h-12 min-w-12 px-3 rounded-xl border transition',
                            it.status === 'not_available'
                              ? 'text-gray-700 bg-gray-100 border-gray-300 active:bg-gray-200'
@@ -464,13 +455,16 @@ async function quickToggleNotAvailable(it) {
       @save="persist({ close: true })"
     >
       <div v-if="editing" class="p-4 space-y-4">
+        <!-- Ce qu'est la pièce (même texte que la bulle du bureau) -->
+        <p v-if="editing.description" class="text-sm text-gray-600 leading-relaxed">{{ editing.description }}</p>
         <!-- Statut -->
         <div class="grid grid-cols-3 gap-2">
           <button v-for="opt in [
-            { v: 'pending',       label: 'À collecter',  icon: 'circle-exclamation' },
-            { v: 'available',     label: 'Collecté',     icon: 'check' },
-            { v: 'not_available', label: 'Non dispo.',   icon: 'ban' },
+            { v: 'pending',       label: 'À collecter',     icon: 'circle-exclamation' },
+            { v: 'available',     label: 'Collecté',        icon: 'check' },
+            { v: 'not_available', label: 'Non disponible',  icon: 'ban' },
           ]" :key="opt.v" type="button" @click="editingStatus = opt.v"
+            v-tooltip="CHECKLIST_STATUS_TIPS[opt.v]"
             :class="['flex flex-col items-center gap-1 px-2 py-3 text-xs font-medium rounded-xl border-2',
                      editingStatus === opt.v
                        ? 'border-indigo-500 bg-indigo-50 text-indigo-800'
@@ -511,8 +505,9 @@ async function quickToggleNotAvailable(it) {
                 class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm">
               <!-- PDF ouvert dans la visionneuse du téléphone (plus de téléchargement forcé). -->
               <a :href="(f.mime_type === 'application/pdf' || /\.pdf$/i.test(f.original_name || '')) ? getSiteDocumentViewUrl(f.id) : getSiteDocumentDownloadUrl(f.id)"
+                 v-tooltip.overflow
                  target="_blank" class="flex-1 truncate text-indigo-700">{{ f.title }}</a>
-              <button type="button" @click="removeFile(f)" class="text-gray-500 active:text-red-600 p-1.5">
+              <button type="button" @click="removeFile(f)" v-tooltip="'Supprimer ce fichier'" class="text-gray-500 active:text-red-600 p-1.5">
                 <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4" />
               </button>
             </li>

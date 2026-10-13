@@ -28,6 +28,8 @@ import {
 } from '@/api'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import RelatedSiteDocsPanel from '@/components/RelatedSiteDocsPanel.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { SERVICE_LEVEL_TIPS, BROCHURE_OVERRIDE_TIP } from '@/lib/misc-tips'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -214,11 +216,12 @@ function isInBrochure(libItem) {
   <div v-else-if="brochure" class="-mx-5 lg:-mx-6 -mt-4 lg:-mt-5 h-[calc(100vh-1rem)] flex flex-col">
     <!-- Header brochure -->
     <header class="bg-white border-b border-gray-200 px-5 lg:px-6 py-3 flex items-center gap-3">
-      <button @click="router.push('/')" class="p-1 -ml-1 text-gray-500 hover:text-gray-800">
+      <button @click="router.push('/')" class="p-1 -ml-1 text-gray-500 hover:text-gray-800"
+              v-tooltip="'Retour à mes documents'">
         <ArrowLeftIcon class="w-4 h-4" />
       </button>
       <div class="flex-1 min-w-0">
-        <h2 class="text-sm font-semibold text-gray-800 truncate flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-gray-800 truncate flex items-center gap-2" v-tooltip.overflow>
           <BookOpenIcon class="w-4 h-4 text-violet-600" />
           {{ brochure.client_name }}
           <span v-if="brochure.project_name" class="text-gray-500">— {{ brochure.project_name }}</span>
@@ -247,10 +250,11 @@ function isInBrochure(libItem) {
             <button v-for="opt in [
               { v: 'all', l: 'Tout' },
               { v: 'feature', l: 'Présentations' },
-              { v: 'offering_level', l: 'Niveaux' },
-              { v: 'company', l: 'Buildy' },
-              { v: 'cgv', l: 'CGV' },
+              { v: 'offering_level', l: 'Niveaux', tip: 'Niveaux d’offre' },
+              { v: 'company', l: 'Buildy', tip: 'Présentation de l’entreprise Buildy' },
+              { v: 'cgv', l: 'CGV', tip: 'Conditions générales de vente' },
             ]" :key="opt.v"
+                    v-tooltip="opt.tip || null"
                     @click="filterKind = opt.v"
                     :class="['text-[10px] px-2 py-0.5 rounded-md border',
                       filterKind === opt.v ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
@@ -265,6 +269,7 @@ function isInBrochure(libItem) {
                :class="['p-2.5 rounded-lg border transition cursor-pointer text-xs',
                  isInBrochure(lib) ? 'bg-emerald-50 border-emerald-200'
                                    : 'bg-white border-gray-200 hover:bg-gray-50']"
+               v-tooltip="isInBrochure(lib) ? 'Déjà dans la brochure' : 'Ajouter à la brochure'"
                @click="!isInBrochure(lib) && addLibItem(lib)">
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
@@ -272,12 +277,13 @@ function isInBrochure(libItem) {
                   <span :class="['inline-block px-1.5 py-0 text-[9px] rounded border', KIND_COLORS[lib.item_kind]]">
                     {{ KIND_LABELS[lib.item_kind] || lib.item_kind }}
                   </span>
-                  <span v-if="lib.service_level" class="text-[9px] font-mono text-violet-600">
+                  <span v-if="lib.service_level" class="text-[9px] font-mono text-violet-600"
+                        v-tooltip="SERVICE_LEVEL_TIPS[lib.service_level] || null">
                     [{{ lib.service_level }}]
                   </span>
                 </div>
-                <div class="font-medium text-gray-800 truncate">{{ lib.title }}</div>
-                <div v-if="lib.summary" class="text-[10px] text-gray-500 line-clamp-2">{{ lib.summary }}</div>
+                <div class="font-medium text-gray-800 truncate" v-tooltip.overflow>{{ lib.title }}</div>
+                <div v-if="lib.summary" class="text-[10px] text-gray-500 line-clamp-2" v-tooltip.overflow>{{ lib.summary }}</div>
               </div>
               <PlusIcon v-if="!isInBrochure(lib)" class="w-4 h-4 text-indigo-500 shrink-0" />
               <span v-else class="text-[10px] text-emerald-600 font-medium">✓</span>
@@ -332,7 +338,8 @@ function isInBrochure(libItem) {
                   <span :class="['inline-block px-1.5 py-0 text-[10px] rounded border', KIND_COLORS[item.item_kind]]">
                     {{ KIND_LABELS[item.item_kind] || item.item_kind }}
                   </span>
-                  <span v-if="item.override_title || item.override_html" class="text-[10px] text-violet-600 font-mono">
+                  <span v-if="item.override_title || item.override_html" class="text-[10px] text-violet-600 font-mono"
+                        v-tooltip="BROCHURE_OVERRIDE_TIP">
                     [override]
                   </span>
                 </div>
@@ -342,23 +349,29 @@ function isInBrochure(libItem) {
                 </button>
                 <div v-if="effectiveBody(item) && expandedItem !== item.id"
                      class="text-[11px] text-gray-500 mt-0.5 line-clamp-2"
+                     v-tooltip.overflow
                      v-html="effectiveBody(item).replace(/<[^>]+>/g, ' ')" />
               </div>
               <div class="flex flex-col gap-1 shrink-0">
-                <button @click="move(item, 'up')" :disabled="idx === 0"
-                        class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
-                  <ArrowUpIcon class="w-4 h-4" />
-                </button>
-                <button @click="move(item, 'down')" :disabled="idx === sortedItems.length - 1"
-                        class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
-                  <ArrowDownIcon class="w-4 h-4" />
-                </button>
+                <Tooltip :text="idx === 0 ? 'Déjà en tête de la brochure' : 'Monter cet élément'">
+                  <button @click="move(item, 'up')" :disabled="idx === 0"
+                          class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
+                    <ArrowUpIcon class="w-4 h-4" />
+                  </button>
+                </Tooltip>
+                <Tooltip :text="idx === sortedItems.length - 1 ? 'Déjà en fin de brochure' : 'Descendre cet élément'">
+                  <button @click="move(item, 'down')" :disabled="idx === sortedItems.length - 1"
+                          class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
+                    <ArrowDownIcon class="w-4 h-4" />
+                  </button>
+                </Tooltip>
                 <button @click="expandedItem = expandedItem === item.id ? null : item.id"
                         class="p-1 text-gray-400 hover:text-indigo-600"
-                        v-tooltip="'Modifier le titre / le contenu pour ce client'">
+                        v-tooltip="expandedItem === item.id ? 'Replier l’éditeur' : 'Modifier pour ce client'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
-                <button @click="removeItem(item)" class="p-1 text-gray-400 hover:text-red-600">
+                <button @click="removeItem(item)" class="p-1 text-gray-400 hover:text-red-600"
+                        v-tooltip="'Retirer cet élément de la brochure'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>

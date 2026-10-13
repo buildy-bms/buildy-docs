@@ -11,17 +11,21 @@
  * Format attendu en API : array de strings (vide → null à l'écriture).
  */
 
-function parseRoles(raw) {
-  if (raw == null) return [];
-  if (Array.isArray(raw)) return raw.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim());
+// Une valeur peut avoir été encodée en JSON plusieurs fois (« ["[\"production\"]"] », vu sur des
+// modèles de la bibliothèque re-sauvés : chaque sauvegarde ré-emballait la valeur). On déballe
+// chaque niveau : l'API renvoie des rôles propres et la sauvegarde suivante répare la donnée.
+function parseRoles(raw, depth = 0) {
+  if (raw == null || depth > 8) return [];
+  if (Array.isArray(raw)) {
+    const out = raw.flatMap(v => (typeof v === 'string' && v.trim().startsWith('[') ? parseRoles(v, depth + 1) : (typeof v === 'string' && v.trim() ? [v.trim()] : [])));
+    return [...new Set(out)];
+  }
   const s = String(raw).trim();
   if (!s) return [];
   if (s.startsWith('[')) {
     try {
       const parsed = JSON.parse(s);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim());
-      }
+      if (Array.isArray(parsed)) return parseRoles(parsed, depth + 1);
     } catch { /* legacy non-JSON */ }
   }
   return [s];

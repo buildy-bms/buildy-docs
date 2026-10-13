@@ -152,7 +152,8 @@ const TEMPLATES = [
   },
   {
     slug: 'groupe-eau-glacee',
-    name: 'Groupe d\'eau glacée (chiller)',
+    // « chiller » reste trouvable par la recherche (frontend lib/library-search.js).
+    name: 'Groupe d\'eau glacée',
     category: 'thermique_mixte',
     icon_value: 'fa-temperature-snow',
     icon_color: '#0891b2',

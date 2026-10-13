@@ -29,6 +29,12 @@
   --color-indigo-900: #0a0f1a;
   --color-indigo-950: #050810;
 
+  /* Navy Buildy sous son nom de jeton (infobulles, comme Buildy Tools) + très petit texte
+     (touches de raccourci, pied des cartes d'infobulle). */
+  --color-primary: #1b2842;
+  --text-2xs: 0.72rem;
+  --text-2xs--line-height: 1.4;
+
   /* Polices Buildy (décision 2026-09-16) : TEXTE en Poppins, CHIFFRES en Sora.
      « Sora Digits » ne couvre que 0-9 (unicode-range, cf. @font-face plus bas) et
      passe en tête : les nombres sortent en Sora, le reste en Poppins.
@@ -157,6 +163,17 @@
   }
 }
 strong, b { font-weight: 500; }
+
+/**
+ * Infobulles (v-tooltip, lib/tooltip.js) : un bouton grisé ne reçoit pas le survol dans tous
+ * les navigateurs. Sa bulle (la raison du grisé) est portée par l'enveloppe <Tooltip>
+ * (data-tip-wrap) : le bouton grisé laisse passer le pointeur jusqu'à elle.
+ */
+[data-tip-wrap] > :disabled { pointer-events: none; }
+[data-tip-wrap]:has(> :disabled) { cursor: not-allowed; }
+/* Contrôle grisé sans bulle propre, à l'intérieur d'un élément qui en a une (ex. sélecteur de
+   protocoles grisé dans une cellule « Réponds d'abord… ») : le survol passe à l'élément. */
+[data-tooltip] :disabled:not([data-tooltip]) { pointer-events: none; }
 
 /**
  * Composants reutilisables (Buildy design system).

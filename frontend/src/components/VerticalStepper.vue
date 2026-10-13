@@ -25,7 +25,9 @@ const emit = defineEmits(['select'])
 <template>
   <ol class="space-y-3">
     <li v-for="(s, i) in steps" :key="i" class="relative flex items-start gap-3">
+      <!-- Pastille d'état : ✓ = partie renseignée, numéro gris = encore à renseigner. -->
       <span
+        v-tooltip="s.done ? 'Partie renseignée' : 'Partie encore à renseigner'"
         :class="[
           'shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold border-2 transition relative z-10',
           s.done

@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+// Registre des icônes de la base (catégories, modèles, check-list) : affichées tout de suite,
+// sans attendre la bibliothèque complète chargée en arrière-plan (Safari, 4G).
+import '@/lib/equipment-icons'
 
 // Note : depuis le chargement complet de la lib FA Pro Solid au démarrage
 // (cf. main.js — import('@fortawesome/pro-solid-svg-icons') + library.add),

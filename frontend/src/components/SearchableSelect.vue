@@ -18,6 +18,8 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { plural } from '@/lib/tooltip-content'
+import { abbreviationTip } from '@/lib/acronym-tips'
 // Registre cure (~40 icones) pour eviter d'embarquer les ~3000 FA Pro
 // Solid dans le bundle principal. Les options qui referencent une icone
 // hors registre tombent sur 'cube' (cf. equipment-icons.js).
@@ -324,7 +326,7 @@ function clear() {
             :class="triggerCls">
       <!-- Mode multi : chips. Click sur ✕ retire la valeur sans ouvrir le popover. -->
       <template v-if="multiple">
-        <span v-if="!selectedOptions.length"
+        <span v-if="!selectedOptions.length" v-tooltip.overflow
               class="flex-1 text-left truncate text-gray-400 italic">{{ placeholder }}</span>
         <!-- min-w-0 : dans une case étroite, les chips se tronquent (…) au
              lieu de déborder sur la case voisine. -->
@@ -333,9 +335,10 @@ function clear() {
                on affiche les N premières chips suivies d'un badge compact
                « + M équipements » au lieu de toutes les chips wrap qui
                cassaient la ligne (multiselect 1ʳᵉ ligne dans card 06). -->
+          <!-- Nom complet de la puce seulement si elle est coupée (…). -->
           <span v-for="o in visibleChips" :key="o.value"
                 class="inline-flex min-w-0 items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]"
-                v-tooltip="o.chipLabel || o.label">
+                v-tooltip.overflow>
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
                              :style="{ color: o.color || '#6b7280' }"
                              class="w-3 h-3 shrink-0" />
@@ -350,13 +353,13 @@ function clear() {
             <span class="truncate max-w-60">{{ o.chipLabel || o.label }}</span>
             <button v-if="!disabled" type="button" @click.stop="removeChip(o.value)"
                     class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-500 transition"
-                    v-tooltip="'Retirer'">
+                    v-tooltip="'Retirer ce choix'">
               <XMarkIcon class="w-2.5 h-2.5" />
             </button>
           </span>
           <span v-if="hiddenChipsCount > 0"
                 class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 text-[11px] whitespace-nowrap shrink-0"
-                v-tooltip="hiddenChipsLabels">
+                v-tooltip="{ title: plural(hiddenChipsCount, `autre ${chipLabel}`, `autres ${chipLabelPlural}`), tone: 'neutral', icon: 'ellipsis', text: hiddenChipsLabels }">
             + {{ hiddenChipsCount }}
           </span>
         </span>
@@ -372,7 +375,7 @@ function clear() {
         <span v-else-if="selectedOption?.color"
               class="w-2.5 h-2.5 rounded-full shrink-0"
               :style="{ backgroundColor: selectedOption.color }"></span>
-        <span class="flex-1 text-left truncate"
+        <span class="flex-1 text-left truncate" v-tooltip.overflow
               :class="(selectedOption || customLabel) ? 'text-gray-900' : 'text-gray-400 italic'">
           {{ selectedOption?.chipLabel || selectedOption?.label || customLabel || placeholder }}
         </span>
@@ -380,7 +383,7 @@ function clear() {
       <button v-if="clearable && (multiple ? selectedOptions.length : (selectedOption || customLabel)) && !disabled" type="button"
               @click.stop="clear"
               class="text-gray-400 hover:text-gray-600 -my-1 p-0.5 rounded"
-              v-tooltip="'Effacer la sélection'">
+              v-tooltip="multiple ? 'Effacer tous les choix' : 'Effacer ce choix'">
         <XMarkIcon class="w-3.5 h-3.5" />
       </button>
       <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
@@ -406,7 +409,8 @@ function clear() {
             <div v-if="groupByHint && o.hint && (i === 0 || filteredOptions[i - 1].hint !== o.hint)"
                  :class="['mx-1 mb-1 px-2.5 py-1 rounded bg-slate-100 border-l-2 text-[11px] font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5',
                           i === 0 ? 'mt-0' : 'mt-2']"
-                 :style="{ borderLeftColor: o.groupColor || '#94a3b8' }">
+                 :style="{ borderLeftColor: o.groupColor || '#94a3b8' }"
+                 v-tooltip="abbreviationTip(o.hint)">
               <!-- Icône de groupe optionnelle (ex: catégorie de système) —
                    portée par les options via groupIcon / groupColor. -->
               <FontAwesomeIcon v-if="o.groupIcon"
@@ -438,7 +442,7 @@ function clear() {
             <span class="flex-1 whitespace-normal wrap-break-word leading-tight">{{ o.label }}</span>
             <!-- En mode groupByHint, le hint est porté par le sous-titre ; on
                  évite de le doubler sur chaque ligne. -->
-            <span v-if="o.hint && !groupByHint" class="text-[11px] text-gray-400 truncate shrink-0">{{ o.hint }}</span>
+            <span v-if="o.hint && !groupByHint" v-tooltip.overflow class="text-[11px] text-gray-400 truncate shrink-0">{{ o.hint }}</span>
             <CheckIcon v-if="isSelected(o.value)" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           </button>
           </template>
@@ -447,7 +451,7 @@ function clear() {
           </div>
           <button v-if="canCreate" type="button" @click="createCustom"
                   class="w-full flex items-center gap-2.5 px-3 py-1.5 sm:py-1.5 text-sm text-left transition border-t border-gray-100 text-indigo-700 hover:bg-indigo-50 min-h-11 sm:min-h-0">
-            <span class="flex-1 truncate">+ Ajouter «&nbsp;<strong>{{ search.trim() }}</strong>&nbsp;»</span>
+            <span class="flex-1 truncate" v-tooltip.overflow>+ Ajouter «&nbsp;<strong>{{ search.trim() }}</strong>&nbsp;»</span>
           </button>
         </div>
       </div>

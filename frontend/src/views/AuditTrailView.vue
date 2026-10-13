@@ -8,6 +8,8 @@ import {
   ClockIcon, MagnifyingGlassIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 import { listAuditLog, listAuditActions } from '@/api'
+import Tooltip from '@/components/Tooltip.vue'
+import { auditTypeTip, AUDIT_DOCUMENT_COLUMN_TIP } from '@/lib/faq-tips'
 
 const rows = ref([])
 const total = ref(0)
@@ -129,11 +131,12 @@ function toggle(id) {
                autocomplete="off"
                class="w-full pl-9 pr-9 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         <button v-if="search" @click="search = ''"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
-      <select v-model="filterAction"
+      <select v-model="filterAction" aria-label="Filtrer par action"
               class="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
         <option value="">Toutes les actions</option>
         <option v-for="a in actions" :key="a" :value="a">{{ a }}</option>
@@ -148,7 +151,7 @@ function toggle(id) {
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Type</th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Action</th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Utilisateur</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">AF concernée</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="AUDIT_DOCUMENT_COLUMN_TIP">AF concernée</th>
             <th class="text-left px-4 py-2.5">Détails</th>
           </tr>
         </thead>
@@ -162,7 +165,8 @@ function toggle(id) {
                   @click="toggle(r.id)">
                 <td class="px-4 py-2 text-xs text-gray-600 font-mono whitespace-nowrap">{{ formatDate(r.created_at) }}</td>
                 <td class="px-4 py-2 whitespace-nowrap">
-                  <span :class="['inline-flex items-center px-2 py-0.5 text-[11px] rounded-full border', actionBadge(r.action).color]">
+                  <span :class="['inline-flex items-center px-2 py-0.5 text-[11px] rounded-full border', actionBadge(r.action).color]"
+                        v-tooltip="auditTypeTip(r.action)">
                     {{ actionBadge(r.action).label }}
                   </span>
                 </td>
@@ -179,7 +183,8 @@ function toggle(id) {
                   </span>
                   <span v-else class="text-gray-300 italic">—</span>
                 </td>
-                <td class="px-4 py-2 text-xs text-gray-500 max-w-md truncate">
+                <td class="px-4 py-2 text-xs text-gray-500 max-w-md truncate"
+                    v-tooltip.overflow="expanded.has(r.id) ? 'Replier la ligne' : 'Déplier la ligne pour tout lire'">
                   <span v-if="r.payload">{{ r.payload }}</span>
                   <span v-else class="text-gray-300 italic">—</span>
                 </td>
@@ -203,14 +208,18 @@ function toggle(id) {
     <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 text-xs text-gray-600">
       <span>Page {{ page + 1 }} / {{ totalPages }}</span>
       <div class="flex items-center gap-2">
-        <button @click="prevPage" :disabled="page === 0"
-                class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition">
-          <ChevronLeftIcon class="w-4 h-4" /> Précédent
-        </button>
-        <button @click="nextPage" :disabled="page >= totalPages - 1"
-                class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition">
-          Suivant <ChevronRightIcon class="w-4 h-4" />
-        </button>
+        <Tooltip :text="page === 0 ? 'Tu es déjà sur la première page' : null">
+          <button @click="prevPage" :disabled="page === 0"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition">
+            <ChevronLeftIcon class="w-4 h-4" /> Précédent
+          </button>
+        </Tooltip>
+        <Tooltip :text="page >= totalPages - 1 ? 'Tu es déjà sur la dernière page' : null">
+          <button @click="nextPage" :disabled="page >= totalPages - 1"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 transition">
+            Suivant <ChevronRightIcon class="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   </div>

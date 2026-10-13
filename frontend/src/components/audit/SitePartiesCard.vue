@@ -13,7 +13,9 @@ import { useNotification } from '@/composables/useNotification'
 import { useViewport } from '@/composables/useViewport'
 import { createSiteParty, updateSiteParty, deleteSiteParty } from '@/api'
 import { OWNERSHIP_STRUCTURES, PARTY_KINDS } from '@/lib/audit-options'
+import { OWNERSHIP_HELP_TIP, PARTY_SUGGESTION_TIP } from '@/lib/audit-tips-site'
 import PartyZonesPicker from '@/components/audit/PartyZonesPicker.vue'
+import HelpTip from '@/components/HelpTip.vue'
 
 // `flush` : rendu en sous-section (sans chrome de card) quand la carte est
 // imbriquée dans une autre section — évite l'effet « card dans une card ».
@@ -105,14 +107,15 @@ const structure = computed({
     <div :class="['flex items-center gap-2',
                   flush ? 'pb-2.5' : 'px-4 py-3 border-b border-gray-100']">
       <FontAwesomeIcon :icon="['fas', 'scale-balanced']" class="w-5 h-5 text-indigo-600 shrink-0" />
-      <h3 class="text-base font-medium text-gray-900">Structure juridique &amp; parties prenantes</h3>
+      <h3 class="text-base font-medium text-gray-900">Structure juridique et parties prenantes</h3>
     </div>
     <div :class="flush ? 'space-y-3' : 'p-4 space-y-3'">
       <!-- Structure juridique + bouton Notes des particularités à droite -->
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-0.5">
-          Structure de propriété / occupation
-          <span class="font-normal text-gray-400">— détermine l'assujetti au décret, calculé par système</span>
+          Structure de propriété ou d’occupation
+          <span class="font-normal text-gray-400">— indique qui doit appliquer le décret, système par système</span>
+          <HelpTip size="xs" class="ml-0.5" :tip="OWNERSHIP_HELP_TIP" />
         </label>
         <div class="flex items-center gap-2">
           <select v-model="structure" :class="fieldCls" class="flex-1 min-w-0">
@@ -134,7 +137,7 @@ const structure = computed({
               hasNotes(site?.ownership_notes)
                 ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                 : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50']"
-            v-tooltip="hasNotes(site?.ownership_notes) ? 'Modifier les particularités de la structure' : 'Ajouter des particularités de la structure'"
+            v-tooltip="hasNotes(site?.ownership_notes) ? 'Modifier les particularités juridiques' : 'Ajouter des particularités juridiques'"
           >
             <PencilSquareIcon class="w-4 h-4 shrink-0" />
             {{ hasNotes(site?.ownership_notes) ? 'Notes' : '+ Notes' }}
@@ -157,11 +160,12 @@ const structure = computed({
         <!-- Suggestion par défaut -->
         <div v-if="suggestion && !parties.length && !adding"
              class="mb-1.5 flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-          <span class="text-xs text-amber-800">
+          <span class="text-xs text-amber-800" v-tooltip="PARTY_SUGGESTION_TIP">
             Suggestion : <strong>{{ suggestion.name }}</strong> ({{ partyKindLabel(suggestion.kind) }})
           </span>
           <button @click="addParty(suggestion)"
-                  class="text-xs font-medium text-amber-800 underline whitespace-nowrap shrink-0">
+                  class="text-xs font-medium text-amber-800 underline whitespace-nowrap shrink-0"
+                  v-tooltip="'Ajouter la partie prenante suggérée'">
             Créer
           </button>
         </div>

@@ -11,7 +11,11 @@ import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import MeterEnergyGroup from '@/components/audit/MeterEnergyGroup.vue'
-import { METER_TYPES as ENERGY_METAS, REQUIRED_LOCKED_TIP, thermalMeterName } from '@/lib/meter-options'
+import { METER_TYPES as ENERGY_METAS, thermalMeterName } from '@/lib/meter-options'
+import {
+  METER_MISSING_TIP, REQUIRED_LOCKED_CARD, METER_TOGGLE_TIPS, energyTabTip, thermalMeterTip,
+  metersMissingTip, metersUnansweredTip, metersPresentTip, metersCommunicatingTip,
+} from '@/lib/audit-tips'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -92,9 +96,7 @@ const energyTabs = computed(() => energySections.value.map(({ energy, meters: li
     iconColor: energy.color,
     badge: missing || null,
     badgeTone: 'red',
-    tooltip: list.length
-      ? `${list.length} compteur${list.length > 1 ? 's' : ''} · ${present} présent${present > 1 ? 's' : ''}${missing ? ` · ${missing} requis manquant${missing > 1 ? 's' : ''}` : ''}${unanswered ? ` · ${unanswered} présence${unanswered > 1 ? 's' : ''} à vérifier` : ''}`
-      : `Aucun compteur ${energy.label.toLowerCase()} — ouvrir pour en ajouter un`,
+    tooltip: energyTabTip({ value: energy.value, label: energy.label, total: list.length, present, missing, unanswered }),
   }
 }))
 
@@ -230,7 +232,7 @@ function hasNotes(html) {
   <CollapsibleSection storage-key="meters" section-id="section-meters" :active="active">
     <template #header>
       <SectionHeader number="5" :title="'Compteurs et mesurage'"
-                     :subtitle="audit.isBacs ? 'R175-3 1° — suivi continu, pas horaire, conservation 5 ans' : 'Compteurs présents et raccordés'"
+                     :subtitle="audit.isBacs ? 'Mesurer les consommations par zone et par usage, heure par heure' : 'Compteurs présents et raccordés'"
                      :icon="BoltIcon" icon-color="text-emerald-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"
@@ -256,22 +258,25 @@ function hasNotes(html) {
           <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ globalStats.total }}</span>
           compteur{{ globalStats.total > 1 ? 's' : '' }}
         </span>
-        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
+        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-700"
+              v-tooltip="metersPresentTip(globalStats.present)">
           <span class="text-sm font-semibold tabular-nums">{{ globalStats.present }}</span>
           présent{{ globalStats.present > 1 ? 's' : '' }}
         </span>
-        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-xs text-indigo-700">
+        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-xs text-indigo-700"
+              v-tooltip="metersCommunicatingTip(globalStats.communicating)">
           <span class="text-sm font-semibold tabular-nums">{{ globalStats.communicating }}</span>
           communicant{{ globalStats.communicating > 1 ? 's' : '' }}
         </span>
         <span :class="['inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border text-xs',
-                       globalStats.missing > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-500']">
+                       globalStats.missing > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-500']"
+              v-tooltip="globalStats.missing > 0 ? metersMissingTip(globalStats.missing) : 'Aucun compteur requis ne manque'">
           <span class="text-sm font-semibold tabular-nums">{{ globalStats.missing }}</span>
           requis manquant{{ globalStats.missing > 1 ? 's' : '' }}
         </span>
         <span v-if="globalStats.unanswered > 0"
               class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800"
-              v-tooltip="'Compteurs requis dont la présence n\'a pas été vérifiée : le rapport les indique « à qualifier »'">
+              v-tooltip="metersUnansweredTip(globalStats.unanswered)">
           <span class="text-sm font-semibold tabular-nums">{{ globalStats.unanswered }}</span>
           présence{{ globalStats.unanswered > 1 ? 's' : '' }} à vérifier
         </span>
@@ -318,8 +323,8 @@ function hasNotes(html) {
       <!-- Empty state (aucune zone créée encore) -->
       <div v-if="!meters.length && !zones.length"
            class="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center text-xs text-gray-500">
-        Crée d'abord des zones — le plan de comptage apparaîtra ensuite. Renseigne les
-        compteurs requis (R175-3 1°) à mesure de la visite.
+        Crée d'abord des zones : le plan de comptage apparaîtra ensuite. Renseigne les
+        compteurs attendus au fil de la visite.
       </div>
     </div>
 
@@ -334,23 +339,24 @@ function hasNotes(html) {
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span v-if="isMissing(m)"
-                    class="text-red-600" v-tooltip="'Compteur requis non présent'">⚠</span>
-              <span v-truncate-tooltip class="font-medium text-sm text-gray-800 truncate">
+                    class="text-red-600" v-tooltip="METER_MISSING_TIP">⚠</span>
+              <span v-tooltip.overflow class="font-medium text-sm text-gray-800 truncate">
                 {{ m.zone_name || 'Compteur général' }}
               </span>
             </div>
             <div class="flex items-center gap-1.5 mt-1">
-              <span v-if="m.zone_id && thermalMeterName(m)" class="text-xs font-medium text-gray-700">{{ thermalMeterName(m) }}</span>
+              <span v-if="m.zone_id && thermalMeterName(m)" class="text-xs font-medium text-gray-700"
+                    v-tooltip="thermalMeterTip(thermalMeterName(m), m.usage)">{{ thermalMeterName(m) }}</span>
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
             </div>
             <p v-if="m.purpose" class="mt-1 text-[11px] text-slate-600">{{ m.purpose }}</p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
-            <button @click="dupMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg" aria-label="Dupliquer">
+            <button @click="dupMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg" v-tooltip="'Dupliquer ce compteur'">
               <DocumentDuplicateIcon class="w-5 h-5" />
             </button>
-            <button @click="removeMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-red-600 rounded-lg" aria-label="Supprimer">
+            <button @click="removeMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-red-600 rounded-lg" v-tooltip="'Supprimer ce compteur'">
               <TrashIcon class="w-5 h-5" />
             </button>
           </div>
@@ -362,10 +368,9 @@ function hasNotes(html) {
             <span v-if="requiredLocked && requiredCellLabel(m, meterPlanStatus)"
                   v-tooltip="meterPlanNote(m, meterPlanStatus)?.tooltip"
                   class="text-slate-500 italic">{{ requiredCellLabel(m, meterPlanStatus) }}</span>
-            <span v-else-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
-              <SegmentedToggle compact disabled neutral-no :model-value="!!m.required" />
-            </span>
-            <SegmentedToggle v-else compact :model-value="!!m.required"
+            <SegmentedToggle v-else-if="requiredLocked" compact disabled neutral-no :model-value="!!m.required"
+                             :tooltip="REQUIRED_LOCKED_CARD" />
+            <SegmentedToggle v-else compact :model-value="!!m.required" :tooltip="METER_TOGGLE_TIPS.required"
                              @update:model-value="v => patchMeter(m, { required: v })" />
           </label>
           <label class="flex items-center justify-between gap-2">

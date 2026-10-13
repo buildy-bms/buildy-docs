@@ -1,6 +1,9 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { CheckCircleIcon, CloudArrowUpIcon, ExclamationTriangleIcon, ClockIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { autosaveErrorTip, AUTOSAVE_RETRY_TIP, savedAtTip } from '@/lib/editor-tips'
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 
 const props = defineProps({
   state: { type: String, default: 'idle' }, // 'idle' | 'pending' | 'saving' | 'saved' | 'error'
@@ -33,13 +36,17 @@ const absoluteSaved = computed(() => {
   if (!props.lastSaved) return null
   return props.lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 })
+
+// Bulle de l'échec : carte « Échec de l'enregistrement » (détail lisible au lieu du message
+// réseau brut, souvent en anglais) + conseil. Évaluée au survol.
+const errorTip = () => autosaveErrorTip({ error: props.error, attempt: props.attempt, lastSaved: absoluteSaved.value, isMac })
 </script>
 
 <template>
   <div class="inline-flex items-center gap-1.5 text-xs">
     <template v-if="state === 'saving'">
       <CloudArrowUpIcon class="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-      <span class="text-indigo-600">
+      <span class="text-indigo-600" v-tooltip="attempt > 0 ? AUTOSAVE_RETRY_TIP : null">
         {{ attempt > 0 ? `Nouvelle tentative (${attempt})…` : 'Enregistrement…' }}
       </span>
     </template>
@@ -49,7 +56,7 @@ const absoluteSaved = computed(() => {
     </template>
     <template v-else-if="state === 'error'">
       <ExclamationTriangleIcon class="w-3.5 h-3.5 text-red-500" />
-      <span class="text-red-600 font-medium" v-tooltip="error?.message">
+      <span class="text-red-600 font-medium" v-tooltip="errorTip">
         Sauvegarde impossible
         <span v-if="absoluteSaved" class="font-normal">— dernière validée {{ absoluteSaved }}</span>
       </span>
@@ -57,7 +64,7 @@ const absoluteSaved = computed(() => {
     </template>
     <template v-else-if="lastSaved">
       <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-500" />
-      <span class="text-gray-500" v-tooltip="absoluteSaved ? `Validée à ${absoluteSaved}` : ''">
+      <span class="text-gray-500" v-tooltip="savedAtTip(absoluteSaved)">
         Enregistré {{ relativeSaved }}
       </span>
     </template>

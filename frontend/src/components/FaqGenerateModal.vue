@@ -23,6 +23,11 @@ import {
 import BaseModal from './BaseModal.vue'
 import SafeHtml from './SafeHtml.vue'
 import AnnotationEditor from './faq-annotations/AnnotationEditor.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  GENERATE_CORPUS_TIP, GENERATE_QUESTION_MISSING_LABEL, ANNOTATED_CAPTURE_TIP, INCLUDE_CAPTURES_TIP,
+  VISION_COST_TIP, generationUsageTip, CREATE_DRAFT_TIP, BACK_TO_INPUTS_LABEL,
+} from '@/lib/faq-tips'
 import { useFaqStore } from '@/stores/faq'
 import { faqAiCorpusStats } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -225,7 +230,7 @@ onMounted(() => {
       </p>
       <div v-if="corpusStats"
            class="flex flex-wrap items-center gap-2 mb-4 px-3 py-2 rounded-lg border border-violet-100 bg-violet-50/60 text-xs text-violet-900"
-           v-tooltip="corpusStats.details">
+           v-tooltip="GENERATE_CORPUS_TIP">
         <SparklesIcon class="w-3.5 h-3.5 shrink-0 text-violet-500" />
         <span class="font-medium">Corpus complet :</span>
         <span>{{ corpusStats.sections }} sections</span>
@@ -288,15 +293,16 @@ onMounted(() => {
         <div v-else class="grid grid-cols-3 md:grid-cols-4 gap-3">
           <div v-for="img in images" :key="img.id" class="relative group bg-white rounded-lg border border-gray-200 overflow-hidden">
             <img :src="img.preview" class="w-full h-24 object-cover" />
-            <span v-if="img.annotated" class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-xs font-medium">Annotée</span>
+            <span v-if="img.annotated" class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-xs font-medium"
+                  v-tooltip="ANNOTATED_CAPTURE_TIP">Annotée</span>
             <button type="button" @click="removeImage(img.id)"
                     class="absolute top-1 right-1 p-1 bg-white/90 hover:bg-red-50 text-red-500 rounded transition opacity-0 group-hover:opacity-100"
-                    v-tooltip="'Retirer'">
+                    v-tooltip="'Retirer cette capture'">
               <XMarkIcon class="w-3.5 h-3.5" />
             </button>
             <button type="button" @click="openAnnotation(img)"
                     class="absolute bottom-1 left-1 p-1 bg-white/90 hover:bg-indigo-50 text-indigo-600 rounded transition opacity-0 group-hover:opacity-100"
-                    v-tooltip="'Annoter'">
+                    v-tooltip="'Annoter cette capture'">
               <PencilSquareIcon class="w-3.5 h-3.5" />
             </button>
             <textarea v-model="img.annotation" rows="1" placeholder="Élément à mettre en évidence (optionnel)"
@@ -311,11 +317,11 @@ onMounted(() => {
         <input ref="fileInputRef" type="file" accept="image/*" multiple class="hidden" @change="onPickerChange" />
       </div>
       <div v-if="images.length" class="flex items-center justify-between text-xs text-gray-500 mb-4">
-        <label class="inline-flex items-center gap-2">
+        <label class="inline-flex items-center gap-2" v-tooltip="INCLUDE_CAPTURES_TIP">
           <input type="checkbox" :checked="includeInContent" @change="toggleInclude" class="rounded" />
           Inclure ces captures dans l'article publié sur Crisp
         </label>
-        <span>~{{ visionCost.tokens }} tokens (≈ {{ visionCost.eur }} €)</span>
+        <span v-tooltip="VISION_COST_TIP">~{{ visionCost.tokens }} tokens (≈ {{ visionCost.eur }} €)</span>
       </div>
 
       <!-- Boutons -->
@@ -324,11 +330,13 @@ onMounted(() => {
                 class="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 transition whitespace-nowrap">
           Annuler
         </button>
-        <button type="button" @click="generate" :disabled="generating || !question.trim()"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition whitespace-nowrap disabled:opacity-50 shadow-sm">
-          <SparklesIcon class="w-4 h-4 shrink-0" :class="generating ? 'animate-pulse' : ''" />
-          {{ generating ? 'Génération…' : 'Générer l\'article' }}
-        </button>
+        <Tooltip :text="!generating && !question.trim() ? GENERATE_QUESTION_MISSING_LABEL : null">
+          <button type="button" @click="generate" :disabled="generating || !question.trim()"
+                  class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition whitespace-nowrap disabled:opacity-50 shadow-sm">
+            <SparklesIcon class="w-4 h-4 shrink-0" :class="generating ? 'animate-pulse' : ''" />
+            {{ generating ? 'Génération…' : 'Générer l\'article' }}
+          </button>
+        </Tooltip>
       </div>
     </div>
 
@@ -337,7 +345,7 @@ onMounted(() => {
       <div class="flex items-start justify-between mb-4">
         <div>
           <h3 class="text-base font-semibold text-gray-800">{{ result.suggested_title || 'Article généré' }}</h3>
-          <p class="text-xs text-gray-500 mt-0.5">
+          <p class="text-xs text-gray-500 mt-0.5" v-tooltip="generationUsageTip(result.usage)">
             {{ result.usage?.input_tokens || 0 }} tokens in · {{ result.usage?.output_tokens || 0 }} tokens out
             <span v-if="result.meta?.images_count"> · {{ result.meta.images_count }} capture(s)</span>
           </p>
@@ -359,7 +367,8 @@ onMounted(() => {
       </div>
       <div class="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-100">
         <button type="button" @click="backToInputs"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700">
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700"
+                v-tooltip="BACK_TO_INPUTS_LABEL">
           <ArrowUturnLeftIcon class="w-4 h-4 shrink-0" /> Modifier les inputs
         </button>
         <div class="flex items-center gap-2">
@@ -369,11 +378,13 @@ onMounted(() => {
             {{ generating ? 'Régénération…' : 'Régénérer' }}
           </button>
           <button v-if="mode === 'insert'" type="button" @click="insertHere"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap shadow-sm">
+                  class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap shadow-sm"
+                  v-tooltip="'Insérer ce contenu dans l’article'">
             <CheckIcon class="w-4 h-4 shrink-0" /> Insérer ici
           </button>
           <button v-else type="button" @click="createArticle"
-                  class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap shadow-sm">
+                  class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap shadow-sm"
+                  v-tooltip="CREATE_DRAFT_TIP">
             <CheckIcon class="w-4 h-4 shrink-0" /> Créer l'article
           </button>
         </div>

@@ -1,14 +1,19 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { BuildingOffice2Icon, ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { BuildingOffice2Icon, ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
+import HelpTip from '@/components/HelpTip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SitePartiesCard from '@/components/audit/SitePartiesCard.vue'
 import EnergyHistoryCard from '@/components/audit/EnergyHistoryCard.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
+import {
+  POWER_LABEL_HELP, POWER_AUTO_TIP, POWER_SOURCE_LABELS, POWER_SOURCE_TIPS, RETAINED_POWER_TIP,
+  PERMIT_DATE_TIP, SUBSTATION_TIP, powerDeviceTip, powerCategoryLabel, applicabilityTip, thermalTriggerTip,
+} from '@/lib/audit-tips-site'
 
 // Section 1 — Identification du site & applicabilité R175-2.
 const props = defineProps({
@@ -50,18 +55,33 @@ const r175_6_applicable = computed(() => {
   const works = document.value.bacs_generator_works_date
   const pcAfter = pc && pc > R175_6_TRIGGER_DATE
   const worksAfter = works && works > R175_6_TRIGGER_DATE
+  // Textes affichés en clair (pastille) ; le détail des dates est dans l'infobulle.
   if (pcAfter && worksAfter) {
-    return { applies: true, message: '✓ R175-6 applicable — PC postérieur au 21/07/2021 et travaux générateur récents.' }
+    return { applies: true, message: 'Régulation pièce par pièce obligatoire : permis et travaux après le 21 juillet 2021' }
   }
   if (pcAfter) {
-    return { applies: true, message: '✓ R175-6 applicable — permis de construire postérieur au 21/07/2021.' }
+    return { applies: true, message: 'Régulation pièce par pièce obligatoire : permis déposé après le 21 juillet 2021' }
   }
   if (worksAfter) {
-    return { applies: true, message: '✓ R175-6 applicable — travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021.' }
+    return { applies: true, message: 'Régulation pièce par pièce obligatoire : travaux sur le générateur après le 21 juillet 2021' }
   }
   if (!pc && !works) return null
-  return { applies: false, message: 'R175-6 non applicable — aucun déclencheur (PC ou travaux générateur après 21/07/2021).' }
+  return { applies: false, message: 'Régulation pièce par pièce non exigée : ni permis ni travaux après le 21 juillet 2021' }
 })
+const r175_6_tip = computed(() => r175_6_applicable.value && thermalTriggerTip({
+  applies: r175_6_applicable.value.applies,
+  permitDate: document.value?.bacs_building_permit_date,
+  worksDate: document.value?.bacs_generator_works_date,
+}))
+
+// Origine de la puissance (calcul automatique ou saisie à la main), en clair.
+const powerSource = computed(() => (document.value?.bacs_total_power_source === 'manual_override' ? 'manual_override' : 'auto'))
+
+// Verdict d'assujettissement : carte qui explique le verdict (présumé quand des
+// puissances d'équipements manquent, cf. bacs-audit-power.js).
+const verdictTip = computed(() => applicabilityTip(document.value?.bacs_applicability_status, {
+  presumed: !!powerSummary.value?.power_summary?.presumedSubjectDueToMissingData,
+}))
 
 // Style d'input harmonisé avec les autres cards (focus ring, transitions),
 // hauteur uniforme h-9 (36px). La largeur est définie au cas par cas.
@@ -75,7 +95,7 @@ const showPowerDetail = ref(false)
   <CollapsibleSection storage-key="identification" section-id="section-identification" :active="active">
     <template #header>
       <SectionHeader number="1"
-                     :title="audit.isBacs ? 'Identification du site &amp; applicabilité R175-2' : 'Identification du site'"
+                     :title="audit.isBacs ? 'Identification du site : concerné par le décret ?' : 'Identification du site'"
                      :icon="BuildingOffice2Icon" icon-color="text-indigo-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"
@@ -85,8 +105,8 @@ const showPowerDetail = ref(false)
     </template>
     <template #summary>
       <span v-if="audit.isBacs">
-        Puissance chauffage + clim {{ document?.bacs_total_power_kw ?? '—' }} kW
-        · R175-2 {{ document?.bacs_applicable ? 'applicable' : 'non applicable' }}
+        Chauffage et climatisation : {{ document?.bacs_total_power_kw ?? '—' }} kW
+        · {{ document?.bacs_applicable ? 'concerné par le décret' : 'non concerné par le décret' }}
       </span>
       <span v-else>
         {{ document?.client_name || 'Client à renseigner' }}
@@ -96,13 +116,14 @@ const showPowerDetail = ref(false)
          est affiché à côté de la puissance et du permis qui le déterminent. -->
     <div v-if="audit.isBacs" class="p-4 space-y-4 bg-slate-50/70">
       <div id="ident-applicability" class="audit-subcard">
-        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Applicabilité du décret (R175-2)</h3>
+        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Le bâtiment est-il concerné ?</h3>
         <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-4 items-start">
       <!-- Applicabilité R175-2 : puissance + permis sur une ligne -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2">
         <div class="md:col-span-2">
           <label class="block text-xs font-medium text-gray-700 mb-0.5">
-            Puissance nominale utile cumulée chauffage + climatisation (kW)
+            Puissance de chauffage et de climatisation (kW)
+            <HelpTip size="xs" class="ml-0.5" :tip="POWER_LABEL_HELP" />
           </label>
           <div class="flex gap-2">
             <input type="number" min="0" step="0.1"
@@ -111,21 +132,25 @@ const showPowerDetail = ref(false)
                    :class="inputCls" class="flex-1 min-w-0" />
             <button @click="emit('recompute-power')"
                     class="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap shrink-0 transition"
-                    v-tooltip="'Cumul automatique des équipements chauffage + climatisation du site'">
+                    v-tooltip="POWER_AUTO_TIP">
               <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Auto-calculer
             </button>
           </div>
           <p class="text-[11px] text-gray-500 mt-0.5">
-            Source : <span class="font-mono">{{ document?.bacs_total_power_source || 'auto' }}</span><span v-if="document?.bacs_total_power_source === 'manual_override'" class="text-amber-700"> (override manuel)</span><template v-if="powerSummary?.heating_cooling_breakdown?.length"> · <button type="button" @click="showPowerDetail = !showPowerDetail" class="text-indigo-600 hover:text-indigo-800 font-medium">{{ showPowerDetail ? 'Masquer le détail' : 'Détail' }} ({{ powerSummary.heating_cooling_breakdown.length }} éq.)</button></template>
+            Source : <span :class="powerSource === 'manual_override' ? 'text-amber-700' : ''"
+                           v-tooltip="POWER_SOURCE_TIPS[powerSource]">{{ POWER_SOURCE_LABELS[powerSource] }}</span><template v-if="powerSummary?.heating_cooling_breakdown?.length"> · <button type="button" @click="showPowerDetail = !showPowerDetail" class="text-indigo-600 hover:text-indigo-800 font-medium"
+                      v-tooltip="showPowerDetail ? 'Masquer le détail du calcul' : 'Afficher le détail du calcul'">{{ showPowerDetail ? 'Masquer le détail' : 'Détail du calcul' }} ({{ powerSummary.heating_cooling_breakdown.length }} {{ powerSummary.heating_cooling_breakdown.length > 1 ? 'équipements' : 'équipement' }})</button></template>
           </p>
           <div v-if="showPowerDetail && powerSummary?.heating_cooling_breakdown?.length"
                class="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-2 text-[11px] text-gray-600">
             <ul class="space-y-0.5 font-mono">
               <li v-for="d in powerSummary.heating_cooling_breakdown" :key="d.id"
-                  :class="['flex justify-between gap-2', d.in_scope === false ? 'opacity-50' : '']">
+                  :class="['flex justify-between gap-2', d.in_scope === false ? 'opacity-50' : '']"
+                  v-tooltip="powerDeviceTip(d)">
                 <span class="truncate">
-                  <span :class="d.system_category === 'heating' ? 'text-orange-600' : 'text-cyan-600'">●</span>
-                  {{ d.name || (d.brand ? d.brand : '—') }}<span class="text-gray-400"> ({{ d.zone_name || '—' }})</span><span v-if="d.in_scope === false" class="text-gray-400"> · hors cumul<template v-if="d.exclusion_reason_label"> ({{ d.exclusion_reason_label }})</template></span>
+                  <span :class="d.system_category === 'heating' ? 'text-orange-600' : 'text-cyan-600'"
+                        v-tooltip="powerCategoryLabel(d.system_category)">●</span>
+                  {{ d.name || (d.brand ? d.brand : '—') }}<span class="text-gray-400"> ({{ d.zone_name || '—' }})</span><span v-if="d.in_scope === false" class="text-gray-400"> · non compté<template v-if="d.exclusion_reason_label"> ({{ d.exclusion_reason_label }})</template></span>
                 </span>
                 <span :class="['font-semibold whitespace-nowrap', d.in_scope === false ? 'line-through text-gray-400' : '']">
                   <template v-if="(d.quantity || 1) > 1">{{ d.quantity }} × {{ d.power_kw }} = {{ Math.round((Number(d.power_kw) || 0) * d.quantity * 10) / 10 }} kW</template>
@@ -133,8 +158,9 @@ const showPowerDetail = ref(false)
                 </span>
               </li>
             </ul>
-            <p class="mt-1 pt-1 border-t border-gray-200 flex justify-between font-semibold">
-              <span>Puissance retenue R175-2 <span class="font-normal text-gray-400">(max chaud/froid, émetteurs exclus)</span> :</span>
+            <p class="mt-1 pt-1 border-t border-gray-200 flex justify-between font-semibold"
+               v-tooltip="RETAINED_POWER_TIP">
+              <span>Puissance retenue <span class="font-normal text-gray-400">(la plus forte des deux, sans les émetteurs)</span> :</span>
               <span class="font-mono">{{ powerSummary.power_summary?.retainedKw ?? powerSummary.heating_cooling_total_kw }} kW</span>
             </p>
           </div>
@@ -144,22 +170,23 @@ const showPowerDetail = ref(false)
           <input type="date" :value="document?.bacs_building_permit_date || ''"
                  @input="e => emit('save-doc', { bacs_building_permit_date: e.target.value || null })"
                  :class="inputCls" class="w-full"
-                 v-tooltip="'Postérieur au 8 avril 2024 : bâtiment soumis dès la livraison.'" />
+                 v-tooltip="PERMIT_DATE_TIP" />
         </div>
       </div>
           <!-- Verdict d'applicabilité (auparavant en bas de la carte) -->
           <div>
             <template v-if="document?.bacs_applicability_status">
-              <div :class="['rounded-lg border p-3 flex items-start gap-3', applicabilityLabels[document.bacs_applicability_status].cls]">
-                <ExclamationTriangleIcon class="w-5 h-5 shrink-0 mt-0.5" />
+              <div :class="['rounded-lg border p-3 flex items-start gap-3', applicabilityLabels[document.bacs_applicability_status].cls]"
+                   v-tooltip="verdictTip">
+                <CheckCircleIcon v-if="document.bacs_applicability_status === 'not_subject'" class="w-5 h-5 shrink-0 mt-0.5" />
+                <ExclamationTriangleIcon v-else class="w-5 h-5 shrink-0 mt-0.5" />
                 <div class="flex-1">
                   <div class="font-medium text-sm">{{ applicabilityLabels[document.bacs_applicability_status].label }}</div>
                 </div>
               </div>
               <p v-if="document?.bacs_applicability_status !== 'not_subject'" class="mt-2 text-[11px] text-gray-500 leading-relaxed">
-                <em>À titre informatif :</em> l'article R175-2 prévoit une clause de dispense applicable lorsque le temps de retour
-                sur investissement de la mise en conformité dépasse 10 ans. Ce calcul ne relève pas du périmètre de l'audit
-                (cf. Annexe D, point 4).
+                <em>À titre informatif :</em> le propriétaire peut être dispensé si la mise en conformité ne se rembourse
+                pas en moins de 10 ans. Ce calcul ne fait pas partie de l’audit (voir l’annexe D du rapport, point 4).
               </p>
             </template>
             <div v-else class="rounded-lg border border-dashed border-gray-300 p-3 text-xs text-gray-500">
@@ -171,36 +198,40 @@ const showPowerDetail = ref(false)
 
       <!-- Déclencheurs réglementaires : Oui / Non, conditionnels en dessous -->
       <div id="ident-triggers" class="audit-subcard">
-        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Déclencheurs réglementaires</h3>
+        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Travaux récents et réseau urbain</h3>
         <div class="qa-grid text-sm">
           <div class="qa-question">
             Des travaux d'installation ou de remplacement d'un générateur de chaleur ont-ils été réalisés ?
-            <span class="qa-desc">Déclencheur R175-6 (régulation thermique automatique par zone).</span>
+            <span class="qa-desc">Après le 21 juillet 2021, ils rendent obligatoire la régulation automatique de la température pièce par pièce.</span>
           </div>
           <SegmentedToggle :model-value="generatorWorksDone" @update:model-value="v => generatorWorksDone = v" />
 
           <div class="qa-question">
             Le bâtiment est-il raccordé à un <strong>réseau urbain de chaleur ou de froid</strong> ?
-            <span class="qa-desc">Si oui, la puissance retenue pour R175-2 est celle de la station d'échange (prime sur le cumul aval).</span>
+            <span class="qa-desc">Si oui, la puissance retenue est celle de la station d’échange, pas la somme des équipements qu’elle alimente.</span>
           </div>
           <SegmentedToggle :model-value="districtConnected" @update:model-value="v => districtConnected = v" />
         </div>
         <!-- Champs conditionnels (en pleine largeur sous le grid, alignés avec le label de question) -->
         <template v-if="document?.bacs_generator_works_date != null">
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <label class="text-xs text-gray-600">Date des derniers travaux générateur :</label>
+            <label class="text-xs text-gray-600">Date des derniers travaux sur le générateur :</label>
             <input type="date" :value="document?.bacs_generator_works_date || ''"
                    @input="e => emit('save-doc', { bacs_generator_works_date: e.target.value || null })"
                    :class="inputCls" />
             <span v-if="r175_6_applicable" class="text-[11px] px-2 py-0.5 rounded"
-                  :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
+                  :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'"
+                  v-tooltip="r175_6_tip">
               {{ r175_6_applicable.message }}
             </span>
           </div>
         </template>
         <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
              class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <label class="text-xs text-gray-600">Puissance station d'échange (kW) :</label>
+          <label class="text-xs text-gray-600">
+            Puissance de la station d’échange (kW)
+            <HelpTip size="xs" class="ml-0.5" :tip="SUBSTATION_TIP" /> :
+          </label>
           <input type="number" min="0" step="0.1"
                  :value="document?.bacs_district_heating_substation_kw"
                  @input="e => emit('save-doc', { bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
@@ -219,8 +250,8 @@ const showPowerDetail = ref(false)
     </div>
     <div v-if="!audit.isBacs" class="px-5 py-4 text-sm text-gray-500">
       <p>
-        Audit GTB (Classique) — les contraintes du décret R175 sont
-        désactivées pour ce document. Les sections ci-dessous se
+        Audit GTB (classique) : les exigences du décret BACS ne
+        s’appliquent pas à ce document. Les sections ci-dessous se
         concentrent sur l'inventaire technique nécessaire au chiffrage.
       </p>
     </div>

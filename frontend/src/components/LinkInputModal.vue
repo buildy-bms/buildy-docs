@@ -13,6 +13,8 @@
  */
 import { ref, watch, nextTick, useTemplateRef } from 'vue'
 import BaseModal from './BaseModal.vue'
+import HelpTip from './HelpTip.vue'
+import { LINK_FORMATS_TIP } from '@/lib/editor-tips'
 
 const props = defineProps({
   initialUrl: { type: String, default: '' },
@@ -52,7 +54,7 @@ function onRemove() {
   <BaseModal :title="'Insérer un lien'" size="lg" @close="emit('close')">
     <form @submit.prevent="onSubmit" class="space-y-3 min-w-lg">
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">URL</label>
+        <label class="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">URL <HelpTip :tip="LINK_FORMATS_TIP" size="xs" /></label>
         <input
           ref="inputRef"
           v-model="url"

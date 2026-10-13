@@ -34,17 +34,8 @@ watch(sidebarCollapsed, (v) => {
   localStorage.setItem(SIDEBAR_STORAGE_KEY, v ? '1' : '0')
 })
 
-const tooltip = ref(null)
-function showTooltip(label, event) {
-  if (!sidebarCollapsed.value) return
-  const rect = event.currentTarget.getBoundingClientRect()
-  tooltip.value = {
-    label,
-    top: rect.top + rect.height / 2,
-    left: rect.right + 8,
-  }
-}
-function hideTooltip() { tooltip.value = null }
+// Menu replié : chaque icône affiche son nom en infobulle à droite (v-tooltip.right).
+const collapsedTip = (label) => (sidebarCollapsed.value ? label : null)
 
 const appVersion = ref('')
 const buildSha = ref('')
@@ -106,7 +97,8 @@ async function logout() {
       <button
         @click="sidebarOpen = !sidebarOpen"
         class="text-white/70 hover:text-white tap-target inline-flex items-center justify-center"
-        aria-label="Menu"
+        :aria-label="sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
+        v-tooltip.bottom="sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'"
       >
         <Bars3Icon v-if="!sidebarOpen" class="w-6 h-6" />
         <XMarkIcon v-else class="w-6 h-6" />
@@ -117,10 +109,12 @@ async function logout() {
       <!-- Sidebar : repliable comme dans Buildy Tools.
            Mode replie : 64px, icones seulement avec tooltip au survol.
            Mode etendu : 224px, libelles + sections.
-           Etat persiste dans localStorage. -->
+           Etat persiste dans localStorage.
+           lg:z-40 : au-dessus des bandeaux collants du contenu (ex. en-tête de l'audit, z-30),
+           sinon la moitié du bouton « Replier le menu » qui dépasse est recouverte (ni clic ni bulle). -->
       <aside
         :class="[
-          'fixed inset-y-0 left-0 z-30 w-60 h-screen bg-indigo-600 flex flex-col transform transition-transform lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:transition-[width] lg:duration-200 shrink-0',
+          'fixed inset-y-0 left-0 z-30 lg:z-40 w-60 h-screen bg-indigo-600 flex flex-col transform transition-transform lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:transition-[width] lg:duration-200 shrink-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           sidebarCollapsed ? 'lg:w-16' : 'lg:w-56',
         ]"
@@ -128,8 +122,7 @@ async function logout() {
         <!-- Toggle desktop -->
         <button
           @click="sidebarCollapsed = !sidebarCollapsed"
-          @mouseenter="showTooltip(sidebarCollapsed ? 'Déplier le menu' : 'Replier le menu', $event)"
-          @mouseleave="hideTooltip"
+          v-tooltip.right="sidebarCollapsed ? 'Déplier le menu' : 'Replier le menu'"
           class="hidden lg:flex absolute top-3 -right-3 z-40 w-6 h-6 items-center justify-center rounded-full bg-indigo-600 border border-white/20 text-white/60 hover:text-white hover:bg-indigo-700 transition-colors"
         >
           <ChevronDoubleLeftIcon v-if="!sidebarCollapsed" class="w-3.5 h-3.5" />
@@ -145,8 +138,7 @@ async function logout() {
         <div :class="['px-2.5 mt-3', sidebarCollapsed ? 'lg:px-2' : '']">
           <button
             @click="paletteRef?.openPalette ? paletteRef.openPalette() : null"
-            @mouseenter="showTooltip('Rechercher…', $event)"
-            @mouseleave="hideTooltip"
+            v-tooltip.right="sidebarCollapsed ? { label: 'Rechercher', keys: ['Mod', 'K'] } : null"
             :class="[
               'w-full flex items-center gap-2 rounded-lg text-xs text-white/60 hover:text-white/90 hover:bg-white/8 border border-white/10',
               sidebarCollapsed ? 'justify-center px-2 py-2' : 'justify-between px-2.5 py-1.5'
@@ -172,8 +164,7 @@ async function logout() {
               v-else
               :to="item.to"
               @click="sidebarOpen = false"
-              @mouseenter="showTooltip(item.name, $event)"
-              @mouseleave="hideTooltip"
+              v-tooltip.right="collapsedTip(item.name)"
               :class="[
                 'flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
                 sidebarCollapsed ? 'lg:justify-center lg:px-2 px-2.5' : 'px-2.5',
@@ -188,20 +179,18 @@ async function logout() {
 
         <div class="shrink-0 px-2.5 py-3 border-t border-white/10">
           <div
-            @mouseenter="showTooltip(currentUser?.display_name || currentUser?.email || 'Utilisateur', $event)"
-            @mouseleave="hideTooltip"
+            v-tooltip.right="collapsedTip(`Connecté : ${currentUser?.display_name || currentUser?.email || 'utilisateur'}`)"
             :class="[
               'flex items-center gap-2 py-1.5 mb-1 text-xs text-white/70',
               sidebarCollapsed ? 'lg:justify-center px-1' : 'px-2.5'
             ]"
           >
             <UserCircleIcon class="w-4 h-4 shrink-0" />
-            <span v-if="!sidebarCollapsed" class="truncate">{{ currentUser?.display_name || currentUser?.email || 'Utilisateur' }}</span>
+            <span v-if="!sidebarCollapsed" v-tooltip.right.overflow class="truncate">{{ currentUser?.display_name || currentUser?.email || 'Utilisateur' }}</span>
           </div>
           <button
             @click="logout"
-            @mouseenter="showTooltip('Déconnexion', $event)"
-            @mouseleave="hideTooltip"
+            v-tooltip.right="collapsedTip('Se déconnecter')"
             :class="[
               'flex items-center gap-2 w-full py-1.5 mb-2 text-xs text-white/50 hover:text-white/90 hover:bg-white/8 rounded-lg transition-colors',
               sidebarCollapsed ? 'lg:justify-center px-2' : 'px-2.5'
@@ -216,31 +205,20 @@ async function logout() {
             v-if="!sidebarCollapsed"
             :to="{ name: 'release-notes' }"
             class="block text-[10px] text-white/40 hover:text-white/90 px-2.5 transition-colors"
-            v-tooltip="'Voir les notes de version'"
+            v-tooltip.right="'Voir les nouveautés de chaque version'"
           >
             Buildy Docs v{{ appVersion || '0.1.0' }}<span v-if="buildSha"> · {{ buildSha }}</span>
           </router-link>
           <router-link
             v-else
             :to="{ name: 'release-notes' }"
-            class="block text-[9px] text-white/40 hover:text-white/90 text-center font-mono transition-colors"
-            v-tooltip="`Buildy Docs v${appVersion || '0.1.0'}${buildSha ? ' · ' + buildSha : ''} — voir notes de version`"
+            class="block text-[9px] text-white/40 hover:text-white/90 text-center tabular-nums transition-colors"
+            v-tooltip.right="`Version ${appVersion || '0.1.0'}${buildSha ? ' · ' + buildSha : ''} : voir les nouveautés`"
           >
             {{ buildSha || ('v' + (appVersion || '0.1.0')) }}
           </router-link>
         </div>
       </aside>
-
-      <!-- Tooltip teleporte (visible uniquement quand sidebar repliee) -->
-      <Teleport to="body">
-        <div
-          v-if="tooltip"
-          :style="{ top: tooltip.top + 'px', left: tooltip.left + 'px' }"
-          class="fixed z-100 -translate-y-1/2 px-2.5 py-1 text-[11px] font-medium text-white bg-indigo-600 rounded-md shadow-lg pointer-events-none whitespace-nowrap"
-        >
-          {{ tooltip.label }}
-        </div>
-      </Teleport>
 
       <!-- Overlay mobile -->
       <div v-if="sidebarOpen" class="fixed inset-0 z-20 bg-black/40 lg:hidden" @click="sidebarOpen = false" />

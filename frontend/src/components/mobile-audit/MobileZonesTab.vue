@@ -15,7 +15,9 @@ import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
 import ZoneFunctionalHelpModal from '@/components/audit/ZoneFunctionalHelpModal.vue'
 import ZonePartiesPicker from '@/components/audit/ZonePartiesPicker.vue'
+import HelpTip from '@/components/HelpTip.vue'
 import { ZONE_NATURES as ZONE_NATURES_DECORATED, ZONE_OCCUPANCY_PROFILES, isTechnicalNature } from '@/lib/audit-options'
+import { ZONE_KIND_TIPS } from '@/lib/audit-tips-site'
 
 const audit = useAuditStore()
 const { document, zones, siteParties } = storeToRefs(audit)
@@ -180,7 +182,7 @@ const totalSurface = computed(() =>
     <!-- Zones fonctionnelles -->
     <div>
       <p class="px-1 pb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-        Zones fonctionnelles ({{ functionalZones.length }})
+        Zones fonctionnelles ({{ functionalZones.length }})<HelpTip :tip="ZONE_KIND_TIPS.functional" class="ml-1 p-1 -my-1" />
       </p>
       <div v-if="functionalZones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
         <button
@@ -191,8 +193,8 @@ const totalSurface = computed(() =>
           class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ z.name }}</p>
-            <p class="text-sm text-gray-500 truncate mt-1">
+            <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">{{ z.name }}</p>
+            <p v-tooltip.overflow class="text-sm text-gray-500 truncate mt-1">
               <span>{{ natureLabel(z.nature) }}</span>
               <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
             </p>
@@ -215,7 +217,7 @@ const totalSurface = computed(() =>
     <div>
       <div class="px-1 pb-1.5">
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          Zones techniques ({{ technicalZones.length }})
+          Zones techniques ({{ technicalZones.length }})<HelpTip :tip="ZONE_KIND_TIPS.technical" class="ml-1 p-1 -my-1" />
         </p>
       </div>
       <div v-if="technicalZones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
@@ -227,8 +229,8 @@ const totalSurface = computed(() =>
           class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ z.name }}</p>
-            <p class="text-sm text-gray-500 truncate mt-1">
+            <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">{{ z.name }}</p>
+            <p v-tooltip.overflow class="text-sm text-gray-500 truncate mt-1">
               <span>{{ natureLabel(z.nature) }}</span>
               <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
             </p>
@@ -237,7 +239,7 @@ const totalSurface = computed(() =>
         </button>
       </div>
       <p v-else class="text-sm text-gray-500 italic px-1 py-2">
-        Aucune zone technique — locaux hors décret BACS (local technique, TGBT…).
+        Aucune zone technique : locaux hors décret (local technique, tableau électrique général, local compteurs…).
       </p>
       <button
         type="button"
@@ -280,7 +282,7 @@ const totalSurface = computed(() =>
           />
         </div>
 
-        <MobileField label="Nom" hint="Nom court qui identifie la zone dans tout l'audit. Reste cohérent avec les plans du bâtiment si possible." required>
+        <MobileField label="Nom" hint="Nom court qui identifie la zone dans tout l’audit. Reprends si possible celui des plans du bâtiment." required>
           <input
             v-model="editForm.name"
             type="text"
@@ -294,11 +296,11 @@ const totalSurface = computed(() =>
         <button v-if="editForm.kind !== 'technical'" type="button" @click="showHelp = true"
                 class="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-200 text-left">
           <FontAwesomeIcon :icon="['fas', 'circle-question']" class="w-5 h-5 text-indigo-600 shrink-0" />
-          <span class="flex-1 text-sm text-gray-700">Comprendre la zone fonctionnelle — ce n'est pas une pièce.</span>
+          <span class="flex-1 text-sm text-gray-700">Comprendre la zone fonctionnelle : ce n’est pas une pièce.</span>
           <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-4 h-4 text-indigo-400 shrink-0" />
         </button>
 
-        <MobileField label="Nature de la zone" hint="Type d'usage (R175-1 6°). Une zone fonctionnelle = un local ou regroupement de locaux ayant le même type d'utilisation.">
+        <MobileField label="Nature de la zone" hint="Ce qu’on fait dans la zone : bureaux, restauration, atelier, local technique… Une zone fonctionnelle regroupe des locaux aux usages homogènes.">
           <MobileSelectSheet
             v-model="editForm.nature"
             :options="ZONE_NATURES"
@@ -308,7 +310,7 @@ const totalSurface = computed(() =>
         </MobileField>
 
         <MobileField v-if="editForm.kind !== 'technical'" label="Régime d'activité"
-                     hint="Usage temporel de la zone (24/7, heures de bureau, scolaire…). Aide à juger si deux zones ont un usage homogène.">
+                     hint="Quand la zone est occupée : 24 h/24, heures de bureau, rythme scolaire… Des horaires différents justifient souvent deux zones.">
           <MobileSelectSheet
             v-model="editForm.occupancy_profile"
             :options="ZONE_OCCUPANCY_PROFILES"
@@ -318,7 +320,7 @@ const totalSurface = computed(() =>
         </MobileField>
 
         <MobileField v-if="editForm.kind !== 'technical'" label="Contrainte de confort"
-                     hint="Contrainte spécifique éventuelle : température minimale imposée, exigence de qualité d'air…">
+                     hint="Exigence particulière de la zone, par exemple une température minimale imposée ou une qualité d’air renforcée. Facultatif.">
           <input
             v-model="editForm.comfort_constraint"
             type="text"
@@ -328,14 +330,16 @@ const totalSurface = computed(() =>
           />
         </MobileField>
 
-        <MobileField label="Type de zone" hint="Une zone technique (local technique, TGBT, local compteurs…) est hors décret BACS : elle ne génère pas de système ni de compteur automatiquement.">
+        <MobileField label="Type de zone" hint="Une zone technique (local technique, tableau électrique général, local compteurs…) est hors décret : simple inventaire, sans système ni compteur créé automatiquement.">
           <div class="flex gap-2">
             <button type="button" @click="setKind('functional')"
+                    v-tooltip="ZONE_KIND_TIPS.functional"
                     :class="editForm.kind !== 'technical'
                       ? 'bg-indigo-600 text-white border-indigo-600'
                       : 'bg-white text-gray-600 border-gray-200'"
                     class="flex-1 min-h-11 px-3 rounded-lg border font-medium transition">Fonctionnelle</button>
             <button type="button" @click="setKind('technical')"
+                    v-tooltip="ZONE_KIND_TIPS.technical"
                     :class="editForm.kind === 'technical'
                       ? 'bg-slate-600 text-white border-slate-600'
                       : 'bg-white text-gray-600 border-gray-200'"
@@ -359,14 +363,14 @@ const totalSurface = computed(() =>
         <!-- Parties prenantes rattachées à la zone (édition uniquement :
              la zone doit exister pour porter des affectations). -->
         <MobileField v-if="editing?.mode === 'edit'" label="Parties prenantes"
-                     hint="Propriétaires, preneurs à bail ou syndicat qui occupent ou contrôlent cette zone. À définir d'abord dans l'identification du site.">
+                     hint="Propriétaires, locataires (preneurs à bail) ou syndicat de copropriété qui occupent ou gèrent cette zone. Ajoute-les d’abord dans l’onglet « Site ».">
           <ZonePartiesPicker
             :zone-id="editing.zone.zone_id"
             :site-parties="siteParties"
           />
         </MobileField>
 
-        <MobileField label="Position sur la carte" hint="Place un repère sur le bâtiment. Touchez la carte pour positionner la zone, déplacez le pin pour ajuster.">
+        <MobileField label="Position sur la carte" hint="Place un repère sur le bâtiment : touche la carte pour positionner la zone, puis déplace le repère pour ajuster.">
           <ZoneMapPicker
             v-model:latitude="editForm.latitude"
             v-model:longitude="editForm.longitude"

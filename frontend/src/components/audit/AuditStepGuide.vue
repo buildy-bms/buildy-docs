@@ -16,6 +16,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faBullseye, faCircleCheck, faListCheck, faRotateLeft, faCheck } from '@fortawesome/pro-solid-svg-icons'
 import Button from '@/components/Button.vue'
 import { phaseForStep } from '@/lib/audit-steps-ui'
+import { phaseTip, NON_BLOCKING_STEP_TIP, REOPEN_STEP_TIP, stepNotValidableTip } from '@/lib/audit-tips'
 
 library.add(faBullseye, faCircleCheck, faListCheck, faRotateLeft, faCheck)
 
@@ -49,11 +50,12 @@ function capitalize(s) {
   >
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 flex-wrap text-[11px]">
-        <span v-if="phase" :class="['inline-flex items-center h-5 px-2 rounded-full font-medium', phase.tone.chip]">
+        <span v-if="phase" :class="['inline-flex items-center h-5 px-2 rounded-full font-medium', phase.tone.chip]"
+              v-tooltip="phaseTip(phase)">
           {{ phase.label }}
         </span>
         <span class="text-gray-500">Étape {{ step.number }}/{{ total }}</span>
-        <span v-if="!step.blocking" class="text-gray-400">· non bloquante</span>
+        <span v-if="!step.blocking" class="text-gray-400" v-tooltip="NON_BLOCKING_STEP_TIP">· non bloquante</span>
       </div>
 
       <p class="mt-2 text-sm text-gray-800 leading-relaxed flex items-start gap-2">
@@ -98,6 +100,7 @@ function capitalize(s) {
         v-if="!step.validated"
         :variant="step.complete || !step.blocking ? 'success' : 'secondary'"
         size="md"
+        v-tooltip="stepNotValidableTip(step)"
         @click="emit('validate', step.key)"
       >
         <template #icon-left><FontAwesomeIcon :icon="['fas', 'check']" class="w-3.5 h-3.5" /></template>
@@ -107,7 +110,7 @@ function capitalize(s) {
         v-else
         variant="secondary"
         size="md"
-        v-tooltip="{ text: 'Annuler la validation pour modifier cette étape', placement: 'bottom' }"
+        v-tooltip="REOPEN_STEP_TIP"
         @click="emit('invalidate', step.key)"
       >
         <template #icon-left><FontAwesomeIcon :icon="['fas', 'rotate-left']" class="w-3.5 h-3.5" /></template>

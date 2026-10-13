@@ -17,6 +17,7 @@ import EditSiteModal from '@/components/EditSiteModal.vue'
 import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
 import SitePhotoGallery from '@/components/SitePhotoGallery.vue'
 import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
+import { ZONE_KIND_TIPS, docKindTip, dateLabel } from '@/lib/misc-tips'
 
 const props = defineProps({ uuid: { type: String, required: true } })
 const router = useRouter()
@@ -55,7 +56,7 @@ const hasMapData = computed(() =>
 )
 
 const tiles = computed(() => [
-  { key: 'af', label: 'AF', icon: DocumentTextIcon },
+  { key: 'af', label: 'AF', icon: DocumentTextIcon, tip: 'Analyses fonctionnelles du site' },
   { key: 'audit', label: 'Audits', icon: ClipboardDocumentCheckIcon },
   { key: 'zones', label: 'Zones', icon: Squares2X2Icon },
   { key: 'equipments', label: 'Équipements', icon: CpuChipIcon },
@@ -106,7 +107,7 @@ function onSiteSaved() {
               <BuildingOffice2Icon class="w-6 h-6" />
             </div>
             <div class="min-w-0">
-              <h1 class="text-2xl font-semibold text-gray-800 truncate">{{ site.name }}</h1>
+              <h1 class="text-2xl font-semibold text-gray-800 truncate" v-tooltip.overflow>{{ site.name }}</h1>
               <p v-if="site.customer_name" class="text-sm text-gray-500">{{ site.customer_name }}</p>
             </div>
           </div>
@@ -114,7 +115,8 @@ function onSiteSaved() {
             <span v-if="site.address" class="inline-flex items-center gap-1">
               <MapPinIcon class="w-3.5 h-3.5 shrink-0" /> {{ site.address }}
             </span>
-            <span v-if="coordsLabel" class="font-mono">{{ coordsLabel }}</span>
+            <span v-if="coordsLabel" class="font-mono"
+                  v-tooltip="{ label: 'Coordonnées GPS : latitude, longitude', icon: 'location-dot' }">{{ coordsLabel }}</span>
           </div>
         </div>
         <button @click="showEditSite = true"
@@ -125,7 +127,7 @@ function onSiteSaved() {
 
       <!-- Compteurs -->
       <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
-        <div v-for="t in tiles" :key="t.key"
+        <div v-for="t in tiles" :key="t.key" v-tooltip="t.tip || null"
              class="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center text-center">
           <component :is="t.icon" class="w-5 h-5 text-gray-400" />
           <span class="mt-1 text-xl font-semibold text-gray-800 tabular-nums">{{ counts[t.key] || 0 }}</span>
@@ -159,14 +161,15 @@ function onSiteSaved() {
                 @click="openDocument(d)"
                 class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer">
               <td class="px-4 py-2.5">
-                <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded', KIND_CLASS[d.kind] || 'bg-gray-100 text-gray-600']">
+                <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded', KIND_CLASS[d.kind] || 'bg-gray-100 text-gray-600']"
+                      v-tooltip="docKindTip(d.kind)">
                   {{ KIND_LABEL[d.kind] || d.kind }}
                 </span>
               </td>
               <td class="px-4 py-2.5 font-medium text-gray-800">{{ d.project_name }}</td>
               <td class="px-4 py-2.5 text-gray-600">{{ d.client_name || '—' }}</td>
               <td class="px-4 py-2.5 text-xs text-gray-500">
-                {{ d.delivered_at ? 'Livré' : (d.status || '—') }}
+                <span v-tooltip="d.delivered_at ? dateLabel('Livré le', d.delivered_at) : null">{{ d.delivered_at ? 'Livré' : (d.status || '—') }}</span>
               </td>
               <td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{{ fmtDate(d.updated_at) }}</td>
             </tr>
@@ -195,7 +198,8 @@ function onSiteSaved() {
               <td class="px-4 py-2.5 text-gray-600">{{ natureLabel(z.nature) }}</td>
               <td class="px-4 py-2.5">
                 <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded',
-                               (z.kind || 'functional') === 'technical' ? 'bg-slate-100 text-slate-700' : 'bg-indigo-100 text-indigo-700']">
+                               (z.kind || 'functional') === 'technical' ? 'bg-slate-100 text-slate-700' : 'bg-indigo-100 text-indigo-700']"
+                      v-tooltip="ZONE_KIND_TIPS[(z.kind || 'functional') === 'technical' ? 'technical' : 'functional']">
                   {{ (z.kind || 'functional') === 'technical' ? 'Technique' : 'Fonctionnelle' }}
                 </span>
               </td>

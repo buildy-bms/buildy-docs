@@ -20,9 +20,13 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import {
-  meterUsageLabel, METER_USAGES, getMeterUsageMeta,
-  REQUIRED_LOCKED_TIP, thermalMeterName,
+  meterUsageLabel, METER_USAGES, getMeterUsageMeta, thermalMeterName,
 } from '@/lib/meter-options'
+import {
+  METER_MISSING_TIP, METER_UNANSWERED_TIP, METER_COLUMN_TIPS, METER_TOGGLE_TIPS,
+  REQUIRED_LOCKED_CARD, METER_NOT_PRESENT_LABEL, PROTOCOLS_DISABLED_LABEL,
+  metersMissingTip, metersUnansweredTip, metersPresentTip, thermalMeterTip, meterDragTip,
+} from '@/lib/audit-tips'
 import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
@@ -241,9 +245,10 @@ onBeforeUnmount(teardownSortable)
 <template>
   <div :class="['bg-white rounded-2xl border overflow-hidden transition',
                 meters.length === 0 ? 'border-gray-200 opacity-80' : 'border-gray-200']">
-    <!-- Header énergie : couleur + KPI + toggle -->
-    <button type="button" @click="toggle" :disabled="tabMode"
-            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition disabled:cursor-default disabled:hover:bg-transparent">
+    <!-- Header énergie : couleur + KPI + toggle. En mode onglets, le groupe reste ouvert : l'en-tête
+         est un simple titre (plus un bouton grisé sans raison, ni un faux élément cliquable). -->
+    <component :is="tabMode ? 'div' : 'button'" :type="tabMode ? undefined : 'button'" @click="!tabMode && toggle()"
+               :class="['w-full flex items-center gap-3 px-4 py-3 text-left transition', tabMode ? '' : 'hover:bg-gray-50']">
       <span class="w-10 h-10 rounded-xl inline-flex items-center justify-center shrink-0"
             :style="{ background: energy.color + '1a', color: energy.color }">
         <FontAwesomeIcon :icon="['fas', energy.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
@@ -251,29 +256,30 @@ onBeforeUnmount(teardownSortable)
       <div class="flex-1 min-w-0">
         <p class="text-base font-semibold text-gray-900 leading-tight">
           {{ energy.label }}
-          <span v-if="energy.value === 'thermal'" class="text-sm font-normal text-gray-500">— calorimètres et frigorimètres</span>
+          <span v-if="energy.value === 'thermal'" class="text-sm font-normal text-gray-500"
+                v-tooltip="{ title: 'Calorimètres et frigorimètres', accent: 'thermal', text: 'Compteurs d’énergie thermique : le calorimètre mesure la chaleur, le frigorimètre le froid, fournis par un réseau d’eau.' }">— calorimètres et frigorimètres</span>
         </p>
         <p class="text-xs text-gray-500 mt-0.5">
           <span v-if="!stats.total">Aucun compteur</span>
           <template v-else>
             <span>{{ stats.total }} compteur{{ stats.total > 1 ? 's' : '' }}</span>
             <span class="mx-1 text-gray-300">·</span>
-            <span class="text-emerald-700 font-medium">{{ stats.present }} présent{{ stats.present > 1 ? 's' : '' }}</span>
+            <span class="text-emerald-700 font-medium" v-tooltip="metersPresentTip(stats.present)">{{ stats.present }} présent{{ stats.present > 1 ? 's' : '' }}</span>
             <template v-if="stats.missing > 0">
               <span class="mx-1 text-gray-300">·</span>
-              <span class="text-red-700 font-medium">{{ stats.missing }} requis manquant{{ stats.missing > 1 ? 's' : '' }}</span>
+              <span class="text-red-700 font-medium" v-tooltip="metersMissingTip(stats.missing)">{{ stats.missing }} requis manquant{{ stats.missing > 1 ? 's' : '' }}</span>
             </template>
             <template v-if="stats.unanswered > 0">
               <span class="mx-1 text-gray-300">·</span>
               <span class="text-amber-700 font-medium"
-                    v-tooltip="'Compteurs requis dont la présence n\'a pas été vérifiée : le rapport les indique « à qualifier »'">{{ stats.unanswered }} présence{{ stats.unanswered > 1 ? 's' : '' }} à vérifier</span>
+                    v-tooltip="metersUnansweredTip(stats.unanswered)">{{ stats.unanswered }} présence{{ stats.unanswered > 1 ? 's' : '' }} à vérifier</span>
             </template>
           </template>
         </p>
       </div>
       <ChevronDownIcon v-if="!tabMode" :class="['w-5 h-5 text-gray-400 transition-transform shrink-0',
                                 collapsed ? '-rotate-90' : '']" />
-    </button>
+    </component>
 
     <!-- Table compacte des compteurs (visible si déplié ; toujours en mode
          onglet, sinon une énergie vide masquerait son bouton « Ajouter ») -->
@@ -304,15 +310,15 @@ onBeforeUnmount(teardownSortable)
           <thead>
             <tr>
               <th class="w-8"></th>
-              <th v-if="groupBy !== 'usage'">Usage</th>
-              <th v-if="groupBy !== 'zone'">Zone</th>
-              <th>Requis</th>
-              <th>Présent</th>
-              <th>Localisation</th>
-              <th>Communicant</th>
-              <th>Protocoles</th>
-              <th>Câblé</th>
-              <th>Hors service</th>
+              <th v-if="groupBy !== 'usage'" v-tooltip="METER_COLUMN_TIPS.usage">Usage</th>
+              <th v-if="groupBy !== 'zone'" v-tooltip="METER_COLUMN_TIPS.zone">Zone</th>
+              <th v-tooltip="METER_COLUMN_TIPS.required">Requis</th>
+              <th v-tooltip="METER_COLUMN_TIPS.present">Présent</th>
+              <th v-tooltip="METER_COLUMN_TIPS.location">Localisation</th>
+              <th v-tooltip="METER_COLUMN_TIPS.communicating">Communicant</th>
+              <th v-tooltip="METER_COLUMN_TIPS.protocols">Protocoles</th>
+              <th v-tooltip="METER_COLUMN_TIPS.wired">Câblé</th>
+              <th v-tooltip="METER_COLUMN_TIPS.outOfService">Hors service</th>
               <th class="text-center">Actions</th>
             </tr>
           </thead>
@@ -349,7 +355,7 @@ onBeforeUnmount(teardownSortable)
               <td class="align-middle">
                 <button type="button"
                         class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                        v-tooltip="'Glisser pour réordonner'">
+                        v-tooltip="meterDragTip(dragEnabled)">
                   <Bars3Icon class="w-4 h-4" />
                 </button>
               </td>
@@ -358,11 +364,12 @@ onBeforeUnmount(teardownSortable)
               <td v-if="groupBy !== 'usage'">
                 <div class="flex items-center gap-1">
                   <span v-if="isMissing(row.meter)"
-                        class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
+                        class="text-red-600 shrink-0" v-tooltip="METER_MISSING_TIP">⚠</span>
                   <span v-else-if="isUnanswered(row.meter)"
-                        class="text-amber-600 font-semibold shrink-0" v-tooltip="'Présence à vérifier : le rapport indique ce compteur « à qualifier »'">?</span>
+                        class="text-amber-600 font-semibold shrink-0" v-tooltip="METER_UNANSWERED_TIP">?</span>
                   <span v-if="row.meter.zone_id && thermalMeterName(row.meter)"
-                        class="text-xs font-medium text-gray-700 shrink-0">{{ thermalMeterName(row.meter) }}</span>
+                        class="text-xs font-medium text-gray-700 shrink-0"
+                        v-tooltip="thermalMeterTip(thermalMeterName(row.meter), row.meter.usage)">{{ thermalMeterName(row.meter) }}</span>
                   <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
                   <span v-else class="text-xs text-gray-400 italic">—</span>
                 </div>
@@ -379,7 +386,7 @@ onBeforeUnmount(teardownSortable)
                 </p>
                 <!-- Nom du système desservi (ex. « Chaudière principale »),
                      auparavant visible seulement dans la matrice « Plan de comptage ». -->
-                <p v-if="systemNameForMeter(row.meter)" v-truncate-tooltip
+                <p v-if="systemNameForMeter(row.meter)" v-tooltip.overflow
                    class="mt-0.5 text-[11px] text-gray-500 truncate max-w-56 text-left">
                   {{ systemNameForMeter(row.meter) }}
                 </p>
@@ -390,12 +397,13 @@ onBeforeUnmount(teardownSortable)
               <td v-if="groupBy !== 'zone'" class="text-gray-700">
                 <div class="flex items-center gap-1">
                   <span v-if="groupBy === 'usage' && isMissing(row.meter)"
-                        class="text-red-600 shrink-0" v-tooltip="'Compteur requis non présent'">⚠</span>
+                        class="text-red-600 shrink-0" v-tooltip="METER_MISSING_TIP">⚠</span>
                   <span v-else-if="groupBy === 'usage' && isUnanswered(row.meter)"
-                        class="text-amber-600 font-semibold shrink-0" v-tooltip="'Présence à vérifier : le rapport indique ce compteur « à qualifier »'">?</span>
-                  <span v-truncate-tooltip class="truncate max-w-60">{{ row.meter.zone_name || 'Compteur général' }}</span>
+                        class="text-amber-600 font-semibold shrink-0" v-tooltip="METER_UNANSWERED_TIP">?</span>
+                  <span v-tooltip.overflow class="truncate max-w-60">{{ row.meter.zone_name || 'Compteur général' }}</span>
                   <span v-if="groupBy === 'usage' && row.meter.zone_id && thermalMeterName(row.meter)"
-                        class="text-xs text-gray-500 shrink-0">· {{ thermalMeterName(row.meter) }}</span>
+                        class="text-xs text-gray-500 shrink-0"
+                        v-tooltip="thermalMeterTip(thermalMeterName(row.meter), row.meter.usage)">· {{ thermalMeterName(row.meter) }}</span>
                 </div>
                 <p v-if="groupBy === 'usage' && row.meter.purpose" v-tooltip="planNote(row.meter)?.tooltip"
                    class="mt-0.5 text-[11px] text-slate-600 text-left whitespace-normal max-w-md">
@@ -407,7 +415,7 @@ onBeforeUnmount(teardownSortable)
                 </p>
                 <!-- Groupé par usage : la colonne Usage est masquée, le nom du
                      système desservi passe sous la zone. -->
-                <p v-if="groupBy === 'usage' && systemNameForMeter(row.meter)" v-truncate-tooltip
+                <p v-if="groupBy === 'usage' && systemNameForMeter(row.meter)" v-tooltip.overflow
                    class="mt-0.5 text-[11px] text-gray-500 truncate max-w-60 text-left">
                   {{ systemNameForMeter(row.meter) }}
                 </p>
@@ -418,16 +426,15 @@ onBeforeUnmount(teardownSortable)
                      non éditable. Audit GTB classique : choix de l'auditeur. -->
                 <span v-if="requiredLocked && requiredLabel(row.meter)" v-tooltip="planNote(row.meter)?.tooltip"
                       class="text-xs text-slate-500 italic">{{ requiredLabel(row.meter) }}</span>
-                <span v-else-if="requiredLocked" class="inline-flex" v-tooltip="REQUIRED_LOCKED_TIP">
-                  <SegmentedToggle compact disabled neutral-no :model-value="!!row.meter.required" />
-                </span>
+                <SegmentedToggle v-else-if="requiredLocked" compact disabled neutral-no :model-value="!!row.meter.required"
+                                 :tooltip="REQUIRED_LOCKED_CARD" />
                 <SegmentedToggle v-else compact :model-value="!!row.meter.required"
-                                 tooltip="Compteur requis ?"
+                                 :tooltip="METER_TOGGLE_TIPS.required"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { required: v } })" />
               </td>
               <td class="whitespace-nowrap">
                 <SegmentedToggle compact :model-value="presentToggleValue(row.meter)"
-                                 tooltip="Compteur présent sur site ?"
+                                 :tooltip="METER_TOGGLE_TIPS.present"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { present_actual: v } })" />
               </td>
               <td class="whitespace-nowrap min-w-44">
@@ -439,18 +446,18 @@ onBeforeUnmount(teardownSortable)
                   search-placeholder="Rechercher un local…"
                   @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { location_zone_id: v ?? null } })"
                 />
-                <span v-else class="text-gray-300 text-xs">—</span>
+                <span v-else class="text-gray-300 text-xs" v-tooltip="METER_NOT_PRESENT_LABEL">—</span>
               </td>
               <td class="whitespace-nowrap">
                 <SegmentedToggle v-if="row.meter.present_actual" compact :model-value="!!row.meter.communicating"
-                                 tooltip="Compteur communicant ?"
+                                 :tooltip="METER_TOGGLE_TIPS.communicating"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: v
                                    ? { communicating: true }
                                    : { communicating: false, communication_protocols: null, communication_protocol: null } })" />
-                <span v-else class="text-gray-300">—</span>
+                <span v-else class="text-gray-300" v-tooltip="METER_NOT_PRESENT_LABEL">—</span>
               </td>
               <td>
-                <div class="min-w-32">
+                <div class="min-w-32" v-tooltip="row.meter.communicating ? null : PROTOCOLS_DISABLED_LABEL">
                   <ProtocolMultiPicker
                     :model-value="row.meter.communication_protocols || (row.meter.communication_protocol && row.meter.communication_protocol !== 'non_communicant' ? JSON.stringify([row.meter.communication_protocol]) : null)"
                     :disabled="!row.meter.communicating"
@@ -462,13 +469,13 @@ onBeforeUnmount(teardownSortable)
               </td>
               <td class="whitespace-nowrap">
                 <SegmentedToggle v-if="row.meter.present_actual" compact :model-value="!!row.meter.wired"
-                                 tooltip="Communication câblée vers la GTB ?"
+                                 :tooltip="METER_TOGGLE_TIPS.wired"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { wired: v } })" />
-                <span v-else class="text-gray-300">—</span>
+                <span v-else class="text-gray-300" v-tooltip="METER_NOT_PRESENT_LABEL">—</span>
               </td>
               <td class="whitespace-nowrap">
                 <SegmentedToggle compact yes-danger :model-value="!!row.meter.out_of_service"
-                                 tooltip="Compteur hors service ? (HS = ignoré du plan d'action)"
+                                 :tooltip="METER_TOGGLE_TIPS.outOfService"
                                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { out_of_service: v } })" />
               </td>
               <td class="whitespace-nowrap text-center">
@@ -492,10 +499,10 @@ onBeforeUnmount(teardownSortable)
                     :attach-to="{ meter_id: row.meter.id }"
                     :label="meterContextLabel(row.meter)"
                   />
-                  <button @click="emit('duplicate-meter', row.meter)" class="btn-icon" v-tooltip="'Dupliquer'">
+                  <button @click="emit('duplicate-meter', row.meter)" class="btn-icon" v-tooltip="'Dupliquer ce compteur'">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
-                  <button @click="emit('remove-meter', row.meter)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
+                  <button @click="emit('remove-meter', row.meter)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer ce compteur'">
                     <TrashIcon class="w-4 h-4" />
                   </button>
                 </div>

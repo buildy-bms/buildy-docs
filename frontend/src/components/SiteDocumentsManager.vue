@@ -11,7 +11,9 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { meterUsageLabel } from '@/lib/meter-options'
+import { exifTip, attachmentTip, DOC_ATTACHED_COLUMN_TIP, DOC_REPORT_COLUMN_TIP } from '@/lib/audit-tips-site'
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
 
 /**
  * Manager des fichiers DOE rattachés à un site (visibles depuis l'audit BACS).
@@ -42,7 +44,7 @@ const CATEGORIES = [
   { value: 'schema_electrique', label: 'Schéma électrique' },
   { value: 'schema_synoptique', label: 'Schéma synoptique' },
   { value: 'analyse_fonctionnelle', label: 'Analyse fonctionnelle' },
-  { value: 'datasheet', label: 'Fiche technique (datasheet)' },
+  { value: 'datasheet', label: 'Fiche technique' },
   { value: 'manuel_utilisateur', label: 'Manuel utilisateur' },
   { value: 'rapport_essais', label: "Rapport d'essais" },
   { value: 'autre', label: 'Autre' },
@@ -182,17 +184,8 @@ function gpsMapUrl(d) {
   if (d.gps_latitude == null || d.gps_longitude == null) return null
   return `https://www.google.com/maps/search/?api=1&query=${d.gps_latitude},${d.gps_longitude}`
 }
-function exifTooltip(d) {
-  const parts = []
-  if (d.taken_at) parts.push('Pris le ' + fmtTakenAt(d.taken_at))
-  if (d.camera_make || d.camera_model) {
-    parts.push([d.camera_make, d.camera_model].filter(Boolean).join(' '))
-  }
-  if (d.gps_latitude != null && d.gps_longitude != null) {
-    parts.push(`GPS ${d.gps_latitude.toFixed(5)}, ${d.gps_longitude.toFixed(5)}`)
-  }
-  return parts.join(' · ')
-}
+// Informations de la photo (date de prise de vue, appareil, position) : carte
+// exifTip (lib/audit-tips-site.js), plus de ligne brute « Pris le … · Canon … · GPS … ».
 
 function categoryLabel(v) {
   return CATEGORIES.find(c => c.value === v)?.label || v
@@ -200,7 +193,7 @@ function categoryLabel(v) {
 
 const SYSTEM_LABEL_FR = {
   heating: 'Chauffage', cooling: 'Refroidissement', ventilation: 'Ventilation',
-  dhw: 'ECS', lighting_indoor: 'Éclairage intérieur',
+  dhw: 'Eau chaude sanitaire', lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur', electricity_production: 'Production photovoltaïque',
 }
 
@@ -211,12 +204,12 @@ function attachmentLabel(d) {
   }
   if (d.bacs_audit_device_id) {
     const dev = props.devices.find(x => x.id === d.bacs_audit_device_id)
-    return { kind: 'Système', label: dev?.name || dev?.brand || `Équipement #${d.bacs_audit_device_id}` }
+    return { kind: 'Équipement', label: dev?.name || dev?.brand || `Équipement #${d.bacs_audit_device_id}` }
   }
   if (d.bacs_audit_system_id) {
     const s = props.systems.find(x => x.id === d.bacs_audit_system_id)
     const cat = s ? (SYSTEM_LABEL_FR[s.system_category] || s.system_category) : `Système #${d.bacs_audit_system_id}`
-    return { kind: 'Catégorie', label: s ? `${cat} / ${s.zone_name}` : cat }
+    return { kind: 'Système', label: s ? `${cat} / ${s.zone_name}` : cat }
   }
   if (d.bacs_audit_meter_id) {
     const m = props.meters.find(x => x.id === d.bacs_audit_meter_id)
@@ -238,11 +231,9 @@ function attachmentLabel(d) {
   }
   // Document de l'ensemble du site (plan, schéma, manuel…), sans élément
   // précis : il EST rattaché au site. L'ancien libellé « Site — non
-  // rattaché », sous l'en-tête « Rattaché à », se contredisait.
-  return {
-    kind: 'Site', label: '',
-    tooltip: 'Document de l\'ensemble du site, sans élément précis (zone, système, compteur ou GTB).',
-  }
+  // rattaché », sous l'en-tête « Rattaché à », se contredisait. Infobulle :
+  // attachmentTip (lib/audit-tips-site.js).
+  return { kind: 'Site', label: '' }
 }
 
 const previewDoc = ref(null)
@@ -406,14 +397,15 @@ onBeforeUnmount(() => {
       <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
         <tr>
           <th class="text-center py-2 px-2">
-            <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded" />
+            <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded"
+                   v-tooltip="allSelected ? { label: 'Tout désélectionner', icon: 'square-minus' } : 'Tout sélectionner'" />
           </th>
           <th class="text-center px-3 py-2">Aperçu</th>
           <th class="text-left px-3 py-2">Titre</th>
           <th class="text-left px-3 py-2">Catégorie</th>
-          <th class="text-left px-3 py-2">Rattaché à</th>
+          <th class="text-left px-3 py-2" v-tooltip="DOC_ATTACHED_COLUMN_TIP">Rattaché à</th>
           <th class="text-right px-3 py-2">Taille</th>
-          <th class="text-center px-3 py-2">Rapport</th>
+          <th class="text-center px-3 py-2" v-tooltip="DOC_REPORT_COLUMN_TIP">Rapport</th>
           <th class="text-center px-3 py-2">Actions</th>
         </tr>
       </thead>
@@ -421,32 +413,33 @@ onBeforeUnmount(() => {
         <tr v-for="d in documents" :key="d.id"
             :class="['group hover:bg-gray-50/60 align-middle', selectedIds.has(d.id) ? 'bg-indigo-50/40' : '']">
           <td class="text-center py-2 px-2 align-middle">
-            <input type="checkbox" :checked="selectedIds.has(d.id)" @change="toggleOne(d.id)" class="rounded" />
+            <input type="checkbox" :checked="selectedIds.has(d.id)" @change="toggleOne(d.id)" class="rounded"
+                   v-tooltip="selectedIds.has(d.id) ? { label: 'Désélectionner ce document', icon: 'square-minus' } : 'Sélectionner ce document'" />
           </td>
           <td class="px-3 py-2 text-center align-middle">
-            <button v-if="isImage(d)" @click="openPreview(d)" class="inline-block">
+            <button v-if="isImage(d)" @click="openPreview(d)" class="inline-block" v-tooltip="'Agrandir la photo'">
               <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title || d.original_name || 'Document'"
                    loading="lazy" decoding="async"
                    class="w-12 h-12 object-cover rounded border border-gray-200 hover:border-indigo-400 transition" />
             </button>
-            <button v-else-if="isPdf(d)" @click="openPreview(d)" class="inline-block" v-tooltip="'Aperçu du PDF'">
+            <button v-else-if="isPdf(d)" @click="openPreview(d)" class="inline-block" v-tooltip="'Voir le PDF'">
               <DocumentIcon class="w-6 h-6 text-gray-400 hover:text-indigo-600 mx-auto transition" />
             </button>
             <DocumentIcon v-else class="w-6 h-6 text-gray-400 mx-auto" />
           </td>
           <td class="px-3 py-2 text-gray-700 align-middle min-w-0">
-            <input type="text" :value="d.title"
+            <input type="text" :value="d.title" v-tooltip.overflow
                    @blur="e => e.target.value !== d.title && patchDoc(d, { title: e.target.value })"
                    class="w-full px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded text-sm" />
             <div class="px-2 mt-0.5 flex items-center gap-2 flex-wrap text-[11px] text-gray-400">
-              <span class="truncate">{{ d.original_name }}</span>
-              <span v-if="d.taken_at" v-tooltip="exifTooltip(d)"
+              <span class="truncate" v-tooltip.overflow>{{ d.original_name }}</span>
+              <span v-if="d.taken_at" v-tooltip="exifTip(d)"
                     class="inline-flex items-center gap-0.5 text-gray-500 shrink-0">
                 <ClockIcon class="w-3 h-3" />
                 {{ fmtTakenAt(d.taken_at) }}
               </span>
               <a v-if="gpsMapUrl(d)" :href="gpsMapUrl(d)" target="_blank" rel="noopener"
-                 v-tooltip="`Voir sur Google Maps — ${exifTooltip(d)}`"
+                 v-tooltip="'Voir l’endroit sur Google Maps'"
                  class="inline-flex items-center gap-0.5 text-indigo-600 hover:text-indigo-800 shrink-0"
                  @click.stop>
                 <MapPinIcon class="w-3 h-3" />
@@ -467,7 +460,7 @@ onBeforeUnmount(() => {
               attachmentLabel(d).kind === 'Site'
                 ? 'border-gray-200 text-gray-600 bg-gray-50'
                 : 'border-indigo-200 text-indigo-700 bg-indigo-50']"
-                  v-tooltip="attachmentLabel(d).tooltip || (attachmentLabel(d).label ? `${attachmentLabel(d).kind} : ${attachmentLabel(d).label}` : '')">
+                  v-tooltip="attachmentTip(attachmentLabel(d))">
               <span class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
               <span v-if="attachmentLabel(d).label" class="truncate">{{ attachmentLabel(d).label }}</span>
             </span>
@@ -475,7 +468,7 @@ onBeforeUnmount(() => {
           <td class="px-3 py-2 text-right text-xs text-gray-500 tabular-nums align-middle whitespace-nowrap">{{ fmtSize(d.size_bytes) }}</td>
           <td class="px-3 py-2 text-center align-middle">
             <label class="inline-flex items-center gap-1.5 text-xs leading-5 text-gray-600 cursor-pointer select-none align-middle"
-                   v-tooltip="'Inclure ce document dans le rapport PDF (annexe « Documents joints »)'">
+                   v-tooltip="{ label: 'Joindre ce document au rapport PDF', icon: 'paperclip' }">
               <input type="checkbox" :checked="!!d.include_in_report"
                      @change="e => setInReport(d, e.target.checked)"
                      class="rounded accent-emerald-600" />
@@ -484,14 +477,14 @@ onBeforeUnmount(() => {
           </td>
           <td class="px-3 py-2 text-center whitespace-nowrap align-middle">
             <button v-if="isImage(d) || isPdf(d)" @click="openPreview(d)"
-                    class="text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Aperçu'">
+                    class="text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Voir ce document'">
               <EyeIcon class="w-4 h-4" />
             </button>
             <a :href="getSiteDocumentDownloadUrl(d.id)" target="_blank"
-               class="inline-block text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Télécharger'">
+               class="inline-block text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Télécharger ce document'">
               <ArrowDownTrayIcon class="w-4 h-4" />
             </a>
-            <button @click="removeDoc(d)" class="text-gray-400 hover:text-red-600 mx-0.5 p-1" v-tooltip="'Supprimer'">
+            <button @click="removeDoc(d)" class="text-gray-400 hover:text-red-600 mx-0.5 p-1" v-tooltip="'Supprimer ce document'">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>
@@ -510,18 +503,20 @@ onBeforeUnmount(() => {
       <div class="relative max-w-6xl max-h-[90vh] w-full flex flex-col">
         <header class="flex items-center justify-between text-white mb-3">
           <div class="min-w-0 flex-1">
-            <h3 class="text-base font-semibold truncate">{{ previewDoc.title }}</h3>
-            <p class="text-xs opacity-70 truncate">
+            <h3 class="text-base font-semibold truncate" v-tooltip.overflow>{{ previewDoc.title }}</h3>
+            <p class="text-xs opacity-70 truncate" v-tooltip.overflow>
               {{ attachmentLabel(previewDoc).kind }}{{ attachmentLabel(previewDoc).label ? ' : ' + attachmentLabel(previewDoc).label : '' }}
               · {{ fmtSize(previewDoc.size_bytes) }}
             </p>
             <div v-if="previewDoc.taken_at || gpsMapUrl(previewDoc) || previewDoc.camera_make || previewDoc.camera_model"
-                 class="mt-1 flex items-center gap-3 flex-wrap text-[11px] opacity-80">
+                 class="mt-1 flex items-center gap-3 flex-wrap text-[11px] opacity-80"
+                 v-tooltip="exifTip(previewDoc)">
               <span v-if="previewDoc.taken_at" class="inline-flex items-center gap-1">
                 <ClockIcon class="w-3 h-3" />
                 {{ fmtTakenAt(previewDoc.taken_at) }}
               </span>
               <a v-if="gpsMapUrl(previewDoc)" :href="gpsMapUrl(previewDoc)" target="_blank" rel="noopener"
+                 v-tooltip="'Voir l’endroit sur Google Maps'"
                  class="inline-flex items-center gap-1 text-indigo-200 hover:text-white">
                 <MapPinIcon class="w-3 h-3" />
                 {{ previewDoc.gps_latitude.toFixed(5) }}, {{ previewDoc.gps_longitude.toFixed(5) }}
@@ -535,7 +530,8 @@ onBeforeUnmount(() => {
              class="ml-4 px-3 py-1.5 text-xs font-medium text-white border border-white/40 rounded hover:bg-white/10">
             <ArrowDownTrayIcon class="w-4 h-4 inline-block mr-1" /> Télécharger
           </a>
-          <button @click="previewDoc = null" class="ml-2 p-2 text-white hover:bg-white/10 rounded">
+          <button @click="previewDoc = null" class="ml-2 p-2 text-white hover:bg-white/10 rounded"
+                  v-tooltip="'Fermer l’aperçu'">
             <XMarkIcon class="w-5 h-5" />
           </button>
         </header>
@@ -581,10 +577,12 @@ onBeforeUnmount(() => {
                     class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
               Annuler
             </button>
-            <button type="submit" :disabled="uploading || !pendingMeta.title.trim()"
-                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
-              {{ uploading ? 'Upload…' : 'Téléverser' }}
-            </button>
+            <Tooltip :text="uploading ? 'Envoi en cours…' : (!pendingMeta.title.trim() ? 'Donne d’abord un titre au document' : null)">
+              <button type="submit" :disabled="uploading || !pendingMeta.title.trim()"
+                      class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
+                {{ uploading ? 'Envoi…' : 'Téléverser' }}
+              </button>
+            </Tooltip>
           </div>
         </form>
       </div>

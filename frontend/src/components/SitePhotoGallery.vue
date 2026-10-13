@@ -9,6 +9,7 @@ import { CameraIcon, MapPinIcon } from '@heroicons/vue/24/outline'
 import ImageLightbox from './ImageLightbox.vue'
 import { listSiteDocuments, getSiteDocumentDownloadUrl } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { sitePhotoTip } from '@/lib/misc-tips'
 
 const props = defineProps({ uuid: { type: String, required: true } })
 const { error: notifyError } = useNotification()
@@ -70,13 +71,14 @@ function captionDate(p) {
     <div v-else-if="sorted.length"
          class="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
       <button v-for="(p, i) in sorted" :key="p.id" type="button"
+              v-tooltip="() => sitePhotoTip(p)"
               @click="lightboxIndex = i"
               class="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
         <img :src="getSiteDocumentDownloadUrl(p.id)" :alt="p.title || ''"
              loading="lazy"
              class="w-full h-full object-cover transition group-hover:scale-105" />
         <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pt-5 pb-1.5">
-          <p class="text-[11px] text-white/90 leading-tight truncate">{{ captionDate(p) }}</p>
+          <p class="text-[11px] text-white/90 leading-tight truncate" v-tooltip.overflow>{{ captionDate(p) }}</p>
           <p v-if="p.gps_latitude != null" class="text-[10px] text-white/70 inline-flex items-center gap-0.5">
             <MapPinIcon class="w-3 h-3 shrink-0" /> Géolocalisée
           </p>

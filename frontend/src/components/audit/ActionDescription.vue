@@ -15,12 +15,18 @@
  * En PWA / si l'élément cible n'est pas dans le DOM (autre onglet),
  * la pilule reste cliquable mais sans effet — pas d'erreur visible.
  */
-import { computed, h } from 'vue'
+import { computed, h, withDirectives } from 'vue'
 import { useAuditStore } from '@/stores/audit'
 import { storeToRefs } from 'pinia'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
 import { requestAuditReveal } from '@/lib/audit-reveal'
+import { vTooltip } from '@/lib/tooltip'
+
+// Infobulle (v-tooltip) d'une pastille rendue par h() : ce que fait le clic.
+function withTip(vnode, label) {
+  return withDirectives(vnode, [[vTooltip, label]])
+}
 
 const props = defineProps({
   text: { type: String, required: true },
@@ -132,29 +138,29 @@ function faIcon(name, color) {
 function renderPill(token) {
   if (token.type === 'zone') {
     const label = zoneLabel(token.id)
-    return h('button', {
+    return withTip(h('button', {
       type: 'button',
       class: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition align-baseline',
       onClick: (e) => { e.stopPropagation(); gotoZone(token.id) },
-    }, [faIcon('location-dot', '#4f46e5'), h('span', label)])
+    }, [faIcon('location-dot', '#4f46e5'), h('span', label)]), 'Aller à cette zone')
   }
   if (token.type === 'system') {
     const meta = systemMeta(token.id)
     const tone = meta.decor || { icon: 'gear', color: '#6b7280' }
-    return h('button', {
+    return withTip(h('button', {
       type: 'button',
       class: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border hover:opacity-90 transition align-baseline',
       style: { color: tone.color, borderColor: tone.color + '66', backgroundColor: tone.color + '1A' },
       onClick: (e) => { e.stopPropagation(); gotoSystem(token.id) },
-    }, [faIcon(tone.icon, tone.color), h('span', meta.label), meta.zoneName ? h('span', ` · ${meta.zoneName}`) : null])
+    }, [faIcon(tone.icon, tone.color), h('span', meta.label), meta.zoneName ? h('span', ` · ${meta.zoneName}`) : null]), 'Aller à ce système')
   }
   if (token.type === 'device') {
     const label = deviceLabel(token.id)
-    return h('button', {
+    return withTip(h('button', {
       type: 'button',
       class: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition align-baseline',
       onClick: (e) => { e.stopPropagation(); gotoDevice(token.id) },
-    }, [faIcon('gear', '#475569'), h('span', label)])
+    }, [faIcon('gear', '#475569'), h('span', label)]), 'Aller à cet équipement')
   }
   return h('span', '')
 }

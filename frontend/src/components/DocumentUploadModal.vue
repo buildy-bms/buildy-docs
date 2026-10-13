@@ -9,6 +9,7 @@
  */
 import { ref, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
+import Tooltip from './Tooltip.vue'
 
 const props = defineProps({
   files: { type: Array, required: true }, // [File, ...]
@@ -50,6 +51,14 @@ function canConfirm() {
   return rows.value.length > 0
     && rows.value.every(r => r.title.trim().length > 0 && r.category)
     && !props.uploading
+}
+
+// Raison du bouton « Téléverser » grisé (null quand il est actif).
+function confirmReason() {
+  if (props.uploading) return 'Envoi en cours…'
+  if (rows.value.some(r => !r.title.trim())) return 'Donne un titre à chaque document'
+  if (rows.value.some(r => !r.category)) return 'Choisis une catégorie pour chaque document'
+  return null
 }
 
 function submit() {
@@ -97,7 +106,7 @@ function formatSize(n) {
             <div class="flex items-center gap-2 min-w-0">
               <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-600 text-[10px] font-bold shrink-0">PDF</span>
               <div class="min-w-0">
-                <div class="text-sm font-medium text-gray-900 truncate" :title="row.file.name">{{ row.file.name }}</div>
+                <div class="text-sm font-medium text-gray-900 truncate" v-tooltip.overflow>{{ row.file.name }}</div>
                 <div class="text-[10px] text-gray-500">{{ formatSize(row.file.size) }}</div>
               </div>
             </div>
@@ -137,14 +146,16 @@ function formatSize(n) {
         >
           Annuler
         </button>
-        <button
-          type="button"
-          class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          :disabled="!canConfirm()"
-          @click="submit"
-        >
-          {{ uploading ? 'Téléversement…' : (files.length > 1 ? `Téléverser ${files.length} documents` : 'Téléverser') }}
-        </button>
+        <Tooltip :text="confirmReason()">
+          <button
+            type="button"
+            class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            :disabled="!canConfirm()"
+            @click="submit"
+          >
+            {{ uploading ? 'Téléversement…' : (files.length > 1 ? `Téléverser ${files.length} documents` : 'Téléverser') }}
+          </button>
+        </Tooltip>
       </div>
     </template>
   </BaseModal>

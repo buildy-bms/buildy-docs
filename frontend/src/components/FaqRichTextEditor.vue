@@ -31,6 +31,7 @@ import { useNotification } from '@/composables/useNotification'
 import LinkInputModal from './LinkInputModal.vue'
 import FaqArticleLinkModal from './FaqArticleLinkModal.vue'
 import FaqRewriteSelectionModal from './FaqRewriteSelectionModal.vue'
+import Tooltip from './Tooltip.vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -364,39 +365,39 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
     <!-- Toolbar (sticky pour rester visible sur articles longs) -->
     <div class="sticky top-0 z-10 flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50/95 backdrop-blur-sm rounded-t-lg flex-wrap">
       <!-- Headings -->
-      <button type="button" @click="setHeading(1)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 1 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Titre H1">
+      <button type="button" @click="setHeading(1)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 1 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('heading', { level: 1 })" v-tooltip="{ label: 'Titre 1', keys: ['Mod', 'Alt', '1'] }">
         <H1Icon class="w-4 h-4" />
       </button>
-      <button type="button" @click="setHeading(2)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 2 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Titre H2">
+      <button type="button" @click="setHeading(2)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 2 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('heading', { level: 2 })" v-tooltip="{ label: 'Titre 2', keys: ['Mod', 'Alt', '2'] }">
         <H2Icon class="w-4 h-4" />
       </button>
-      <button type="button" @click="setHeading(3)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 3 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Titre H3">
+      <button type="button" @click="setHeading(3)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 3 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('heading', { level: 3 })" v-tooltip="{ label: 'Titre 3', keys: ['Mod', 'Alt', '3'] }">
         <H3Icon class="w-4 h-4" />
       </button>
 
       <span class="w-px h-5 bg-gray-200 mx-1.5" />
 
       <!-- Inline -->
-      <button type="button" @click="editor?.chain().focus().toggleBold().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('bold') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Gras">
+      <button type="button" @click="editor?.chain().focus().toggleBold().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('bold') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('bold')" v-tooltip="{ label: 'Gras', keys: ['Mod', 'B'] }">
         <BoldIcon class="w-4 h-4" />
       </button>
-      <button type="button" @click="editor?.chain().focus().toggleItalic().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('italic') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Italique">
+      <button type="button" @click="editor?.chain().focus().toggleItalic().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('italic') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('italic')" v-tooltip="{ label: 'Italique', keys: ['Mod', 'I'] }">
         <ItalicIcon class="w-4 h-4" />
       </button>
-      <button type="button" @click="editor?.chain().focus().toggleUnderline().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('underline') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Souligné">
+      <button type="button" @click="editor?.chain().focus().toggleUnderline().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('underline') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('underline')" v-tooltip="{ label: 'Souligné', keys: ['Mod', 'U'] }">
         <UnderlineIcon class="w-4 h-4" />
       </button>
-      <button type="button" @click="editor?.chain().focus().toggleHighlight().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('highlight') ? 'bg-yellow-200 text-gray-900' : 'text-gray-600']" title="Surligner">
+      <button type="button" @click="editor?.chain().focus().toggleHighlight().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('highlight') ? 'bg-yellow-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('highlight')" v-tooltip="{ label: 'Surligner', keys: ['Mod', 'Shift', 'H'] }">
         <span class="block w-4 h-4 text-xs font-bold leading-4 text-center">A</span>
       </button>
 
       <span class="w-px h-5 bg-gray-200 mx-1.5" />
 
       <!-- Lists -->
-      <button type="button" @click="editor?.chain().focus().toggleBulletList().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('bulletList') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Liste à puces">
+      <button type="button" @click="editor?.chain().focus().toggleBulletList().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('bulletList') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('bulletList')" v-tooltip="{ label: 'Liste à puces', keys: ['Mod', 'Shift', '8'] }">
         <ListBulletIcon class="w-4 h-4" />
       </button>
-      <button type="button" @click="editor?.chain().focus().toggleOrderedList().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('orderedList') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Liste numérotée">
+      <button type="button" @click="editor?.chain().focus().toggleOrderedList().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('orderedList') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('orderedList')" v-tooltip="{ label: 'Liste numérotée', keys: ['Mod', 'Shift', '7'] }">
         <NumberedListIcon class="w-4 h-4" />
       </button>
 
@@ -405,10 +406,11 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
       <!-- Citation simple -->
       <button type="button" @click="editor?.chain().focus().wrapIn('blockquote', { variant: null }).run()"
               :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('blockquote') && !editor?.getAttributes('blockquote').variant ? 'bg-gray-200 text-gray-900' : 'text-gray-600']"
-              title="Citation">
+              :aria-pressed="isActive('blockquote') && !editor?.getAttributes('blockquote').variant"
+              v-tooltip="{ label: 'Citation', keys: ['Mod', 'Shift', 'B'] }">
         <ChatBubbleBottomCenterTextIcon class="w-4 h-4" />
       </button>
-      <button type="button" @click="editor?.chain().focus().toggleCodeBlock().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('codeBlock') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Bloc de code">
+      <button type="button" @click="editor?.chain().focus().toggleCodeBlock().run()" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('codeBlock') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" :aria-pressed="isActive('codeBlock')" v-tooltip="{ label: 'Bloc de code', keys: ['Mod', 'Alt', 'C'] }">
         <CodeBracketIcon class="w-4 h-4" />
       </button>
 
@@ -417,47 +419,51 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
       <!-- Encarts Crisp : tip / info / warning -->
       <button type="button" @click="toggleCallout('tip')"
               :class="['p-1.5 rounded transition', isCalloutVariant('tip') ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-200']"
-              title="Encart Astuce (vert)">
+              :aria-pressed="isCalloutVariant('tip')" v-tooltip="'Encart vert « Astuce »'">
         <LightBulbIcon class="w-4 h-4" />
       </button>
       <button type="button" @click="toggleCallout('info')"
               :class="['p-1.5 rounded transition', isCalloutVariant('info') ? 'bg-yellow-100 text-yellow-700' : 'text-gray-600 hover:bg-gray-200']"
-              title="Encart Information (jaune)">
+              :aria-pressed="isCalloutVariant('info')" v-tooltip="'Encart jaune « Information »'">
         <InformationCircleIcon class="w-4 h-4" />
       </button>
       <button type="button" @click="toggleCallout('warning')"
               :class="['p-1.5 rounded transition', isCalloutVariant('warning') ? 'bg-orange-100 text-orange-700' : 'text-gray-600 hover:bg-gray-200']"
-              title="Encart Avertissement (orange)">
+              :aria-pressed="isCalloutVariant('warning')" v-tooltip="'Encart orange « Avertissement »'">
         <ExclamationTriangleIcon class="w-4 h-4" />
       </button>
 
       <span class="w-px h-5 bg-gray-200 mx-1.5" />
 
       <!-- Link -->
-      <button type="button" @click="openLink" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('link') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Lien externe (URL)">
+      <button type="button" @click="openLink" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('link') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" v-tooltip="isActive('link') ? 'Modifier ce lien' : 'Lien vers une page web'">
         <LinkIcon class="w-4 h-4" />
       </button>
       <button type="button" @click="openArticleLink"
               class="p-1.5 rounded hover:bg-gray-200 transition text-gray-600"
-              title="Lien vers un autre article FAQ">
+              v-tooltip="'Lien vers un autre article de la FAQ'">
         <BookOpenIcon class="w-4 h-4" />
       </button>
 
-      <!-- Image upload -->
-      <button type="button" @click="triggerImagePicker" :disabled="uploading"
-              class="p-1.5 rounded hover:bg-gray-200 transition text-gray-600 disabled:opacity-50" title="Insérer une image">
-        <PhotoIcon class="w-4 h-4" :class="uploading ? 'animate-pulse' : ''" />
-      </button>
+      <!-- Image upload (bulle portée par l'enveloppe : visible aussi quand le bouton est grisé) -->
+      <Tooltip :text="uploading ? 'Image en cours d’envoi…' : 'Insérer une image'">
+        <button type="button" @click="triggerImagePicker" :disabled="uploading"
+                class="p-1.5 rounded hover:bg-gray-200 transition text-gray-600 disabled:opacity-50">
+          <PhotoIcon class="w-4 h-4" :class="uploading ? 'animate-pulse' : ''" />
+        </button>
+      </Tooltip>
       <input ref="imageInputRef" type="file" accept="image/png,image/jpeg,image/webp,image/gif"
              class="hidden" @change="onImageSelected" />
 
       <!-- IA — pousser à droite -->
       <div v-if="articleId" class="ml-auto">
-        <button type="button" @click="rewriteWithAi" :disabled="aiRunning"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap disabled:opacity-50">
-          <SparklesIcon class="w-3.5 h-3.5 shrink-0" :class="aiRunning ? 'animate-pulse' : ''" />
-          {{ aiRunning ? 'Réécriture…' : 'Réécrire avec IA' }}
-        </button>
+        <Tooltip :text="{ title: 'Réécrire tout l’article avec l’IA', icon: 'wand-magic-sparkles', text: 'Tu peux donner des consignes à l’IA. Pour ne réécrire qu’un passage, sélectionne-le : un bouton apparaît juste au-dessus.' }">
+          <button type="button" @click="rewriteWithAi" :disabled="aiRunning"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap disabled:opacity-50">
+            <SparklesIcon class="w-3.5 h-3.5 shrink-0" :class="aiRunning ? 'animate-pulse' : ''" />
+            {{ aiRunning ? 'Réécriture…' : 'Réécrire avec IA' }}
+          </button>
+        </Tooltip>
       </div>
     </div>
 
@@ -471,7 +477,7 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
         <div class="inline-flex items-center gap-1 px-1 py-1 bg-white border border-gray-200 rounded-lg shadow-md">
           <button type="button" @click="openRewriteSelectionModal"
                   class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded text-violet-700 hover:bg-violet-50 transition whitespace-nowrap font-medium"
-                  title="Réécrire la sélection avec l'IA">
+                  v-tooltip="'Réécrire ce passage avec l’IA'">
             <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
             Réécrire avec IA
           </button>
@@ -494,7 +500,8 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
                       ? 'bg-indigo-100 text-indigo-700'
                       : 'text-gray-700 hover:bg-gray-100'
                   ]"
-                  :title="p.width ? `Largeur ${p.width}px` : 'Pleine largeur du container'">
+                  :aria-pressed="currentImageWidth() === p.width"
+                  v-tooltip="p.width ? `Image affichée sur ${p.width} px de large` : 'Image affichée sur toute la largeur'">
             {{ p.label }}
           </button>
         </div>

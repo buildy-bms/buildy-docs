@@ -16,6 +16,9 @@ import { MagnifyingGlassIcon, XMarkIcon, ArrowsUpDownIcon, ArrowUpIcon, ArrowDow
 import BaseModal from './BaseModal.vue'
 import { listAfPoints } from '@/api'
 import { useTableSortFilter } from '@/composables/useTableSortFilter'
+import {
+  POINT_KPI_TIPS, POINT_COLUMN_TIPS, POINT_TYPE_LABELS, POINT_NATURE_LABELS, pointDirectionLabel, pointOptionalLabel,
+} from '@/lib/af-tips'
 
 const props = defineProps({ afId: { type: Number, required: true } })
 const emit = defineEmits(['close', 'goto-section'])
@@ -125,31 +128,36 @@ const cols = [
         <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
           <button type="button" @click="toggleKpi(null)"
                   :class="['px-3 py-2 border rounded text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30',
-                           kpiFilter === null ? 'bg-gray-100 border-gray-400 ring-2 ring-gray-300' : 'bg-gray-50 border-gray-200 hover:border-gray-300']">
+                           kpiFilter === null ? 'bg-gray-100 border-gray-400 ring-2 ring-gray-300' : 'bg-gray-50 border-gray-200 hover:border-gray-300']"
+                  v-tooltip="POINT_KPI_TIPS.all">
             <p class="text-[10px] uppercase tracking-wider text-gray-500">Total</p>
             <p class="text-lg font-semibold text-gray-800 tabular-nums">{{ totals.all }}</p>
           </button>
           <button type="button" @click="toggleKpi('required')"
                   :class="['px-3 py-2 border rounded text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-500/30',
-                           kpiFilter === 'required' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-300' : 'bg-emerald-50 border-emerald-200 hover:border-emerald-300']">
+                           kpiFilter === 'required' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-300' : 'bg-emerald-50 border-emerald-200 hover:border-emerald-300']"
+                  v-tooltip="POINT_KPI_TIPS.required">
             <p class="text-[10px] uppercase tracking-wider text-emerald-700">Obligatoires</p>
             <p class="text-lg font-semibold text-emerald-800 tabular-nums">{{ totals.required }}</p>
           </button>
           <button type="button" @click="toggleKpi('optional')"
                   :class="['px-3 py-2 border rounded text-left transition focus:outline-none focus:ring-2 focus:ring-amber-500/30',
-                           kpiFilter === 'optional' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300' : 'bg-amber-50 border-amber-200 hover:border-amber-300']">
+                           kpiFilter === 'optional' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300' : 'bg-amber-50 border-amber-200 hover:border-amber-300']"
+                  v-tooltip="POINT_KPI_TIPS.optional">
             <p class="text-[10px] uppercase tracking-wider text-amber-700">Optionnels</p>
             <p class="text-lg font-semibold text-amber-800 tabular-nums">{{ totals.optional }}</p>
           </button>
           <button type="button" @click="toggleKpi('read')"
                   :class="['px-3 py-2 border rounded text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/30',
-                           kpiFilter === 'read' ? 'bg-indigo-100 border-indigo-400 ring-2 ring-indigo-300' : 'bg-indigo-50 border-indigo-200 hover:border-indigo-300']">
+                           kpiFilter === 'read' ? 'bg-indigo-100 border-indigo-400 ring-2 ring-indigo-300' : 'bg-indigo-50 border-indigo-200 hover:border-indigo-300']"
+                  v-tooltip="POINT_KPI_TIPS.read">
             <p class="text-[10px] uppercase tracking-wider text-indigo-700">En lecture</p>
             <p class="text-lg font-semibold text-indigo-800 tabular-nums">{{ totals.read }}</p>
           </button>
           <button type="button" @click="toggleKpi('write')"
                   :class="['px-3 py-2 border rounded text-left transition focus:outline-none focus:ring-2 focus:ring-rose-500/30',
-                           kpiFilter === 'write' ? 'bg-rose-100 border-rose-400 ring-2 ring-rose-300' : 'bg-rose-50 border-rose-200 hover:border-rose-300']">
+                           kpiFilter === 'write' ? 'bg-rose-100 border-rose-400 ring-2 ring-rose-300' : 'bg-rose-50 border-rose-200 hover:border-rose-300']"
+                  v-tooltip="POINT_KPI_TIPS.write">
             <p class="text-[10px] uppercase tracking-wider text-rose-700">En écriture</p>
             <p class="text-lg font-semibold text-rose-800 tabular-nums">{{ totals.write }}</p>
           </button>
@@ -161,7 +169,8 @@ const cols = [
         <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
         <input v-model="search" type="text" placeholder="Rechercher (libellé, repère, équipement, instance)…" autocomplete="off"
                class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-        <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+        <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -172,7 +181,8 @@ const cols = [
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
               <th v-for="c in cols" :key="c.key"
-                  :class="['px-3 py-2 whitespace-nowrap select-none', c.align === 'center' ? 'text-center' : 'text-left']">
+                  :class="['px-3 py-2 whitespace-nowrap select-none', c.align === 'center' ? 'text-center' : 'text-left']"
+                  v-tooltip="POINT_COLUMN_TIPS[c.key]">
                 <button @click="toggleSort(c.key)" class="inline-flex items-center gap-1 hover:text-indigo-700 whitespace-nowrap">
                   {{ c.label }}
                   <ArrowUpIcon v-if="sortKey === c.key && sortDir === 'asc'" class="w-3 h-3 shrink-0" />
@@ -206,21 +216,25 @@ const cols = [
               <td class="px-3 py-2 whitespace-nowrap"><code v-if="p.tech_name" class="text-[11px] text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded">{{ p.tech_name }}</code><span v-else class="text-gray-400">—</span></td>
               <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ p.label }}</td>
               <td class="px-3 py-2 whitespace-nowrap">
-                <span :class="['text-[11px] px-1.5 py-0.5 rounded font-medium', TYPE_COLORS[p.data_type]?.bg || 'bg-gray-100', TYPE_COLORS[p.data_type]?.text || 'text-gray-700']">{{ p.data_type }}</span>
+                <span :class="['text-[11px] px-1.5 py-0.5 rounded font-medium', TYPE_COLORS[p.data_type]?.bg || 'bg-gray-100', TYPE_COLORS[p.data_type]?.text || 'text-gray-700']"
+                      v-tooltip="POINT_TYPE_LABELS[p.data_type]">{{ p.data_type }}</span>
               </td>
               <td class="px-3 py-2 whitespace-nowrap text-center">
-                <span :class="['text-[11px] px-1.5 py-0.5 rounded font-medium', p.direction === 'read' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800']">{{ p.direction === 'read' ? 'R' : 'W' }}</span>
+                <span :class="['text-[11px] px-1.5 py-0.5 rounded font-medium', p.direction === 'read' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800']"
+                      v-tooltip="pointDirectionLabel(p.direction)">{{ p.direction === 'read' ? 'R' : 'W' }}</span>
               </td>
               <td class="px-3 py-2 whitespace-nowrap">
                 <span v-if="p.nature && NATURE_COLORS[p.nature]"
-                      :class="['text-[11px] px-1.5 py-0.5 rounded border font-medium', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]">{{ p.nature }}</span>
+                      :class="['text-[11px] px-1.5 py-0.5 rounded border font-medium', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]"
+                      v-tooltip="POINT_NATURE_LABELS[p.nature]">{{ p.nature }}</span>
                 <span v-else class="text-gray-400">—</span>
               </td>
               <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{ p.unit || '—' }}</td>
               <td class="px-3 py-2 whitespace-nowrap text-center">
                 <!-- Checkbox ronde verte (charte Buildy, alignee sur la liste de points PDF) -->
                 <span :class="['inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle',
-                               p.is_optional ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300']">
+                               p.is_optional ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300']"
+                      v-tooltip="pointOptionalLabel(p.is_optional)">
                   <span v-if="p.is_optional" class="text-white text-[10px] leading-none font-bold">✓</span>
                 </span>
               </td>

@@ -57,7 +57,18 @@ const auditStore = useAuditStore()
 const documentSystems = computed(() => auditStore.systems || [])
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
-import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete, deviceMissingFields, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
+// Contenus des infobulles (partagés avec la liste du mode étape et le mobile)
+import {
+  DEVICE_COLUMN_TIPS, DEVICE_BACKUP_TIP, POWER_NOT_APPLICABLE_TIP, ENERGY_NOT_APPLICABLE_TIP,
+  devicePowerFieldTip, deviceStatusTip,
+} from '@/lib/audit-tips-systems'
+
+// Bouton « Modifier » d'un équipement incomplet (rouge) : ce qu'il reste à renseigner.
+function editButtonTip(d) {
+  if (isDeviceComplete(d, props.system.system_category)) return 'Modifier l’équipement'
+  return deviceStatusTip(deviceMissingFields(d, props.system.system_category))
+}
 
 // Item 3c — les puissances nominales (chaud / froid) n'ont de sens que pour
 // les systèmes qui mettent en jeu une puissance thermique ou aéraulique.
@@ -71,9 +82,9 @@ import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete, deviceRoleAllowsEnergyS
 // côté backend ne cumule que les catégories thermiques pour R175-2.
 const POWER_RELEVANT_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 const showPower = computed(() => POWER_RELEVANT_CATEGORIES.has(props.system?.system_category))
-// Catégories effectivement cumulées dans R175-2 (chauffage + climatisation +
-// ventilation avec batterie). Les autres restent informatives.
-const thermalCategories = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+// Catégories cumulées dans R175-2 (chauffage + climatisation, ventilation / ECS
+// seulement par leur batterie) : expliqué au survol du champ Puissance par
+// devicePowerFieldTip (lib/audit-tips-systems.js).
 
 // Champ de puissance pertinent pour l'usage de CE tableau. Dans un usage
 // refroidissement, un équipement réversible (qui sert aussi un usage
@@ -315,11 +326,11 @@ async function removeDevice(d) {
     <!-- Header avec puissance totale (mode compact : résumé dans l'en-tête de la carte système) -->
     <div v-if="!compact" class="flex items-center mb-2 flex-wrap gap-2 min-w-0">
       <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
-        <span v-truncate-tooltip class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
+        <span v-tooltip.overflow class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
         <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono whitespace-nowrap">
-          {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'systèmes' : 'système' }})
+          {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'équipements' : 'équipement' }})
         </span>
-        <span v-else class="text-gray-400 italic whitespace-nowrap">aucun système saisi</span>
+        <span v-else class="text-gray-400 italic whitespace-nowrap">aucun équipement saisi</span>
       </div>
     </div>
 
@@ -333,10 +344,13 @@ async function removeDevice(d) {
             <DataTableSortHeader sort-key="brand" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Marque</DataTableSortHeader>
             <DataTableSortHeader sort-key="model_reference" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Référence</DataTableSortHeader>
             <DataTableSortHeader sort-key="age_years" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Âge</DataTableSortHeader>
-            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Qté</DataTableSortHeader>
-            <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puissance</DataTableSortHeader>
-            <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
-            <th>Fonction(s)</th>
+            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort"
+                                 v-tooltip="DEVICE_COLUMN_TIPS.quantity">Qté</DataTableSortHeader>
+            <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort"
+                                 v-tooltip="DEVICE_COLUMN_TIPS.power">Puissance</DataTableSortHeader>
+            <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort"
+                                 v-tooltip="DEVICE_COLUMN_TIPS.energy">Énergie</DataTableSortHeader>
+            <th v-tooltip="DEVICE_COLUMN_TIPS.roles">Fonctions</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -373,7 +387,7 @@ async function removeDevice(d) {
                      de la cellule. -->
                 <span v-if="isBackup(d)"
                       class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 shrink-0"
-                      v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
+                      v-tooltip="DEVICE_BACKUP_TIP">
                   <ShieldExclamationIcon class="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -404,7 +418,7 @@ async function removeDevice(d) {
                 <input type="number" min="1" step="1" :value="d.quantity ?? 1" placeholder="1"
                        @blur="e => patchDevice(d, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })"
                        :class="inputCls" class="text-center placeholder:text-gray-300"
-                       v-tooltip="'Nombre d’unités identiques (multiplie la puissance pour le cumul R175-2)'" />
+                       v-tooltip="DEVICE_COLUMN_TIPS.quantity" />
               </div>
             </td>
             <!-- Puissance — règles :
@@ -417,22 +431,20 @@ async function removeDevice(d) {
             <td class="px-2 py-2 align-middle whitespace-nowrap">
               <div v-if="!deviceRoleAllowsEnergySource(d.device_role)"
                    class="px-2 py-1.5 text-xs text-gray-400 italic border border-dashed border-gray-200 rounded-md text-center cursor-help w-24 mx-auto"
-                   :title="'La puissance R175-2 est portée par l\'équipement de PRODUCTION amont (UE DRV, chiller, chaudière, sous-station). Cet émetteur transfère vers le local des kW déjà comptabilisés via le producteur — les cumuler ici ferait du double comptage. Pour activer ce champ, ajoute la fonction « Production » dans la colonne Fonction(s).'">
+                   v-tooltip="POWER_NOT_APPLICABLE_TIP">
                 — non applicable
               </div>
-              <div v-else class="relative w-24 mx-auto">
+              <!-- Bulle portée par le conteneur : le champ grisé (puissance inconnue) ne reçoit
+                   pas le survol, la carte dit alors comment la saisir. -->
+              <div v-else class="relative w-24 mx-auto"
+                   v-tooltip="devicePowerFieldTip({ category: system.system_category, unknown: !!d.power_kw_unknown })">
                 <input type="number" min="0" step="0.1"
                        :value="d.power_kw_unknown ? '' : d[powerFieldFor(d)]"
                        :placeholder="d.power_kw_unknown ? 'Inconnue' : '—'"
                        :disabled="!!d.power_kw_unknown"
                        @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
                        :class="[inputCls, d.power_kw_unknown ? 'bg-gray-50 italic placeholder:text-gray-500' : '']"
-                       class="text-right pr-9 placeholder:text-gray-300"
-                       v-tooltip="d.power_kw_unknown
-                          ? 'Puissance déclarée inconnue par auditeur. Pour modifier, ouvre cet équipement (bouton Modifier).'
-                          : (thermalCategories.has(system.system_category)
-                              ? (system.system_category === 'cooling' ? 'Puissance froid nominale — entre dans le cumul R175-2' : 'Puissance chaud nominale — entre dans le cumul R175-2')
-                              : 'Puissance installée — informative, hors cumul R175-2 (qui ne retient que la puissance thermique chauffage + climatisation)')" />
+                       class="text-right pr-9 placeholder:text-gray-300" />
                 <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
               </div>
             </td>
@@ -445,7 +457,7 @@ async function removeDevice(d) {
               <div class="min-w-28">
                 <div v-if="!deviceRoleAllowsEnergySource(d.device_role)"
                      class="px-2 py-1.5 text-xs text-gray-400 italic border border-dashed border-gray-200 rounded-md text-center cursor-help"
-                     :title="'L\'énergie primaire n\'est saisissable que pour un équipement de PRODUCTION. Pour activer ce champ, ajoute la fonction « Production » dans la colonne Fonction(s). Cas typique : une VMC qui consomme de l\'élec → fonction « Production + Émission ».'">
+                     v-tooltip="ENERGY_NOT_APPLICABLE_TIP">
                   — non applicable
                 </div>
                 <SearchableSelect
@@ -471,7 +483,7 @@ async function removeDevice(d) {
                   :multiple="true"
                   :clearable="true"
                   size="sm"
-                  placeholder="Fonction(s)"
+                  placeholder="Fonctions"
                 />
               </div>
             </td>
@@ -483,14 +495,12 @@ async function removeDevice(d) {
                           isDeviceComplete(d, system.system_category)
                             ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                             : 'text-red-700 bg-red-50 hover:bg-red-100']"
-                        v-tooltip="isDeviceComplete(d, system.system_category)
-                          ? 'Modifier l\'équipement'
-                          : 'Équipement incomplet — à compléter avant de valider l\'étape Systèmes'">
+                        v-tooltip="() => editButtonTip(d)">
                   <Cog6ToothIcon class="w-3.5 h-3.5 shrink-0" /> Modifier
                 </button>
                 <button type="button" @click="emit('open-device-notes', d)"
                         :class="['btn-icon', hasNotes(d.notes_html || d.notes) && 'is-active']"
-                        v-tooltip="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                        v-tooltip="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes de l’équipement' : 'Ajouter une note à l’équipement'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
                 <!-- BacsPhotoButton : galerie popover (miniatures cliquables
@@ -513,10 +523,10 @@ async function removeDevice(d) {
                   :systems="documentSystems"
                   @updated="emit('changed')" />
                 <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
-                <button @click="dupDevice(d)" class="btn-icon" v-tooltip="'Dupliquer'">
+                <button @click="dupDevice(d)" class="btn-icon" v-tooltip="'Dupliquer cet équipement'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
-                <button @click="removeDevice(d)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
+                <button @click="removeDevice(d)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer cet équipement'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>

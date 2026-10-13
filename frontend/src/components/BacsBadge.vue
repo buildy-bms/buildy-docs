@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ScaleIcon } from '@heroicons/vue/24/outline'
 import { getBacsArticles } from '@/api'
+import { bacsReferenceTip } from '@/lib/af-tips'
 import BaseModal from './BaseModal.vue'
 
 const props = defineProps({
@@ -138,7 +139,7 @@ onMounted(() => {
     type="button"
     @click.stop="openModal"
     class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap hover:bg-purple-100 hover:border-purple-300 cursor-pointer"
-    v-tooltip="`Voir l'extrait du décret BACS — ${formattedReference}`"
+    v-tooltip="bacsReferenceTip(reference, context)"
   >
     <ScaleIcon class="w-3 h-3" />
     {{ labelPrefix }} · {{ formattedReference }}

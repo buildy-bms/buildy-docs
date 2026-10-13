@@ -15,6 +15,7 @@ import {
   listPdfBoilerplate, createPdfBoilerplate, updatePdfBoilerplate, deletePdfBoilerplate,
 } from '@/api'
 import RichTextEditor from '@/components/RichTextEditor.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -147,25 +148,27 @@ async function toggleActive(item) {
               />
             </div>
             <div class="flex flex-col gap-1 shrink-0">
-              <button @click="move(item, 'up')" :disabled="idx === 0"
-                      class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30"
-                      v-tooltip="'Monter'">
-                <ArrowUpIcon class="w-4 h-4" />
-              </button>
-              <button @click="move(item, 'down')" :disabled="idx === methodology.length - 1"
-                      class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30"
-                      v-tooltip="'Descendre'">
-                <ArrowDownIcon class="w-4 h-4" />
-              </button>
+              <Tooltip :text="idx === 0 ? 'Ce point est déjà le premier' : 'Monter ce point'">
+                <button @click="move(item, 'up')" :disabled="idx === 0"
+                        class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
+                  <ArrowUpIcon class="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip :text="idx === methodology.length - 1 ? 'Ce point est déjà le dernier' : 'Descendre ce point'">
+                <button @click="move(item, 'down')" :disabled="idx === methodology.length - 1"
+                        class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
+                  <ArrowDownIcon class="w-4 h-4" />
+                </button>
+              </Tooltip>
               <button @click="toggleActive(item)"
                       class="p-1 text-gray-400 hover:text-indigo-600"
-                      v-tooltip="item.is_active ? 'Désactiver (ne plus inclure dans le PDF)' : 'Réactiver'">
+                      v-tooltip="item.is_active ? 'Masquer ce point dans le PDF' : 'Afficher ce point dans le PDF'">
                 <EyeSlashIcon v-if="item.is_active" class="w-4 h-4" />
                 <EyeIcon v-else class="w-4 h-4" />
               </button>
               <button @click="removeItem(item)"
                       class="p-1 text-gray-400 hover:text-red-600"
-                      v-tooltip="'Supprimer'">
+                      v-tooltip="'Supprimer ce point'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </div>
@@ -202,21 +205,27 @@ async function toggleActive(item) {
               />
             </div>
             <div class="flex flex-col gap-1 shrink-0">
-              <button @click="move(item, 'up')" :disabled="idx === 0"
-                      class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
-                <ArrowUpIcon class="w-4 h-4" />
-              </button>
-              <button @click="move(item, 'down')" :disabled="idx === disclaimers.length - 1"
-                      class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
-                <ArrowDownIcon class="w-4 h-4" />
-              </button>
+              <Tooltip :text="idx === 0 ? 'Cette mention est déjà la première' : 'Monter cette mention'">
+                <button @click="move(item, 'up')" :disabled="idx === 0"
+                        class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
+                  <ArrowUpIcon class="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip :text="idx === disclaimers.length - 1 ? 'Cette mention est déjà la dernière' : 'Descendre cette mention'">
+                <button @click="move(item, 'down')" :disabled="idx === disclaimers.length - 1"
+                        class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30">
+                  <ArrowDownIcon class="w-4 h-4" />
+                </button>
+              </Tooltip>
               <button @click="toggleActive(item)"
-                      class="p-1 text-gray-400 hover:text-indigo-600">
+                      class="p-1 text-gray-400 hover:text-indigo-600"
+                      v-tooltip="item.is_active ? 'Masquer cette mention dans le PDF' : 'Afficher cette mention dans le PDF'">
                 <EyeSlashIcon v-if="item.is_active" class="w-4 h-4" />
                 <EyeIcon v-else class="w-4 h-4" />
               </button>
               <button @click="removeItem(item)"
-                      class="p-1 text-gray-400 hover:text-red-600">
+                      class="p-1 text-gray-400 hover:text-red-600"
+                      v-tooltip="'Supprimer cette mention'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </div>

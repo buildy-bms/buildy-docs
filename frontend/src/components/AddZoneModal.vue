@@ -5,7 +5,9 @@ import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import ZoneMapPicker from './ZoneMapPicker.vue'
 import ZoneFunctionalHelpModal from './audit/ZoneFunctionalHelpModal.vue'
+import Tooltip from './Tooltip.vue'
 import { isTechnicalNature, ZONE_OCCUPANCY_PROFILES } from '@/lib/audit-options'
+import { ZONE_KIND_TIPS } from '@/lib/audit-tips-site'
 import { useAuditStore } from '@/stores/audit'
 
 const props = defineProps({
@@ -86,22 +88,25 @@ async function submit() {
         <label class="block text-xs font-medium text-gray-700 mb-1">Type de zone</label>
         <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
           <button type="button" @click="setKind('functional')"
+                  v-tooltip="ZONE_KIND_TIPS.functional"
                   :class="!isTechnical ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
                   class="px-4 py-2 font-medium transition">Fonctionnelle</button>
           <button type="button" @click="setKind('technical')"
+                  v-tooltip="ZONE_KIND_TIPS.technical"
                   :class="isTechnical ? 'bg-slate-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
                   class="px-4 py-2 font-medium transition border-l border-gray-200">Technique</button>
         </div>
         <p class="mt-1 text-xs text-gray-500">
           {{ isTechnical
-            ? 'Local hors décret BACS : pas de système ni compteur généré automatiquement.'
-            : 'Zone assujettie au décret BACS : alimente les cards Systèmes et Compteurs.' }}
+            ? 'Local non concerné par le décret : aucun système ni compteur n’est créé pour lui.'
+            : 'Zone concernée par le décret : ses systèmes et ses compteurs se décrivent aux étapes Systèmes et Compteurs.' }}
         </p>
       </div>
       <div v-if="!isTechnical" class="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-2 flex items-center gap-2">
         <QuestionMarkCircleIcon class="w-5 h-5 text-indigo-600 shrink-0" />
-        <span class="text-xs text-gray-700 flex-1">Une zone fonctionnelle n'est pas une pièce — c'est une unité de suivi énergétique.</span>
+        <span class="text-xs text-gray-700 flex-1">Une zone fonctionnelle n'est pas une pièce : c'est un ensemble de locaux dont on suit l’énergie ensemble.</span>
         <button type="button" @click="showHelp = true"
+                v-tooltip="'Comprendre la zone fonctionnelle'"
                 class="text-xs font-medium text-indigo-700 hover:text-indigo-900 underline whitespace-nowrap shrink-0">
           En savoir plus
         </button>
@@ -122,7 +127,7 @@ async function submit() {
           placeholder="Sélectionner un régime d'activité"
         />
         <p class="mt-1 text-xs text-gray-500">
-          Caractérise l'usage temporel de la zone (24/7, heures de bureau, scolaire…).
+          Quand la zone est occupée : 24 h/24, heures de bureau, rythme scolaire…
         </p>
       </div>
       <div v-if="!isTechnical">
@@ -181,10 +186,12 @@ async function submit() {
                 class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
           Annuler
         </button>
-        <button type="submit" :disabled="!form.name.trim() || submitting"
-                class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm">
-          {{ submitting ? 'Création…' : 'Ajouter la zone' }}
-        </button>
+        <Tooltip :text="submitting ? 'Création en cours…' : (!form.name.trim() ? 'Donne d’abord un nom à la zone' : null)">
+          <button type="submit" :disabled="!form.name.trim() || submitting"
+                  class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm">
+            {{ submitting ? 'Création…' : 'Ajouter la zone' }}
+          </button>
+        </Tooltip>
       </div>
     </form>
   </BaseModal>

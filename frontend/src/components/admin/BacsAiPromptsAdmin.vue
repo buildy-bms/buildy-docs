@@ -16,6 +16,8 @@ import {
 import { listAiPrompts, getAiPrompt, updateAiPrompt, resetAiPrompt, restoreAiPromptVersion } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import Tooltip from '@/components/Tooltip.vue'
+import { promptHistoryTip, promptResetTip, PROMPT_VERSION_RESTORE_TIP } from '@/lib/faq-tips'
 
 const { success, error: notifyError } = useNotification()
 const { confirm } = useConfirm()
@@ -164,14 +166,18 @@ function formatDate(s) {
               <span class="ml-3">{{ draft.length }} caractères</span>
             </div>
             <div class="flex items-center gap-2">
-              <button @click="showHistory = !showHistory" :disabled="!detail.versions?.length"
-                      class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50 whitespace-nowrap">
-                <ClockIcon class="w-4 h-4 shrink-0" /> Historique ({{ detail.versions?.length || 0 }})
-              </button>
-              <button @click="resetToDefault" :disabled="!detail.is_overridden"
-                      class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-amber-700 disabled:opacity-50 whitespace-nowrap">
-                <ArrowPathIcon class="w-4 h-4 shrink-0" /> Restaurer défaut
-              </button>
+              <Tooltip :text="promptHistoryTip(detail.versions?.length || 0, showHistory)">
+                <button @click="showHistory = !showHistory" :disabled="!detail.versions?.length"
+                        class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 disabled:opacity-50 whitespace-nowrap">
+                  <ClockIcon class="w-4 h-4 shrink-0" /> Historique ({{ detail.versions?.length || 0 }})
+                </button>
+              </Tooltip>
+              <Tooltip :text="promptResetTip(detail.is_overridden)">
+                <button @click="resetToDefault" :disabled="!detail.is_overridden"
+                        class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-amber-700 disabled:opacity-50 whitespace-nowrap">
+                  <ArrowPathIcon class="w-4 h-4 shrink-0" /> Restaurer défaut
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -214,7 +220,8 @@ function formatDate(s) {
                   <td class="px-4 py-2 text-gray-600">{{ v.label || 'modification manuelle' }}</td>
                   <td class="px-4 py-2 text-right">
                     <button @click="restoreVersion(v)"
-                            class="text-xs text-violet-700 hover:text-violet-900 font-medium">
+                            class="text-xs text-violet-700 hover:text-violet-900 font-medium"
+                            v-tooltip="PROMPT_VERSION_RESTORE_TIP">
                       Restaurer
                     </button>
                   </td>

@@ -4,6 +4,7 @@ import {
   FolderIcon, FolderOpenIcon, EllipsisHorizontalIcon, ArrowUpOnSquareIcon,
   PencilSquareIcon, TrashIcon, PlusIcon,
 } from '@heroicons/vue/24/outline'
+import { CATEGORY_DIRTY_TIP } from '@/lib/faq-tips'
 
 const props = defineProps({
   category: { type: Object, required: true },
@@ -32,10 +33,11 @@ function onClickAway(e) {
                        ? 'bg-indigo-600 text-white font-medium'
                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200']">
       {{ category.name }}
-      <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400" v-tooltip="'Modifiée localement'" />
+      <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400" v-tooltip="CATEGORY_DIRTY_TIP" />
     </button>
     <button @click.stop="menuOpen = !menuOpen"
-            class="opacity-0 group-hover:opacity-100 absolute -right-1 -top-1 p-0.5 rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition">
+            class="opacity-0 group-hover:opacity-100 absolute -right-1 -top-1 p-0.5 rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition"
+            v-tooltip="'Plus d’actions sur cette catégorie'">
       <EllipsisHorizontalIcon class="w-3 h-3 text-gray-500" />
     </button>
     <Teleport to="body">
@@ -62,19 +64,21 @@ function onClickAway(e) {
   <!-- Variante par défaut : arbre vertical avec children imbriqués. -->
   <div v-else>
     <div class="group flex items-center gap-1 hover:bg-gray-50 rounded">
-      <button v-if="category.children?.length" @click="expanded = !expanded" class="p-0.5 shrink-0">
+      <button v-if="category.children?.length" @click="expanded = !expanded" class="p-0.5 shrink-0"
+              v-tooltip="expanded ? 'Replier la catégorie' : 'Déplier la catégorie'">
         <FolderOpenIcon v-if="expanded" class="w-3.5 h-3.5 text-gray-400" />
         <FolderIcon v-else class="w-3.5 h-3.5 text-gray-400" />
       </button>
       <span v-else class="w-4 shrink-0" />
-      <button @click="emit('select', category.id)"
+      <button @click="emit('select', category.id)" v-tooltip.overflow
               :class="['flex-1 text-left px-2 py-1 text-sm transition rounded truncate',
                        selected === category.id ? 'text-indigo-700 font-medium' : 'text-gray-700']">
         {{ category.name }}
-        <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block ml-1 align-middle" v-tooltip="'Modifiée localement'" />
+        <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block ml-1 align-middle" v-tooltip="CATEGORY_DIRTY_TIP" />
       </button>
       <div class="relative opacity-0 group-hover:opacity-100 transition" data-faq-cat-menu>
-        <button @click.stop="menuOpen = !menuOpen" class="p-1 hover:bg-gray-100 rounded shrink-0">
+        <button @click.stop="menuOpen = !menuOpen" class="p-1 hover:bg-gray-100 rounded shrink-0"
+                v-tooltip="'Plus d’actions sur cette catégorie'">
           <EllipsisHorizontalIcon class="w-4 h-4 text-gray-400" />
         </button>
         <Teleport to="body">

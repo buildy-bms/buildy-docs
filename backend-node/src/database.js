@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 212;
+const TARGET_VERSION = 214;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7847,6 +7847,41 @@ function runMigrations() {
     catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
     log.info('Migration 212 appliquee : site_documents.include_in_report');
     db.pragma('user_version = 212');
+  }
+
+  if (current < 213) {
+    // Migration 213 — Noms de la bibliothèque en français (refonte des
+    // infobulles, 2026-10-13 ; cible : exploitants et maîtres d'ouvrage) :
+    // « Groupe d'eau glacée (chiller) » → « Groupe d'eau glacée »,
+    // catégorie « Process » → « Procédés industriels ». Seulement si le nom
+    // par défaut n'a pas été modifié depuis la bibliothèque. Les équipements
+    // déjà saisis dans les audits gardent leur nom (donnée de l'auditeur).
+    // « chiller » reste un mot de recherche (frontend lib/library-search.js).
+    const tpl = db.prepare(`UPDATE equipment_templates SET name = 'Groupe d''eau glacée'
+                            WHERE slug = 'groupe-eau-glacee' AND name = 'Groupe d''eau glacée (chiller)'`).run();
+    let cat = { changes: 0 };
+    try {
+      cat = db.prepare(`UPDATE system_categories_db SET label = 'Procédés industriels'
+                        WHERE key = 'process' AND label = 'Process'`).run();
+    } catch (e) { if (!/no such table/i.test(e.message)) throw e; }
+    log.info(`Migration 213 appliquee : noms de bibliotheque en francais (${tpl.changes} modele, ${cat.changes} categorie)`);
+    db.pragma('user_version = 213');
+  }
+
+  if (current < 214) {
+    // Migration 214 — Suite de la 213 : les équipements d'audit créés depuis ce modèle et qui
+    // portent encore son ancien nom par défaut (jamais renommés par l'auditeur) prennent le
+    // nouveau nom. Audits livrés exclus : leur contenu reste celui du rapport remis.
+    const r = db.prepare(`
+      UPDATE bacs_audit_system_devices SET name = 'Groupe d''eau glacée'
+      WHERE name = 'Groupe d''eau glacée (chiller)'
+        AND equipment_template_id IN (SELECT id FROM equipment_templates WHERE slug = 'groupe-eau-glacee')
+        AND system_id IN (
+          SELECT s.id FROM bacs_audit_systems s JOIN afs a ON a.id = s.document_id
+          WHERE COALESCE(a.status, '') NOT IN ('delivered', 'livree')
+        )`).run();
+    log.info(`Migration 214 appliquee : ${r.changes} equipement(s) d'audit renomme(s) « Groupe d'eau glacee »`);
+    db.pragma('user_version = 214');
   }
 
   if (current > TARGET_VERSION) {

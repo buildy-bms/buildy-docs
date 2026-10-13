@@ -11,6 +11,7 @@ import EquipmentIcon from './EquipmentIcon.vue'
 import { listAfInstances, duplicateInstance } from '@/api'
 import { useTableSortFilter } from '@/composables/useTableSortFilter'
 import { useNotification } from '@/composables/useNotification'
+import { INSTANCE_COLUMN_TIPS, SECTION_EXCLUDED_TIP, QTY_TOTAL_LABEL } from '@/lib/af-tips'
 
 const props = defineProps({ afId: { type: Number, required: true } })
 const emit = defineEmits(['close', 'goto-section'])
@@ -100,8 +101,8 @@ const cols = [
           <div v-for="g in groupedCount" :key="g.template_id || g.template_name"
                class="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded">
             <EquipmentIcon v-if="g.template_id" :template="{ icon_kind: g.icon_kind, icon_value: g.icon_value, icon_color: g.icon_color }" size="sm" />
-            <span class="flex-1 text-sm text-gray-700 truncate">{{ g.template_name }}</span>
-            <span class="text-xs font-semibold text-gray-900 tabular-nums">{{ g.qty_total }}</span>
+            <span class="flex-1 text-sm text-gray-700 truncate" v-tooltip.overflow>{{ g.template_name }}</span>
+            <span class="text-xs font-semibold text-gray-900 tabular-nums" v-tooltip="QTY_TOTAL_LABEL">{{ g.qty_total }}</span>
           </div>
         </div>
       </div>
@@ -111,7 +112,8 @@ const cols = [
         <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
         <input v-model="search" type="text" placeholder="Rechercher (repère, localisation, équipement, section)…" autocomplete="off"
                class="w-full pl-9 pr-9 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-        <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+        <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -122,7 +124,8 @@ const cols = [
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
               <th v-for="c in cols" :key="c.key"
-                  :class="['px-3 py-2 whitespace-nowrap select-none', c.align === 'center' ? 'text-center' : 'text-left']">
+                  :class="['px-3 py-2 whitespace-nowrap select-none', c.align === 'center' ? 'text-center' : 'text-left']"
+                  v-tooltip="INSTANCE_COLUMN_TIPS[c.key]">
                 <button @click="toggleSort(c.key)" class="inline-flex items-center gap-1 hover:text-indigo-700 whitespace-nowrap">
                   {{ c.label }}
                   <ArrowUpIcon v-if="sortKey === c.key && sortDir === 'asc'" class="w-3 h-3 shrink-0" />
@@ -151,7 +154,7 @@ const cols = [
               <td class="px-3 py-2 whitespace-nowrap cursor-pointer" @click="gotoSection(i.section_id)">
                 <span class="font-mono text-[11px] text-gray-500">{{ i.section_number || '—' }}</span>
                 <span class="ml-1 text-xs text-gray-700">{{ i.section_title }}</span>
-                <span v-if="i.section_included_in_export === 0" class="ml-1 text-[10px] text-amber-600 italic">(exclue)</span>
+                <span v-if="i.section_included_in_export === 0" class="ml-1 text-[10px] text-amber-600 italic" v-tooltip="SECTION_EXCLUDED_TIP">(exclue)</span>
               </td>
               <td class="px-3 py-2 whitespace-nowrap cursor-pointer" @click="gotoSection(i.section_id)">
                 <span class="inline-flex items-center gap-1.5">
@@ -162,9 +165,9 @@ const cols = [
               <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-800 cursor-pointer" @click="gotoSection(i.section_id)">{{ i.reference }}</td>
               <td class="px-3 py-2 whitespace-nowrap text-gray-600 cursor-pointer" @click="gotoSection(i.section_id)">{{ i.location || '—' }}</td>
               <td class="px-3 py-2 text-center tabular-nums text-gray-700 cursor-pointer" @click="gotoSection(i.section_id)">{{ i.qty || 1 }}</td>
-              <td class="px-3 py-2 text-gray-500 text-xs truncate max-w-xs cursor-pointer" @click="gotoSection(i.section_id)">{{ i.notes || '—' }}</td>
+              <td class="px-3 py-2 text-gray-500 text-xs truncate max-w-xs cursor-pointer" @click="gotoSection(i.section_id)" v-tooltip.overflow>{{ i.notes || '—' }}</td>
               <td class="px-2 py-2 text-right whitespace-nowrap">
-                <button @click.stop="duplicateRow(i)" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-900" title="Dupliquer">
+                <button @click.stop="duplicateRow(i)" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-900" v-tooltip="'Dupliquer cette instance'">
                   <DocumentDuplicateIcon class="w-4 h-4 inline" />
                 </button>
               </td>

@@ -19,7 +19,7 @@ const SYSTEM_CATEGORIES = [
   { key: 'comptage',      label: 'Comptage',          bacs: null,        slugs: ['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories'] },
   { key: 'qai',           label: 'QAI',               bacs: null,        slugs: ['qai'] },
   { key: 'occultation',   label: 'Occultation',       bacs: null,        slugs: ['volets', 'stores'] },
-  { key: 'process',       label: 'Process',           bacs: null,        slugs: ['process-industriel'] },
+  { key: 'process',       label: 'Procédés industriels', bacs: null,     slugs: ['process-industriel'] },
   { key: 'autres',        label: 'Autres',            bacs: null,        slugs: ['equipement-generique'] },
 ];
 

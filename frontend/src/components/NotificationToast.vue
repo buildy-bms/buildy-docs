@@ -53,7 +53,7 @@ onUnmounted(() => {
         <button
           @click="dismiss(n.id)"
           class="opacity-70 hover:opacity-100 shrink-0"
-          title="Fermer"
+          v-tooltip.bottom="'Fermer la notification'"
           :style="{ color: styleFor(n.type).fg }"
         >
           <XMarkIcon class="w-4 h-4" />

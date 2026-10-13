@@ -15,15 +15,38 @@
 import { computed, ref } from 'vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import CompactToggle from '@/components/SegmentedToggle.vue'
+import HelpTip from '@/components/HelpTip.vue'
 import { isDeviceComplete } from '@/lib/audit-options'
+import {
+  PRESENCE_TOGGLE_TIP, PRESENCE_ZONE_LABEL, PRESENCE_OTHER_COLUMN_TIP, PRESENCE_LEGEND_TIP, TECHNICAL_ZONE_TIP,
+  presenceCellTip, presenceAddTip, presenceUnansweredTip, presenceToFixTip,
+} from '@/lib/audit-tips-systems'
+import {
+  synthesisTotals, zoneTodoParts, RESUME_ALL_LABEL, RESUME_ALL_TIP, TODO_COLUMN_TIP, CHECK_CELL_TIP,
+} from '@/lib/audit-tips-systems-guide'
+
+// Mise en page guidée : couleurs des totaux et de la colonne « Reste à faire ».
+const TOTAL_TONE = {
+  amber: 'bg-amber-50 ring-amber-300 text-amber-900',
+  rose: 'bg-rose-50 ring-rose-200 text-rose-800',
+  dashed: 'bg-white ring-0 border border-dashed border-slate-500 text-slate-700',
+}
+const PART_TONE = { amber: 'text-amber-800', rose: 'text-rose-700', slate: 'text-slate-600', green: 'text-emerald-700' }
 
 const props = defineProps({
   groups: { type: Array, required: true },            // systemsByZone (vue)
   devicesBySystem: { type: Object, required: true },
   allDevices: { type: Array, default: () => [] },     // équipements partagés
   activeZoneId: { type: [Number, String], default: null },
+  // Faux dans l'onglet « Synthèse des systèmes » : le tableau en est le contenu,
+  // toujours affiché (pas de « Masquer le tableau »), plus haut avant de défiler.
+  collapsible: { type: Boolean, default: true },
+  // Mise en page guidée : { byZone: { [zoneId]: zoneGuide() }, totals: guideTotals(),
+  // checkCells: Set('zoneId:catégorie'), stops: nombre de points à reprendre }. Ajoute les
+  // totaux, « Reprendre le parcours », la colonne « Reste à faire » et le repère « ! ».
+  guide: { type: Object, default: null },
 })
-const emit = defineEmits(['select', 'set-presence', 'add-system'])
+const emit = defineEmits(['select', 'set-presence', 'add-system', 'resume'])
 
 const COLUMNS = [
   { cat: 'heating', label: 'Chauffage' },
@@ -33,8 +56,14 @@ const COLUMNS = [
   { cat: 'lighting_indoor', label: 'Écl. int.', full: 'Éclairage intérieur' },
   { cat: 'lighting_outdoor', label: 'Écl. ext.', full: 'Éclairage extérieur' },
   { cat: 'electricity_production', label: 'PV', full: 'Production photovoltaïque' },
-  { cat: '__other', label: 'Autres', full: 'Usages hors décret (bornes de recharge, process…)' },
+  { cat: '__other', label: 'Autres', full: 'Autres usages' },
 ]
+
+// En-tête : nom complet d'une colonne abrégée ; « Autres » a sa carte (usages hors décret).
+function columnTip(col) {
+  if (col.cat === '__other') return PRESENCE_OTHER_COLUMN_TIP
+  return col.full || null
+}
 
 // Tableau replié / déplié (mémorisé, tous audits).
 const COLLAPSE_KEY = 'bacs-systems-matrix-collapsed'
@@ -88,60 +117,92 @@ const summary = computed(() => {
   return { zones: rows.value.length, unanswered, toFix }
 })
 
-function cellTooltip(g, col, cell) {
-  const name = col.full || col.label
-  const parts = [`${g.zone_name} · ${name}`]
-  if (cell.kind === 'single') {
-    parts.push(cell.state === true ? 'Présent' : cell.state === false ? 'Non concerné' : 'Sans réponse (Présent / Non concerné ?)')
-  } else if (cell.systems.length > 1) {
-    parts.push(`${cell.systems.length} systèmes — réponds dans la liste de la zone`)
-  }
-  if (cell.count) parts.push(`${cell.count} équipement${cell.count > 1 ? 's' : ''}`)
-  if (cell.withoutDevice) parts.push('Présent sans équipement saisi')
-  if (cell.incomplete) parts.push(`${cell.incomplete} équipement${cell.incomplete > 1 ? 's' : ''} incomplet${cell.incomplete > 1 ? 's' : ''}`)
-  parts.push('Clic sur le nombre : ouvrir cet usage')
-  return parts.join('\n')
+// Carte d'une case (lib/audit-tips-systems.js) : réponse, équipements, ce qui reste à reprendre.
+function cellTip(g, col, cell) {
+  return presenceCellTip({
+    zone: g.zone_name || 'Zone sans nom',
+    usage: col.full || col.label,
+    category: col.cat,
+    kind: cell.kind,
+    state: cell.state,
+    systems: cell.systems.length,
+    count: cell.count,
+    withoutDevice: cell.withoutDevice,
+    incomplete: cell.incomplete,
+    unanswered: cell.unanswered,
+  })
 }
 
 function setPresence(cell, v) {
   if (!cell.system) return
   emit('set-presence', { system: cell.system, value: v ? 'present' : 'not_concerned' })
 }
+
+const totals = computed(() => (props.guide ? synthesisTotals(props.guide.totals || {}) : []))
+function hasCheck(g, col) { return !!props.guide?.checkCells?.has(`${g.zone_id}:${col.cat}`) }
+function todoParts(g) {
+  const z = props.guide?.byZone?.[g.zone_id]
+  return z ? zoneTodoParts(z) : []
+}
 </script>
 
 <template>
   <div class="rounded-xl border border-slate-200 bg-white overflow-hidden" data-systems-presence-matrix>
+    <!-- Mise en page guidée : totaux de l'étape et reprise du parcours. -->
+    <div v-if="guide" class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 flex-wrap" data-guide-totals>
+      <h3 class="flex-1 min-w-[14rem] text-[15px] font-semibold text-indigo-600">Présence des usages par zone</h3>
+      <div class="flex flex-wrap items-center gap-2">
+        <span v-for="t in totals" :key="t.tone"
+              :class="['inline-flex items-baseline gap-1.5 rounded-lg px-2.5 py-1 ring-1 ring-inset', TOTAL_TONE[t.tone]]"
+              v-tooltip="t.tip">
+          <span class="text-[15px] font-semibold">{{ t.value }}</span>
+          <span class="text-xs">{{ t.label }}</span>
+        </span>
+      </div>
+      <button v-if="guide.stops" type="button" @click="emit('resume')" v-tooltip="RESUME_ALL_TIP"
+              class="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-indigo-700 transition">
+        {{ RESUME_ALL_LABEL }}
+      </button>
+    </div>
     <div class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 flex-wrap">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-700">Présence des usages par zone</h3>
-      <span class="text-[11px] text-gray-500">
+      <h3 v-if="!guide" class="text-xs font-semibold uppercase tracking-wider text-gray-700">Présence des usages par zone</h3>
+      <span v-if="!guide" class="text-[11px] text-gray-500">
         {{ summary.zones }} zone{{ summary.zones > 1 ? 's' : '' }}
-        <template v-if="summary.unanswered"> · <span class="text-amber-700">{{ summary.unanswered }} sans réponse</span></template>
-        <template v-if="summary.toFix"> · <span class="text-amber-700">{{ summary.toFix }} à reprendre</span></template>
+        <template v-if="summary.unanswered"> · <span class="text-amber-700" v-tooltip="presenceUnansweredTip(summary.unanswered)">{{ summary.unanswered }} sans réponse</span></template>
+        <template v-if="summary.toFix"> · <span class="text-amber-700" v-tooltip="presenceToFixTip(summary.toFix)">{{ summary.toFix }} à reprendre</span></template>
       </span>
       <div class="ml-auto flex items-center gap-3 text-[11px] text-gray-500">
         <span class="hidden xl:inline"><span class="font-bold text-emerald-700">✓</span> présent</span>
         <span class="hidden xl:inline"><span class="font-bold text-slate-600">✗</span> non concerné</span>
-        <span class="hidden xl:inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> à reprendre</span>
+        <span class="hidden xl:inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> {{ guide ? 'à compléter' : 'à reprendre' }}</span>
+        <span v-if="guide" class="hidden xl:inline"><span class="font-bold text-rose-700">!</span> à vérifier</span>
+        <span v-if="guide" class="hidden xl:inline"><span class="inline-block rounded border border-dashed border-slate-500 px-1">✓ ✗</span> sans réponse</span>
         <span class="hidden xl:inline"><span class="font-bold text-gray-400">+</span> absent de la zone (clic : ajouter)</span>
-        <button type="button" @click="toggleCollapsed"
+        <!-- Légende masquée sous 1280 px : un ⓘ l'ouvre en carte. -->
+        <HelpTip class="xl:hidden" :tip="PRESENCE_LEGEND_TIP" />
+        <button v-if="collapsible" type="button" @click="toggleCollapsed"
                 class="text-gray-500 hover:text-gray-800 underline underline-offset-2">
           {{ collapsed ? 'Afficher le tableau' : 'Masquer le tableau' }}
         </button>
       </div>
     </div>
-    <div v-show="!collapsed" class="overflow-auto max-h-[360px]">
+    <div v-show="!collapsible || !collapsed" :class="['overflow-auto', collapsible ? 'max-h-[360px]' : 'max-h-[70vh]']">
       <table class="w-full text-xs border-separate border-spacing-0">
         <thead>
           <tr>
             <th class="sticky top-0 z-10 bg-slate-50 text-left font-medium text-gray-600 px-3 py-2 border-b border-slate-200">Zone</th>
+            <!-- Bulle sur les en-têtes abrégés seulement (nom complet) ; l'icône n'a pas la
+                 sienne, pour que tout l'en-tête affiche la même. -->
             <th v-for="col in COLUMNS" :key="col.cat"
                 class="sticky top-0 z-10 bg-slate-50 font-medium text-gray-600 px-2 py-2 border-b border-slate-200 whitespace-nowrap"
-                v-tooltip="col.full || col.label">
+                v-tooltip="columnTip(col)">
               <span class="inline-flex items-center gap-1">
-                <SystemCategoryIcon v-if="col.cat !== '__other'" :category="col.cat" size="sm" />
+                <SystemCategoryIcon v-if="col.cat !== '__other'" :category="col.cat" size="sm" :with-tooltip="false" />
                 {{ col.label }}
               </span>
             </th>
+            <th v-if="guide" class="sticky top-0 z-10 bg-slate-50 text-left font-medium text-gray-600 px-3 py-2 border-b border-slate-200 whitespace-nowrap"
+                v-tooltip="TODO_COLUMN_TIP">Reste à faire</th>
           </tr>
         </thead>
         <tbody>
@@ -151,9 +212,10 @@ function setPresence(cell, v) {
               <button type="button" @click="emit('select', { zoneId: r.g.zone_id })"
                       :class="['inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 transition',
                                r.g.zone_id === activeZoneId ? 'text-indigo-700 font-medium' : 'text-gray-800 hover:text-indigo-700']"
-                      v-tooltip="'Afficher les usages et équipements de cette zone'">
+                      v-tooltip="PRESENCE_ZONE_LABEL">
                 {{ r.g.zone_name || 'Zone sans nom' }}
-                <span v-if="r.g.zone_kind === 'technical'" class="text-[10px] px-1 py-px rounded bg-slate-200 text-slate-600">tech.</span>
+                <span v-if="r.g.zone_kind === 'technical'" class="text-[10px] px-1 py-px rounded bg-slate-200 text-slate-600"
+                      v-tooltip="TECHNICAL_ZONE_TIP">tech.</span>
               </button>
             </th>
             <td v-for="{ col, cell } in r.cells" :key="col.cat"
@@ -165,16 +227,21 @@ function setPresence(cell, v) {
               <button v-if="cell.kind === 'none'" type="button"
                       @click="emit('add-system', { zoneId: r.g.zone_id, zoneName: r.g.zone_name, category: col.cat })"
                       class="inline-flex items-center justify-center w-6 h-[22px] rounded-md border border-dashed border-gray-300 text-gray-400 font-bold hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 transition"
-                      v-tooltip="`Pas d'usage « ${col.full || col.label} » dans ${r.g.zone_name}${r.g.zone_kind === 'technical' ? ' (zone technique, hors décret BACS)' : ''}.\nCliquer pour l'ajouter.`">
+                      v-tooltip="presenceAddTip({ zone: r.g.zone_name || 'Zone sans nom', usage: col.full || col.label, technical: r.g.zone_kind === 'technical' })">
                 +
               </button>
               <span v-else class="inline-flex items-center gap-1">
-                <CompactToggle v-if="cell.kind === 'single'" compact neutral-no size="xs"
-                               :model-value="cell.state"
-                               @update:model-value="v => setPresence(cell, v)" />
+                <!-- Mise en page guidée : sans réponse = toggle en pointillés. -->
+                <span v-if="cell.kind === 'single'"
+                      :class="guide && cell.state == null ? 'rounded-lg outline-1 outline-dashed outline-slate-500 outline-offset-1' : 'contents'">
+                  <CompactToggle compact neutral-no size="xs"
+                                 :model-value="cell.state"
+                                 :tooltip="PRESENCE_TOGGLE_TIP"
+                                 @update:model-value="v => setPresence(cell, v)" />
+                </span>
                 <button type="button"
                         @click="emit('select', { zoneId: r.g.zone_id, category: col.cat })"
-                        v-tooltip="cellTooltip(r.g, col, cell)"
+                        v-tooltip="() => cellTip(r.g, col, cell)"
                         :class="['relative inline-flex items-center justify-center min-w-6 h-[22px] px-1.5 rounded-md text-[11px] font-medium transition',
                                  (cell.kind === 'single' ? cell.state === true : cell.anyPresent)
                                    ? 'bg-slate-100 text-slate-700 hover:bg-indigo-100 hover:text-indigo-800'
@@ -183,7 +250,17 @@ function setPresence(cell, v) {
                   <span v-if="cell.warn || (cell.kind === 'multi' && cell.unanswered)"
                         class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white"></span>
                 </button>
+                <span v-if="guide && hasCheck(r.g, col)" class="text-[12px] font-bold leading-none text-rose-700"
+                      v-tooltip="CHECK_CELL_TIP">!</span>
               </span>
+            </td>
+            <td v-if="guide" class="px-3 py-1 border-b border-slate-100 whitespace-nowrap">
+              <button type="button" @click="emit('select', { zoneId: r.g.zone_id })"
+                      class="text-left text-xs hover:underline" v-tooltip="PRESENCE_ZONE_LABEL">
+                <template v-for="(p, i) in todoParts(r.g)" :key="p.text">
+                  <span v-if="i" class="text-slate-400">, </span><span :class="PART_TONE[p.tone]">{{ p.text }}</span>
+                </template>
+              </button>
             </td>
           </tr>
         </tbody>

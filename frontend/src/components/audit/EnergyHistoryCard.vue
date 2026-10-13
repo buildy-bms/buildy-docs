@@ -20,6 +20,8 @@ import {
 } from '@/api'
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { ENERGY_HISTORY_TYPES, MONTH_LABELS } from '@/lib/audit-options'
+import { plural } from '@/lib/tooltip-content'
+import { TENANT_COLUMN_TIP, ATTACH_INVOICE_TIP, ENERGY_IMPORT_TIP, CSV_TEMPLATE_TIP } from '@/lib/audit-tips-site'
 
 // `flush` : rendu en sous-section (sans chrome de card) quand imbriquée.
 defineProps({
@@ -195,7 +197,7 @@ async function doImport() {
     rows.value = data.rows || []
     pasteText.value = ''
     importing.value = false
-    success(`${data.created} ligne(s) ajoutée(s), ${data.updated} mise(s) à jour`)
+    success(`${plural(data.created || 0, 'ligne ajoutée', 'lignes ajoutées')}, ${plural(data.updated || 0, 'mise à jour', 'mises à jour')}`)
   } catch (e) {
     error(e.response?.data?.detail || 'Import impossible')
   }
@@ -240,7 +242,7 @@ function onInvoiceDrop(row, e) {
   const file = e.dataTransfer?.files?.[0]
   if (!file) return
   if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
-    return error('Format non supporté — déposez une facture PDF ou une image.')
+    return error('Format non pris en charge : dépose une facture PDF ou une image.')
   }
   uploadInvoice(row, file)
 }
@@ -297,9 +299,9 @@ function downloadCsvTemplate() {
     </div>
     <div :class="flush ? 'space-y-4' : 'p-4 space-y-4'">
       <p class="text-xs text-gray-500 leading-relaxed">
-        Saisissez 12 à 24 mois de consommation depuis les factures du client ou
-        des locataires. Cette base de référence permettra de mesurer les
-        économies réelles après la mise en place du BACS.
+        Saisis 12 à 24 mois de consommation à partir des factures du client ou
+        des locataires. Cette base de référence servira à mesurer les économies
+        réelles une fois la GTB en place.
       </p>
 
       <!-- Groupes existants -->
@@ -315,7 +317,7 @@ function downloadCsvTemplate() {
               {{ energyLabel(g.energy_type) }}
             </span>
             <span v-if="g.contract_label" class="text-xs text-gray-500">{{ g.contract_label }}</span>
-            <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
+            <span class="ml-auto text-xs text-gray-600 whitespace-nowrap" v-tooltip="'Total des mois saisis'">
               {{ g.monthsCount }} mois · <strong>{{ g.total.toLocaleString('fr-FR') }} {{ g.unit }}</strong>
               <template v-if="g.cost"> · {{ g.cost.toLocaleString('fr-FR') }} €</template>
             </span>
@@ -327,7 +329,7 @@ function downloadCsvTemplate() {
                 <th class="text-left font-medium px-3 py-1.5">Mois</th>
                 <th class="text-right font-medium px-3 py-1.5">Quantité</th>
                 <th class="text-right font-medium px-3 py-1.5">Coût (€)</th>
-                <th class="text-left font-medium px-3 py-1.5">Preneur</th>
+                <th class="text-left font-medium px-3 py-1.5" v-tooltip="TENANT_COLUMN_TIP">Locataire</th>
                 <th class="text-left font-medium px-3 py-1.5">Facture</th>
                 <th class="px-3 py-1.5"></th>
               </tr>
@@ -373,13 +375,14 @@ function downloadCsvTemplate() {
                   <a v-if="r.invoice_attachment_id"
                      :href="invoiceDoc(r).mime_type ? getSiteDocumentViewUrl(r.invoice_attachment_id) : downloadUrl(r.invoice_attachment_id)" target="_blank"
                      @click.exact="e => openInvoice(e, r)"
+                     v-tooltip="'Ouvrir la facture'"
                      class="text-xs text-indigo-600 hover:underline inline-flex items-center gap-1">
                     <FontAwesomeIcon :icon="['fas', 'file-pdf']" class="w-3 h-3 shrink-0" />
                     {{ r.invoice_name || 'Facture' }}
                   </a>
                   <label v-else
                          class="text-xs text-gray-500 hover:text-indigo-600 cursor-pointer inline-flex items-center gap-1"
-                         v-tooltip="'Cliquer ou glisser-déposer une facture (PDF / image) sur la ligne'">
+                         v-tooltip="ATTACH_INVOICE_TIP">
                     <FontAwesomeIcon
                       :icon="['fas', invoiceUploadRow === r.id ? 'spinner' : 'paperclip']"
                       :class="['w-3 h-3 shrink-0', { 'fa-spin': invoiceUploadRow === r.id }]" />
@@ -391,7 +394,7 @@ function downloadCsvTemplate() {
                 <td class="px-3 py-1.5 text-right">
                   <button @click="removeRow(r)"
                           class="btn-icon btn-icon-danger"
-                          v-tooltip="'Supprimer cette ligne'">
+                          v-tooltip="'Supprimer la consommation de ce mois'">
                     <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4" />
                   </button>
                 </td>
@@ -413,10 +416,12 @@ function downloadCsvTemplate() {
         </button>
         <div class="flex flex-wrap gap-2">
           <button @click="importing = true"
+                  v-tooltip="ENERGY_IMPORT_TIP"
                   class="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-100 whitespace-nowrap inline-flex items-center gap-1.5">
             <FontAwesomeIcon :icon="['fas', 'table-cells']" class="w-3 h-3 shrink-0" /> Importer (Excel / CSV)
           </button>
           <button @click="downloadCsvTemplate"
+                  v-tooltip="CSV_TEMPLATE_TIP"
                   class="text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-100 whitespace-nowrap inline-flex items-center gap-1.5">
             <FontAwesomeIcon :icon="['fas', 'file-arrow-down']" class="w-3 h-3 shrink-0" /> Télécharger un modèle CSV
           </button>
@@ -466,7 +471,7 @@ function downloadCsvTemplate() {
                    class="mt-1 w-full px-2.5 py-2 border border-gray-200 rounded-lg text-sm bg-white" />
           </label>
           <label v-if="tenants.length" class="text-xs font-medium text-gray-700 col-span-2">
-            Preneur (optionnel)
+            Locataire (optionnel)
             <select v-model="newRow.tenant_id"
                     class="mt-1 w-full px-2.5 py-2 border border-gray-200 rounded-lg text-sm bg-white">
               <option :value="null">— Aucun</option>
@@ -508,7 +513,7 @@ function downloadCsvTemplate() {
           </label>
         </div>
         <p class="text-[11px] text-gray-500 leading-relaxed">
-          Collez les lignes depuis Excel — une ligne par mois, colonnes
+          Colle les lignes depuis Excel : une ligne par mois, colonnes
           <strong>année</strong>, <strong>mois</strong>, <strong>quantité</strong>
           et <strong>coût</strong> (optionnel). Séparateur tabulation, point-virgule ou virgule.
         </p>

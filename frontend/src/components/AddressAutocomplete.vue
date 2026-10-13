@@ -139,8 +139,8 @@ onUnmounted(() => {
       >
         <MapPinIcon class="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
         <div class="min-w-0 flex-1">
-          <div class="text-gray-800 truncate">{{ s.label }}</div>
-          <div class="text-[11px] text-gray-400 truncate">{{ s.context }}</div>
+          <div class="text-gray-800 truncate" v-tooltip.overflow>{{ s.label }}</div>
+          <div class="text-[11px] text-gray-400 truncate" v-tooltip.overflow>{{ s.context }}</div>
         </div>
       </li>
     </ul>

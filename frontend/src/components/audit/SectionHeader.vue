@@ -51,9 +51,10 @@ const displayNumber = computed(() => (phase.value && stepMode.numberFor?.(props.
     </span>
     <component v-if="icon" :is="icon" :class="['w-5 h-5 shrink-0', phase ? phase.tone.icon : iconColor]" />
     <div class="min-w-0">
-      <h2 :class="['font-medium text-gray-900 leading-tight truncate', phase ? 'text-[15px]' : 'text-base']">{{ title }}</h2>
+      <!-- Titre et sous-titre coupés (…) : texte complet au survol, seulement s'il est coupé. -->
+      <h2 v-tooltip.overflow :class="['font-medium text-gray-900 leading-tight truncate', phase ? 'text-[15px]' : 'text-base']">{{ title }}</h2>
       <p v-if="subtitle || $slots['subtitle-extra']" class="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-        <span v-if="subtitle" class="truncate">{{ subtitle }}</span>
+        <span v-if="subtitle" v-tooltip.overflow class="truncate">{{ subtitle }}</span>
         <slot name="subtitle-extra" />
       </p>
     </div>

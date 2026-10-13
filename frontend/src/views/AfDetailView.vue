@@ -20,6 +20,11 @@ import {
 } from '@fortawesome/pro-solid-svg-icons'
 library.add(faCircleCheck, faBan, faEye, faEyeSlash, faTrashCan)
 import Tooltip from '@/components/Tooltip.vue'
+import {
+  verificationProgressTip, sectionKindsTip, addSectionBlockedTip,
+  PROJECTION_TIP, DEMAND_TIP, UNDEMAND_LABEL, OPT_OUT_TIP, OPT_IN_LABEL, PAID_OPTION_TIP, REMOVE_PAID_OPTION_LABEL,
+  EXCLUDE_SECTION_TIP, INCLUDE_SECTION_LABEL, DELETE_SECTION_TIP,
+} from '@/lib/af-tips'
 
 const { width: treeWidth, onMouseDown: onTreeResize } = useResizable({
   storageKey: 'af-tree-width',
@@ -201,6 +206,11 @@ const showAddModal = ref(false)
 const addParent = ref(null) // null = section racine
 const addForm = ref({ title: '', kind: 'standard', equipment_template_id: null })
 const equipmentTemplates = ref([])
+// Bouton « Ajouter » grisé : ce qui manque encore (infobulle).
+const addSectionTip = computed(() => addSectionBlockedTip({
+  titleMissing: !addForm.value.title.trim(),
+  templateMissing: addForm.value.kind === 'equipment' && !addForm.value.equipment_template_id,
+}))
 
 async function openAddSection(parentNode) {
   addParent.value = parentNode || null
@@ -656,7 +666,7 @@ watch(() => route.params.id, async (newId, oldId) => {
         v-if="!isCompact && treeCollapsed"
         @click="toggleTreeCollapsed"
         class="shrink-0 self-start mt-2 px-2 py-3 bg-white border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-indigo-600 transition-colors flex flex-col items-center gap-2"
-        title="Afficher l'arborescence des sections"
+        v-tooltip.right="'Afficher l’arbre des sections'"
       >
         <ChevronRightIcon class="w-4 h-4" />
         <span class="text-[10px] font-semibold uppercase tracking-wider [writing-mode:vertical-rl]">Sections</span>
@@ -683,20 +693,20 @@ watch(() => route.params.id, async (newId, oldId) => {
                         verificationProgress.ratio === 1 ? 'text-emerald-600'
                         : verificationProgress.ratio >= 0.5 ? 'text-emerald-700'
                         : 'text-gray-500']"
-                      v-tooltip="`${verificationProgress.verified} sections vérifiées sur ${verificationProgress.total} sections incluses dans l'export`">
+                      v-tooltip="verificationProgressTip(verificationProgress)">
                   ✓ {{ verificationProgress.verified }} / {{ verificationProgress.total }}
                 </span>
                 <button
                   v-if="!isCompact"
                   @click="toggleTreeCollapsed"
                   class="text-gray-400 hover:text-indigo-600 transition-colors"
-                  title="Masquer l'arborescence"
+                  v-tooltip="'Masquer l’arbre des sections'"
                 >
                   <ChevronLeftIcon class="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <p class="text-[11px] text-gray-400 mt-0.5">
+            <p class="text-[11px] text-gray-400 mt-0.5" v-tooltip="sectionKindsTip(sectionsCountByKind)">
               {{ sectionsCountByKind.standard }} texte ·
               {{ sectionsCountByKind.equipment }} équip. ·
               {{ sectionsCountByKind.hyperveez_page }} Hyperveez ·
@@ -750,7 +760,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           v-if="!isCompact"
           @mousedown.prevent="onTreeResize"
           class="group/resize shrink-0 w-3 cursor-col-resize flex items-center justify-center hover:bg-indigo-50 transition-colors"
-          title="Glisser pour redimensionner l'arborescence"
+          v-tooltip.right="'Glisser pour redimensionner l’arbre'"
         >
           <div class="flex flex-col gap-1 opacity-70 group-hover/resize:opacity-100 transition-opacity">
             <span class="block w-1 h-1 rounded-full bg-gray-400 group-hover/resize:bg-indigo-500 transition-colors"></span>
@@ -776,6 +786,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                 type="button"
                 @click="selectSection(sections[0]?.id)"
                 class="hover:text-indigo-700 transition-colors whitespace-nowrap"
+                v-tooltip="'Aller à la première section'"
               >
                 {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
               </button>
@@ -785,7 +796,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                   type="button"
                   @click="selectSection(ancestor.id)"
                   class="hover:text-indigo-700 transition-colors truncate max-w-xs"
-                  v-tooltip="ancestor.title"
+                  v-tooltip.overflow
                 >
                   <span v-if="ancestor.number" class="font-mono text-gray-400 mr-1">§{{ ancestor.number }}</span>
                   {{ ancestor.title }}
@@ -796,7 +807,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               type="button"
               @click="projectionOpen = true"
               class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-indigo-700 border border-gray-200 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
-              v-tooltip="'Afficher cette section en plein écran (vidéoprojecteur)'"
+              v-tooltip="PROJECTION_TIP"
             >
               <PresentationChartLineIcon class="w-3.5 h-3.5 shrink-0" />
               Projection
@@ -807,7 +818,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <div v-if="selectedSection.kind !== 'zones'" class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
             <Tooltip
               v-if="selectedCanOptOut"
-              :text="selectedFlags.demanded ? 'Annuler — la fonction ne sera plus marquée comme exigée par la MOA' : 'Marquer cette fonction comme exigée par la maîtrise d\'ouvrage (à inclure dans l\'avenant contractuel)'"
+              :text="selectedFlags.demanded ? UNDEMAND_LABEL : DEMAND_TIP"
             >
               <button
                 type="button"
@@ -823,7 +834,7 @@ watch(() => route.params.id, async (newId, oldId) => {
             </Tooltip>
             <Tooltip
               v-if="selectedCanOptOut"
-              :text="selectedFlags.optedOut ? 'Réactiver cette fonctionnalité (elle ne sera plus marquée comme écartée par la MOA)' : 'Marquer cette fonctionnalité comme écartée par la maîtrise d\'ouvrage (visible dans le PDF avec encart)'"
+              :text="selectedFlags.optedOut ? OPT_IN_LABEL : OPT_OUT_TIP"
             >
               <button
                 type="button"
@@ -841,7 +852,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                  feature est avail_paid_option au niveau choisi par le MOA) -->
             <Tooltip
               v-if="selectedCanOptinPaidOption"
-              :text="selectedFlags.optinPaid ? 'Retirer du contrat (cette option payante ne sera plus comptée dans l\'avenant)' : 'Ajouter cette fonctionnalité au contrat comme option payante — sans changer de niveau d\'offre'"
+              :text="selectedFlags.optinPaid ? REMOVE_PAID_OPTION_LABEL : PAID_OPTION_TIP"
             >
               <button
                 type="button"
@@ -856,7 +867,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               </button>
             </Tooltip>
             <Tooltip
-              :text="selectedFlags.excluded ? 'Réinclure cette section dans les exports (PDF, listes)' : 'Exclure cette section de tous les exports (PDF, listes) — utile pour des sections internes ou en cours de rédaction'"
+              :text="selectedFlags.excluded ? INCLUDE_SECTION_LABEL : EXCLUDE_SECTION_TIP"
             >
               <button
                 type="button"
@@ -871,7 +882,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               </button>
             </Tooltip>
             <span class="flex-1"></span>
-            <Tooltip text="Supprimer définitivement cette section et toutes ses sous-sections — action irréversible">
+            <Tooltip :text="DELETE_SECTION_TIP">
               <button
                 type="button"
                 @click="handleDeleteSection(selectedSection)"
@@ -1030,10 +1041,12 @@ watch(() => route.params.id, async (newId, oldId) => {
     </form>
     <template #footer>
       <button @click="showAddModal = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
-      <button @click="submitAddSection" :disabled="!addForm.title.trim() || (addForm.kind === 'equipment' && !addForm.equipment_template_id)"
-              class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
-        Ajouter
-      </button>
+      <Tooltip :text="addSectionTip">
+        <button @click="submitAddSection" :disabled="!addForm.title.trim() || (addForm.kind === 'equipment' && !addForm.equipment_template_id)"
+                class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+          Ajouter
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 
@@ -1050,10 +1063,10 @@ watch(() => route.params.id, async (newId, oldId) => {
     >
       <header class="shrink-0 flex items-center justify-between gap-4 px-8 py-3 border-b border-gray-200 bg-gray-50">
         <div class="min-w-0 flex-1">
-          <p class="text-[11px] uppercase tracking-wider text-gray-500 truncate">
+          <p class="text-[11px] uppercase tracking-wider text-gray-500 truncate" v-tooltip.overflow.bottom>
             {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
           </p>
-          <h1 class="text-xl font-bold text-gray-900 truncate mt-0.5">
+          <h1 class="text-xl font-bold text-gray-900 truncate mt-0.5" v-tooltip.overflow.bottom>
             <span v-if="selectedSection.number" class="font-mono text-indigo-600 mr-2">§{{ selectedSection.number }}</span>
             {{ selectedSection.title }}
           </h1>
@@ -1062,7 +1075,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <button
             @click="projectionGoto('prev')"
             class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
-            v-tooltip="'Section précédente (←)'"
+            v-tooltip.bottom="{ label: 'Aller à la section précédente', keys: ['Left'], icon: 'arrow-left' }"
           >
             <ChevronLeftIcon class="w-4 h-4 shrink-0" />
             Précédent
@@ -1070,7 +1083,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <button
             @click="projectionGoto('next')"
             class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
-            v-tooltip="'Section suivante (→)'"
+            v-tooltip.bottom="{ label: 'Aller à la section suivante', keys: ['Right'] }"
           >
             Suivant
             <ChevronRightIcon class="w-4 h-4 shrink-0" />
@@ -1078,7 +1091,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <button
             @click="projectionOpen = false"
             class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded-lg bg-white transition-colors whitespace-nowrap"
-            v-tooltip="'Fermer (Échap)'"
+            v-tooltip.bottom="{ label: 'Fermer le mode projection', keys: ['Esc'] }"
           >
             <XMarkIcon class="w-4 h-4 shrink-0" />
             Fermer
@@ -1134,7 +1147,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                 type="button"
                 @click="projectionLightboxIndex = idx"
                 class="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-400 transition-colors"
-                v-tooltip="att.original_name || att.filename"
+                v-tooltip="`Agrandir « ${att.original_name || att.filename} »`"
               >
                 <img
                   :src="projectionAttUrl(att)"
@@ -1159,7 +1172,7 @@ watch(() => route.params.id, async (newId, oldId) => {
         <button
           @click="projectionLightboxIndex = null"
           class="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg"
-          v-tooltip="'Fermer (Échap)'"
+          v-tooltip.left="{ label: 'Fermer la capture', keys: ['Esc'] }"
         >
           <XMarkIcon class="w-6 h-6" />
         </button>

@@ -31,6 +31,11 @@ import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import BulkDocumentKindsModal from '@/components/BulkDocumentKindsModal.vue'
 import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  PENDING_FILTER_TIP, PHOTOS_COLUMN_TIP, DOCUMENTS_COLUMN_TIP, NO_DOCUMENT_TIP, BULK_KINDS_TIP,
+  photosTip, sectionUsageTip, afColumnTip, bacsColumnTip, documentKindTip, dragTip, regenerateTip,
+} from '@/lib/library-tips'
 import { useNotification } from '@/composables/useNotification'
 import { useRoute } from 'vue-router'
 
@@ -399,6 +404,11 @@ function documentKindLabel(kind) {
   const meta = documentKindsCatalog.value.find(d => d.kind === kind)
   return meta?.label || kind
 }
+// Carte d'une pastille de type de document (texte en clair, catalogue en repli).
+function documentKindCard(kind) {
+  const meta = documentKindsCatalog.value.find(d => d.kind === kind)
+  return documentKindTip(kind, { label: documentKindLabel(kind), description: meta?.description })
+}
 
 onMounted(async () => {
   await refresh()
@@ -427,10 +437,12 @@ onBeforeUnmount(teardownSortables)
         </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button @click="showBulk = true" :disabled="!bulkItems.length"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
-          <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
-        </button>
+        <Tooltip :text="regenerateTip(bulkItems.length, 'sections')">
+          <button @click="showBulk = true" :disabled="!bulkItems.length"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+            <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
+          </button>
+        </Tooltip>
         <button @click="openCreate"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
           <PlusIcon class="w-4 h-4" /> Nouvelle section type
@@ -445,7 +457,8 @@ onBeforeUnmount(teardownSortables)
                autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         <button v-if="search" @click="search = ''"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -474,7 +487,7 @@ onBeforeUnmount(teardownSortables)
           Vides <span class="text-gray-400 font-normal">{{ validationCounts.empty }}</span>
         </button>
         <button @click="validationFilter = 'pending'"
-                title="Vide + brouillon (tout ce qui n'est pas encore validé)"
+                v-tooltip="PENDING_FILTER_TIP"
                 :class="['px-2.5 py-1 rounded-md transition font-medium',
                          validationFilter === 'pending' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
           À traiter <span class="text-gray-400 font-normal">{{ validationCounts.empty + validationCounts.draft }}</span>
@@ -486,7 +499,8 @@ onBeforeUnmount(teardownSortables)
       <table class="w-full text-sm" style="table-layout: auto">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>
-            <th class="text-center px-2 py-2.5 w-8" v-tooltip="'Tout cocher / décocher (lignes visibles)'">
+            <th class="text-center px-2 py-2.5 w-8"
+                v-tooltip="allFlatSelected ? 'Décocher les lignes affichées' : 'Cocher toutes les lignes affichées'">
               <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30"
                      :checked="allFlatSelected"
                      :indeterminate.prop="!allFlatSelected && someFlatSelected"
@@ -494,10 +508,10 @@ onBeforeUnmount(teardownSortables)
             </th>
             <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
-            <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="'Documents où cette section apparaît (AF / Brochure / Audit BACS / Audit GTB)'">Documents</th>
-            <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
+            <th class="text-center px-2 py-2.5 w-10" v-tooltip="PHOTOS_COLUMN_TIP">Photos</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="bacsColumnTip('section')">BACS</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="DOCUMENTS_COLUMN_TIP">Documents</th>
+            <th class="text-center px-4 py-2.5 whitespace-nowrap" v-tooltip="afColumnTip('section')">AFs</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
@@ -518,7 +532,7 @@ onBeforeUnmount(teardownSortables)
                      @change="toggleSelected(t.id)" />
             </td>
             <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
-                @click.stop>
+                @click.stop v-tooltip="dragTip(!search.trim() && validationFilter === 'all', 'filter')">
               <Bars3Icon class="w-4 h-4 inline-block" />
             </td>
             <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap"
@@ -538,9 +552,7 @@ onBeforeUnmount(teardownSortables)
                          t.attachments_count > 0
                            ? 'text-emerald-600 hover:bg-emerald-100'
                            : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
-                :title="t.attachments_count > 0
-                  ? `${t.attachments_count} capture${t.attachments_count > 1 ? 's' : ''} — cliquer pour gérer`
-                  : 'Aucune capture — cliquer pour en ajouter ou glisser une image sur la ligne'"
+                v-tooltip="photosTip(t.attachments_count)"
               >
                 <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
                 <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
@@ -555,28 +567,30 @@ onBeforeUnmount(teardownSortables)
                 <span v-for="dk in t.document_kinds" :key="dk"
                       :class="['inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
                                documentKindBadgeClass(dk)]"
-                      v-tooltip="documentKindLabel(dk)">
+                      v-tooltip="documentKindCard(dk)">
                   {{ documentKindShortLabel(dk) }}
                 </span>
               </div>
-              <span v-else class="text-amber-700 italic text-[11px]" title="Cette section n'apparaît dans aucun document">⚠ aucun</span>
+              <span v-else class="text-amber-700 italic text-[11px]" v-tooltip="NO_DOCUMENT_TIP">⚠ aucun</span>
             </td>
             <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
-              <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" v-tooltip="'AFs utilisant cette section / AFs avec mise à jour en attente'">
+              <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded"
+                    v-tooltip="sectionUsageTip({ count: t.affected_afs_count, outdated: t.outdated_count })">
                 {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
               </span>
-              <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
-              <span v-else class="text-gray-300 italic" v-tooltip="'Jamais utilisée — candidate au nettoyage'">∅</span>
+              <span v-else-if="t.affected_afs_count > 0" class="text-gray-500"
+                    v-tooltip="sectionUsageTip({ count: t.affected_afs_count })">{{ t.affected_afs_count }}</span>
+              <span v-else class="text-gray-300 italic" v-tooltip="sectionUsageTip({ count: 0 })">∅</span>
             </td>
             <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
               <button type="button" @click="openClone(t)"
                       class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition mr-1"
-                      v-tooltip="'Dupliquer cette section type (avec son sous-arbre)'">
+                      v-tooltip="'Dupliquer avec ses sous-sections'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
               <button type="button" @click="openEditor(t)"
                       class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                      v-tooltip="'Éditer'">
+                      v-tooltip="'Modifier cette section'">
                 <PencilIcon class="w-4 h-4" />
               </button>
             </td>
@@ -606,7 +620,8 @@ onBeforeUnmount(teardownSortables)
         </span>
         <span class="w-px h-5 bg-gray-200" />
         <button type="button" @click="showBulkDocKinds = true"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-full transition whitespace-nowrap">
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-full transition whitespace-nowrap"
+                v-tooltip="BULK_KINDS_TIP">
           <TagIcon class="w-4 h-4" /> Modifier les tags…
         </button>
         <button type="button" @click="clearSelection"
@@ -645,7 +660,7 @@ onBeforeUnmount(teardownSortables)
 
     <BulkRegenerateModal
       v-if="showBulk"
-      v-tooltip="'Régénérer les sections types avec Claude'"
+      :title="'Régénérer les sections types avec Claude'"
       :items="bulkItems"
       :get-html="bulkGetHtml"
       :on-save-html="bulkSaveHtml"
@@ -694,10 +709,12 @@ onBeforeUnmount(teardownSortables)
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition whitespace-nowrap">
           Annuler
         </button>
-        <button @click="submitClone" :disabled="!cloning.title.trim()"
-                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
-          Dupliquer
-        </button>
+        <Tooltip :text="cloning.title.trim() ? null : 'Saisis d’abord le titre de la copie'">
+          <button @click="submitClone" :disabled="!cloning.title.trim()"
+                  class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
+            Dupliquer
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
   </div>

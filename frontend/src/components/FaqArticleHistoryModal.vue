@@ -10,6 +10,8 @@
 import { ref, onMounted } from 'vue'
 import { ArrowUturnLeftIcon, ClockIcon, SparklesIcon, ArrowUpOnSquareIcon, ArrowsRightLeftIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { FAQ_VERSION_RESTORE_TIP, versionStatusLabel } from '@/lib/faq-tips'
 import { listFaqArticleVersions, restoreFaqArticleVersion } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -88,19 +90,21 @@ async function restore(v) {
           <component :is="reasonMeta(v.reason).icon"
                      :class="['w-5 h-5 shrink-0 mt-0.5', reasonMeta(v.reason).cls]" />
           <div class="flex-1 min-w-0">
-            <div class="font-medium text-gray-800 truncate">{{ v.title }}</div>
+            <div class="font-medium text-gray-800 truncate" v-tooltip.overflow>{{ v.title }}</div>
             <div class="text-xs text-gray-500 mt-0.5">
               {{ reasonMeta(v.reason).label }} · {{ fmtDate(v.created_at) }}
               <span v-if="v.created_by_name"> · par {{ v.created_by_name }}</span>
               <span class="ml-1 text-gray-400">· {{ Math.round(v.content_size / 100) / 10 }} ko</span>
-              <span class="ml-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{{ v.status }}</span>
+              <span class="ml-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-600" v-tooltip="versionStatusLabel(v.status)">{{ v.status }}</span>
             </div>
           </div>
-          <button @click="restore(v)" :disabled="restoring === v.id"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition whitespace-nowrap disabled:opacity-50">
-            <ArrowUturnLeftIcon class="w-3.5 h-3.5 shrink-0" />
-            {{ restoring === v.id ? 'Restauration…' : 'Restaurer' }}
-          </button>
+          <Tooltip :text="FAQ_VERSION_RESTORE_TIP">
+            <button @click="restore(v)" :disabled="restoring === v.id"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition whitespace-nowrap disabled:opacity-50">
+              <ArrowUturnLeftIcon class="w-3.5 h-3.5 shrink-0" />
+              {{ restoring === v.id ? 'Restauration…' : 'Restaurer' }}
+            </button>
+          </Tooltip>
         </li>
       </ul>
     </div>

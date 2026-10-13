@@ -19,6 +19,7 @@
 import { ref, watch, computed } from 'vue'
 import BaseModal from './BaseModal.vue'
 import SitePicker from './SitePicker.vue'
+import Tooltip from './Tooltip.vue'
 import { updateAf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
@@ -47,6 +48,15 @@ watch(() => props.audit, (a) => {
 const canSubmit = computed(() =>
   !!form.value.client_name.trim() && !!form.value.project_name.trim() && !submitting.value,
 )
+// Bouton « Enregistrer » grisé : ce qui manque (porté par l'enveloppe <Tooltip>).
+const submitBlockedReason = computed(() => {
+  if (canSubmit.value || submitting.value) return null
+  const missing = [
+    !form.value.client_name.trim() && 'le client',
+    !form.value.project_name.trim() && 'le nom du projet',
+  ].filter(Boolean)
+  return missing.length ? `Renseigne ${missing.join(' et ')}` : null
+})
 
 function onSiteChange(site) {
   // Hydrate le client par défaut si vide (pattern AF).
@@ -82,7 +92,7 @@ async function submit() {
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1.5">
             Site rattaché
-            <span class="text-gray-400 font-normal">— optionnel, partage adresse / zones / équipements avec les autres documents du site</span>
+            <span class="text-gray-400 font-normal">— facultatif : l'adresse, les zones et les équipements sont partagés avec les autres documents du site</span>
           </label>
           <SitePicker v-model="form.site_id" @change="onSiteChange" />
         </div>
@@ -128,6 +138,7 @@ async function submit() {
       >
         Annuler
       </button>
+      <Tooltip :text="submitBlockedReason">
       <button
         type="button"
         @click="submit"
@@ -136,6 +147,7 @@ async function submit() {
       >
         {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
       </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

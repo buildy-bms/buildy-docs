@@ -124,6 +124,7 @@ onMounted(loadSites)
       v-if="selected && !open"
       class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-indigo-300 transition"
       :class="disabled ? 'opacity-60 cursor-not-allowed' : ''"
+      v-tooltip="disabled ? null : 'Choisir un autre site'"
       @click="!disabled && openForChange()"
     >
       <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
@@ -141,7 +142,7 @@ onMounted(loadSites)
         type="button"
         @click.stop="clear"
         class="text-gray-400 hover:text-red-600 p-1"
-        v-tooltip="'Retirer'"
+        v-tooltip="'Retirer ce site'"
       >
         <XMarkIcon class="w-4 h-4" />
       </button>

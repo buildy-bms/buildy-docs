@@ -30,6 +30,11 @@ import '@/lib/equipment-icons' // enregistre les icônes FA de la liste des docu
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { BUILDY_OFFER_LEVELS, buildyReserves, buildyOfferLabel } from '@/lib/buildy-offer'
 import { flashAuditTarget } from '@/lib/audit-reveal'
+import HelpTip from '@/components/HelpTip.vue'
+import {
+  BMS_LEVEL_LOCK_TIP, BMS_COLUMN_TIPS, BMS_INTEGRATED_TOGGLE_TIP, BMS_STATUS_TIPS, BMS_SYSTEM_LEVEL_CHECKS_TIP,
+  bmsLevelTip, bmsOperationalTip, bmsMeterIntegratedTip, bmsUsageToggleLabel,
+} from '@/lib/audit-tips-systems'
 
 // Section "Solution GTB / GTC en place" (R175-3 / R175-4 / R175-5).
 // Lit l'etat depuis useAuditStore (bms, document, meters, devices) et
@@ -80,7 +85,8 @@ const buildyReservesList = computed(() => buildyReserves(bms.value))
 // Les réponses qui découlent du niveau d'offre sont celles du modèle (le
 // rapport les lit ainsi) : verrouillées tant qu'un niveau est choisi.
 const levelLocked = computed(() => !!bms.value?.buildy_offer_level)
-const LEVEL_LOCK_HINT = 'Découle du niveau d\'offre Buildy choisi ci-dessus.'
+// Carte des interrupteurs verrouillés (lib/audit-tips-systems.js) : pourquoi + quoi faire.
+const levelLockTip = computed(() => (levelLocked.value ? BMS_LEVEL_LOCK_TIP : null))
 
 // Question préalable (mig 206) : « La GTB en place est-elle une supervision
 // Buildy ? ». Le choix du niveau d'offre n'apparaît que sur « Oui ». Une
@@ -448,7 +454,7 @@ function hasNotes(html) {
     <template #header>
       <SectionHeader number="6"
                      :title="audit.isBacs ? 'Solution GTB / GTC en place' : 'Solution de supervision en place'"
-                     :subtitle="audit.isBacs ? 'R175-3 + R175-4 + R175-5' : 'Inventaire du superviseur en place'"
+                     :subtitle="audit.isBacs ? 'Ce que sait faire la GTB, son entretien et la formation de l’exploitant' : 'Inventaire du superviseur en place'"
                      :icon="WrenchScrewdriverIcon" icon-color="text-purple-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"
@@ -466,7 +472,7 @@ function hasNotes(html) {
               hasNotes(bms.notes_html)
                 ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                 : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
-            v-tooltip="hasNotes(bms.notes_html) ? 'Modifier les notes GTB' : 'Ajouter une note GTB'">
+            v-tooltip="hasNotes(bms.notes_html) ? 'Modifier les notes de la GTB' : 'Ajouter une note sur la GTB'">
             <PencilSquareIcon class="w-4 h-4" />
           </button>
           <BacsPhotoButton
@@ -510,7 +516,7 @@ function hasNotes(html) {
                            @update:model-value="v => setGtbPresent(v ? 1 : 0)" />
         </div>
         <p v-if="bms.present == null" class="text-xs text-amber-600 mt-3">
-          Indiquez d'abord si une GTB est présente pour saisir la suite.
+          Indique d'abord si une GTB est présente pour saisir la suite.
         </p>
         <p v-else-if="bms.present === 0" class="text-xs text-gray-500 mt-3">
           Aucune GTB sur le site — une action « Installer une GTB » est ajoutée au plan de mise en conformité.
@@ -533,15 +539,18 @@ function hasNotes(html) {
               <div class="font-medium text-gray-800">Quel niveau d'offre Buildy Cloud est souscrit ?</div>
               <div class="text-gray-500 mt-0.5">La carte est pré-remplie pour ce niveau et l'accès « comptes nominatifs » est ajouté à l'étape 10 · Accès.</div>
             </div>
+            <!-- Ce que comprend chaque niveau : carte au survol (lib/audit-tips-systems.js). -->
             <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
-              <button v-for="(lvl, i) in BUILDY_OFFER_LEVELS" :key="lvl.value" type="button"
-                      :disabled="applyingPreset"
-                      @click="applyBuildyPreset(lvl.value)"
-                      :class="['h-7 px-3 text-xs font-medium transition whitespace-nowrap disabled:opacity-50',
-                               i > 0 ? 'border-l border-gray-200' : '',
-                               bms.buildy_offer_level === lvl.value ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
-                {{ lvl.label }}
-              </button>
+              <Tooltip v-for="(lvl, i) in BUILDY_OFFER_LEVELS" :key="lvl.value" :text="bmsLevelTip(lvl.value)">
+                <button type="button"
+                        :disabled="applyingPreset"
+                        @click="applyBuildyPreset(lvl.value)"
+                        :class="['h-7 px-3 text-xs font-medium transition whitespace-nowrap disabled:opacity-50',
+                                 i > 0 ? 'border-l border-gray-200' : '',
+                                 bms.buildy_offer_level === lvl.value ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+                  {{ lvl.label }}
+                </button>
+              </Tooltip>
             </div>
           </div>
           <div v-if="audit.isBacs && bms.buildy_offer_level && buildyReservesList.length"
@@ -549,12 +558,12 @@ function hasNotes(html) {
             <strong>Conforme au décret BACS, sous réserves.</strong>
             Le niveau {{ buildyOfferLabel(bms.buildy_offer_level) }} assure les fonctions exigées par le décret. Le rapport met en évidence les obligations suivantes, ajoutées au plan comme réserves :
             <ul class="list-disc ml-4 mt-1 space-y-0.5">
-              <li v-for="r in buildyReservesList" :key="r.key">{{ r.label }} <span class="text-indigo-700">({{ r.article }})</span></li>
+              <li v-for="r in buildyReservesList" :key="r.key">{{ r.label }} <R175Tooltip :article="r.article" class="align-middle" /></li>
             </ul>
           </div>
           <div v-else-if="audit.isBacs && bms.buildy_offer_level"
                class="mt-2.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 leading-snug">
-            Le niveau {{ buildyOfferLabel(bms.buildy_offer_level) }} assure les fonctions exigées par le décret, sans réserve liée au niveau d'offre. La formation de l'exploitant (R175-5) reste à attester.
+            Le niveau {{ buildyOfferLabel(bms.buildy_offer_level) }} assure les fonctions exigées par le décret, sans réserve liée au niveau d'offre. La formation de l'exploitant reste à attester.
           </div>
         </div>
         </div>
@@ -613,7 +622,7 @@ function hasNotes(html) {
           <div id="bms-block-protocols" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">
-                Protocoles de mise à disposition des points
+                Protocoles de partage des données
                 <span class="text-gray-400 font-normal">— vers la supervision Buildy ou un tiers</span>
               </label>
               <ProtocolMultiPicker
@@ -631,7 +640,7 @@ function hasNotes(html) {
               <SegmentedToggle :model-value="triState(bms.out_of_service)"
                                @update:model-value="v => setBmsFlag('out_of_service', v)" />
             </div>
-            <p class="text-[11px] text-gray-400 mt-0.5">Le plan d'action ignore alors les exigences GTB. Les sous-blocs restent saisissables (notes incluses) pour la traçabilité.</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">Le plan d'actions ignore alors les exigences sur la GTB. Les rubriques restent modifiables (notes comprises) pour garder une trace.</p>
           </div>
 
           <div id="bms-block-af" class="audit-subcard">
@@ -669,7 +678,7 @@ function hasNotes(html) {
                 <p class="mt-2 text-sm text-gray-700">
                   <span v-if="afUploading">Téléversement en cours…</span>
                   <span v-else>
-                    {{ afDocs.length ? 'Glisser un autre document ici ou' : 'Glisser le document d\'AF ici ou' }}
+                    {{ afDocs.length ? 'Glisser un autre document ici ou' : 'Glisser le document d\'analyse fonctionnelle ici ou' }}
                     <span class="text-indigo-600 font-semibold">parcourir</span>
                   </span>
                 </p>
@@ -679,20 +688,22 @@ function hasNotes(html) {
                 <li v-for="d in afDocs" :key="d.id" class="flex items-center gap-2 px-3 py-2">
                   <FontAwesomeIcon :icon="['fas', d.mime_type === 'application/pdf' ? 'file-pdf' : 'file-lines']"
                                    class="h-4 w-4 shrink-0 text-gray-400" />
+                  <!-- Étiquette = action + nom complet du document (souvent coupé). -->
                   <button type="button" @click="openAfDoc(d)"
                           class="min-w-0 flex-1 truncate text-left text-sm text-gray-800 hover:text-indigo-700"
-                          v-tooltip="afIsPreviewable(d) ? 'Aperçu' : 'Télécharger'">{{ d.title }}</button>
-                  <span class="shrink-0 text-[11px] text-gray-400">
+                          v-tooltip="afIsPreviewable(d) ? `Voir l’aperçu de « ${d.title} »` : `Télécharger « ${d.title} »`">{{ d.title }}</button>
+                  <span class="shrink-0 text-[11px] text-gray-400"
+                        v-tooltip="afDate(d.uploaded_at) ? `Déposé le ${afDate(d.uploaded_at)}` : null">
                     {{ [afSize(d.size_bytes), afDate(d.uploaded_at)].filter(Boolean).join(' · ') }}
                   </span>
                   <a :href="getSiteDocumentDownloadUrl(d.id)"
                      class="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                     v-tooltip="'Télécharger'">
+                     v-tooltip="'Télécharger ce document'">
                     <FontAwesomeIcon :icon="['fas', 'file-arrow-down']" class="h-3.5 w-3.5" />
                   </a>
                   <button type="button" @click="removeAfDoc(d)"
                           class="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                          v-tooltip="'Supprimer'">
+                          v-tooltip="'Supprimer ce document'">
                     <FontAwesomeIcon :icon="['fas', 'trash-can']" class="h-3.5 w-3.5" />
                   </button>
                 </li>
@@ -724,13 +735,13 @@ function hasNotes(html) {
               <BmsTopicNoteButton topic-key="usages" topic-label="Usages traités par la GTB"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
-            <p class="text-xs text-gray-500 mb-2">Un usage non coché n'est pas relié à la GTB : le décret peut en exiger le raccordement (obligatoire, ou sous condition de temps de retour sur investissement dans un bâtiment existant). Le plan d'actions le signale.</p>
+            <p class="text-xs text-gray-500 mb-2">Un usage non coché n'est pas relié à la GTB : le décret peut en exiger le raccordement (obligatoire, ou seulement s'il se rembourse en moins de 10 ans dans un bâtiment existant). Le plan d'actions le signale.</p>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-sm">
               <button v-for="u in [
                         { key: 'manages_heating', cat: 'heating', label: 'Chauffage' },
                         { key: 'manages_cooling', cat: 'cooling', label: 'Refroidissement' },
                         { key: 'manages_ventilation', cat: 'ventilation', label: 'Ventilation' },
-                        { key: 'manages_dhw', cat: 'dhw', label: 'ECS' },
+                        { key: 'manages_dhw', cat: 'dhw', label: 'Eau chaude' },
                         { key: 'manages_lighting', cat: 'lighting_indoor', label: 'Éclairage' },
                       ]"
                       :key="u.key" type="button"
@@ -738,8 +749,9 @@ function hasNotes(html) {
                       :class="['flex items-center gap-2 px-2.5 py-2 rounded-lg border-2 transition whitespace-nowrap text-left',
                                bms[u.key]
                                  ? 'border-[#00cd92] bg-emerald-50/60 hover:bg-emerald-50'
-                                 : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600']">
-                <SystemCategoryIcon :category="u.cat" size="sm" />
+                                 : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600']"
+                      v-tooltip="bmsUsageToggleLabel(!!bms[u.key])">
+                <SystemCategoryIcon :category="u.cat" size="sm" :with-tooltip="false" />
                 <span :class="bms[u.key] ? 'text-gray-800 font-medium' : ''">{{ u.label }}</span>
                 <span v-if="bms[u.key]" class="ml-auto text-[#00cd92] font-bold">✓</span>
               </button>
@@ -760,8 +772,8 @@ function hasNotes(html) {
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Équipement</th>
-                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip></th>
-                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="L.auditeur a vérifié sur place que la GTB voit cet équipement et que les valeurs remontent correctement."><span>Opérationnel</span></Tooltip></th>
+                    <th class="text-center py-1 font-semibold w-28" v-tooltip="BMS_COLUMN_TIPS.integratedDevice">Intégré</th>
+                    <th class="text-center py-1 font-semibold w-28" v-tooltip="BMS_COLUMN_TIPS.operationalDevice">Opérationnel</th>
                   </tr>
                 </thead>
                 <tbody v-for="group in devicesByZone" :key="group.zone" class="divide-y divide-gray-100">
@@ -779,22 +791,23 @@ function hasNotes(html) {
                         <span :class="d.bms_integration_out_of_service ? 'text-red-500' : 'text-gray-400'">
                           — {{ systemLabels[d.system_category] || d.system_category }}
                         </span>
-                        <span v-if="d.out_of_service" class="text-[11px] text-red-600">Hors service (étape 3)</span>
+                        <span v-if="d.out_of_service" class="text-[11px] text-red-600"
+                              v-tooltip="BMS_STATUS_TIPS.deviceOutOfService">Hors service (étape 3)</span>
                       </span>
                     </td>
                     <td class="py-1 text-center">
                       <!-- Un équipement HS peut avoir été intégré à la GTB :
                            la question reste ouverte, seul « Opérationnel » est forcé. -->
                       <CompactToggle compact :model-value="triState(d.managed_by_bms)"
+                                     :tooltip="BMS_INTEGRATED_TOGGLE_TIP"
                                      @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
                     </td>
                     <td class="py-1 text-center">
-                      <Tooltip
-                        :text="!d.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : d.out_of_service ? 'Équipement hors service (étape 3 · Systèmes) — il ne peut pas être opérationnel dans la GTB.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB voit l\'équipement.'">
-                        <CompactToggle compact :model-value="!d.managed_by_bms ? null : d.out_of_service ? false : !d.wired ? null : triState(!d.bms_integration_out_of_service)"
-                                       :disabled="!d.managed_by_bms || !!d.out_of_service || !d.wired"
-                                       @update:model-value="v => patchDeviceMb(d, { bms_integration_out_of_service: !v })" />
-                      </Tooltip>
+                      <!-- Grisé : la carte (portée par le contrôle) dit pourquoi et quoi faire. -->
+                      <CompactToggle compact :model-value="!d.managed_by_bms ? null : d.out_of_service ? false : !d.wired ? null : triState(!d.bms_integration_out_of_service)"
+                                     :disabled="!d.managed_by_bms || !!d.out_of_service || !d.wired"
+                                     :tooltip="bmsOperationalTip({ kind: 'device', integrated: d.managed_by_bms, outOfService: d.out_of_service, wired: d.wired })"
+                                     @update:model-value="v => patchDeviceMb(d, { bms_integration_out_of_service: !v })" />
                     </td>
                   </tr>
                 </tbody>
@@ -817,8 +830,8 @@ function hasNotes(html) {
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Compteur</th>
-                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip></th>
-                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="L.auditeur a vérifié sur place que la GTB relève bien le compteur et que les index remontent."><span>Opérationnel</span></Tooltip></th>
+                    <th class="text-center py-1 font-semibold w-28" v-tooltip="BMS_COLUMN_TIPS.integratedMeter">Intégré</th>
+                    <th class="text-center py-1 font-semibold w-28" v-tooltip="BMS_COLUMN_TIPS.operationalMeter">Opérationnel</th>
                   </tr>
                 </thead>
                 <template v-for="typeGroup in metersByEnergyThenZone" :key="typeGroup.type">
@@ -841,26 +854,27 @@ function hasNotes(html) {
                       <td class="px-2 py-1 pl-8">
                         <span class="inline-flex items-center gap-2">
                           <MeterUsagePill :usage="m.usage" />
-                          <span v-if="m.out_of_service" class="text-[11px] text-red-600">Hors service (étape 5)</span>
-                          <span v-if="m.communicating === 0 || m.communicating === false" class="text-[11px] text-gray-500">Non communicant (étape 5)</span>
+                          <span v-if="m.out_of_service" class="text-[11px] text-red-600"
+                                v-tooltip="BMS_STATUS_TIPS.meterOutOfService">Hors service (étape 5)</span>
+                          <span v-if="m.communicating === 0 || m.communicating === false" class="text-[11px] text-gray-500"
+                                v-tooltip="BMS_STATUS_TIPS.meterNotCommunicating">Non communicant (étape 5)</span>
                         </span>
                       </td>
                       <td class="py-1 text-center">
                         <!-- Un compteur HS peut avoir été intégré à la GTB : la
                              question reste ouverte, seul « Opérationnel » est forcé.
-                             Un non-communicant, lui, ne peut pas être intégré. -->
-                        <Tooltip :text="m.communicating == null ? 'Indique d\'abord à l\'étape 5 · Compteurs si le compteur est communicant.' : !m.communicating ? 'Compteur non communicant (étape 5 · Compteurs) — il ne peut pas être intégré à la GTB.' : ''">
-                          <CompactToggle compact :model-value="!m.communicating ? null : triState(m.managed_by_bms)"
-                                         :disabled="!m.communicating"
-                                         @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
-                        </Tooltip>
+                             Un non-communicant, lui, ne peut pas être intégré (carte
+                             de la raison portée par le contrôle grisé). -->
+                        <CompactToggle compact :model-value="!m.communicating ? null : triState(m.managed_by_bms)"
+                                       :disabled="!m.communicating"
+                                       :tooltip="bmsMeterIntegratedTip(m.communicating)"
+                                       @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
                       </td>
                       <td class="py-1 text-center">
-                        <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : m.out_of_service ? 'Compteur hors service (étape 5 · Compteurs) — il ne peut pas être opérationnel dans la GTB.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB relève le compteur.'">
-                          <CompactToggle compact :model-value="!m.managed_by_bms ? null : m.out_of_service ? false : !m.wired ? null : triState(!m.bms_integration_out_of_service)"
-                                         :disabled="!m.managed_by_bms || !!m.out_of_service || !m.wired"
-                                         @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
-                        </Tooltip>
+                        <CompactToggle compact :model-value="!m.managed_by_bms ? null : m.out_of_service ? false : !m.wired ? null : triState(!m.bms_integration_out_of_service)"
+                                       :disabled="!m.managed_by_bms || !!m.out_of_service || !m.wired"
+                                       :tooltip="bmsOperationalTip({ kind: 'meter', integrated: m.managed_by_bms, outOfService: m.out_of_service, wired: m.wired })"
+                                       @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
                       </td>
                     </tr>
                   </tbody>
@@ -878,27 +892,33 @@ function hasNotes(html) {
 
           <div v-if="audit.isBacs" id="bms-block-r175-3" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
             <div class="flex items-start justify-between gap-2 mb-2">
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
-                R175-3 — Capacités de la solution de supervision
-                <Tooltip text="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf. étape 3 · Systèmes.">
-                  <span class="font-normal normal-case text-gray-500 text-[10px]">ⓘ 3° et 4° sont évalués au niveau des systèmes (étape 3)</span>
-                </Tooltip>
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1 flex-wrap">
+                Ce que sait faire la supervision
+                <R175Tooltip article="R175-3" />
+                <span class="inline-flex items-center gap-1 font-normal normal-case text-gray-500 text-[10px]">
+                  — dialogue avec les équipements et arrêt à la main : vérifiés à l’étape Systèmes
+                  <HelpTip size="xs" :tip="BMS_SYSTEM_LEVEL_CHECKS_TIP" />
+                </span>
               </h3>
               <BmsTopicNoteButton topic-key="r175_3_capacites"
-                                  topic-label="R175-3 — Capacités de la solution de supervision"
+                                  topic-label="Ce que sait faire la supervision"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
             <div class="qa-grid text-sm">
-              <div class="qa-question"><strong>1°.</strong> La GTB suit-elle en continu, par zone fonctionnelle et au pas horaire, les consommations, et conserve-t-elle ces données pendant 5 ans ?</div>
-              <Tooltip :text="levelLocked ? LEVEL_LOCK_HINT : ''">
-                <SegmentedToggle :model-value="triState(bms.meets_r175_3_p1)" :disabled="levelLocked"
-                                 @update:model-value="v => setBmsFlag('meets_r175_3_p1', v)" />
-              </Tooltip>
-              <div class="qa-question"><strong>2°.</strong> La GTB compare-t-elle l'efficacité énergétique à des valeurs de référence, détecte-t-elle les pertes d'efficacité et en informe-t-elle l'exploitant ?</div>
-              <Tooltip :text="levelLocked ? LEVEL_LOCK_HINT : ''">
-                <SegmentedToggle :model-value="triState(bms.meets_r175_3_p2)" :disabled="levelLocked"
-                                 @update:model-value="v => setBmsFlag('meets_r175_3_p2', v)" />
-              </Tooltip>
+              <div class="qa-question">
+                La GTB suit-elle les consommations heure par heure, par zone et par usage, et garde-t-elle ces données 5 ans ?
+                <R175Tooltip article="R175-3 1°" class="align-middle" />
+              </div>
+              <SegmentedToggle :model-value="triState(bms.meets_r175_3_p1)" :disabled="levelLocked"
+                               :tooltip="levelLockTip"
+                               @update:model-value="v => setBmsFlag('meets_r175_3_p1', v)" />
+              <div class="qa-question">
+                La GTB repère-t-elle les dérives (comparaison à des valeurs de référence, pertes d'efficacité) et prévient-elle l'exploitant ?
+                <R175Tooltip article="R175-3 2°" class="align-middle" />
+              </div>
+              <SegmentedToggle :model-value="triState(bms.meets_r175_3_p2)" :disabled="levelLocked"
+                               :tooltip="levelLockTip"
+                               @update:model-value="v => setBmsFlag('meets_r175_3_p2', v)" />
             </div>
             <div v-if="bms.meets_r175_3_p1" class="ml-4 mt-2 space-y-3">
               <div>
@@ -924,12 +944,12 @@ function hasNotes(html) {
 
           <div v-if="audit.isBacs" id="bms-block-data-provision" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
             <div class="flex items-center justify-between gap-2 mb-2">
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                R175-3 — Mise à disposition des données
-                <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(dernier alinéa)</span>
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                Mise à disposition des données
+                <R175Tooltip article="R175-3" />
               </h3>
               <BmsTopicNoteButton topic-key="r175_3_mise_dispo"
-                                  topic-label="R175-3 — Mise à disposition des données"
+                                  topic-label="Mise à disposition des données"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
             <div class="qa-grid text-sm">
@@ -937,10 +957,9 @@ function hasNotes(html) {
               <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
                                @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
               <div class="qa-question">Chaque <strong>exploitant des systèmes techniques</strong> reçoit-il les données qui le concernent ?</div>
-              <Tooltip :text="levelLocked ? LEVEL_LOCK_HINT : ''">
-                <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)" :disabled="levelLocked"
-                                 @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
-              </Tooltip>
+              <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)" :disabled="levelLocked"
+                               :tooltip="levelLockTip"
+                               @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
             </div>
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
@@ -968,18 +987,20 @@ function hasNotes(html) {
           <!-- Item 15 — R175-3 : conservation 5 ans + accès aux données -->
           <div v-if="audit.isBacs" id="bms-block-data-storage" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
             <div class="flex items-center justify-between gap-2 mb-2">
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                R175-3 — Conservation et accès aux données
-                <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(archivage 5 ans)</span>
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                Conservation et accès aux données
+                <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(historique de 5 ans)</span>
+                <R175Tooltip article="R175-3 1°" />
               </h3>
             </div>
             <div class="qa-grid text-sm">
-              <!-- Q1 — Conservation 5 ans (3 valeurs : oui / non / inconnu) -->
+              <!-- Q1 — Conservation 5 ans (3 valeurs : oui / non / inconnu). Bug corrigé
+                   2026-10-12 : `title` (sans effet sur ce composant) → propriété `tooltip`. -->
               <div class="qa-question">Les données sont-elles conservées 5 ans à l'échelle mensuelle ?</div>
               <SegmentedToggle
                 :model-value="bms.data_storage_5y_compliant"
                 :disabled="levelLocked"
-                :title="levelLocked ? LEVEL_LOCK_HINT : undefined"
+                :tooltip="levelLockTip"
                 :options="[
                   { value: 'yes', label: 'Oui', tone: 'green' },
                   { value: 'no', label: 'Non', tone: 'slate' },
@@ -1044,8 +1065,11 @@ function hasNotes(html) {
           <div v-if="audit.isBacs" id="bms-block-r175-4-5" :class="['audit-subcard space-y-4', bms.out_of_service ? 'opacity-70' : '']">
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">R175-4 — Vérifications périodiques</h3>
-                <BmsTopicNoteButton topic-key="r175_4" topic-label="R175-4 — Vérifications périodiques"
+                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                  Vérifications périodiques de la GTB
+                  <R175Tooltip article="R175-4" />
+                </h3>
+                <BmsTopicNoteButton topic-key="r175_4" topic-label="Vérifications périodiques de la GTB"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
               <div class="qa-grid text-sm">
@@ -1072,8 +1096,11 @@ function hasNotes(html) {
             </div>
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">R175-5 — Formation exploitant</h3>
-                <BmsTopicNoteButton topic-key="r175_5" topic-label="R175-5 — Formation exploitant"
+                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                  Formation de l’exploitant
+                  <R175Tooltip article="R175-5" />
+                </h3>
+                <BmsTopicNoteButton topic-key="r175_5" topic-label="Formation de l’exploitant"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
               <div class="qa-grid text-sm">
@@ -1104,7 +1131,7 @@ function hasNotes(html) {
                 </div>
               </div>
               <p v-if="isBuildySupervision === true || (isBuildySupervision === null && (bms.existing_solution || '').toLowerCase().includes('buildy'))" class="mt-2 text-[11px] text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1">
-                Supervision Buildy : l'assistance intégrée facilite la prise en main, mais ne remplace pas la formation de l'exploitant au fonctionnement et au paramétrage de la GTB, à attester (attestation ou feuille d'émargement, R175-5).
+                Supervision Buildy : l'assistance intégrée facilite la prise en main, mais ne remplace pas la formation de l'exploitant au fonctionnement et au paramétrage de la GTB, à attester (attestation ou feuille d'émargement).
               </p>
             </div>
           </div>

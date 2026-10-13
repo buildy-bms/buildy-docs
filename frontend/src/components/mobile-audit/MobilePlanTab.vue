@@ -11,7 +11,11 @@ import MobileField from './MobileField.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
 import ActionDescription from '@/components/audit/ActionDescription.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import HelpTip from '@/components/HelpTip.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { groupByCard, CARD_FLAT_OPTIONS, cardOfAction } from '@/lib/action-cards'
+import { plural } from '@/lib/tooltip-content'
+import { levelTip, levelCountTip, actionNumberTip, articleTip, REGENERATE_PLAN_TIP } from '@/lib/audit-tips-site'
 
 const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
@@ -88,7 +92,7 @@ async function regenerate() {
   regenerating.value = true
   try {
     const { data } = await regenerateBacsActionItems(document.value.id)
-    success(`+${data.added} nouvelles · ${data.updated} synchronisées · ${data.resolved} résolues`)
+    success(`Plan régénéré : ${plural(data.added, 'nouvelle action', 'nouvelles actions')} · ${plural(data.updated, 'mise à jour', 'mises à jour')} · ${plural(data.resolved, 'résolue', 'résolues')}`)
     await audit.refreshAuditCore()
   } catch {
     error('Régénération impossible')
@@ -207,8 +211,8 @@ async function saveEdit() {
         <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-3.5 h-3.5" />
         Retour
       </button>
-      <div class="flex-1 min-w-0 text-xs text-gray-500 truncate">
-        Plan d'action
+      <div v-tooltip.overflow class="flex-1 min-w-0 text-xs text-gray-500 truncate">
+        Plan d’actions
         <span class="text-gray-400"> › </span>
         <strong class="text-gray-700">{{ currentCard.label }}</strong>
         <template v-if="currentSub">
@@ -235,15 +239,17 @@ async function saveEdit() {
     <!-- 3 stats severities (niveau 1 uniquement) -->
     <div v-if="drillView === 'cards'" class="grid grid-cols-3 gap-2">
       <div v-for="sev in ['blocking', 'major', 'minor']" :key="sev"
+           v-tooltip="levelCountTip(sev, itemsBySeverity[sev].length)"
            :class="['rounded-xl border p-3 text-center', SEVERITY_LABEL[sev].cls]">
         <p class="text-2xl font-medium leading-none">{{ itemsBySeverity[sev].length }}</p>
         <p class="text-xs uppercase tracking-wider mt-1 opacity-80">{{ SEVERITY_LABEL[sev].label }}</p>
       </div>
     </div>
 
-    <!-- Bouton régénérer (niveau 1 uniquement) -->
+    <!-- Bouton régénérer (niveau 1 uniquement) : la carte est portée par
+         l'enveloppe, le bouton étant grisé pendant le calcul. -->
+    <Tooltip v-if="drillView === 'cards'" :text="REGENERATE_PLAN_TIP" class="w-full">
     <button
-      v-if="drillView === 'cards'"
       @click="regenerate"
       :disabled="regenerating"
       class="pwa-button pwa-button--neutral w-full"
@@ -251,14 +257,21 @@ async function saveEdit() {
       <FontAwesomeIcon :icon="['fas', 'arrows-rotate']" :class="['w-4 h-4', regenerating ? 'animate-spin' : '']" />
       {{ regenerating ? 'Régénération…' : 'Régénérer le plan' }}
     </button>
+    </Tooltip>
 
     <!-- Encart sources : hiérarchie des références citées dans les
-         descriptions. Visible seulement au niveau 1 (vue cartes). -->
+         descriptions, même texte que le bureau (CompliancePlanSection).
+         Visible seulement au niveau 1 (vue cartes). -->
     <div v-if="drillView === 'cards' && filteredItems.length"
          class="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
       <FontAwesomeIcon :icon="['fas', 'circle-info']" class="w-4 h-4 shrink-0 text-indigo-500 mt-0.5" />
       <div class="text-[11px] leading-relaxed text-indigo-900/90">
-        <p><strong class="font-semibold">Sources d'aide à l'interprétation (non opposables).</strong> Les actions reposent sur le décret BACS (articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l'habitation, et arrêté du 7 avril 2023 : seuls textes juridiquement opposables), complété par : Guide d'application ministère (janvier 2026) ; Guide PROFEEL (novembre 2025) ; norme NF EN ISO 52120-1.</p>
+        <p><strong class="font-semibold">Sources qui aident à lire le décret (sans valeur légale).</strong> Les actions ci-dessous reposent sur le décret BACS (articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l’habitation, et arrêté du 7 avril 2023 : les seuls textes qui s’imposent légalement), éclairé par :</p>
+        <ul class="mt-1 space-y-0.5 list-disc pl-4">
+          <li>Guide d’application du décret BACS — ministère, version 2, janvier 2026.</li>
+          <li>FAQ BACS du ministère.</li>
+          <li>Guide pratique d’application du décret BACS — PROFEEL, novembre 2025.</li>
+        </ul>
       </div>
     </div>
 
@@ -315,13 +328,15 @@ async function saveEdit() {
           (it.status === 'done' || it.status === 'declined') ? 'opacity-60' : '']"
       >
         <div class="flex items-start gap-2 mb-2 flex-wrap">
-          <span class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-mono rounded bg-gray-800 text-white whitespace-nowrap">
+          <span class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-mono rounded bg-gray-800 text-white whitespace-nowrap"
+                v-tooltip="actionNumberTip(it.display_number)">
             {{ it.display_number || '—' }}
           </span>
-          <span :class="['inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full', SEVERITY_LABEL[it.severity].cls]">
+          <span :class="['inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full', SEVERITY_LABEL[it.severity].cls]"
+                v-tooltip="levelTip(it)">
             {{ SEVERITY_LABEL[it.severity].label }}
           </span>
-          <span class="text-xs text-gray-500 font-mono">{{ it.r175_article || '—' }}</span>
+          <span class="text-xs text-gray-500 font-mono" v-tooltip="articleTip(it.r175_article)">{{ it.r175_article || '—' }}</span>
           <span v-if="it.status === 'declined'" class="ml-auto inline-flex items-center gap-1 text-xs text-gray-500 italic">
             Écartée
           </span>
@@ -368,7 +383,11 @@ async function saveEdit() {
             <ActionDescription :text="editing.description" />
           </p>
           <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            <span v-if="editing.r175_article" class="font-mono">{{ editing.r175_article }}</span>
+            <!-- Article du décret : ⓘ = l'exigence en clair (s'ouvre au doigt). -->
+            <span v-if="editing.r175_article" class="inline-flex items-center gap-1">
+              <span class="font-mono">{{ editing.r175_article }}</span>
+              <HelpTip v-if="articleTip(editing.r175_article)" :tip="articleTip(editing.r175_article)" class="p-1 -my-1" />
+            </span>
             <!-- Zone affichée via pilule {{zone:N}} dans le titre/description. -->
             <span v-if="editing.auto_generated" class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">
               Auto-générée
@@ -411,33 +430,32 @@ async function saveEdit() {
 
         <!-- Carte de l'audit (items MANUELS uniquement) -->
         <MobileField v-if="editing && !editing.auto_generated"
-                     label="Carte de l'audit"
-                     hint="Range cette préconisation dans une carte du stepper. Par défaut elle vit dans « Divers ».">
+                     label="Étape de l’audit"
+                     hint="Range cette action dans une étape de l’audit. Par défaut, elle va dans « Divers ».">
           <MobileSelectSheet
             :model-value="manualAssignedValue(editing) || ''"
             @update:modelValue="v => reassignManual(editing, v || '')"
             :options="[{ value: '', label: 'Divers' }, ...CARD_OPTIONS]"
-            title="Carte de l'audit"
+            title="Étape de l’audit"
             placeholder="— Divers —"
           />
         </MobileField>
 
-        <!-- Alternatives proposées (texte libre, V1 mobile sans richtext) -->
-        <MobileField label="Alternatives proposées" hint="Variantes / préconisations Buildy listées dans le PDF (R175-5-1 4°).">
+        <!-- Préconisations Buildy (texte libre, V1 mobile sans richtext) -->
+        <MobileField label="Préconisations Buildy" hint="Les solutions que Buildy propose au client pour cette action : elles s’impriment sous l’action dans le rapport.">
           <textarea
             :value="(draft.alternative_solutions_html || '').replace(/<[^>]*>/g, '').trim()"
             @input="e => draft.alternative_solutions_html = e.target.value ? `<p>${e.target.value.replace(/\n+/g, '</p><p>')}</p>` : null"
             rows="4"
-            placeholder="ex : Passerelle CoolMaster Pro pour intégrer le DRV Daikin, ou remplacement par DRV Mitsubishi compatible BACnet."
+            placeholder="ex : passerelle CoolMaster Pro pour raccorder la climatisation Daikin, ou remplacement par un modèle Mitsubishi compatible BACnet."
             class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 resize-y"
           ></textarea>
         </MobileField>
 
         <p v-if="editing.auto_generated" class="text-xs text-gray-500 leading-relaxed">
-          Item généré automatiquement depuis l'audit. Le titre, la description
-          et la sévérité ne sont pas modifiables — ils suivent l'état de
-          l'entité source (système, compteur, GTB…). Pour les changer, ajuste
-          l'entité concernée puis « Régénérer le plan ».
+          Action créée automatiquement à partir de l’audit : son titre, sa description
+          et son niveau ne se modifient pas ici. Ils suivent l’élément concerné
+          (système, compteur, GTB…) : corrige-le, puis touche « Régénérer le plan ».
         </p>
       </div>
     </MobileSheet>

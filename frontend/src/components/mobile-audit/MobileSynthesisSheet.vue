@@ -17,6 +17,8 @@ import { useConfirm } from '@/composables/useConfirm'
 import { generateBacsAuditSynthesis, updateBacsAuditSynthesis, updateAf } from '@/api'
 import { isSynthesisStale } from '@/lib/synthesis-staleness'
 import MobileSheet from './MobileSheet.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { CONFIRM_SYNTHESIS_TIP } from '@/lib/audit-tips-site'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -114,7 +116,7 @@ async function clearSynthesis() {
         <div class="flex-1 text-sm text-violet-900">
           <p class="font-medium">Note de synthèse client</p>
           <p class="text-xs text-violet-700 mt-1 leading-relaxed">
-            Claude lit l'audit complet (zones, systèmes, compteurs, GTB, plan) et rédige une note client. La génération prend ~30 secondes. L'édition fine se fait au bureau.
+            Claude lit tout l’audit (zones, systèmes, compteurs, GTB, plan d’actions) et rédige une note pour le client, en 30 secondes environ. Pour la retoucher en détail, passe par un ordinateur.
           </p>
         </div>
       </div>
@@ -144,10 +146,12 @@ async function clearSynthesis() {
         <p class="text-xs text-amber-800 leading-relaxed">
           Une note périmée contredirait le tableau de bord et le plan. Régénère-la avec Claude, ou relis-la puis confirme qu'elle est à jour.
         </p>
+        <Tooltip :text="confirming ? null : CONFIRM_SYNTHESIS_TIP" class="w-full">
         <button type="button" @click="confirmCurrent" :disabled="confirming"
                 class="pwa-button w-full border border-amber-300 bg-white text-amber-900 active:bg-amber-100 disabled:opacity-50">
           {{ confirming ? 'Enregistrement…' : 'Note relue et à jour' }}
         </button>
+        </Tooltip>
       </div>
 
       <div v-if="synthesisHtml" class="space-y-2">
@@ -164,7 +168,7 @@ async function clearSynthesis() {
         </button>
       </div>
       <div v-else class="text-sm text-gray-500 italic text-center py-8">
-        Pas encore de synthèse — clique sur le bouton violet pour la générer.
+        Pas encore de note de synthèse : touche le bouton violet pour la faire rédiger.
       </div>
     </div>
   </MobileSheet>

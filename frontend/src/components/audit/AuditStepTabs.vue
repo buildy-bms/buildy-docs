@@ -18,6 +18,7 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faCheck, faBan } from '@fortawesome/pro-solid-svg-icons'
 import { AUDIT_PHASES } from '@/lib/audit-steps-ui'
+import { stepTip } from '@/lib/audit-tips'
 import { useRovingTabs } from '@/composables/useRovingTabs'
 
 library.add(faCheck, faBan)
@@ -68,13 +69,6 @@ function tabClass(s, g) {
   return [base, 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-200 hover:text-slate-900 after:hidden']
 }
 
-function formatWhen(v) {
-  if (!v) return ''
-  const d = new Date(String(v).includes('T') ? v : String(v).replace(' ', 'T'))
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
 function statusText(s) {
   switch (stateOf(s)) {
     case 'disabled': return 'sans objet'
@@ -86,25 +80,18 @@ function statusText(s) {
   }
 }
 
-function tooltipFor(s) {
-  const lines = [`${s.number}. ${s.label}`]
-  if (s.disabled) {
-    if (s.disabledReason) lines.push(s.disabledReason)
-    return lines.join('\n')
-  }
-  if (s.objective) lines.push(s.objective)
-  if (s.validated) {
-    const when = formatWhen(s.validated_at)
-    lines.push(`✓ Validée${when ? ` le ${when}` : ''}${s.validated_by_name ? ` par ${s.validated_by_name}` : ''}`)
-    if (s.with_pending) lines.push('Validée avec des éléments encore en attente.')
-  } else if (s.complete) {
-    lines.push('Tout est renseigné : étape prête à être validée.')
-  } else if (s.incompleteReasons.length) {
-    lines.push('Reste à faire :')
-    for (const r of s.incompleteReasons) lines.push(`• ${r}`)
-  }
-  return lines.join('\n')
-}
+// Infobulle de l'onglet : carte aux couleurs de la phase (objectif en clair, état, reste à
+// faire), cf. lib/audit-tips.js.
+const tipFor = (s, g) => stepTip(s, g.key)
+
+// Progression : les étapes « sans objet » ne comptent pas.
+const progressTip = computed(() => ({
+  title: `${validatedCount.value} étape${validatedCount.value > 1 ? 's' : ''} validée${validatedCount.value > 1 ? 's' : ''} sur ${countable.value}`,
+  tone: validatedCount.value === countable.value && countable.value ? 'success' : 'info',
+  icon: 'list-check',
+  text: 'Les étapes sans objet pour ce site (grisées) ne comptent pas.',
+  placement: 'bottom',
+}))
 
 // ── Mode compact : libellés masqués (sauf onglet actif) quand ça déborde ──
 // À chaque mesure, on réessaie l'affichage complet : libellés remis, mesure
@@ -155,7 +142,8 @@ watch(() => props.activeKey, (k) => nextTick(async () => {
 <template>
   <nav class="relative flex items-end" data-audit-step-tabs aria-label="Étapes de l'audit">
     <!-- Progression, dans la ligne des noms de phase (à droite) -->
-    <div class="audit-tabs-progress absolute right-0 top-0 flex items-center gap-2 pointer-events-none" aria-live="polite">
+    <div class="audit-tabs-progress absolute right-0 top-0 z-10 flex items-center gap-2" aria-live="polite"
+         v-tooltip="progressTip">
       <span class="text-[11px] leading-none text-gray-500 whitespace-nowrap">
         <span class="text-gray-900 font-medium">{{ validatedCount }}</span>/{{ countable }} étapes validées
       </span>
@@ -189,7 +177,7 @@ watch(() => props.activeKey, (k) => nextTick(async () => {
             :tabindex="s.key === activeKey ? 0 : -1"
             :data-audit-step-tab="s.key"
             :class="tabClass(s, g)"
-            v-tooltip="{ text: tooltipFor(s), placement: 'bottom' }"
+            v-tooltip="tipFor(s, g)"
             @click="!s.disabled && emit('select', s.key)"
           >
             <span

@@ -10,6 +10,8 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 import AddressAutocomplete from '@/components/AddressAutocomplete.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { SITE_SYNC_COLUMN_TIP, siteSyncTip, siteIdTip } from '@/lib/misc-tips'
 
 const { success, error } = useNotification()
 const { confirm } = useConfirm()
@@ -146,7 +148,7 @@ onMounted(refresh)
         <button
           @click="refresh"
           class="p-2 text-gray-500 hover:text-gray-700"
-          v-tooltip="'Rafraîchir'"
+          v-tooltip="'Rafraîchir la liste des sites'"
         >
           <ArrowPathIcon class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
         </button>
@@ -171,7 +173,8 @@ onMounted(refresh)
           autocomplete="off"
           class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
         />
-        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -208,7 +211,7 @@ onMounted(refresh)
             <th class="text-left px-4 py-2.5">Site</th>
             <th class="text-left px-4 py-2.5">Client</th>
             <th class="text-left px-4 py-2.5">Adresse</th>
-            <th class="text-left px-4 py-2.5 w-36">Synchro FM</th>
+            <th class="text-left px-4 py-2.5 w-36" v-tooltip="SITE_SYNC_COLUMN_TIP">Synchro FM</th>
             <th class="text-left px-4 py-2.5 w-32">Modifié</th>
             <th class="text-right px-4 py-2.5 w-20">Actions</th>
           </tr>
@@ -218,7 +221,7 @@ onMounted(refresh)
               class="border-t border-gray-100 hover:bg-indigo-50/40 group cursor-pointer">
             <td class="px-4 py-2.5 font-semibold text-gray-800 whitespace-nowrap">
               {{ s.name }}
-              <span class="block text-[10px] text-gray-400 font-mono font-normal">{{ s.site_uuid.slice(0, 8) }}</span>
+              <span class="block text-[10px] text-gray-400 font-mono font-normal" v-tooltip="siteIdTip(s.site_uuid)">{{ s.site_uuid.slice(0, 8) }}</span>
             </td>
             <td class="px-4 py-2.5 text-gray-700">{{ s.customer_name || '—' }}</td>
             <td class="px-4 py-2.5 text-gray-500 text-xs">
@@ -228,17 +231,18 @@ onMounted(refresh)
               <span v-else class="italic">—</span>
             </td>
             <td class="px-4 py-2.5">
-              <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded', syncBadge(s).cls]">
+              <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded', syncBadge(s).cls]"
+                    v-tooltip="siteSyncTip(s)">
                 {{ syncBadge(s).label }}
               </span>
             </td>
             <td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{{ formatDate(s.updated_at) }}</td>
             <td class="px-4 py-2.5 text-right">
               <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button @click.stop="openEdit(s)" class="text-gray-400 hover:text-indigo-600 p-1" v-tooltip="'Éditer'">
+                <button @click.stop="openEdit(s)" class="text-gray-400 hover:text-indigo-600 p-1" v-tooltip="'Modifier ce site'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
-                <button @click.stop="confirmDelete(s)" class="text-gray-400 hover:text-red-600 p-1" v-tooltip="'Supprimer'">
+                <button @click.stop="confirmDelete(s)" class="text-gray-400 hover:text-red-600 p-1" v-tooltip="'Supprimer ce site'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>
@@ -310,13 +314,15 @@ onMounted(refresh)
           >
             Annuler
           </button>
-          <button
-            type="submit"
-            :disabled="submitting || !form.name.trim()"
-            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {{ submitting ? 'Enregistrement...' : (editing ? 'Mettre à jour' : 'Créer') }}
-          </button>
+          <Tooltip :text="!submitting && !form.name.trim() ? 'Renseigne d’abord le nom du site' : null">
+            <button
+              type="submit"
+              :disabled="submitting || !form.name.trim()"
+              class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {{ submitting ? 'Enregistrement...' : (editing ? 'Mettre à jour' : 'Créer') }}
+            </button>
+          </Tooltip>
         </div>
       </form>
     </BaseModal>

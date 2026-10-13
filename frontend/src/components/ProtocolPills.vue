@@ -1,5 +1,7 @@
 <script setup>
 import { computed } from 'vue'
+import { moreProtocolsTip } from '@/lib/library-tips'
+import { protocolTip } from '@/lib/acronym-tips'
 
 const props = defineProps({
   // CSV : "Modbus TCP,BACnet/IP" ou tableau
@@ -47,12 +49,13 @@ function colorFor(p) {
       v-for="p in list"
       :key="p"
       :class="['inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border whitespace-nowrap', colorFor(p)]"
+      v-tooltip="protocolTip(p)"
     >
       {{ p }}
     </span>
     <span
       v-if="overflow > 0"
-      v-tooltip="allList.slice(max).join(', ')"
+      v-tooltip="moreProtocolsTip(allList.slice(max))"
       class="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border bg-gray-100 text-gray-600 border-gray-200 whitespace-nowrap"
     >
       +{{ overflow }}

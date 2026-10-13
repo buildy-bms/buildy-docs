@@ -15,6 +15,8 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import StatusBadge from '@/components/StatusBadge.vue'
 import WhitepaperRichTextEditor from '@/components/WhitepaperRichTextEditor.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { maintenanceStatusTip, MAINTENANCE_PERIOD_TIP } from '@/lib/misc-tips'
 
 const route = useRoute()
 const router = useRouter()
@@ -127,21 +129,24 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
           <ArrowLeftIcon class="w-4 h-4" /> Mes documents
         </button>
         <div class="flex-1"></div>
-        <StatusBadge :status="report.status" />
+        <StatusBadge :status="report.status" v-tooltip.bottom="maintenanceStatusTip(report.status)" />
         <button @click="toggleStatus" class="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
           {{ report.status === 'published' ? 'Repasser en brouillon' : 'Marquer publié' }}
         </button>
-        <button @click="openPreview" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+        <button @click="openPreview" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                v-tooltip="'Ouvrir l’aperçu dans un nouvel onglet'">
           <EyeIcon class="w-4 h-4" /> Aperçu
         </button>
         <button @click="exportPdf" :disabled="exporting"
                 class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
           <ArrowDownTrayIcon class="w-4 h-4" /> {{ exporting ? 'Export…' : 'Exporter PDF' }}
         </button>
-        <button @click="save" :disabled="!dirty || saving"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
-          <CheckIcon class="w-4 h-4" /> {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-        </button>
+        <Tooltip :text="!dirty && !saving ? 'Aucune modification à enregistrer' : null">
+          <button @click="save" :disabled="!dirty || saving"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
+            <CheckIcon class="w-4 h-4" /> {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+          </button>
+        </Tooltip>
       </div>
 
       <!-- Métadonnées -->
@@ -167,7 +172,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
             <input v-model="periodEnd" type="date"
                    class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
           </div>
-          <div v-if="report.period_label" class="text-xs text-gray-500 pb-2">
+          <div v-if="report.period_label" class="text-xs text-gray-500 pb-2" v-tooltip="MAINTENANCE_PERIOD_TIP">
             Sur la cover : « {{ report.period_label }} »
           </div>
         </div>

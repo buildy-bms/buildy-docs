@@ -20,7 +20,9 @@
  */
 import { ref, computed } from 'vue'
 import BaseModal from './BaseModal.vue'
+import Tooltip from './Tooltip.vue'
 import { bulkUpdateSectionTemplateDocumentKinds } from '@/api'
+import { documentKindTip } from '@/lib/library-tips'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
@@ -54,6 +56,14 @@ const canSubmit = computed(() =>
 
 const actionMeta = computed(() => ACTIONS.find(a => a.value === action.value))
 
+// Bouton « Appliquer » grisé : ce qui manque (rien pendant l'envoi, le bouton l'affiche).
+const submitBlockedTip = computed(() => {
+  if (submitting.value) return null
+  if (!props.selected.length) return 'Aucune section sélectionnée'
+  if (!selectedKinds.value.size) return 'Choisis au moins un type de document'
+  return null
+})
+
 async function submit() {
   if (!canSubmit.value) return
   submitting.value = true
@@ -84,7 +94,7 @@ async function submit() {
         <label class="block text-xs font-medium text-gray-600 mb-1.5">Sections concernées</label>
         <div class="bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-32 overflow-y-auto">
           <ul class="text-sm text-gray-700 space-y-0.5">
-            <li v-for="s in selected" :key="s.id" class="truncate">
+            <li v-for="s in selected" :key="s.id" class="truncate" v-tooltip.overflow>
               <span class="text-gray-400 text-xs mr-1">•</span>{{ s.title }}
             </li>
           </ul>
@@ -117,7 +127,7 @@ async function submit() {
         <div class="flex flex-wrap gap-1.5">
           <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
                   @click="toggleKind(dk.kind)"
-                  v-tooltip="dk.description"
+                  v-tooltip="documentKindTip(dk.kind, dk)"
                   :class="['inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition whitespace-nowrap',
                            isKindActive(dk.kind)
                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
@@ -146,10 +156,12 @@ async function submit() {
               class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
         Annuler
       </button>
-      <button @click="submit" :disabled="!canSubmit"
-              class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
-        {{ submitting ? 'Application…' : 'Appliquer' }}
-      </button>
+      <Tooltip :text="submitBlockedTip">
+        <button @click="submit" :disabled="!canSubmit"
+                class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
+          {{ submitting ? 'Application…' : 'Appliquer' }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

@@ -22,6 +22,8 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useViewport } from '@/composables/useViewport'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import Tooltip from '@/components/Tooltip.vue'
+import { VOICE_OFFLINE_TIP, voiceButtonTip } from '@/lib/audit-tips-shell'
 
 const props = defineProps({
   siteUuid: { type: String, required: true },
@@ -115,7 +117,7 @@ async function startRecording() {
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
   } catch {
-    notifyError("Micro inaccessible — autorisez l'accès au microphone")
+    notifyError("Micro inaccessible : autorise l'accès au microphone")
     return
   }
   chunks = []
@@ -243,17 +245,19 @@ const btnCls = computed(() => {
   // des notes vocales existent.
   return `btn-icon relative${notes.value.length ? ' is-voice' : ''}`
 })
+
+// Bulle du bouton : hors ligne → pourquoi il est grisé ; sinon ce qu'on y fait et le nombre de
+// notes. Portée par l'enveloppe <Tooltip> (un bouton grisé ne reçoit pas le survol).
+const voiceTip = computed(() => (isOnline.value ? voiceButtonTip(props.label, notes.value.length) : VOICE_OFFLINE_TIP))
 </script>
 
 <template>
   <div :class="['relative', isMobile ? 'block w-full' : 'inline-block']" ref="rootEl">
+    <Tooltip :text="voiceTip" :class="isMobile ? 'w-full' : ''">
     <button
       type="button"
       :class="btnCls"
       :disabled="!isOnline"
-      v-tooltip="!isOnline
-        ? 'Notes vocales indisponibles hors ligne'
-        : (label ? `Notes vocales - ${label}` : 'Notes vocales')"
       @click="showGallery = !showGallery"
     >
       <MicrophoneIcon :class="['shrink-0', isMobile ? 'w-5 h-5' : 'w-4 h-4']" />
@@ -265,6 +269,7 @@ const btnCls = computed(() => {
         {{ notes.length }}
       </span>
     </button>
+    </Tooltip>
 
     <Teleport to="body" :disabled="!isMobile">
       <div
@@ -282,12 +287,13 @@ const btnCls = computed(() => {
           :style="isMobile ? { paddingTop: 'env(safe-area-inset-top)' } : {}"
         >
           <div class="flex items-center gap-2 px-3" :class="isMobile ? 'h-12' : 'h-10'">
-            <h2 class="flex-1 min-w-0 font-medium truncate text-gray-900" :class="isMobile ? 'text-base' : 'text-xs'">
+            <h2 v-tooltip.overflow class="flex-1 min-w-0 font-medium truncate text-gray-900" :class="isMobile ? 'text-base' : 'text-xs'">
               Notes vocales<span v-if="label"> · {{ label }}</span>
             </h2>
             <button @click="showGallery = false"
                     class="inline-flex items-center justify-center text-gray-500 hover:text-gray-800"
-                    :class="isMobile ? 'tap-target' : 'p-1'" aria-label="Fermer">
+                    :class="isMobile ? 'tap-target' : 'p-1'" aria-label="Fermer les notes vocales"
+                    v-tooltip="'Fermer les notes vocales'">
               <XMarkIcon :class="isMobile ? 'w-6 h-6' : 'w-4 h-4'" />
             </button>
           </div>
@@ -334,10 +340,10 @@ const btnCls = computed(() => {
                :class="isMobile ? 'p-3' : 'p-2.5'">
             <div class="flex items-center gap-2 text-xs text-gray-500">
               <span class="font-medium text-gray-700 tabular-nums">{{ fmtDuration(n.duration_seconds) || '—' }}</span>
-              <span class="truncate flex-1">{{ fmtDate(n.uploaded_at) }}</span>
+              <span v-tooltip.overflow class="truncate flex-1">{{ fmtDate(n.uploaded_at) }}</span>
               <button type="button" @click="deleteNote(n)"
                       class="shrink-0 inline-flex items-center justify-center text-gray-400 hover:text-red-600 active:text-red-600 rounded-md"
-                      :class="isMobile ? 'w-11 h-11 -my-2' : 'p-1'" v-tooltip="'Supprimer'" aria-label="Supprimer">
+                      :class="isMobile ? 'w-11 h-11 -my-2' : 'p-1'" v-tooltip="'Supprimer cette note vocale'" aria-label="Supprimer cette note vocale">
                 <TrashIcon :class="isMobile ? 'w-5 h-5' : 'w-4 h-4'" />
               </button>
             </div>

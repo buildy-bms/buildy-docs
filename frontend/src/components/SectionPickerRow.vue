@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { SECTION_KIND_LABELS, sectionPickLabel } from '@/lib/af-tips'
 
 defineOptions({ name: 'SectionPickerRow' })
 
@@ -17,6 +18,9 @@ const state = computed(() => props.stateFn(props.node))
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const Icon = computed(() => props.iconMap[props.node.kind] || props.iconMap.standard)
+// Infobulles : type de la section (icône) et effet de la case à cocher.
+const kindLabel = computed(() => SECTION_KIND_LABELS[props.node.kind] || null)
+const pickLabel = computed(() => sectionPickLabel(state.value, hasChildren.value))
 
 const indentStyle = computed(() => ({
   paddingLeft: `${0.25 + props.level * 0.85}rem`,
@@ -39,6 +43,7 @@ const fontWeight = computed(() => props.level === 0 ? 'font-bold' : props.level 
         type="button"
         @click.stop="emit('toggle-collapse', node)"
         class="shrink-0 p-0.5 rounded hover:bg-gray-200"
+        v-tooltip="isCollapsed ? 'Déplier cette section' : 'Replier cette section'"
       >
         <ChevronRightIcon v-if="isCollapsed" class="w-3 h-3 text-gray-500" />
         <ChevronDownIcon v-else class="w-3 h-3 text-gray-500" />
@@ -49,12 +54,13 @@ const fontWeight = computed(() => props.level === 0 ? 'font-bold' : props.level 
         type="button"
         @click.stop="emit('toggle', node)"
         :class="['shrink-0 w-4 h-4 border-2 rounded flex items-center justify-center text-[10px] font-bold', checkboxClass]"
+        v-tooltip="pickLabel"
       >{{ checkSymbol }}</button>
 
-      <component :is="Icon" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+      <component :is="Icon" class="w-3.5 h-3.5 text-gray-400 shrink-0" v-tooltip="kindLabel" />
 
       <span v-if="node.number" class="text-[11px] text-gray-500 shrink-0 font-mono">{{ node.number }}</span>
-      <span :class="['flex-1 min-w-0 truncate text-[12px]', titleClass, fontWeight]">{{ node.title }}</span>
+      <span :class="['flex-1 min-w-0 truncate text-[12px]', titleClass, fontWeight]" v-tooltip.overflow>{{ node.title }}</span>
     </div>
 
     <div v-if="hasChildren && !isCollapsed">

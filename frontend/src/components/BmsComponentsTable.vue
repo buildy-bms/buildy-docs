@@ -17,6 +17,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import Tooltip from './Tooltip.vue'
+import { BMS_COMPONENT_ADD_TIPS, BMS_COMPONENT_COLUMN_TIPS } from '@/lib/audit-tips-systems'
 
 const props = defineProps({
   documentId: { type: Number, required: true },
@@ -31,7 +32,7 @@ const TYPE_OPTIONS = [
   { value: 'gateway',    label: 'Passerelle',         icon: ArrowsRightLeftIcon, color: 'text-violet-600' },
   { value: 'plc',        label: 'Automate',           icon: CpuChipIcon,         color: 'text-emerald-600' },
   { value: 'controller', label: 'Contrôleur',         icon: BoltIcon,            color: 'text-amber-600' },
-  { value: 'io_module',  label: 'Module IO',          icon: Square3Stack3DIcon,  color: 'text-blue-600' },
+  { value: 'io_module',  label: 'Module d’entrées/sorties', icon: Square3Stack3DIcon, color: 'text-blue-600' },
   { value: 'router',     label: 'Routeur',            icon: GlobeAltIcon,        color: 'text-indigo-600' },
   { value: 'switch',     label: 'Switch réseau',      icon: GlobeAltIcon,        color: 'text-sky-600' },
   { value: 'server',     label: 'Serveur supervision',icon: ServerIcon,          color: 'text-purple-600' },
@@ -117,29 +118,29 @@ const inputCls = 'w-full px-2 py-1 text-xs border border-gray-200 rounded hover:
       <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
         Composants matériels GTB
         <span class="font-normal normal-case text-gray-500 text-[10px]">
-          — passerelles, automates, contrôleurs, modules IO…
+          — passerelles, automates, contrôleurs, modules d’entrées/sorties…
         </span>
       </h3>
       <div class="flex items-center gap-1">
-        <Tooltip text="Ajouter une passerelle (ex : Niagara JACE)">
+        <Tooltip :text="BMS_COMPONENT_ADD_TIPS.gateway">
           <button @click="addComponent('gateway')"
                   class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded">
             <PlusIcon class="w-3 h-3" /> Passerelle
           </button>
         </Tooltip>
-        <Tooltip text="Ajouter un automate (PLC)">
+        <Tooltip :text="BMS_COMPONENT_ADD_TIPS.plc">
           <button @click="addComponent('plc')"
                   class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded">
             <PlusIcon class="w-3 h-3" /> Automate
           </button>
         </Tooltip>
-        <Tooltip text="Ajouter un contrôleur (régulation)">
+        <Tooltip :text="BMS_COMPONENT_ADD_TIPS.controller">
           <button @click="addComponent('controller')"
                   class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded">
             <PlusIcon class="w-3 h-3" /> Contrôleur
           </button>
         </Tooltip>
-        <Tooltip text="Ajouter un autre composant (module IO, routeur, switch…)">
+        <Tooltip :text="BMS_COMPONENT_ADD_TIPS.other">
           <button @click="addComponent('other')"
                   class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded">
             <PlusIcon class="w-3 h-3" /> Autre
@@ -160,9 +161,9 @@ const inputCls = 'w-full px-2 py-1 text-xs border border-gray-200 rounded hover:
           <th class="text-left py-1.5 px-2 font-semibold">Marque</th>
           <th class="text-left py-1.5 px-2 font-semibold">Modèle</th>
           <th class="text-left py-1.5 px-2 font-semibold">Localisation</th>
-          <th class="text-left py-1.5 px-2 font-semibold w-32">IP / Adresse</th>
-          <th class="text-left py-1.5 px-2 font-semibold w-44">Protocoles exposés</th>
-          <th class="text-left py-1.5 px-2 font-semibold w-24">Firmware</th>
+          <th class="text-left py-1.5 px-2 font-semibold w-32" v-tooltip="BMS_COMPONENT_COLUMN_TIPS.address">IP / Adresse</th>
+          <th class="text-left py-1.5 px-2 font-semibold w-44" v-tooltip="BMS_COMPONENT_COLUMN_TIPS.protocols">Protocoles exposés</th>
+          <th class="text-left py-1.5 px-2 font-semibold w-24" v-tooltip="BMS_COMPONENT_COLUMN_TIPS.firmware">Micrologiciel</th>
           <th class="text-left py-1.5 px-2 font-semibold">Notes</th>
           <th class="text-center py-1.5 px-1 font-semibold w-16"></th>
         </tr>
@@ -217,12 +218,12 @@ const inputCls = 'w-full px-2 py-1 text-xs border border-gray-200 rounded hover:
           </td>
           <td class="py-1 px-1 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1">
-              <Tooltip text="Dupliquer">
+              <Tooltip text="Dupliquer ce composant">
                 <button @click="dupComponent(c)" class="btn-icon">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
               </Tooltip>
-              <Tooltip text="Supprimer">
+              <Tooltip text="Supprimer ce composant">
                 <button @click="removeComponent(c)" class="btn-icon btn-icon-danger">
                   <TrashIcon class="w-4 h-4" />
                 </button>

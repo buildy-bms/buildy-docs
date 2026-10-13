@@ -8,10 +8,10 @@
  * le contenu avant de déclencher la génération PDF Puppeteer (qui prend
  * 3-5s par export).
  *
- * Usage :
+ * Usage (`title` = titre de la fenêtre, pas une infobulle : jamais v-tooltip ici) :
  *   <PdfPreviewModal
  *     v-if="previewOpen"
- *     v-tooltip="'Aperçu rapport audit BACS'"
+ *     title="Aperçu du rapport d'audit BACS"
  *     :preview-url="`/api/bacs-audit/${docId}/preview`"
  *     :downloading="exporting"
  *     @download="exportPdf"
@@ -46,14 +46,16 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
               <DocumentArrowDownIcon class="w-4 h-4" />
               {{ downloading ? 'Génération…' : downloadLabel }}
             </button>
-            <button @click="emit('close')" aria-label="Fermer l'aperçu"
+            <button @click="emit('close')" aria-label="Fermer l’aperçu"
+                    v-tooltip="{ label: 'Fermer l’aperçu', keys: ['Esc'] }"
                     class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded">
               <XMarkIcon class="w-5 h-5" />
             </button>
           </div>
         </header>
+        <!-- title = nom accessible de l'iframe (lecteurs d'écran), pas une infobulle -->
         <iframe :src="previewUrl"
-                v-tooltip="'Aperçu PDF'"
+                :title="title"
                 class="flex-1 w-full bg-white border-0"
                 sandbox="allow-same-origin" />
       </div>

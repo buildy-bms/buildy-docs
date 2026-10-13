@@ -55,6 +55,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
         <div class="flex items-center justify-between px-5 pt-3 pb-2 border-b border-gray-100 shrink-0">
           <h2 :id="titleId" class="text-base font-semibold text-gray-800">{{ title }}</h2>
           <button @click="emit('close')" aria-label="Fermer la fenêtre"
+                  v-tooltip="{ label: 'Fermer la fenêtre', keys: ['Esc'] }"
                   class="text-gray-400 hover:text-gray-700 p-1 -mr-1">
             <XMarkIcon class="w-5 h-5" />
           </button>

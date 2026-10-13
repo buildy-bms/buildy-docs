@@ -154,7 +154,18 @@ import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
-import { useClaudeUsage, formatUsageTooltip } from '@/composables/useClaudeUsage'
+import { useClaudeUsage } from '@/composables/useClaudeUsage'
+// Infobulles de l'en-tête et de la barre d'outils (cartes navy, français simple).
+import {
+  parseDbDate, modifiedTip, deliveredTip, AUDIT_KIND_TIPS, openActionsTip, saveStatusTip,
+  PREVIEW_TIP, reportTip, tablesTip, PRECHECK_TIP, deliverTip, BULK_PHOTOS_TIP, TRANSCRIPT_TIP, dossierTip,
+  auditTitleTip,
+} from '@/lib/audit-tips-shell'
+import { isTruncated } from '@/lib/tooltip'
+
+// Titre de l'audit : coupé sur un écran étroit → la bulle donne le titre en entier.
+const auditTitleInput = ref(null)
+const auditTitleTooltip = () => auditTitleTip(document.value?.project_name, !!auditTitleInput.value && isTruncated(auditTitleInput.value))
 
 const router = useRouter()
 const route = useRoute()
@@ -196,7 +207,9 @@ const addDeviceSystem = ref(null) // { id, system_category, zone_name } — moda
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
 // SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
-import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES, isDeviceComplete } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES } from '@/lib/audit-options'
+import { systemsStepTodo } from '@/lib/systems-guide'
+import { plural } from '@/lib/tooltip-content'
 
 const showNotConcernedSystems = ref(localStorage.getItem('bacs-show-not-concerned') === '1')
 watch(showNotConcernedSystems, v => localStorage.setItem('bacs-show-not-concerned', v ? '1' : '0'))
@@ -284,7 +297,7 @@ const GENERATOR_OPTIONS = [
   { value: 'gas', label: 'Gaz' },
   { value: 'electric', label: 'Effet Joule' },
   { value: 'heat_pump', label: 'Pompe à chaleur' },
-  { value: 'wood_appliance', label: 'Appareil bois (exempté R175-6)' },
+  { value: 'wood_appliance', label: 'Appareil au bois (dispensé de régulation pièce par pièce)' },
   { value: 'district_heating', label: 'Réseau de chaleur' },
   { value: 'other', label: 'Autre' },
 ]
@@ -383,8 +396,10 @@ const resolvedCount = computed(() =>
 )
 
 function relativeTime(s) {
-  if (!s) return ''
-  const d = new Date(s)
+  // Date de la base = UTC sans fuseau : lue comme UTC (sinon « il y a 2 h » juste après une
+  // modification, en été), comme la date complète de l'infobulle.
+  const d = parseDbDate(s)
+  if (!d) return ''
   const diffSec = Math.floor((Date.now() - d.getTime()) / 1000)
   if (diffSec < 60) return 'quelques secondes'
   if (diffSec < 3600) return Math.floor(diffSec / 60) + ' min'
@@ -482,17 +497,19 @@ const thermalFiltered = computed(() => {
 // R175-4/5 maintenance + formation). En mode site_audit : 5 etapes,
 // les 3 reglementaires sont retirees.
 const bmsSteps = computed(() => {
+  // Libellés visibles en clair (sommaire de la carte GTB) : pas d'article du décret.
   if (bms.value?.out_of_service) {
-    return [{ label: isBacs.value ? 'GTB déclarée hors-service' : 'Supervision déclarée hors-service',
+    return [{ label: isBacs.value ? 'GTB déclarée hors service' : 'Supervision déclarée hors service',
               done: true,
               anchor: 'bms-block-out-of-service',
-              hint: isBacs.value ? 'Plan d\'action ignore les exigences GTB' : 'Sections supervision masquées' }]
+              // Plan : action bloquante « Remettre en service la GTB » (bacs-audit-action-generator).
+              hint: isBacs.value ? 'Le plan d\'actions propose de la remettre en service' : 'Rubriques de la supervision masquées' }]
   }
   const common = [
     { label: isBacs.value ? 'Identification de la GTB' : 'Identification de la supervision',
       done: !!bms.value?.existing_solution,
       anchor: 'bms-block-identification',
-      hint: 'Solution + marque + localisation' },
+      hint: 'Solution, marque et emplacement' },
     { label: 'Protocoles de mise à disposition',
       anchor: 'bms-block-protocols',
       done: !!(bms.value?.provided_protocols && JSON.parse(bms.value.provided_protocols || '[]').length) },
@@ -505,7 +522,7 @@ const bmsSteps = computed(() => {
       done: !!(bms.value?.manages_heating || bms.value?.manages_cooling
               || bms.value?.manages_ventilation || bms.value?.manages_dhw
               || bms.value?.manages_lighting) },
-    { label: 'Équipements / compteurs intégrés',
+    { label: 'Équipements et compteurs intégrés',
       anchor: 'bms-block-integrated',
       done: !!(devices.value.some(d => d.managed_by_bms) || meters.value.some(m => m.managed_by_bms)),
       hint: 'Au moins un système ou compteur lié à la supervision' },
@@ -513,13 +530,13 @@ const bmsSteps = computed(() => {
   if (!isBacs.value) return common
   return [
     ...common,
-    { label: 'Capacités R175-3 (P1 + P2)',
+    { label: 'Suivi des consommations et des dérives',
       anchor: 'bms-block-r175-3',
       done: !!(bms.value?.meets_r175_3_p1 && bms.value?.meets_r175_3_p2) },
     { label: 'Mise à disposition des données',
       anchor: 'bms-block-data-provision',
       done: !!(bms.value?.data_provision_to_manager && bms.value?.data_provision_to_operators) },
-    { label: 'R175-4 maintenance + R175-5 formation',
+    { label: 'Vérifications et formation de l\'exploitant',
       anchor: 'bms-block-r175-4-5',
       done: !!(bms.value?.has_maintenance_procedures && bms.value?.operator_trained) },
   ]
@@ -670,7 +687,7 @@ function onCredentialsChanged() {
 const STEP_DEFINITIONS = [
   { key: 'identification',
     label: 'Identification',
-    description: 'Site et applicabilite R175-2 renseignes.',
+    description: 'Site rattaché, et on sait si le bâtiment est concerné par le décret.',
     incomplete: () => {
       const r = []
       // Site rattaché = document.site_id non-null en DB. Le hydrate
@@ -679,33 +696,36 @@ const STEP_DEFINITIONS = [
       // le rattachement soit absent.
       if (!document.value?.site_id) r.push("le site n'est pas rattaché")
       if (!document.value?.bacs_applicability_status) {
-        r.push("l'applicabilité R175-2 n'est pas déterminée (puissance chauffage + climatisation et date de permis à renseigner)")
+        r.push('on ne sait pas encore si le bâtiment est concerné : renseigne la puissance de chauffage et de climatisation, et la date du permis de construire')
       }
       return r
     } },
   { key: 'zones',
     label: 'Zones',
-    description: 'Au moins une zone fonctionnelle saisie. Les locaux techniques (hors décret BACS) sont inventoriés dans la même carte mais ne sont pas exigés pour la validation.',
+    description: 'Au moins une zone saisie. Les locaux techniques, hors décret, sont listés au même endroit mais ne sont pas exigés pour valider.',
     incomplete: () => (zones.value.some(z => (z.kind || 'functional') !== 'technical')
       ? [] : ["aucune zone fonctionnelle n'a été saisie"]) },
   { key: 'systems',
     label: 'Systèmes',
-    description: 'Chaque équipement des systèmes présents doit être complètement renseigné.',
+    description: 'Chaque usage a sa réponse (présent ou non concerné), chaque usage présent a ses équipements, et chaque équipement est complètement renseigné.',
+    // Mêmes règles que le guide de l'étape (lib/systems-guide.js) : « à vérifier » ne bloque pas.
     incomplete: () => {
-      const presentIds = new Set(systems.value.filter(s => s.present).map(s => s.id))
-      const auditedDevices = devices.value.filter(d => presentIds.has(d.system_id))
-      if (!auditedDevices.length) return ["aucun équipement n'est saisi sur les usages marqués présents"]
-      const catById = {}
-      for (const s of systems.value) catById[s.id] = s.system_category
-      const ko = auditedDevices.filter(d => !isDeviceComplete(d, catById[d.system_id]))
-      if (!ko.length) return []
-      return [ko.length === 1
-        ? '1 équipement incomplet — repérable à son bouton « Modifier » rouge'
-        : `${ko.length} équipements incomplets — repérables à leur bouton « Modifier » rouge`]
+      const t = systemsStepTodo(systems.value, devices.value)
+      const r = []
+      if (!systems.value.some(s => s.present && !s.not_concerned)) r.push("aucun usage n'est marqué présent")
+      if (t.unanswered) r.push(`${plural(t.unanswered, 'usage', 'usages')} sans réponse : réponds « Présent » ou « Non concerné »`)
+      if (t.empty) r.push(t.empty === 1 ? '1 usage présent sans équipement' : `${t.empty} usages présents sans équipement`)
+      if (t.loops) r.push(t.loops === 1 ? "le bouclage de l’eau chaude à renseigner" : `le bouclage de l’eau chaude à renseigner dans ${t.loops} zones`)
+      if (t.incompleteDevices) {
+        r.push(t.incompleteDevices === 1
+          ? '1 équipement à compléter : repère la pastille « à compléter » dans la liste'
+          : `${t.incompleteDevices} équipements à compléter : repère les pastilles « à compléter » dans la liste`)
+      }
+      return r
     } },
   { key: 'thermal',
     label: 'Régulation',
-    description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
+    description: 'Régulation de la température décrite pour chaque zone chauffée ou climatisée.',
     incomplete: () => {
       // On valide sur thermalFiltered (systèmes chauffage/refroidissement
       // réellement PRÉSENTS, zones techniques exclues) — PAS thermal.value qui
@@ -713,7 +733,7 @@ const STEP_DEFINITIONS = [
       // (ex. Cellule 1 refroidissement, Chaufferie technique). Sinon l'étape
       // est bloquée par des régulations qu'on ne montre même pas à l'auditeur.
       if (thermalFiltered.value.length === 0) {
-        return ["aucune régulation thermique R175-6 n'a été saisie"]
+        return ["aucune régulation de température n'a été décrite"]
       }
       // Chaque ligne doit avoir au moins un équipement d'émission saisi
       // OU être déclarée exemptée (bois). Sinon le PDF générera des
@@ -727,12 +747,12 @@ const STEP_DEFINITIONS = [
         const cat = t.category === 'cooling' ? 'refroidissement' : 'chauffage'
         return `${t.zone_name || 'zone'} (${cat})`
       })
-      const head = `${incomplete.length} régulation${incomplete.length > 1 ? 's' : ''} sans équipement d'émission saisi`
+      const head = `${incomplete.length} régulation${incomplete.length > 1 ? 's' : ''} sans émetteur indiqué (radiateur, ventilo-convecteur…)`
       return [`${head} : ${labels.join(', ')}`]
     } },
   { key: 'meters',
     label: 'Compteurs',
-    description: 'Compteurs requis revus (presents/absents/HS coches).',
+    description: 'Compteurs attendus passés en revue : présents, absents ou en panne.',
     incomplete: () => {
       if (!meters.value.length) return ["aucun compteur n'est listé"]
       if (!meters.value.some(m => m.present_actual !== null)) {
@@ -743,7 +763,7 @@ const STEP_DEFINITIONS = [
   // GTB : complète si « Pas de GTB » répondu, ou GTB présente + solution saisie.
   { key: 'bms',
     label: 'GTB',
-    description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
+    description: 'GTB en place, ce qu’elle sait faire, son entretien et la formation de l’exploitant.',
     incomplete: () => {
       if (bms.value?.present == null) return ["la présence d'une GTB sur le site n'est pas indiquée"]
       if (bms.value?.present === 1 && !bms.value?.existing_solution) {
@@ -753,7 +773,7 @@ const STEP_DEFINITIONS = [
     } },
   { key: 'inspections',
     label: 'Inspections',
-    description: 'R175-5-1 : inspection périodique de la GTB, à l\'initiative du propriétaire (rapport conservé 10 ans).',
+    description: 'Inspection périodique de la GTB, demandée par le propriétaire (rapport à garder 10 ans).',
     incomplete: () => {
       // Mig 187 — case « Aucune inspection à déclarer » bypass la validation.
       const na = document.value?.inspection_not_applicable
@@ -767,7 +787,7 @@ const STEP_DEFINITIONS = [
     // photos arrivent souvent après la visite — on liste ce qui reste et
     // l'auditeur valide quand même s'il le souhaite.
     blocking: false,
-    description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
+    description: 'Plans, schémas, vue d’ensemble de la GTB, adresses réseau, analyse fonctionnelle, contacts des locataires, et une photo de chaque zone, système, compteur et de la GTB.',
     incomplete: () => {
       const r = []
       if (!checklistAllHandled.value) r.push('des éléments de la check-list documentaire sont encore en attente')
@@ -776,9 +796,9 @@ const STEP_DEFINITIONS = [
     } },
   { key: 'documents',
     label: 'Documents',
-    description: 'Plans, schemas, datasheets et manuels deposes.',
+    description: 'Plans, schémas, fiches techniques et manuels déposés.',
     incomplete: () => (siteDocCounts.value.doe > 0
-      ? [] : ["aucun document (plan, schéma, datasheet, manuel) n'a été déposé"]) },
+      ? [] : ["aucun document (plan, schéma, fiche technique, manuel) n'a été déposé"]) },
   { key: 'credentials',
     label: 'Accès',
     description: 'Accès web, SSH et VPN à la GTB et aux systèmes renseignés.',
@@ -786,12 +806,12 @@ const STEP_DEFINITIONS = [
       ? [] : ["aucun accès (web, SSH, VPN) n'a été renseigné"]) },
   { key: 'review',
     label: 'Plan d\'actions',
-    description: 'Plan de mise en conformite relu et annote commercialement.',
+    description: 'Plan de mise en conformité relu et complété.',
     // Le plan n'a plus de champ par action à renseigner : sign-off manuel.
     incomplete: () => [] },
   { key: 'synthesis',
     label: 'Synthèse',
-    description: 'Note de synthese redigee (manuellement ou via Claude).',
+    description: 'Note de synthèse rédigée, à la main ou avec Claude.',
     incomplete: () => ((document.value?.audit_synthesis_html || '').replace(/<[^>]*>/g, '').trim()
       ? [] : ['la note de synthèse est vide']) },
 ]
@@ -865,7 +885,7 @@ const tabSteps = computed(() => allSteps.value.map((s, i) => {
     disabled,
     objective: stepObjective(s.key, isBacs.value),
     disabledReason: disabled
-      ? "Sans objet : aucune GTB sur le site, donc pas d'inspection périodique R175-5-1 à tracer."
+      ? "Sans objet : il n'y a pas de GTB sur le site, donc pas d'inspection à noter."
       : null,
   }
 }))
@@ -904,7 +924,7 @@ async function validateStep(stepKey) {
 
 async function invalidateStep(stepKey) {
   const reason = window.prompt(
-    `Raison de l'invalidation de l'étape "${STEP_DEFINITIONS.find(s => s.key === stepKey)?.label}" (optionnel) :`,
+    `Pourquoi rouvrir l'étape « ${STEP_DEFINITIONS.find(s => s.key === stepKey)?.label} » ? (facultatif)`,
   )
   if (reason === null) return
   try {
@@ -1167,7 +1187,7 @@ async function saveNotesModal(html) {
       // de la table `sites` (propagé à FM via le sync existant).
       await auditStore.updateSiteFields({ [field]: html || null })
     }
-    success('Notes enregistrees')
+    success('Notes enregistrées')
   } catch (e) {
     error(e.response?.data?.detail || 'Sauvegarde notes impossible')
   }
@@ -1178,12 +1198,14 @@ function hasNotes(htmlOrText) {
   return !!String(htmlOrText).replace(/<[^>]*>/g, '').trim()
 }
 
-// ── Applicabilité R175-2 ──
+// ── Le bâtiment est-il concerné par le décret ? (R175-2) ──
+// Libellés en clair, identiques au mobile (MobileSiteTab) et aux titres des cartes
+// d'explication (lib/audit-tips-site.js applicabilityTip). Le PDF garde ses propres libellés.
 const APPLICABILITY_LABEL = {
-  subject_immediate: { label: 'Soumis (immédiat)', cls: 'sev-blocking' },
-  subject_2025: { label: 'Soumis — échéance 1er janvier 2025', cls: 'sev-major' },
-  subject_2030: { label: 'Soumis — échéance 1er janvier 2030', cls: 'sev-minor' },
-  not_subject: { label: 'Non assujetti (puissance < 70 kW)', cls: 'tone-success' },
+  subject_immediate: { label: 'Concerné dès la construction', cls: 'sev-blocking' },
+  subject_2025: { label: 'Concerné depuis le 1er janvier 2025', cls: 'sev-major' },
+  subject_2030: { label: 'Concerné d’ici le 1er janvier 2030', cls: 'sev-minor' },
+  not_subject: { label: 'Non concerné (70 kW ou moins)', cls: 'tone-success' },
 }
 
 let docSaveTimer = null
@@ -1218,7 +1240,7 @@ async function recomputePowerFromEquipments() {
       bacs_total_power_kw: retained,
       bacs_total_power_source: 'auto',
     })
-    success(`Puissance retenue R175-2 recalculée : ${retained} kW (max chaud/froid, hors émetteurs déjà comptés en amont)`)
+    success(`Puissance retenue recalculée : ${String(retained).replace('.', ',')} kW (la plus forte entre chauffage et climatisation, sans recompter les émetteurs)`)
   } catch (e) {
     error(e.response?.data?.detail || 'Calcul de puissance impossible')
   }
@@ -1386,7 +1408,7 @@ async function exportChecklist() {
     a.download = `checklist-audit-${document.value?.slug || docId}.pdf`
     a.click()
     URL.revokeObjectURL(url)
-    success('Checklist A4 prête à imprimer')
+    success('Check-list A4 prête à imprimer')
   } catch (e) {
     error(e.response?.data?.detail || 'Échec de l\'export de la checklist')
   } finally {
@@ -1398,7 +1420,7 @@ const delivering = ref(false)
 async function deliver() {
   const ok = await confirm({
     title: 'Livrer l\'audit BACS ?',
-    message: 'Cette action génère le PDF final, calcule son SHA256 (preuve d\'intégrité) et fige le snapshot Git du document. Une re-livraison ultérieure créera un tag séparé v2/v3 ; l\'historique reste consultable.',
+    message: 'Le rapport PDF définitif sera créé, avec une empreinte qui prouve qu\'il n\'a pas été modifié, et une version figée de l\'audit sera enregistrée. Une nouvelle livraison créera une nouvelle version ; l\'historique reste consultable.',
     confirmLabel: 'Livrer',
   })
   if (!ok) return
@@ -1420,7 +1442,7 @@ async function attemptDelivery(force) {
   delivering.value = true
   try {
     const { data } = await deliverBacsAudit(docId, { force })
-    success(`Audit livré — tag Git ${data.delivered_git_tag}`)
+    success(`Audit livré : version « ${data.delivered_git_tag} » enregistrée`)
     refresh()
     return 'ok'
   } catch (e) {
@@ -1580,25 +1602,29 @@ onBeforeUnmount(() => {
           <span class="text-gray-400">{{ isBacs ? 'Audit BACS' : 'Audit GTB (Classique)' }}</span>
           <span v-if="document?.updated_by_name" class="text-gray-400">
             · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
-            <span v-if="document.updated_at" v-tooltip="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
+            <span v-if="document.updated_at" v-tooltip.bottom="modifiedTip(document.updated_at)"> il y a {{ relativeTime(document.updated_at) }}</span>
           </span>
-          <span v-if="document?.delivered_at" class="ml-2 inline-flex items-center gap-1 text-emerald-700">
+          <span v-if="document?.delivered_at" class="ml-2 inline-flex items-center gap-1 text-emerald-700"
+                v-tooltip="deliveredTip(document.delivered_at)">
             ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
         </div>
         <div class="flex items-center gap-3 min-w-0 flex-wrap">
         <h1 class="audit-title text-lg font-semibold text-gray-800 flex items-center gap-2 min-w-0">
-          <FireIcon v-if="isBacs" class="w-5 h-5 text-orange-500 shrink-0" />
-          <BuildingOffice2Icon v-else class="w-5 h-5 text-emerald-600 shrink-0" />
+          <FireIcon v-if="isBacs" class="w-5 h-5 text-orange-500 shrink-0" v-tooltip="AUDIT_KIND_TIPS.bacs" />
+          <BuildingOffice2Icon v-else class="w-5 h-5 text-emerald-600 shrink-0" v-tooltip="AUDIT_KIND_TIPS.site" />
           <input
+            ref="auditTitleInput"
             type="text"
             :value="document?.project_name || ''"
             @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit GTB') })"
             :placeholder="isBacs ? `Titre de l'audit BACS` : `Titre de l'audit GTB`"
+            v-tooltip.bottom="auditTitleTooltip"
             class="min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             :style="{ width: ((document?.project_name?.length || 12) + 2) + 'ch' }"
           />
-          <span class="audit-subtitle text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
+          <span class="audit-subtitle text-sm font-normal text-gray-500 truncate"
+                v-tooltip.overflow.bottom="document?.client_name">— {{ document?.client_name }}</span>
         </h1>
         <!-- Actions ouvertes du plan de mise en conformité, par sévérité
              (remplace les 3 tuiles). Clic → onglet « Plan d'actions ». -->
@@ -1610,7 +1636,7 @@ onBeforeUnmount(() => {
             @click="goToStep('review')"
             :class="['inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-medium transition hover:brightness-95',
                      SEVERITY_LABEL[sev].cls, itemsBySeverity[sev].length ? '' : 'opacity-50']"
-            v-tooltip="{ text: `${itemsBySeverity[sev].length} action${itemsBySeverity[sev].length > 1 ? 's' : ''} ${SEVERITY_LABEL[sev].label.toLowerCase()}${itemsBySeverity[sev].length > 1 ? 's' : ''} ouverte${itemsBySeverity[sev].length > 1 ? 's' : ''} — voir le plan de mise en conformité`, placement: 'bottom' }"
+            v-tooltip="openActionsTip(sev, itemsBySeverity[sev].length)"
           >
             <span>{{ itemsBySeverity[sev].length }}</span>
             <span>{{ SEVERITY_LABEL[sev].label.toLowerCase() }}{{ itemsBySeverity[sev].length > 1 ? 's' : '' }}</span>
@@ -1624,61 +1650,65 @@ onBeforeUnmount(() => {
              requêtes, saved après succès, error sur fail réseau / 4xx
              / 5xx. Donne à l'auditeur la certitude que ses modifs sont
              bien parties (et signale clairement si pas). -->
+        <!-- Bulles des 3 états : lib/audit-tips-shell.js (saveStatusTip). -->
         <div v-if="saveStatus.state.value === 'saving'"
-             v-tooltip="`${saveStatus.inflight.value} sauvegarde(s) en cours…`"
+             v-tooltip="saveStatusTip('saving', { inflight: saveStatus.inflight.value })"
              class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-gray-500 bg-gray-50 rounded-md whitespace-nowrap">
           <ArrowPathIcon class="w-3.5 h-3.5 shrink-0 animate-spin" /> Sauvegarde…
         </div>
         <div v-else-if="saveStatus.state.value === 'error'"
-             v-tooltip="saveStatus.lastError.value?.response?.data?.detail || 'La dernière sauvegarde a échoué'"
+             v-tooltip="saveStatusTip('error', { errorDetail: saveStatus.lastError.value?.response?.data?.detail })"
              @click="saveStatus.clearError()"
              class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-red-700 bg-red-50 rounded-md whitespace-nowrap cursor-pointer hover:bg-red-100">
           <ExclamationTriangleIcon class="w-3.5 h-3.5 shrink-0" /> Erreur de sauvegarde
         </div>
         <div v-else-if="saveStatus.state.value === 'saved'"
-             v-tooltip="saveStatus.lastSavedAt.value ? `Dernière sauvegarde : ${saveStatus.lastSavedAt.value.toLocaleTimeString('fr-FR')}` : 'Tout est enregistré'"
+             v-tooltip="saveStatusTip('saved', { lastSavedAt: saveStatus.lastSavedAt.value })"
              class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-emerald-700 bg-emerald-50 rounded-md whitespace-nowrap">
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> Enregistré
         </div>
 
-        <!-- Aperçu HTML (avant export PDF) — tooltips en placement 'bottom'
-             pour ne pas masquer les boutons voisins de la toolbar sticky. -->
-        <Button variant="secondary" size="md" @click="openPreview"
-          v-tooltip="{ text: 'Aperçu HTML rapide du rapport (sans génération PDF)', placement: 'bottom' }">
+        <!-- Aperçu HTML (avant export PDF) — bulles placées dessous pour ne pas
+             masquer les boutons voisins de la toolbar sticky. Les boutons grisés
+             pendant une génération portent leur bulle par une enveloppe <Tooltip>
+             (un bouton désactivé ne reçoit pas le survol). -->
+        <Button variant="secondary" size="md" @click="openPreview" v-tooltip="PREVIEW_TIP">
           <template #icon-left><EyeIcon class="w-4 h-4 shrink-0" /></template>
           Aperçu
         </Button>
 
         <!-- Exports PDF principaux (style cohérent avec AF : indigo solide) -->
-        <Button variant="primary" size="md" :loading="exporting" @click="exportPdf"
-          v-tooltip="{ text: 'Génère le rapport d\'audit complet en PDF A4', placement: 'bottom' }">
+        <Tooltip :text="reportTip(exporting)">
+        <Button variant="primary" size="md" :loading="exporting" @click="exportPdf">
           <template #icon-left><DocumentArrowDownIcon class="w-4 h-4" /></template>
           {{ exporting ? 'Génération…' : 'Rapport' }}
         </Button>
-        <Button variant="primary" size="md" :loading="exportingTables" @click="exportTablesPdf"
-          v-tooltip="{ text: 'Génère les tableaux de synthèse (A3 paysage) destinés à l\'intégrateur', placement: 'bottom' }">
+        </Tooltip>
+        <Tooltip :text="tablesTip(exportingTables)">
+        <Button variant="primary" size="md" :loading="exportingTables" @click="exportTablesPdf">
           <template #icon-left><TableCellsIcon class="w-4 h-4" /></template>
           {{ exportingTables ? 'Génération…' : 'Synthèse' }}
         </Button>
+        </Tooltip>
 
-        <!-- Vérifier (Lot 4 — pré-check de cohérence avant livraison) -->
-        <Button variant="secondary" size="md" @click="showPrecheck = true"
-          v-tooltip="{ text: 'Pré-vérification de cohérence avant livraison (R175 — Lot 4)', placement: 'bottom' }">
+        <!-- Vérifier (pré-contrôle de cohérence avant livraison) -->
+        <Button variant="secondary" size="md" @click="showPrecheck = true" v-tooltip="PRECHECK_TIP">
           <template #icon-left><ShieldCheckIcon class="w-4 h-4 shrink-0" /></template>
           Vérifier
         </Button>
 
         <!-- Livrer (CTA principal vert) -->
-        <Button variant="success" size="md" :loading="delivering" @click="deliver"
-          v-tooltip="{ text: 'Génère le PDF final + fige le snapshot Git', placement: 'bottom' }">
+        <Tooltip :text="deliverTip(delivering, document?.delivered_at)">
+        <Button variant="success" size="md" :loading="delivering" @click="deliver">
           <template #icon-left><CheckCircleIcon class="w-4 h-4 shrink-0" /></template>
           {{ delivering ? 'Livraison…' : 'Livrer' }}
         </Button>
+        </Tooltip>
 
         <!-- Menu Plus (cohérent avec AF) -->
         <div ref="settingsMenuRef" class="relative inline-flex">
           <Button variant="secondary" size="md" @click="showSettingsMenu = !showSettingsMenu"
-            v-tooltip="{ text: 'Plus d\'actions', placement: 'bottom' }">
+            v-tooltip="{ label: 'Plus d’actions sur cet audit', placement: 'bottom' }">
             <template #icon-left><EllipsisHorizontalIcon class="w-4 h-4 shrink-0" /></template>
             Plus
           </Button>
@@ -1706,21 +1736,26 @@ onBeforeUnmount(() => {
               Activité
             </button>
             <button v-if="document?.site_uuid" @click="showSettingsMenu = false; openBulkUpload()"
+              v-tooltip="BULK_PHOTOS_TIP"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
               <PhotoIcon class="w-4 h-4 text-gray-400 shrink-0" />
               Photos terrain (import en masse)
             </button>
             <button @click="showSettingsMenu = false; openTranscript()"
+              v-tooltip="TRANSCRIPT_TIP"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
               <SparklesIcon class="w-4 h-4 text-gray-400 shrink-0" />
-              Transcript IA (Plaud Pro)
+              Transcription IA (Plaud Pro)
             </button>
+            <!-- Enveloppe bloc (data-tip-wrap, comme <Tooltip>) : la bulle reste lisible
+                 quand le bouton est grisé pendant la préparation du dossier. -->
+            <div data-tip-wrap v-tooltip="dossierTip(exportingDossier)">
             <button @click="showSettingsMenu = false; exportDossier()" :disabled="exportingDossier"
-              v-tooltip="{ text: 'Rapport PDF, tableaux de synthèse et documents cochés « Inclure dans le rapport », dans un seul fichier ZIP', placement: 'left' }"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50">
               <ArchiveBoxArrowDownIcon class="w-4 h-4 text-gray-400 shrink-0" />
               {{ exportingDossier ? 'Préparation du dossier…' : 'Dossier complet (ZIP)' }}
             </button>
+            </div>
             <div class="border-t border-gray-100 my-1"></div>
             <button @click="showSettingsMenu = false; deleteAudit()"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
@@ -1965,7 +2000,6 @@ onBeforeUnmount(() => {
         :generated-at="document?.audit_synthesis_generated_at"
         :claude-usage="claudeUsage"
         :step="stepFor('synthesis')"
-        :usage-tooltip="formatUsageTooltip(claudeUsage)"
         @generate="generateSynthesis"
         @confirm-current="confirmSynthesisCurrent"
         @update:synthesis-html="onSynthesisInput"
@@ -2009,9 +2043,10 @@ onBeforeUnmount(() => {
     </Teleport>
 
     <!-- Modale d'edition de notes (zones, systemes, compteurs, GTB, devices) -->
+    <!-- :title = titre de la fenêtre (propriété du composant), pas une infobulle. -->
     <NotesEditorModal
       :open="notesModal.open"
-      v-tooltip="notesModal.title"
+      :title="notesModal.title"
       :context-label="notesModal.contextLabel"
       v-model="notesModal.html"
       :assist-context="notesModal.assistContext"
@@ -2066,9 +2101,10 @@ onBeforeUnmount(() => {
       @applied="onSuggestionApplied"
     />
 
+    <!-- :title = titre de la fenêtre (propriété obligatoire), pas une infobulle. -->
     <PdfPreviewModal
       v-if="previewOpen"
-      v-tooltip="`Aperçu — ${isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
+      :title="`Aperçu du rapport ${isBacs ? 'd’audit BACS' : 'd’audit GTB'}${document?.client_name ? ` · ${document.client_name}` : ''}`"
       :preview-url="previewUrl"
       :downloading="exporting"
       download-label="Télécharger le PDF"

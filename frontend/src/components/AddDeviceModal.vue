@@ -4,7 +4,9 @@ import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import { createBacsDevice } from '@/api'
+import Tooltip from './Tooltip.vue'
 import { isThermalCategory, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
+import { addDeviceDisabledTip } from '@/lib/audit-tips-systems'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
@@ -69,7 +71,7 @@ const missingFields = () => {
   if (!hasIdentity()) out.push('un nom, une marque ou une référence')
   if (energyRequired.value && !form.value.energy_source) out.push('l\'énergie primaire')
   if (roleApplies.value && !(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('la fonction')
-  if (protocolCount() === 0) out.push('le(s) protocole(s)')
+  if (protocolCount() === 0) out.push('au moins un protocole')
   return out
 }
 
@@ -90,15 +92,15 @@ async function submit(keepContext = false) {
         communication_protocols: form.value.communication_protocols,
       }
       form.value = { ...EMPTY_FORM(), ...kept }
-      success('Système ajouté — saisissez le suivant')
+      success('Équipement ajouté — saisis le suivant')
       await nextTick()
       nameInput.value?.focus()
     } else {
-      success('Système ajouté')
+      success('Équipement ajouté')
       emit('close')
     }
   } catch (e) {
-    error(e.response?.data?.detail || 'Création du système impossible')
+    error(e.response?.data?.detail || 'Création de l’équipement impossible')
   } finally {
     submitting.value = false
   }
@@ -108,13 +110,13 @@ async function submit(keepContext = false) {
 <template>
   <component
     :is="embedded ? 'div' : BaseModal"
-    v-bind="embedded ? {} : { title: `Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`, size: 'xl', dismissOnBackdrop: false }"
+    v-bind="embedded ? {} : { title: `Ajouter un équipement — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`, size: 'xl', dismissOnBackdrop: false }"
     @close="emit('close')"
   >
     <form @submit.prevent="submit(false)" class="space-y-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Nom du système</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Nom de l’équipement</label>
           <input v-model="form.name" type="text" autofocus ref="nameInput"
                  placeholder="ex : Chaudière gaz principale, Groupe DRV…"
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
@@ -136,7 +138,7 @@ async function submit(keepContext = false) {
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div v-if="roleApplies" :class="{ 'sm:col-span-2': true }">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Fonction(s) de l'équipement <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Fonctions de l'équipement <span class="text-red-500">*</span></label>
           <SearchableSelect
             v-model="form.device_role"
             :options="roleOptions"
@@ -146,7 +148,7 @@ async function submit(keepContext = false) {
             placeholder="Production / Distribution / Émission / Régulation"
           />
           <p class="text-xs text-gray-500 mt-1 leading-snug">
-            <strong>Production</strong> = transforme une énergie primaire (gaz, élec, soleil) en chaleur, froid ou lumière sur place. <strong>Émission seule</strong> = reçoit un fluide d'un autre équipement (radiateur à eau, ventilo-convecteur…).
+            <strong>Production</strong> = transforme une énergie primaire (gaz, électricité, soleil) en chaleur, froid ou lumière sur place. <strong>Émission seule</strong> = reçoit un fluide d'un autre équipement (radiateur à eau, ventilo-convecteur…).
           </p>
         </div>
         <div v-if="energyRequired">
@@ -164,7 +166,7 @@ async function submit(keepContext = false) {
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Protocole(s) de communication <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Protocoles de communication <span class="text-red-500">*</span></label>
           <ProtocolMultiPicker
             v-model="form.communication_protocols"
             :options="commOptions"
@@ -178,21 +180,26 @@ async function submit(keepContext = false) {
         </div>
       </div>
       <p v-if="!canSubmit() && !submitting" class="text-xs text-amber-600">
-        Renseignez {{ missingFields().join(', ') }} pour pouvoir ajouter le système.
+        Renseigne {{ missingFields().join(', ') }} pour pouvoir ajouter l’équipement.
       </p>
       <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
         <button type="button" @click="emit('close')"
                 class="px-4 py-2 min-h-11 sm:min-h-0 text-sm text-gray-700 hover:bg-gray-100 rounded-lg whitespace-nowrap">
           Annuler
         </button>
-        <button type="button" @click="submit(true)" :disabled="!canSubmit() || submitting"
-                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-lg border border-emerald-200 whitespace-nowrap">
-          Enregistrer et ajouter un autre
-        </button>
-        <button type="submit" :disabled="!canSubmit() || submitting"
-                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm whitespace-nowrap">
-          {{ submitting ? 'Création…' : 'Ajouter le système' }}
-        </button>
+        <!-- Grisés tant qu'un champ obligatoire manque : la bulle dit lesquels. -->
+        <Tooltip :text="submitting ? null : addDeviceDisabledTip(missingFields())">
+          <button type="button" @click="submit(true)" :disabled="!canSubmit() || submitting"
+                  class="w-full sm:w-auto px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-lg border border-emerald-200 whitespace-nowrap">
+            Enregistrer et ajouter un autre
+          </button>
+        </Tooltip>
+        <Tooltip :text="submitting ? null : addDeviceDisabledTip(missingFields())">
+          <button type="submit" :disabled="!canSubmit() || submitting"
+                  class="w-full sm:w-auto px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm whitespace-nowrap">
+            {{ submitting ? 'Création…' : 'Ajouter l’équipement' }}
+          </button>
+        </Tooltip>
       </div>
     </form>
   </component>

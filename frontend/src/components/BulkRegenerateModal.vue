@@ -17,7 +17,9 @@
 import { ref, computed } from 'vue'
 import { SparklesIcon, XMarkIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
+import Tooltip from './Tooltip.vue'
 import { claudeLibraryAssist } from '@/api'
+import { CORPUS_TIPS, regenerateStatusTip } from '@/lib/library-tips'
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -63,6 +65,11 @@ const totalCost = ref(0)
 const errors = ref([]) // { id, title, message }
 
 function statusOf(id) { return statuses.value.get(id) || 'pending' }
+// Bulle de l'icône d'état d'une ligne (l'échec affiche le message d'erreur de cette ligne).
+function statusTip(id) {
+  const status = statusOf(id)
+  return regenerateStatusTip(status, status === 'fail' ? errors.value.find(e => e.id === id)?.message : '')
+}
 
 async function start() {
   const queue = props.items.filter(i => selectedIds.value.has(i.id))
@@ -125,20 +132,20 @@ function cancel() {
 
       <!-- Options corpus -->
       <div class="border border-gray-200 rounded-lg p-3 space-y-2 text-sm">
-        <label class="flex items-center gap-2 cursor-pointer">
+        <label class="flex items-center gap-2 cursor-pointer" v-tooltip="CORPUS_TIPS.include">
           <input type="checkbox" v-model="useCorpus" :disabled="running"
                  class="rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
           <span class="font-medium">Inclure le corpus existant</span>
           <span class="text-gray-500 text-xs">(améliore la cohérence ; coût plus élevé)</span>
         </label>
         <div v-if="useCorpus" class="pl-6 flex items-center gap-3 text-xs">
-          <label class="flex items-center gap-1 cursor-pointer">
+          <label class="flex items-center gap-1 cursor-pointer" v-tooltip="CORPUS_TIPS.neighbors">
             <input type="radio" value="neighbors" v-model="corpusStrategy" :disabled="running" /> Voisins
           </label>
-          <label class="flex items-center gap-1 cursor-pointer">
+          <label class="flex items-center gap-1 cursor-pointer" v-tooltip="CORPUS_TIPS.summary">
             <input type="radio" value="summary" v-model="corpusStrategy" :disabled="running" /> Résumé complet
           </label>
-          <label class="flex items-center gap-1 cursor-pointer">
+          <label class="flex items-center gap-1 cursor-pointer" v-tooltip="CORPUS_TIPS.full">
             <input type="radio" value="full" v-model="corpusStrategy" :disabled="running" /> Corpus complet
           </label>
         </div>
@@ -147,14 +154,16 @@ function cancel() {
       <!-- Liste des entrées -->
       <div class="border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
         <div class="sticky top-0 z-10 bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center gap-2 text-xs shadow-sm">
-          <input type="checkbox"
-                 :checked="selectionCount === items.length && items.length > 0"
-                 :indeterminate.prop="selectionCount > 0 && selectionCount < items.length"
-                 @change="toggleAll" :disabled="running"
-                 class="rounded border-gray-300 text-violet-600" />
+          <Tooltip :text="running ? 'Attends la fin de la régénération' : 'Tout cocher / décocher'">
+            <input type="checkbox"
+                   :checked="selectionCount === items.length && items.length > 0"
+                   :indeterminate.prop="selectionCount > 0 && selectionCount < items.length"
+                   @change="toggleAll" :disabled="running"
+                   class="rounded border-gray-300 text-violet-600" />
+          </Tooltip>
           <span class="font-medium text-gray-700">{{ selectionCount }} / {{ items.length }} sélectionnée(s)</span>
           <span v-if="running" class="ml-auto text-violet-700">{{ progress.current }} / {{ progress.total }} en cours…</span>
-          <span v-else-if="totalCost > 0" class="ml-auto font-mono text-gray-600">≈ {{ totalCost.toFixed(3) }} €</span>
+          <span v-else-if="totalCost > 0" class="ml-auto font-mono text-gray-600" v-tooltip="'Coût cumulé de la régénération'">≈ {{ totalCost.toFixed(3) }} €</span>
         </div>
         <ul class="divide-y divide-gray-100 text-sm">
           <li v-for="it in items" :key="it.id"
@@ -164,14 +173,14 @@ function cancel() {
                    @change="toggle(it.id)"
                    :disabled="running"
                    class="rounded border-gray-300 text-violet-600" />
-            <span class="flex-1 truncate">
+            <span class="flex-1 truncate" v-tooltip.overflow>
               <span class="text-[10px] uppercase font-semibold text-gray-400 mr-1.5">{{ kindLabel(it.kind) }}</span>
               {{ it.title }}
             </span>
             <span v-if="statusOf(it.id) === 'running'"
-                  class="text-violet-600 text-xs animate-pulse">⏳</span>
-            <CheckIcon v-else-if="statusOf(it.id) === 'ok'" class="w-4 h-4 text-emerald-600" />
-            <ExclamationTriangleIcon v-else-if="statusOf(it.id) === 'fail'" class="w-4 h-4 text-red-600" />
+                  class="text-violet-600 text-xs animate-pulse" v-tooltip="statusTip(it.id)">⏳</span>
+            <CheckIcon v-else-if="statusOf(it.id) === 'ok'" class="w-4 h-4 text-emerald-600" v-tooltip="statusTip(it.id)" />
+            <ExclamationTriangleIcon v-else-if="statusOf(it.id) === 'fail'" class="w-4 h-4 text-red-600" v-tooltip="statusTip(it.id)" />
           </li>
         </ul>
       </div>
@@ -187,15 +196,19 @@ function cancel() {
 
     <template #footer>
       <button @click="cancel"
-              class="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900">
+              class="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900"
+              v-tooltip="running ? 'Arrêter après l’élément en cours' : null">
         {{ running ? 'Annuler' : 'Fermer' }}
       </button>
-      <button @click="start" :disabled="running || selectionCount === 0"
-              class="px-3 py-1.5 text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 rounded-lg shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50">
-        <SparklesIcon class="w-4 h-4" />
-        <span v-if="running">Régénération…</span>
-        <span v-else>Régénérer ({{ selectionCount }})</span>
-      </button>
+      <!-- Grisé pendant la régénération (le bouton l'affiche) ou sans élément coché. -->
+      <Tooltip :text="!running && selectionCount === 0 ? 'Coche au moins un élément à régénérer' : null">
+        <button @click="start" :disabled="running || selectionCount === 0"
+                class="px-3 py-1.5 text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 rounded-lg shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50">
+          <SparklesIcon class="w-4 h-4" />
+          <span v-if="running">Régénération…</span>
+          <span v-else>Régénérer ({{ selectionCount }})</span>
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

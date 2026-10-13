@@ -26,29 +26,36 @@ export function meterPlanState(m, planStatus) {
 export const isMeterMissing = (m, planStatus) => meterPlanState(m, planStatus) === 'missing'
 export const isMeterUnanswered = (m, planStatus) => meterPlanState(m, planStatus) === 'unanswered'
 
+// Raison d'un compteur non exigé, en mots simples (infobulle + texte du mobile).
 const NOT_REQUIRED_REASON = {
-  exempt_5pct: 'Système exempté de raccordement (règle des 5 %) : ce compteur n\'est pas exigé.',
-  excluded_by_auditor: 'Équipements déclarés non concernés par l\'intégration à la GTB : ce compteur n\'est pas exigé.',
+  exempt_5pct: 'Cet usage pèse moins de 5 % de la consommation : il est dispensé de raccordement à la GTB, donc de compteur.',
+  excluded_by_auditor: 'Les équipements de cet usage ont été déclarés non concernés par la GTB : pas de compteur exigé.',
 }
 
-// Mention courte (+ infobulle) affichée sous l'usage du compteur, ou null.
+// Mention courte affichée sous l'usage du compteur (`label`), son explication en une phrase
+// (`text`, affichée telle quelle sur mobile) et la carte d'infobulle (`tooltip`), ou null.
 export function meterPlanNote(m, planStatus) {
   const st = planStatus?.[m.id]
   if (!st) return null
   if (st.status === 'covered') {
+    const text = 'Ces zones sont regroupées : un seul compteur mesure l’ensemble, car on ne peut pas compter chaque zone à part. Ce compteur-ci n’est donc pas exigé.'
     return {
-      label: 'Couvert par la zone regroupée',
-      tooltip: `Zones regroupées ${st.group} : un compteur unique suffit pour l'ensemble (comptage séparé non réalisable). Ce compteur n'est pas exigé.`,
+      label: 'Couvert par le compteur commun',
+      text,
+      tooltip: { title: 'Comptage commun', tone: 'neutral', icon: 'object-group', text, rows: [{ label: 'Zones regroupées', value: st.group }], article: 'R175-3' },
     }
   }
   if (st.status === 'lead') {
+    const text = 'Ces zones sont regroupées : ce compteur mesure l’ensemble.'
     return {
-      label: 'Compteur unique de la zone regroupée',
-      tooltip: `Zones regroupées ${st.group} : ce compteur porte le comptage de l'ensemble.`,
+      label: 'Compteur commun des zones regroupées',
+      text,
+      tooltip: { title: 'Compteur commun', tone: 'info', icon: 'object-group', text, rows: [{ label: 'Zones regroupées', value: st.group }], article: 'R175-3' },
     }
   }
   if (st.status === 'not_required') {
-    return { label: 'Non exigé', tooltip: NOT_REQUIRED_REASON[st.reason] || 'Ce compteur n\'est pas exigé.' }
+    const text = NOT_REQUIRED_REASON[st.reason] || 'Ce compteur n’est pas exigé.'
+    return { label: 'Non exigé', text, tooltip: { title: 'Compteur non exigé', tone: 'neutral', text, article: 'R175-3' } }
   }
   return null
 }

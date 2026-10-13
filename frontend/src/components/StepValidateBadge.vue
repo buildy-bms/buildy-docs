@@ -2,23 +2,16 @@
 import { computed } from 'vue'
 import { CheckCircleIcon } from '@heroicons/vue/24/solid'
 import { CheckCircleIcon as CheckOutline } from '@heroicons/vue/24/outline'
+import { validateBadgeTip } from '@/lib/audit-tips-shell'
 
 const props = defineProps({
   step: { type: Object, default: null }, // { key, validated, validated_at, complete }
 })
 const emit = defineEmits(['validate', 'invalidate'])
 
-const tooltip = computed(() => {
-  if (!props.step) return ''
-  if (props.step.validated) {
-    const dateStr = props.step.validated_at
-      ? ` le ${new Date(props.step.validated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}`
-      : ''
-    const byStr = props.step.validated_by_name ? ` par ${props.step.validated_by_name}` : ''
-    return `Étape validée${dateStr}${byStr} — clic pour annuler`
-  }
-  return props.step.complete ? 'Valider cette étape' : 'Valider cette étape (conditions automatiques pas encore satisfaites)'
-})
+// Validée : carte (date, auteur, un clic rouvre l'étape). À valider : étiquette, ou ce qui
+// manque encore (lib/audit-tips-shell.js).
+const tooltip = computed(() => validateBadgeTip(props.step))
 </script>
 
 <template>

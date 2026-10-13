@@ -26,7 +26,7 @@ const { document, systems } = storeToRefs(audit)
   <CollapsibleSection storage-key="credentials" section-id="section-credentials" :active="active">
     <template #header>
       <SectionHeader number="10" title="Accès aux systèmes"
-                     subtitle="Identifiants web, SSH et VPN de la GTB et des systèmes (chiffrés AES-256-GCM)"
+                     subtitle="Identifiants web, SSH et VPN de la GTB et des systèmes, stockés chiffrés"
                      :icon="WrenchScrewdriverIcon" icon-color="text-amber-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"

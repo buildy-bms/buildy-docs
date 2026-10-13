@@ -195,7 +195,7 @@ watch(() => props.modelValue, (v) => {
     >
       <!-- Multi-select : pilules des options sélectionnées, à plat -->
       <template v-if="multiple">
-        <span v-if="!selectedOptions.length"
+        <span v-if="!selectedOptions.length" v-tooltip.overflow
               class="flex-1 text-left text-gray-500 italic truncate">{{ placeholder }}</span>
         <span v-else class="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
           <span
@@ -232,6 +232,7 @@ watch(() => props.modelValue, (v) => {
         >{{ matchedOption.pill }}</span>
 
         <span
+          v-tooltip.overflow
           class="flex-1 text-left truncate"
           :class="triggerLabel ? 'text-gray-900' : 'text-gray-500 italic'"
         >{{ triggerLabel || placeholder }}</span>
@@ -265,10 +266,11 @@ watch(() => props.modelValue, (v) => {
               @click="closeSheet"
               class="tap-target inline-flex items-center justify-center text-gray-600 -ml-1"
               aria-label="Fermer"
+              v-tooltip="{ label: 'Fermer la liste', keys: ['Esc'] }"
             >
               <FontAwesomeIcon :icon="['fas', 'xmark']" class="w-6 h-6" />
             </button>
-            <h3 class="flex-1 min-w-0 text-center text-base font-medium text-gray-900 truncate">{{ title }}</h3>
+            <h3 v-tooltip.overflow.bottom class="flex-1 min-w-0 text-center text-base font-medium text-gray-900 truncate">{{ title }}</h3>
             <!-- Multi : bouton « OK » pour confirmer la sélection courante.
                  Mono : bouton « Effacer » si une valeur est posée. -->
             <button
@@ -368,10 +370,10 @@ watch(() => props.modelValue, (v) => {
                 <span v-else class="w-5 shrink-0"></span>
 
                 <span class="flex-1 min-w-0">
-                  <span :class="['block text-base truncate', isSelected(o) ? 'text-indigo-700 font-medium' : 'text-gray-900']">{{ o.label }}</span>
+                  <span v-tooltip.overflow :class="['block text-base truncate', isSelected(o) ? 'text-indigo-700 font-medium' : 'text-gray-900']">{{ o.label }}</span>
                   <!-- En mode groupByHint, le hint est porté par le
                        sous-titre ; on évite de le doubler ici. -->
-                  <span v-if="o.hint && !groupByHint" class="block text-sm text-gray-500 truncate">{{ o.hint }}</span>
+                  <span v-if="o.hint && !groupByHint" v-tooltip.overflow class="block text-sm text-gray-500 truncate">{{ o.hint }}</span>
                 </span>
 
                 <FontAwesomeIcon

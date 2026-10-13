@@ -1,6 +1,10 @@
 <script setup>
+import { docStatusTip } from '@/lib/af-tips'
+
 defineProps({
   status: { type: String, required: true }, // 'redaction' | 'validee' | 'commissioning' | 'commissioned' | 'livree'
+  // Type de document (af | bacs_audit | maintenance_report | brochure) : adapte seulement le texte de l'infobulle.
+  kind: { type: String, default: 'af' },
 })
 
 const config = {
@@ -18,6 +22,7 @@ const config = {
 <template>
   <span
     :class="['inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full', config[status]?.classes || 'bg-gray-100 text-gray-700']"
+    v-tooltip="docStatusTip(status, kind)"
   >
     {{ config[status]?.label || status }}
   </span>

@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.272",
+      "date": "2026-10-13",
+      "title": "Infobulles refaites, étape Systèmes guidée, fiches équipement vraiment complètes",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Toutes les infobulles refaites : plus claires, plus lisibles",
+          "what": "Toutes les bulles d'aide de l'application ont été réécrites et redessinées : fond bleu marine, icônes de couleur, informations aérées, presque toujours sur une seule ligne. Le texte est en français simple, compréhensible sans connaître le décret BACS : l'article concerné est cité en bas, discrètement. Une bulle ne cache jamais ce qu'on survole et reste toujours entière à l'écran ; elle apparaît après un court instant, en fondu. Des bulles ont été ajoutées là où il en manquait : boutons à icône seule, textes coupés (la bulle donne le texte complet), boutons grisés (la bulle dit pourquoi et quoi faire), sigles (ECS, TGBT, AGBT…) et protocoles (Modbus, BACnet, KNX…).",
+          "where": "Toute l'application, à commencer par l'audit BACS.",
+          "how_to_test": "Survoler les boutons, pastilles et en-têtes d'un audit : bulles marine, entières, jamais par-dessus l'élément survolé. Survoler un bouton grisé : la bulle explique ce qui manque."
+        },
+        {
+          "kind": "feature",
+          "title": "Étape Systèmes : une nouvelle mise en page guidée, au choix",
+          "what": "Un bouton « Mise en page : Actuelle / Nouvelle » apparaît à droite de la barre des zones ; l'actuelle reste celle par défaut et ne change pas. La nouvelle met le reste à faire en tête : guide des usages à gauche (« Tous les usages » ou un seul usage à la fois), états « à compléter », « à vérifier » et « sans réponse » partout, un bloc par usage à la couleur de son circuit (rouge chauffage, cyan froid…), la production reliée aux équipements qu'elle dessert, fiche équipement en rubriques qui n'ouvre que ce qui reste à faire, bouton « Suivant à reprendre » qui enchaîne les points de toute l'étape. Les fenêtres aussi sont plus guidées : ajout d'équipement par la recherche, ajout de système en tuiles, une seule fenêtre « Déplacer ou partager ».",
+          "where": "Audit BACS → étape Systèmes (ordinateur).",
+          "how_to_test": "Passer « Mise en page » sur « Nouvelle », choisir une zone, cliquer un usage dans le guide de gauche : seul cet usage reste affiché. Ouvrir un équipement : seules les rubriques à compléter sont dépliées. Repasser sur « Actuelle » : tout est comme avant."
+        },
+        {
+          "kind": "fix",
+          "title": "Un équipement n'est « complet » que si chaque question a sa réponse",
+          "what": "La question « L'équipement dispose-t-il d'une régulation ? » pouvait rester vide sur une fiche déclarée complète. Désormais, chaque question affichée doit avoir sa réponse : régulation (et, si oui, intégrée ou déportée et le type de régulation de chaque fonction), « dessert plusieurs bâtiments », puissance d'une production de chauffage ou de froid (ou « puissance inconnue »), fonction de l'équipement (sauf photovoltaïque), bouclage de l'eau chaude. Le bandeau de l'étape ne dit plus « tout est renseigné » s'il reste un usage sans réponse ou sans équipement, et la validation est refusée tant qu'il reste quelque chose à compléter. Répondre « Non » à la régulation efface les réponses devenues inutiles, qui comptaient encore dans le rapport. Des audits jugés complets peuvent donc afficher quelques points nouveaux à compléter.",
+          "where": "Audit BACS → étape Systèmes (ordinateur et téléphone).",
+          "how_to_test": "Ouvrir un équipement dont la régulation n'est pas renseignée : il passe « à compléter », la rubrique Régulation s'ouvre seule. Le bandeau de l'étape liste ce qui reste à faire."
+        },
+        {
+          "kind": "ux",
+          "title": "Noms de la bibliothèque en français",
+          "what": "« Groupe d'eau glacée (chiller) » devient « Groupe d'eau glacée », la catégorie « Process » devient « Procédés industriels ». Les équipements des audits non livrés qui portaient l'ancien nom suivent ; la recherche trouve toujours « chiller ».",
+          "where": "Bibliothèque des équipements, étape Systèmes des audits.",
+          "how_to_test": "Chercher « chiller » dans l'ajout d'équipement : « Groupe d'eau glacée » est proposé."
+        }
+      ]
+    },
+    {
       "version": "0.1.271",
       "date": "2026-10-12",
       "title": "Compteurs d'audit : chaque compteur obligatoire dit ce qu'il mesure",

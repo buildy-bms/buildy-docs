@@ -23,8 +23,9 @@ defineProps({
   // Labels personnalisables.
   yesLabel: { type: String, default: 'Oui' },
   noLabel: { type: String, default: 'Non' },
-  // Tooltip global sur l'ensemble (ex: "Compteur présent sur site ?").
-  tooltip: { type: String, default: '' },
+  // Infobulle de l'ensemble (v-tooltip : étiquette ou carte), ex. la question posée ou la
+  // raison du grisé. Portée par le conteneur : elle s'affiche aussi quand le contrôle est grisé.
+  tooltip: { type: [String, Object, Function], default: '' },
   // Variante "yes danger" : le "Oui" est rouge et le "Non" vert. Utilisé pour
   // les booléens où le "oui" est une mauvaise nouvelle (out_of_service…).
   // Sans l'inversion du "Non", la bonne réponse s'affichait en rouge et
@@ -50,12 +51,17 @@ function pick(v) {
 </script>
 
 <template>
+  <!-- Grisé : le conteneur garde le survol (infobulle = raison), les boutons ne réagissent plus. -->
   <div :class="['seg-toggle inline-flex border border-gray-200 overflow-hidden shrink-0',
                 size === 'lg' ? 'text-base rounded-lg' : (size === 'xs' ? 'text-[11px] rounded-md' : 'text-xs rounded-lg'),
-                disabled ? 'opacity-50 pointer-events-none' : '']"
-       :title="tooltip">
+                disabled ? 'opacity-50 cursor-not-allowed' : '']"
+       v-tooltip="tooltip || null">
     <button type="button"
+            :disabled="disabled"
+            :aria-label="compact ? yesLabel : undefined"
+            :aria-pressed="modelValue === true"
             :class="['seg-btn font-medium transition whitespace-nowrap select-none',
+                     disabled ? 'pointer-events-none' : '',
                      size === 'lg' ? 'min-h-12 px-4' : (size === 'xs' ? 'seg-btn-xs h-[22px] px-1.5' : 'h-7 px-3'),
                      modelValue === true
                        ? (yesDanger ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800')
@@ -64,7 +70,11 @@ function pick(v) {
       <span class="font-bold">✓</span><span v-if="!compact" class="ml-1">{{ yesLabel }}</span>
     </button>
     <button type="button"
+            :disabled="disabled"
+            :aria-label="compact ? noLabel : undefined"
+            :aria-pressed="modelValue === false"
             :class="['seg-btn font-medium transition whitespace-nowrap select-none border-l border-gray-200',
+                     disabled ? 'pointer-events-none' : '',
                      size === 'lg' ? 'min-h-12 px-4' : (size === 'xs' ? 'seg-btn-xs h-[22px] px-1.5' : 'h-7 px-3'),
                      modelValue === false
                        ? (yesDanger ? 'bg-emerald-100 text-emerald-800' : (neutralNo ? 'bg-slate-200 text-slate-700' : 'bg-red-100 text-red-700'))

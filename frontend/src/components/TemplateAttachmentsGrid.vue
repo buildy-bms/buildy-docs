@@ -25,6 +25,7 @@ import {
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { fullWidthTip } from '@/lib/library-tips'
 
 const props = defineProps({
   // 'section' (section_templates) ou 'equipment' (equipment_templates)
@@ -242,6 +243,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           :alt="att.original_name || ''"
           loading="lazy"
           class="w-full aspect-video object-cover bg-gray-100 cursor-zoom-in"
+          v-tooltip="'Agrandir la capture'"
           @click="openViewer(att)"
           @error="(e) => onImgError(att, e)"
           @load="onImgLoad(att)"
@@ -250,7 +252,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           v-else
           class="w-full aspect-video bg-gray-100 flex flex-col items-center justify-center gap-2 text-center px-3 cursor-pointer hover:bg-gray-200"
           @click="retryImage(att)"
-          v-tooltip="'Cliquer pour réessayer'"
+          v-tooltip="'Recharger cette image'"
         >
           <ExclamationCircleIcon class="w-8 h-8 text-amber-500" />
           <p class="text-[11px] text-gray-600 leading-tight">
@@ -266,7 +268,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
                    att.full_width === 1
                      ? 'bg-indigo-500 text-white hover:bg-indigo-600'
                      : 'bg-white/90 hover:bg-indigo-500 hover:text-white text-gray-600']"
-          v-tooltip="att.full_width === 1 ? 'Capture en pleine largeur (PDF brochure) — cliquer pour repasser en auto' : 'Verrouiller en pleine largeur dans le PDF brochure (au lieu de auto-fit 1-2 colonnes)'"
+          v-tooltip="fullWidthTip(att.full_width === 1)"
         >
           <FontAwesomeIcon :icon="['fas', 'arrows-left-right-to-line']" class="w-3.5 h-3.5" />
         </button>
@@ -274,7 +276,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           type="button"
           @click.stop="removeAttachment(att)"
           class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
-          v-tooltip="'Supprimer (impacte toutes les AFs)'"
+          v-tooltip="'Supprimer la capture de toutes les AF'"
         >
           <TrashIcon class="w-3.5 h-3.5" />
         </button>

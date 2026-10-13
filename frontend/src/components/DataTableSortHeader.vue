@@ -20,9 +20,12 @@ defineEmits(['toggle'])
 </script>
 
 <template>
+  <!-- La flèche dit ce que fera le prochain clic (croissant → décroissant → sans tri) ; une
+       bulle posée sur le composant (<DataTableSortHeader v-tooltip>) explique la colonne. -->
   <th class="sortable" @click="$emit('toggle', sortKey)">
     <span><slot /></span>
-    <span class="sort-ico">{{
+    <span class="sort-ico"
+          v-tooltip="activeKey === sortKey ? (dir === 'asc' ? 'Trier par ordre décroissant' : 'Annuler le tri') : 'Trier par ordre croissant'">{{
       activeKey === sortKey ? (dir === 'asc' ? '↑' : '↓') : '↕'
     }}</span>
   </th>

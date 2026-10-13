@@ -12,6 +12,8 @@ import {
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import Tooltip from '@/components/Tooltip.vue'
+import { NOTHING_TO_SAVE_LABEL, promptResetTip } from '@/lib/faq-tips'
 
 const { success, error: notifyError } = useNotification()
 const { confirm } = useConfirm()
@@ -266,18 +268,23 @@ onMounted(async () => {
             </span>
             <div class="flex items-center gap-2">
               <button v-if="isDirty(s)" @click="discardPrompt(s)"
-                      class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">
+                      class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                      v-tooltip="'Annuler les modifications du prompt'">
                 <ArrowUturnLeftIcon class="w-3.5 h-3.5" /> Annuler
               </button>
-              <button @click="resetPrompt(s)" :disabled="!s.detail?.is_overridden"
-                      class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-amber-700 hover:bg-amber-50 rounded disabled:opacity-50 disabled:hover:bg-transparent">
-                <ArrowPathIcon class="w-3.5 h-3.5" /> Restaurer défaut
-              </button>
-              <button @click="savePrompt(s)" :disabled="!isDirty(s) || s.saving"
-                      class="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm font-medium disabled:opacity-50">
-                <CheckIcon class="w-3.5 h-3.5" />
-                {{ s.saving ? 'Enregistrement…' : 'Enregistrer' }}
-              </button>
+              <Tooltip :text="promptResetTip(s.detail?.is_overridden)">
+                <button @click="resetPrompt(s)" :disabled="!s.detail?.is_overridden"
+                        class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:text-amber-700 hover:bg-amber-50 rounded disabled:opacity-50 disabled:hover:bg-transparent">
+                  <ArrowPathIcon class="w-3.5 h-3.5" /> Restaurer défaut
+                </button>
+              </Tooltip>
+              <Tooltip :text="!isDirty(s) && !s.saving ? NOTHING_TO_SAVE_LABEL : null">
+                <button @click="savePrompt(s)" :disabled="!isDirty(s) || s.saving"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm font-medium disabled:opacity-50">
+                  <CheckIcon class="w-3.5 h-3.5" />
+                  {{ s.saving ? 'Enregistrement…' : 'Enregistrer' }}
+                </button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -304,7 +311,8 @@ onMounted(async () => {
             <strong class="text-gray-700">{{ seoKeywords.length }}</strong> mot{{ seoKeywords.length > 1 ? 's' : '' }}-clé{{ seoKeywords.length > 1 ? 's' : '' }}
             <button type="button" @click="toggleSeoSort"
                     class="ml-2 text-[11px] text-indigo-600 hover:text-indigo-800 underline"
-                    :title="seoSort === 'alpha' ? 'Tri actuel : alphabétique. Cliquer pour passer en ordre d\'ajout.' : 'Tri actuel : ordre d\'ajout. Cliquer pour passer en alphabétique.'">
+                    :aria-label="seoSort === 'alpha' ? 'Revenir à l’ordre d’ajout' : 'Trier par ordre alphabétique'"
+                    v-tooltip="seoSort === 'alpha' ? 'Revenir à l’ordre d’ajout' : 'Trier par ordre alphabétique'">
               {{ seoSort === 'alpha' ? 'A→Z' : '↺' }}
             </button>
           </div>
@@ -321,7 +329,7 @@ onMounted(async () => {
           <span>{{ entry.k }}</span>
           <button @click="removeKeyword(entry.idx)"
                   class="text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 rounded-full w-4 h-4 inline-flex items-center justify-center"
-                  :title="`Retirer « ${entry.k} »`"
+                  v-tooltip="'Retirer ce mot-clé'"
                   :aria-label="`Retirer le mot-clé « ${entry.k} »`">
             <XMarkIcon class="w-3 h-3" />
           </button>
@@ -336,10 +344,12 @@ onMounted(async () => {
         <input v-model="seoNewInput" type="text" placeholder="Ajouter un mot-clé…"
                maxlength="60" autocomplete="off"
                class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
-        <button type="submit" :disabled="!seoNewInput.trim()"
-                class="inline-flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-50 whitespace-nowrap">
-          <PlusIcon class="w-4 h-4" /> Ajouter
-        </button>
+        <Tooltip :text="seoNewInput.trim() ? null : 'Saisis d’abord un mot-clé'">
+          <button type="submit" :disabled="!seoNewInput.trim()"
+                  class="inline-flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg disabled:opacity-50 whitespace-nowrap">
+            <PlusIcon class="w-4 h-4" /> Ajouter
+          </button>
+        </Tooltip>
       </form>
 
       <!-- Actions -->
@@ -350,14 +360,17 @@ onMounted(async () => {
         </button>
         <div class="flex items-center gap-2">
           <button v-if="seoDirty" @click="discardSeoChanges"
-                  class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg whitespace-nowrap">
+                  class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg whitespace-nowrap"
+                  v-tooltip="'Annuler les modifications de la liste'">
             <ArrowUturnLeftIcon class="w-3.5 h-3.5" /> Annuler
           </button>
-          <button @click="saveSeoKeywords" :disabled="!seoDirty || seoSaving"
-                  class="inline-flex items-center gap-1 px-4 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm font-medium disabled:opacity-50 whitespace-nowrap">
-            <CheckIcon class="w-3.5 h-3.5" />
-            {{ seoSaving ? 'Enregistrement…' : 'Enregistrer la liste' }}
-          </button>
+          <Tooltip :text="!seoDirty && !seoSaving ? NOTHING_TO_SAVE_LABEL : null">
+            <button @click="saveSeoKeywords" :disabled="!seoDirty || seoSaving"
+                    class="inline-flex items-center gap-1 px-4 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm font-medium disabled:opacity-50 whitespace-nowrap">
+              <CheckIcon class="w-3.5 h-3.5" />
+              {{ seoSaving ? 'Enregistrement…' : 'Enregistrer la liste' }}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </section>

@@ -9,6 +9,7 @@
 import { computed, ref } from 'vue'
 import { CheckIcon } from '@heroicons/vue/24/outline'
 import EquipmentIcon from './EquipmentIcon.vue'
+import { TEMPLATE_POINTS_COLUMN_TIP, TEMPLATE_SELECTED_LABEL, templatePointsLabel } from '@/lib/af-tips'
 
 const props = defineProps({
   modelValue: { type: Number, default: null },
@@ -86,7 +87,7 @@ function select(t) { emit('update:modelValue', t.id) }
             <th class="text-left px-2 py-1.5 cursor-pointer hover:text-gray-700" @click="toggleSort('category')">
               Catégorie {{ sortBy === 'category' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-center px-2 py-1.5 cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
+            <th class="text-center px-2 py-1.5 cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')" v-tooltip="TEMPLATE_POINTS_COLUMN_TIP">
               Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
             <th class="px-2 py-1.5"></th>
@@ -106,10 +107,10 @@ function select(t) { emit('update:modelValue', t.id) }
             <td class="px-2 py-1.5 text-gray-800 whitespace-nowrap">{{ t.name }}</td>
             <td class="px-2 py-1.5 text-[11px] text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ t.category ? categoryLabel(t.category) : '—' }}</td>
             <td class="px-2 py-1.5 text-center">
-              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-medium tabular-nums">{{ t.points_count }}</span>
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-medium tabular-nums" v-tooltip="templatePointsLabel(t.points_count)">{{ t.points_count }}</span>
             </td>
             <td class="px-2 py-1.5 text-center w-8">
-              <CheckIcon v-if="modelValue === t.id" class="w-4 h-4 text-indigo-600" />
+              <CheckIcon v-if="modelValue === t.id" class="w-4 h-4 text-indigo-600" v-tooltip="TEMPLATE_SELECTED_LABEL" />
             </td>
           </tr>
           <tr v-if="!filteredSorted.length">

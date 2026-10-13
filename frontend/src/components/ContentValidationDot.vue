@@ -8,6 +8,7 @@
 //   <ContentValidationDot :status="getValidationStatus(item)" :validated-at="..." :validated-by="..." />
 // Helper getValidationStatus dans @/lib/content-validation.
 import { computed } from 'vue'
+import { validationTip } from '@/lib/library-tips'
 
 const props = defineProps({
   status: { type: String, required: true },
@@ -27,14 +28,8 @@ const config = computed(() => {
   }
 })
 
-const tooltip = computed(() => {
-  if (props.status === 'validated') {
-    const who = props.validatedBy ? ` par ${props.validatedBy}` : ''
-    const when = props.validatedAt ? ` le ${new Date(props.validatedAt).toLocaleDateString('fr-FR')}` : ''
-    return `Contenu validé${who}${when}`
-  }
-  return config.value.label
-})
+// Carte : état, date et auteur de la validation, ce qu'il reste à faire.
+const tooltip = computed(() => validationTip(props.status, { validatedAt: props.validatedAt, validatedBy: props.validatedBy }))
 </script>
 
 <template>

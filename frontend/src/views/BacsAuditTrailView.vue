@@ -7,6 +7,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeftIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { getAfAudit, getAf } from '@/api'
+import { auditTrailTip, formatDateTime } from '@/lib/audit-tips-shell'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,8 +25,39 @@ const ACTION_LABELS = {
   'document.delivered': { label: 'Audit livré', color: 'bg-emerald-100 text-emerald-700' },
   'site_document.upload': { label: 'Document ajouté', color: 'bg-blue-50 text-blue-600' },
   'site_document.delete': { label: 'Document supprimé', color: 'bg-red-50 text-red-600' },
-  'credential.revealed': { label: 'Credential révélé', color: 'bg-amber-100 text-amber-700' },
-  'credential.create': { label: 'Credential ajouté', color: 'bg-blue-50 text-blue-600' },
+  'credential.revealed': { label: 'Mot de passe affiché', color: 'bg-amber-100 text-amber-700' },
+  'credential.create': { label: 'Accès ajouté', color: 'bg-blue-50 text-blue-600' },
+  // Libellés en clair des autres événements de l'audit (sinon la clé technique s'affichait).
+  'bacs_audit.deliver.forced': { label: 'Livraison forcée', color: 'bg-amber-100 text-amber-700' },
+  'bacs_audit.alternatives.generate': { label: 'Préconisations Claude', color: 'bg-violet-100 text-violet-700' },
+  'bacs.system.create': { label: 'Système ajouté', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.system.update': { label: 'Système modifié', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.system.delete': { label: 'Système supprimé', color: 'bg-red-50 text-red-600' },
+  'bacs.device.create': { label: 'Équipement ajouté', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.device.update': { label: 'Équipement modifié', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.device.delete': { label: 'Équipement supprimé', color: 'bg-red-50 text-red-600' },
+  'bacs.device.move': { label: 'Équipement déplacé', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.device.share': { label: 'Équipement partagé', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.meter.create': { label: 'Compteur ajouté', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.meter.update': { label: 'Compteur modifié', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.meter.delete': { label: 'Compteur supprimé', color: 'bg-red-50 text-red-600' },
+  'bacs.thermal.create': { label: 'Régulation ajoutée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.thermal.update': { label: 'Régulation modifiée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.thermal.delete': { label: 'Régulation supprimée', color: 'bg-red-50 text-red-600' },
+  'bacs.bms.update': { label: 'GTB modifiée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.inspection.create': { label: 'Inspection ajoutée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.inspection.update': { label: 'Inspection modifiée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.inspection.delete': { label: 'Inspection supprimée', color: 'bg-red-50 text-red-600' },
+  'bacs.checklist.update': { label: 'Check-list modifiée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.action_item.create': { label: 'Action ajoutée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.action_item.update': { label: 'Action modifiée', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.action_item.delete': { label: 'Action supprimée', color: 'bg-red-50 text-red-600' },
+  'bacs.action_item.regenerate': { label: 'Plan régénéré', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.precheck.auto_fix': { label: 'Correction automatique', color: 'bg-indigo-50 text-indigo-700' },
+  'bacs.transcript.upload': { label: 'Transcription importée', color: 'bg-violet-100 text-violet-700' },
+  'bacs.transcript.suggestions': { label: 'Suggestions Claude', color: 'bg-violet-100 text-violet-700' },
+  'bacs.suggestion.apply': { label: 'Suggestion appliquée', color: 'bg-violet-100 text-violet-700' },
+  'bacs.suggestion.reject': { label: 'Suggestion rejetée', color: 'bg-gray-100 text-gray-700' },
 }
 
 function actionBadge(action) {
@@ -36,9 +68,10 @@ function actionBadge(action) {
   return { label: action, color: 'bg-gray-100 text-gray-700' }
 }
 
+// Dates du journal : UTC sans fuseau en base (CURRENT_TIMESTAMP) → lues comme UTC, sinon
+// l'heure affichée était décalée du fuseau (2 h en été).
 function formatDate(s) {
-  if (!s) return '—'
-  return new Date(s).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+  return formatDateTime(s) || '—'
 }
 
 function parsePayload(p) {
@@ -95,8 +128,9 @@ onMounted(refresh)
           <tr v-for="r in rows" :key="r.id" class="hover:bg-indigo-50/40">
             <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ formatDate(r.created_at) }}</td>
             <td class="px-4 py-2">
+              <!-- Bulle : explication des événements dont le libellé ne suffit pas (plus de clé technique). -->
               <span :class="['inline-block px-2 py-0.5 text-[11px] font-medium rounded', actionBadge(r.action).color]"
-                    v-tooltip="r.action">
+                    v-tooltip.right="auditTrailTip(r.action)">
                 {{ actionBadge(r.action).label }}
               </span>
             </td>

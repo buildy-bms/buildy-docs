@@ -44,6 +44,7 @@ const tab = ref('library')
             tab === 'library'
               ? 'border-emerald-600 text-emerald-700'
               : 'border-transparent text-gray-500 hover:text-gray-700']"
+          v-tooltip="'Choisir un modèle préconfiguré'"
         >
           Depuis la bibliothèque
         </button>
@@ -54,6 +55,7 @@ const tab = ref('library')
             tab === 'manual'
               ? 'border-emerald-600 text-emerald-700'
               : 'border-transparent text-gray-500 hover:text-gray-700']"
+          v-tooltip="'Décrire l’équipement champ par champ'"
         >
           Saisie manuelle
         </button>

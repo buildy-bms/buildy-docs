@@ -5,6 +5,8 @@ import { getAfTemplateUpdates, applySectionTemplateUpdate, dismissSectionTemplat
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { propagationSourceTip, templateVersionTip, propagationApplyTip, propagationDismissTip } from '@/lib/af-tips'
 
 const props = defineProps({
   afId: { type: Number, required: true },
@@ -159,7 +161,7 @@ defineExpose({ refresh })
   <div v-if="updates.length > 0" class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
     <div class="flex items-center gap-2 min-w-0">
       <ArrowPathIcon class="w-4 h-4 text-amber-700 shrink-0" />
-      <p class="text-xs text-amber-900 truncate">
+      <p class="text-xs text-amber-900 truncate" v-tooltip.overflow>
         <span class="font-semibold">{{ updates.length }} {{ updates.length > 1 ? 'éléments' : 'élément' }}</span>
         à revoir
         <span v-if="sourcesSummary" class="text-amber-700">· {{ sourcesSummary }}</span>
@@ -183,11 +185,13 @@ defineExpose({ refresh })
 
       <div v-for="item in updates" :key="itemKey(item)" class="border border-gray-200 rounded-lg">
         <div class="px-4 py-3 flex items-center justify-between gap-3 bg-gray-50">
-          <button @click="toggle(itemKey(item))" class="flex items-center gap-2 min-w-0 text-left">
+          <button @click="toggle(itemKey(item))" class="flex items-center gap-2 min-w-0 text-left"
+                  v-tooltip="expanded.has(itemKey(item)) ? 'Masquer le détail' : 'Afficher le détail des changements'">
             <ChevronRightIcon :class="['w-4 h-4 text-gray-400 transition-transform', expanded.has(itemKey(item)) && 'rotate-90']" />
             <div class="min-w-0">
-              <p class="text-sm font-semibold text-gray-800 truncate">
-                <span :class="['inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider mr-1.5 align-middle', sourceClass(item.source)]">
+              <p class="text-sm font-semibold text-gray-800 truncate" v-tooltip.overflow>
+                <span :class="['inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider mr-1.5 align-middle', sourceClass(item.source)]"
+                      v-tooltip="propagationSourceTip(item.source)">
                   {{ sourceLabel(item.source) }}
                 </span>
                 <span v-if="item.section_number" class="text-gray-400 font-mono mr-1">{{ item.section_number }}</span>
@@ -199,7 +203,7 @@ defineExpose({ refresh })
                 </template>
                 <template v-else>
                   Template <span class="font-medium">{{ item.template_name }}</span>
-                  <span class="ml-2 inline-flex items-center gap-1">
+                  <span class="ml-2 inline-flex items-center gap-1" v-tooltip="templateVersionTip(item.from_version, item.to_version)">
                     v{{ item.from_version || 0 }}
                     <ArrowsRightLeftIcon class="w-3 h-3" />
                     v{{ item.to_version }}
@@ -210,23 +214,26 @@ defineExpose({ refresh })
             </div>
           </button>
           <div class="flex items-center gap-2 shrink-0">
-            <button
-              @click="dismiss(item)"
-              :disabled="busy.has(itemKey(item))"
-              class="px-2 py-1 text-[11px] text-gray-500 hover:text-gray-800 disabled:opacity-50"
-              v-tooltip="isNewItem(item.source) ? 'Ne pas ajouter cet élément' : 'Acquitter sans changer le contenu local'"
-            >
-              <XMarkIcon class="w-3.5 h-3.5 inline" />
-              {{ isNewItem(item.source) ? 'Ignorer' : 'Garder ma version' }}
-            </button>
-            <button
-              @click="apply(item)"
-              :disabled="busy.has(itemKey(item))"
-              class="px-3 py-1 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-1"
-            >
-              <CheckIcon class="w-3.5 h-3.5" />
-              {{ isNewItem(item.source) ? 'Ajouter à l\'AF' : 'Appliquer' }}
-            </button>
+            <Tooltip :text="propagationDismissTip(item.source)">
+              <button
+                @click="dismiss(item)"
+                :disabled="busy.has(itemKey(item))"
+                class="px-2 py-1 text-[11px] text-gray-500 hover:text-gray-800 disabled:opacity-50"
+              >
+                <XMarkIcon class="w-3.5 h-3.5 inline" />
+                {{ isNewItem(item.source) ? 'Ignorer' : 'Garder ma version' }}
+              </button>
+            </Tooltip>
+            <Tooltip :text="propagationApplyTip(item)">
+              <button
+                @click="apply(item)"
+                :disabled="busy.has(itemKey(item))"
+                class="px-3 py-1 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                <CheckIcon class="w-3.5 h-3.5" />
+                {{ isNewItem(item.source) ? 'Ajouter à l\'AF' : 'Appliquer' }}
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -235,7 +242,7 @@ defineExpose({ refresh })
           <template v-if="isNewItem(item.source)">
             <div class="text-gray-700">
               <p class="font-semibold text-emerald-700 mb-1">+ Nouveau dans la bibliothèque</p>
-              <p v-if="item.body_preview" class="text-gray-600 text-[11px] leading-relaxed line-clamp-4">
+              <p v-if="item.body_preview" class="text-gray-600 text-[11px] leading-relaxed line-clamp-4" v-tooltip.overflow>
                 {{ item.body_preview }}{{ (item.body_preview || '').length >= 200 ? '…' : '' }}
               </p>
               <p v-else class="text-gray-400 italic text-[11px]">

@@ -24,6 +24,11 @@ import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import LibraryFaqStatusBadge from '@/components/library/LibraryFaqStatusBadge.vue'
 import LibraryGenerateFaqModal from '@/components/library/LibraryGenerateFaqModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  PENDING_FILTER_TIP, PHOTOS_COLUMN_TIP, FAQ_COLUMN_TIP, OFFERS_PREVIEW_TIP, OFFERS_PDF_TIP, BROCHURE_PDF_TIP,
+  photosTip, sectionUsageTip, afColumnTip, bacsColumnTip, offerColumnTip, availTip, publishTip, dragTip, regenerateTip,
+} from '@/lib/library-tips'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 // Lazy-load la full lib FA Pro Solid : la grille des fonctionnalites peut
@@ -535,38 +540,46 @@ onBeforeUnmount(teardownSortables)
       </div>
       <div class="flex items-center gap-2">
         <button @click="offeringsPreviewOpen = true"
-                v-tooltip="'Aperçu du tableau des offres Buildy (matrice fonctionnalités × niveaux E/S/P)'"
+                v-tooltip="OFFERS_PREVIEW_TIP"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg whitespace-nowrap transition">
           <EyeIcon class="w-4 h-4" /> Aperçu offres
         </button>
-        <button @click="downloadOfferingsPdf" :disabled="generatingOfferings"
-                v-tooltip="'Télécharger le PDF du catalogue Buildy (régénéré depuis la base)'"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
-          <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingOfferings ? 'Génération…' : 'Tableau des offres' }}
-        </button>
-        <button @click="publishCatalogOnline" :disabled="publishingOfferings"
-                v-tooltip="'Publier le tableau des offres sur buildy.fr/telechargements (URL stable, écrase la version précédente)'"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition disabled:opacity-50"
-                :class="publishInfo.catalog ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
-          <ArrowUpTrayIcon class="w-4 h-4" />
-          {{ publishingOfferings ? 'Publication…' : (publishInfo.catalog ? 'Mettre à jour tableau' : 'Publier tableau') }}
-        </button>
-        <button @click="downloadBrochurePdf" :disabled="generatingBrochure"
-                v-tooltip="'Télécharger la brochure : référentiel détaillé de chaque fonctionnalité (annexe au tableau des offres)'"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
-          <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingBrochure ? 'Génération…' : 'Brochure détaillée' }}
-        </button>
-        <button @click="publishBrochureOnline" :disabled="publishingBrochure"
-                v-tooltip="'Publier la brochure sur buildy.fr/telechargements (URL stable, écrase la version précédente)'"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition disabled:opacity-50"
-                :class="publishInfo.brochure ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
-          <ArrowUpTrayIcon class="w-4 h-4" />
-          {{ publishingBrochure ? 'Publication…' : (publishInfo.brochure ? 'Mettre à jour brochure' : 'Publier brochure') }}
-        </button>
-        <button @click="showBulk = true" :disabled="!bulkItems.length"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
-          <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
-        </button>
+        <!-- Boutons grisés pendant la génération ou la publication : leur libellé l'affiche déjà,
+             la bulle (portée par <Tooltip>) ne s'affiche que hors de ces moments. -->
+        <Tooltip :text="generatingOfferings ? null : OFFERS_PDF_TIP">
+          <button @click="downloadOfferingsPdf" :disabled="generatingOfferings"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+            <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingOfferings ? 'Génération…' : 'Tableau des offres' }}
+          </button>
+        </Tooltip>
+        <Tooltip :text="publishingOfferings ? null : publishTip('catalog', publishInfo.catalog)">
+          <button @click="publishCatalogOnline" :disabled="publishingOfferings"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition disabled:opacity-50"
+                  :class="publishInfo.catalog ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
+            <ArrowUpTrayIcon class="w-4 h-4" />
+            {{ publishingOfferings ? 'Publication…' : (publishInfo.catalog ? 'Mettre à jour tableau' : 'Publier tableau') }}
+          </button>
+        </Tooltip>
+        <Tooltip :text="generatingBrochure ? null : BROCHURE_PDF_TIP">
+          <button @click="downloadBrochurePdf" :disabled="generatingBrochure"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+            <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingBrochure ? 'Génération…' : 'Brochure détaillée' }}
+          </button>
+        </Tooltip>
+        <Tooltip :text="publishingBrochure ? null : publishTip('brochure', publishInfo.brochure)">
+          <button @click="publishBrochureOnline" :disabled="publishingBrochure"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition disabled:opacity-50"
+                  :class="publishInfo.brochure ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
+            <ArrowUpTrayIcon class="w-4 h-4" />
+            {{ publishingBrochure ? 'Publication…' : (publishInfo.brochure ? 'Mettre à jour brochure' : 'Publier brochure') }}
+          </button>
+        </Tooltip>
+        <Tooltip :text="regenerateTip(bulkItems.length, 'functionalities')">
+          <button @click="showBulk = true" :disabled="!bulkItems.length"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+            <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
+          </button>
+        </Tooltip>
         <button @click="openCreate"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
           <PlusIcon class="w-4 h-4" /> Nouvelle fonctionnalité
@@ -581,11 +594,12 @@ onBeforeUnmount(teardownSortables)
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Tableau en ligne
         </span>
         <a :href="publishInfo.catalog.url" target="_blank" rel="noopener"
-           class="text-indigo-600 hover:underline truncate">{{ publishInfo.catalog.url }}</a>
-        <button @click="copyPublishedUrl(publishInfo.catalog.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
+           class="text-indigo-600 hover:underline truncate" v-tooltip.overflow>{{ publishInfo.catalog.url }}</a>
+        <button @click="copyPublishedUrl(publishInfo.catalog.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien du tableau'">
           <ClipboardDocumentIcon class="w-4 h-4" />
         </button>
-        <button @click="openStats('catalog')" class="text-gray-400 hover:text-indigo-700 shrink-0" v-tooltip="'Statistiques de téléchargements'">
+        <button @click="openStats('catalog')" class="text-gray-400 hover:text-indigo-700 shrink-0"
+                v-tooltip="{ label: 'Voir les statistiques de téléchargement', icon: 'chart-simple' }">
           <ChartBarIcon class="w-4 h-4" />
         </button>
         <span class="text-gray-400 shrink-0 whitespace-nowrap text-xs">· {{ formatBytes(publishInfo.catalog.size_bytes) }} · publié le {{ formatPublishedDate(publishInfo.catalog.published_at) }}</span>
@@ -595,11 +609,12 @@ onBeforeUnmount(teardownSortables)
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Brochure en ligne
         </span>
         <a :href="publishInfo.brochure.url" target="_blank" rel="noopener"
-           class="text-indigo-600 hover:underline truncate">{{ publishInfo.brochure.url }}</a>
-        <button @click="copyPublishedUrl(publishInfo.brochure.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
+           class="text-indigo-600 hover:underline truncate" v-tooltip.overflow>{{ publishInfo.brochure.url }}</a>
+        <button @click="copyPublishedUrl(publishInfo.brochure.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien de la brochure'">
           <ClipboardDocumentIcon class="w-4 h-4" />
         </button>
-        <button @click="openStats('brochure')" class="text-gray-400 hover:text-indigo-700 shrink-0" v-tooltip="'Statistiques de téléchargements'">
+        <button @click="openStats('brochure')" class="text-gray-400 hover:text-indigo-700 shrink-0"
+                v-tooltip="{ label: 'Voir les statistiques de téléchargement', icon: 'chart-simple' }">
           <ChartBarIcon class="w-4 h-4" />
         </button>
         <span class="text-gray-400 shrink-0 whitespace-nowrap text-xs">· {{ formatBytes(publishInfo.brochure.size_bytes) }} · publié le {{ formatPublishedDate(publishInfo.brochure.published_at) }}</span>
@@ -627,7 +642,8 @@ onBeforeUnmount(teardownSortables)
                autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         <button v-if="search" @click="search = ''"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -657,7 +673,7 @@ onBeforeUnmount(teardownSortables)
           Vides <span class="text-gray-400 font-normal">{{ validationCounts.empty }}</span>
         </button>
         <button @click="validationFilter = 'pending'"
-                v-tooltip="'Vide + brouillon (tout ce qui n\'est pas encore validé)'"
+                v-tooltip="PENDING_FILTER_TIP"
                 :class="['px-2.5 py-1 rounded-md transition font-medium',
                          validationFilter === 'pending' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
           À traiter <span class="text-gray-400 font-normal">{{ validationCounts.empty + validationCounts.draft }}</span>
@@ -671,13 +687,13 @@ onBeforeUnmount(teardownSortables)
           <tr>
             <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
-            <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
-            <th class="text-center px-3 py-2.5 whitespace-nowrap">Essentials</th>
-            <th class="text-center px-3 py-2.5 whitespace-nowrap">Smart</th>
-            <th class="text-center px-3 py-2.5 whitespace-nowrap">Premium</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
-            <th class="text-center px-3 py-2.5 whitespace-nowrap" title="Article FAQ public lié à cette fonctionnalité">FAQ</th>
-            <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
+            <th class="text-center px-2 py-2.5 w-10" v-tooltip="PHOTOS_COLUMN_TIP">Photos</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap" v-tooltip="offerColumnTip('E')">Essentials</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap" v-tooltip="offerColumnTip('S')">Smart</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap" v-tooltip="offerColumnTip('P')">Premium</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="bacsColumnTip('fonctionnalité')">BACS</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap" v-tooltip="FAQ_COLUMN_TIP">FAQ</th>
+            <th class="text-center px-4 py-2.5 whitespace-nowrap" v-tooltip="afColumnTip('fonctionnalité')">AFs</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
@@ -704,7 +720,7 @@ onBeforeUnmount(teardownSortables)
                 @dragleave="onRowDragLeave"
                 @drop="onRowDrop($event, t)">
               <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
-                  @click.stop>
+                  @click.stop v-tooltip="dragTip(!search.trim(), 'search')">
                 <Bars3Icon class="w-4 h-4 inline-block" />
               </td>
               <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap"
@@ -725,9 +741,7 @@ onBeforeUnmount(teardownSortables)
                            t.attachments_count > 0
                              ? 'text-emerald-600 hover:bg-emerald-100'
                              : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
-                  :title="t.attachments_count > 0
-                    ? `${t.attachments_count} capture${t.attachments_count > 1 ? 's' : ''} — cliquer pour gérer`
-                    : 'Aucune capture — cliquer pour en ajouter ou glisser une image sur la ligne'"
+                  v-tooltip="photosTip(t.attachments_count)"
                 >
                   <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
                   <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
@@ -736,10 +750,11 @@ onBeforeUnmount(teardownSortables)
               <td v-for="lvl in ['avail_e','avail_s','avail_p']" :key="lvl"
                   class="px-3 py-2 text-center whitespace-nowrap">
                 <span v-if="availCell(t[lvl])"
-                      :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border', availCell(t[lvl]).cls]">
+                      :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border', availCell(t[lvl]).cls]"
+                      v-tooltip="availTip(t[lvl], lvl)">
                   {{ availCell(t[lvl]).icon }} {{ availCell(t[lvl]).label }}
                 </span>
-                <span v-else class="text-gray-300 text-xs">—</span>
+                <span v-else class="text-gray-300 text-xs" v-tooltip="availTip(null, lvl)">—</span>
               </td>
               <td class="px-4 py-2 whitespace-nowrap">
                 <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
@@ -753,21 +768,23 @@ onBeforeUnmount(teardownSortables)
                 />
               </td>
               <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
-                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" v-tooltip="'AFs utilisant cette fonctionnalité / AFs avec mise à jour en attente'">
+                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded"
+                      v-tooltip="sectionUsageTip({ count: t.affected_afs_count, outdated: t.outdated_count, noun: 'fonctionnalité' })">
                   {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
                 </span>
-                <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
-                <span v-else class="text-gray-300 italic" v-tooltip="'Jamais utilisée — candidate au nettoyage'">∅</span>
+                <span v-else-if="t.affected_afs_count > 0" class="text-gray-500"
+                      v-tooltip="sectionUsageTip({ count: t.affected_afs_count, noun: 'fonctionnalité' })">{{ t.affected_afs_count }}</span>
+                <span v-else class="text-gray-300 italic" v-tooltip="sectionUsageTip({ count: 0, noun: 'fonctionnalité' })">∅</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
                 <button type="button" @click="openClone(t)"
                         class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition mr-1"
-                        v-tooltip="'Dupliquer cette fonctionnalité (avec son sous-arbre)'">
+                        v-tooltip="'Dupliquer avec ses sous-fonctionnalités'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
                 <button type="button" @click="openEditor(t)"
                         class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                        v-tooltip="'Éditer'">
+                        v-tooltip="'Modifier cette fonctionnalité'">
                   <PencilIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -804,7 +821,7 @@ onBeforeUnmount(teardownSortables)
 
     <BulkRegenerateModal
       v-if="showBulk"
-      v-tooltip="'Régénérer les fonctionnalités avec Claude'"
+      :title="'Régénérer les fonctionnalités avec Claude'"
       :items="bulkItems"
       :get-html="bulkGetHtml"
       :on-save-html="bulkSaveHtml"
@@ -834,7 +851,7 @@ onBeforeUnmount(teardownSortables)
 
     <PdfPreviewModal
       v-if="offeringsPreviewOpen"
-      v-tooltip="'Aperçu — Tableau des fonctionnalités Buildy'"
+      :title="'Aperçu — Tableau des fonctionnalités Buildy'"
       :preview-url="previewOfferingsUrl()"
       :downloading="generatingOfferings"
       download-label="Télécharger le PDF"
@@ -865,10 +882,12 @@ onBeforeUnmount(teardownSortables)
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition whitespace-nowrap">
           Annuler
         </button>
-        <button @click="submitClone" :disabled="!cloning.title.trim()"
-                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
-          Dupliquer
-        </button>
+        <Tooltip :text="cloning.title.trim() ? null : 'Saisis d’abord le titre de la copie'">
+          <button @click="submitClone" :disabled="!cloning.title.trim()"
+                  class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
+            Dupliquer
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
 

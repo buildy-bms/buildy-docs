@@ -17,6 +17,7 @@ import {
   getSystemParties, setSystemParties, getBacsLiability,
 } from '@/api'
 import { PARTY_KINDS } from '@/lib/audit-options'
+import { LIABILITY_TIP, PARTY_INHERITED_TIP, TENANT_WORKS_TIP } from '@/lib/audit-tips-systems'
 
 const props = defineProps({
   system: { type: Object, required: true },
@@ -110,7 +111,7 @@ function toggleWorks(partyId, checked) {
     <!-- Assujetti calculé -->
     <div v-if="liability"
          class="flex items-start gap-2 rounded-md bg-slate-100 border border-slate-200 px-2.5 py-2">
-      <span class="text-sm">⚖️</span>
+      <span class="text-sm" v-tooltip="LIABILITY_TIP">⚖️</span>
       <div class="text-xs text-gray-700 leading-relaxed">
         <strong class="text-slate-800">{{ liability.label }}</strong>
         <span v-if="liability.explanation" class="text-gray-500"> — {{ liability.explanation }}</span>
@@ -123,12 +124,13 @@ function toggleWorks(partyId, checked) {
     <div v-if="parties.length">
       <span class="text-xs font-medium text-gray-600">Parties rattachées à ce système</span>
       <p class="text-[11px] text-gray-400 mb-1">
-        Héritage automatique depuis le site (via la zone). Pour retirer une partie, ouvrez la carte « Identification » du site.
+        Héritage automatique depuis le site (via la zone). Pour retirer une partie, ouvre la carte « Identification » du site.
       </p>
       <ul class="space-y-1">
         <li v-for="p in parties" :key="p.id"
             class="flex items-center gap-2 flex-wrap text-xs">
-          <div class="inline-flex items-center gap-1.5 opacity-90">
+          <!-- Case cochée et grisée : la bulle (portée par le bloc) dit pourquoi. -->
+          <div class="inline-flex items-center gap-1.5 opacity-90" v-tooltip="PARTY_INHERITED_TIP">
             <input type="checkbox" checked disabled
                    class="rounded border-gray-300 text-emerald-600 cursor-not-allowed" />
             <span class="text-gray-700">{{ p.name }}</span>
@@ -136,11 +138,12 @@ function toggleWorks(partyId, checked) {
             <span class="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">hérité de la zone</span>
           </div>
           <label v-if="linkFor(p.id) && p.kind === 'tenant'"
-                 class="inline-flex items-center gap-1 cursor-pointer text-[11px] text-amber-700">
+                 class="inline-flex items-center gap-1 cursor-pointer text-[11px] text-amber-700"
+                 v-tooltip="TENANT_WORKS_TIP">
             <input type="checkbox" :checked="!!linkFor(p.id)?.responsible_for_works"
                    @change="e => toggleWorks(p.id, e.target.checked)"
                    class="rounded border-amber-300" />
-            <span>travaux preneurs</span>
+            <span>installé par ce preneur</span>
           </label>
         </li>
       </ul>

@@ -8,19 +8,20 @@
 //
 // Ce module est l'équivalent côté front de backend-node/src/lib/device-roles.js.
 
-export function parseRoles(raw) {
-  if (raw == null) return []
+// Une valeur peut avoir été encodée en JSON plusieurs fois (« ["[\"production\"]"] » : vu sur des
+// modèles de la bibliothèque re-sauvés) : on déballe chaque niveau jusqu'aux rôles eux-mêmes.
+export function parseRoles(raw, depth = 0) {
+  if (raw == null || depth > 8) return []
   if (Array.isArray(raw)) {
-    return raw.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim())
+    const out = raw.flatMap(v => (typeof v === 'string' && v.trim().startsWith('[') ? parseRoles(v, depth + 1) : (typeof v === 'string' && v.trim() ? [v.trim()] : [])))
+    return [...new Set(out)]
   }
   const s = String(raw).trim()
   if (!s) return []
   if (s.startsWith('[')) {
     try {
       const parsed = JSON.parse(s)
-      if (Array.isArray(parsed)) {
-        return parsed.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim())
-      }
+      if (Array.isArray(parsed)) return parseRoles(parsed, depth + 1)
     } catch { /* legacy non-JSON */ }
   }
   return [s]

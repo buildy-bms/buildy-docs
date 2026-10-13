@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { ClockIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { getAfAudit } from '@/api'
+import { activityDateTip } from '@/lib/audit-tips-shell'
 
 const props = defineProps({
   afId: { type: Number, required: true },
@@ -25,11 +26,11 @@ const loading = ref(false)
 const ACTION_LABELS = computed(() => ({
   // Sections / contenu narratif AF (jamais déclenchés sur un audit)
   'section.update': { label: 'a édité', color: 'text-gray-700' },
-  'section.override.add': { label: 'a ajouté un override de point', color: 'text-amber-700' },
-  'section.override.remove': { label: 'a retiré un override de point', color: 'text-amber-700' },
+  'section.override.add': { label: 'a ajouté un forçage de point', color: 'text-amber-700' },
+  'section.override.remove': { label: 'a retiré un forçage de point', color: 'text-amber-700' },
   'section.instance.add': { label: 'a ajouté une instance', color: 'text-blue-700' },
-  'section.template.sync': { label: 'a synchronisé un template', color: 'text-emerald-700' },
-  'section.template.dismiss': { label: 'a reporté une mise à jour template', color: 'text-gray-600' },
+  'section.template.sync': { label: 'a synchronisé un modèle', color: 'text-emerald-700' },
+  'section.template.dismiss': { label: 'a reporté une mise à jour de modèle', color: 'text-gray-600' },
   'export.points-list': { label: 'a exporté la liste de points', color: 'text-indigo-700' },
   'export.af': { label: `a exporté ${docLabel.value} (PDF)`, color: 'text-indigo-700' },
   'export.bacs-audit': { label: 'a exporté l\'audit (PDF)', color: 'text-indigo-700' },
@@ -54,10 +55,10 @@ const ACTION_LABELS = computed(() => ({
   'bacs_audit.deliver.forced': { label: 'a forcé la livraison malgré la vérification', color: 'text-amber-700' },
   'site_document.upload': { label: 'a ajouté un document', color: 'text-blue-700' },
   'site_document.delete': { label: 'a supprimé un document', color: 'text-red-700' },
-  'credential.create': { label: 'a ajouté un credential', color: 'text-blue-700' },
-  'credential.update': { label: 'a modifié un credential', color: 'text-gray-700' },
-  'credential.delete': { label: 'a supprimé un credential', color: 'text-red-700' },
-  'credential.revealed': { label: 'a révélé un credential', color: 'text-amber-700' },
+  'credential.create': { label: 'a ajouté un accès', color: 'text-blue-700' },
+  'credential.update': { label: 'a modifié un accès', color: 'text-gray-700' },
+  'credential.delete': { label: 'a supprimé un accès', color: 'text-red-700' },
+  'credential.revealed': { label: 'a affiché un mot de passe', color: 'text-amber-700' },
 }))
 
 async function refresh() {
@@ -89,11 +90,30 @@ function payloadOf(entry) {
   catch { return null }
 }
 
+// Champs modifiés d'une section, en clair : le journal garde les noms techniques (body_html…).
+const SECTION_FIELD_LABELS = {
+  title: 'titre',
+  service_level: 'niveau de service',
+  bacs_articles: 'articles du décret',
+  bacs_justification: 'justification décret',
+  body_html: 'contenu',
+  description_html_override: 'description propre au projet',
+  included_in_export: 'présence dans le PDF',
+  fact_check_status: 'vérification',
+  section_template_version: 'version de la bibliothèque',
+  equipment_template_version: 'version de la bibliothèque',
+  opted_out_by_moa: 'écartée par le client',
+  demanded_by_moa: 'demandée par le client',
+  optin_paid_option: 'option payante',
+}
+
 function summary(entry) {
   const p = payloadOf(entry)
   if (!p) return null
   if (entry.action.startsWith('export.')) return p.version || p.motif
-  if (entry.action === 'section.update') return Array.isArray(p) ? p.join(', ') : null
+  if (entry.action === 'section.update') {
+    return Array.isArray(p) ? [...new Set(p.map(k => SECTION_FIELD_LABELS[k] || k))].join(', ') : null
+  }
   if (entry.action === 'af.checkpoint') return p.tag || (p.sha ? p.sha.slice(0, 7) : null)
   if (entry.action === 'af.restore') return `vers ${p.sha?.slice(0, 7) || '?'}`
   if (entry.action === 'claude.draft') return p.length ? `${p.length} caractères générés` : null
@@ -111,10 +131,10 @@ defineExpose({ refresh })
         <ClockIcon class="w-3.5 h-3.5" /> Activité récente
       </h3>
       <div class="inline-flex items-center gap-2">
-        <button @click="refresh" class="text-gray-400 hover:text-gray-700" v-tooltip="'Rafraîchir'">
+        <button @click="refresh" class="text-gray-400 hover:text-gray-700" v-tooltip="'Actualiser l’activité'">
           <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
         </button>
-        <button v-if="closable" @click="emit('close')" class="text-gray-400 hover:text-gray-700" v-tooltip="'Fermer'">
+        <button v-if="closable" @click="emit('close')" class="text-gray-400 hover:text-gray-700" v-tooltip="'Fermer le panneau d’activité'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -133,8 +153,8 @@ defineExpose({ refresh })
             {{ ACTION_LABELS[e.action]?.label || e.action }}
           </span>
         </p>
-        <p v-if="summary(e)" class="text-[11px] text-gray-500 mt-0.5 truncate">{{ summary(e) }}</p>
-        <p class="text-[10px] text-gray-400 mt-0.5">{{ fmtDate(e.created_at) }}</p>
+        <p v-if="summary(e)" v-tooltip.overflow class="text-[11px] text-gray-500 mt-0.5 truncate">{{ summary(e) }}</p>
+        <p class="text-[10px] text-gray-400 mt-0.5"><span v-tooltip.left="activityDateTip(e.created_at)">{{ fmtDate(e.created_at) }}</span></p>
       </li>
     </ul>
   </div>

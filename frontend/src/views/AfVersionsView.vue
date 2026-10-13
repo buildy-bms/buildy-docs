@@ -6,6 +6,7 @@ import { getAf, listAfVersions, getAfVersionsDiff, restoreAfVersion, checkpointA
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
+import { versionTagTip, LATEST_VERSION_TIP, RESTORE_VERSION_TIP, VERSION_ID_LABEL, VERSION_COMPARE_LABEL } from '@/lib/af-tips'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,11 +154,12 @@ onMounted(refresh)
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 mb-1 flex-wrap">
-                <code class="text-[11px] bg-gray-100 px-1.5 py-0.5 font-mono">{{ c.sha_short }}</code>
-                <span v-for="t in c.tags" :key="t" class="inline-flex items-center gap-1 text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 font-semibold">
+                <code class="text-[11px] bg-gray-100 px-1.5 py-0.5 font-mono" v-tooltip="VERSION_ID_LABEL">{{ c.sha_short }}</code>
+                <span v-for="t in c.tags" :key="t" class="inline-flex items-center gap-1 text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-1.5 py-0.5 font-semibold"
+                      v-tooltip="versionTagTip(t)">
                   <TagIcon class="w-3 h-3" /> {{ t }}
                 </span>
-                <span v-if="i === 0" class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800">HEAD</span>
+                <span v-if="i === 0" class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800" v-tooltip="LATEST_VERSION_TIP">HEAD</span>
               </div>
               <p class="text-sm font-medium text-gray-800">{{ c.message }}</p>
               <p class="text-[11px] text-gray-500 mt-0.5 inline-flex items-center gap-1">
@@ -165,7 +167,7 @@ onMounted(refresh)
               </p>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <label class="inline-flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer">
+              <label class="inline-flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer" v-tooltip="VERSION_COMPARE_LABEL">
                 <input type="checkbox" :checked="selectedSet.has(c.sha)" @change="toggleSelect(c.sha)" class="w-3.5 h-3.5" />
                 Sélect.
               </label>
@@ -173,7 +175,7 @@ onMounted(refresh)
                 v-if="i !== 0"
                 @click="restore(c.sha)"
                 class="inline-flex items-center gap-1 px-2 py-1 text-[11px] text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                v-tooltip="'Restaurer cette version'"
+                v-tooltip="RESTORE_VERSION_TIP"
               >
                 <ArrowUturnLeftIcon class="w-3 h-3" /> Restaurer
               </button>

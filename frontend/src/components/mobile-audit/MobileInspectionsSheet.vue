@@ -21,6 +21,11 @@ import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileYesNo from './MobileYesNo.vue'
 import InspectionReportDrop from '@/components/audit/InspectionReportDrop.vue'
+import R175Tooltip from '@/components/R175Tooltip.vue'
+import {
+  inspectionStatusTip, NEXT_INSPECTION_TIP, REPORT_RETENTION_TIP,
+  PLUS_5_YEARS_TIP, PLUS_10_YEARS_TIP,
+} from '@/lib/audit-tips-site'
 
 defineProps({
   open: { type: Boolean, default: false },
@@ -133,14 +138,15 @@ function fmtDate(iso) {
 }
 function statusFor(ins) {
   if (!ins.next_inspection_due_date) return null
+  // Libellés identiques au bureau (InspectionsSection).
   if (ins.next_inspection_due_date < todayIso.value) {
-    return { tone: 'red', label: 'Dépassée' }
+    return { tone: 'red', label: 'Échéance dépassée' }
   }
   const inSixMonths = new Date()
   inSixMonths.setMonth(inSixMonths.getMonth() + 6)
   const sixIso = inSixMonths.toISOString().slice(0, 10)
   if (ins.next_inspection_due_date < sixIso) {
-    return { tone: 'amber', label: '< 6 mois' }
+    return { tone: 'amber', label: 'Échéance sous 6 mois' }
   }
   return { tone: 'emerald', label: 'À jour' }
 }
@@ -149,30 +155,29 @@ function statusFor(ins) {
 <template>
   <MobileSheet
     :open="open"
-    title="Inspections périodiques R175-5-1"
+    title="Inspection périodique de la GTB"
     hide-save
     @close="emit('close')"
   >
     <div class="p-4 space-y-3">
-      <!-- Aide contextuelle R175-5-1 -->
+      <!-- Aide contextuelle R175-5-1 (texte officiel derrière l'ⓘ) -->
       <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-        <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1">
-          R175-5-1
+        <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
+          Inspection régulière, rapport gardé 10 ans
+          <R175Tooltip article="R175-5-1" />
         </p>
         <p class="text-sm text-amber-900 leading-relaxed">
-          Trace ici les inspections périodiques de la GTB, réalisées à l'initiative de son
-          propriétaire (la FAQ ministérielle n° 30, non opposable, juge « pertinent » un inspecteur
-          indépendant ; le décret ne l'impose pas).
-          Rapport conservé <strong>10 ans</strong> (R175-5-1). L'inspection a lieu au moins tous les
-          <strong>5 ans</strong>, et dans les <strong>2 ans</strong> qui suivent l'installation ou le
-          remplacement de la GTB ou d'un système relié (arrêté du 7 avril 2023). L'audit Buildy ne
-          remplace pas cette inspection.
+          Trace ici les inspections périodiques de la GTB, faites à l’initiative de son
+          propriétaire. Le ministère suggère de les confier à un tiers indépendant, sans l’imposer.
+          Le rapport se garde <strong>10 ans</strong>. L’inspection a lieu au moins tous les
+          <strong>5 ans</strong>, et dans les <strong>2 ans</strong> qui suivent l’installation ou le
+          remplacement de la GTB ou d’un système relié. L’audit Buildy ne remplace pas cette inspection.
         </p>
       </div>
 
       <MobileYesNo
         label="Y a-t-il une inspection officielle à tracer pour ce site ?"
-        description="Réponds Non si aucune inspection n'a encore eu lieu ou si aucun rapport n'est disponible. Le rapport indique alors en réserve que l'inspection reste à faire réaliser par le propriétaire."
+        description="Réponds Non si aucune inspection n’a encore eu lieu ou si aucun rapport n’est disponible. L’étape peut alors être validée ; le rapport indique en réserve que l’inspection reste à faire réaliser par le propriétaire."
         :model-value="!notApplicable"
         @update:model-value="v => setNotApplicable(v === false)"
       />
@@ -200,17 +205,18 @@ function statusFor(ins) {
           >
             <FontAwesomeIcon :icon="['fas', 'clock']" class="w-4 h-4 text-amber-600 shrink-0" />
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium text-gray-900 truncate">
+              <div v-tooltip.overflow class="text-sm font-medium text-gray-900 truncate">
                 {{ fmtDate(ins.last_inspection_date) || 'Date à renseigner' }}
               </div>
-              <div class="text-xs text-gray-500 truncate">
+              <div v-tooltip.overflow class="text-xs text-gray-500 truncate">
                 {{ ins.last_inspection_inspector || '—' }}
                 <span v-if="ins.next_inspection_due_date" class="ml-1">
-                  · → {{ fmtDate(ins.next_inspection_due_date) }}
+                  · prochaine le {{ fmtDate(ins.next_inspection_due_date) }}
                 </span>
               </div>
             </div>
             <span v-if="statusFor(ins)"
+                  v-tooltip="inspectionStatusTip(statusFor(ins).tone, ins.next_inspection_due_date)"
                   :class="[
                     'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0',
                     statusFor(ins).tone === 'red' && 'bg-red-50 text-red-700 border-red-200',
@@ -234,6 +240,7 @@ function statusFor(ins) {
                   class="pwa-input flex-1"
                 />
                 <button type="button" @click="setToday(ins)"
+                        v-tooltip="{ label: 'Mettre la date du jour', icon: 'calendar' }"
                         class="px-3 min-h-12 text-xs font-medium text-indigo-700 bg-indigo-50 active:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0">
                   Aujourd'hui
                 </button>
@@ -251,7 +258,7 @@ function statusFor(ins) {
               />
             </MobileField>
 
-            <MobileField label="Prochaine échéance">
+            <MobileField label="Prochaine échéance" :tip="NEXT_INSPECTION_TIP">
               <div class="flex items-center gap-2">
                 <input
                   :value="ins.next_inspection_due_date || ''"
@@ -260,13 +267,14 @@ function statusFor(ins) {
                   class="pwa-input flex-1"
                 />
                 <button type="button" @click="setPlusYears(ins, 'next_inspection_due_date', 5)"
+                        v-tooltip="PLUS_5_YEARS_TIP"
                         class="px-3 min-h-12 text-xs font-medium text-indigo-700 bg-indigo-50 active:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0">
                   +5 ans
                 </button>
               </div>
             </MobileField>
 
-            <MobileField label="Conserver jusqu'au">
+            <MobileField label="Rapport à garder jusqu’au" :tip="REPORT_RETENTION_TIP">
               <div class="flex items-center gap-2">
                 <input
                   :value="ins.retained_until_date || ''"
@@ -275,6 +283,7 @@ function statusFor(ins) {
                   class="pwa-input flex-1"
                 />
                 <button type="button" @click="setPlusYears(ins, 'retained_until_date', 10)"
+                        v-tooltip="PLUS_10_YEARS_TIP"
                         class="px-3 min-h-12 text-xs font-medium text-indigo-700 bg-indigo-50 active:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0">
                   +10 ans
                 </button>
@@ -285,7 +294,7 @@ function statusFor(ins) {
               <textarea
                 :value="ins.last_inspection_anomalies_html || ''"
                 rows="3"
-                placeholder="ex : sonde extérieure défectueuse, défaut de programmation V3V…"
+                placeholder="ex : sonde extérieure défectueuse, défaut de programmation d’une vanne 3 voies…"
                 @input="e => patchDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
                 class="pwa-input w-full resize-y"
               ></textarea>
@@ -295,7 +304,7 @@ function statusFor(ins) {
               <textarea
                 :value="ins.last_inspection_recommendations_html || ''"
                 rows="3"
-                placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3V…"
+                placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3 voies…"
                 @input="e => patchDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
                 class="pwa-input w-full resize-y"
               ></textarea>
@@ -328,7 +337,7 @@ function statusFor(ins) {
       <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center">
         <FontAwesomeIcon :icon="['fas', 'clock']" class="w-10 h-10 text-gray-300 mx-auto" />
         <p class="text-sm font-medium text-gray-700 mt-3">Aucune inspection tracée</p>
-        <p class="text-xs text-gray-500 mt-1">Tant qu'aucune inspection n'est tracée, le rapport indique en réserve que l'inspection périodique de la GTB (R175-5-1) reste à faire réaliser.</p>
+        <p class="text-xs text-gray-500 mt-1">Tant qu’aucune inspection n’est tracée, le rapport indique en réserve que l’inspection périodique de la GTB reste à faire réaliser.</p>
       </div>
 
       <button

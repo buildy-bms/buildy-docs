@@ -65,6 +65,7 @@ async function save() {
   <button
     type="button"
     @click.stop="openSheet"
+    v-tooltip="hasNote ? 'Modifier la note de cette rubrique' : 'Ajouter une note à cette rubrique'"
     :class="['pwa-button border whitespace-nowrap',
       hasNote
         ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
@@ -79,7 +80,7 @@ async function save() {
     <div class="p-4 space-y-3">
       <p class="text-xs text-gray-500 leading-relaxed">
         Saisis ici tout ce que tu observes sur ce sujet (état actuel, défauts, contournements).
-        Cette note apparaîtra dans le PDF rapport sous cette sous-section.
+        Cette note apparaîtra dans le rapport PDF, sous cette rubrique.
       </p>
       <textarea
         v-model="localText"

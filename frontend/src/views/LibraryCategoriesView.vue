@@ -4,6 +4,7 @@ import { PlusIcon } from '@heroicons/vue/24/outline'
 import { listSystemCategories } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import SystemCategoryEditor from '@/components/SystemCategoryEditor.vue'
+import { CATEGORY_COLUMN_TIPS, bacsReferenceTip } from '@/lib/library-tips'
 
 // Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
 defineProps({ embedded: { type: Boolean, default: false } })
@@ -50,9 +51,9 @@ onMounted(refresh)
           <tr>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Libellé</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">Key</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">Article BACS</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">Templates candidats</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="CATEGORY_COLUMN_TIPS.key">Key</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="CATEGORY_COLUMN_TIPS.bacs">Article BACS</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="CATEGORY_COLUMN_TIPS.candidates">Templates candidats</th>
           </tr>
         </thead>
         <tbody>
@@ -65,7 +66,8 @@ onMounted(refresh)
             <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">{{ c.label }}</td>
             <td class="px-4 py-2 whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ c.key }}</code></td>
             <td class="px-4 py-2 whitespace-nowrap">
-              <span v-if="c.bacs" class="inline-block px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-[11px] font-semibold">⚖️ {{ c.bacs }}</span>
+              <span v-if="c.bacs" class="inline-block px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-[11px] font-semibold"
+                    v-tooltip="bacsReferenceTip(c.bacs)">⚖️ {{ c.bacs }}</span>
               <span v-else class="text-gray-300 italic text-xs">—</span>
             </td>
             <td class="px-4 py-2 text-xs text-gray-600">

@@ -15,6 +15,8 @@
  */
 import { computed } from 'vue'
 import { ROLE_OPTIONS } from '@/lib/audit-options'
+import { parseRoles as parseSharedRoles } from '@/composables/useDeviceRoleFilter'
+import { roleTip } from '@/lib/audit-tips-systems'
 
 const props = defineProps({
   // Soit un array de valeurs, soit une string CSV, soit une string JSON array.
@@ -27,14 +29,10 @@ const props = defineProps({
   iconOnly: { type: Boolean, default: false },
 })
 
+// Lecture partagée (useDeviceRoleFilter) : déballe aussi les valeurs encodées plusieurs fois ;
+// les anciennes listes « a, b » restent comprises.
 function parseRoles(raw) {
-  if (Array.isArray(raw)) return raw
-  if (!raw) return []
-  const s = String(raw).trim()
-  if (s.startsWith('[')) {
-    try { const a = JSON.parse(s); if (Array.isArray(a)) return a } catch {}
-  }
-  return s.split(',').map(x => x.trim()).filter(Boolean)
+  return parseSharedRoles(raw).flatMap(x => x.split(',').map(y => y.trim()).filter(Boolean))
 }
 
 const items = computed(() => {
@@ -66,7 +64,7 @@ const sizeClasses = computed(() => {
             borderColor: o.color + '55',
             backgroundColor: o.color + '12',
           }"
-          v-tooltip="iconOnly ? o.label : null">
+          v-tooltip="roleTip(o.value)">
       <span class="rounded-full shrink-0"
             :class="sizeClasses.dot"
             :style="{ backgroundColor: o.color }"></span>

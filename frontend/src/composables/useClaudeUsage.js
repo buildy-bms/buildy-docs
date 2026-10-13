@@ -1,5 +1,6 @@
 import { ref, onMounted } from 'vue'
 import { getClaudeUsage } from '@/api'
+import { claudeUsageTip } from '@/lib/audit-tips-shell'
 
 // Composable partage : un seul fetch lors du premier mount, refresh
 // manuel possible via refresh(). Cache la reponse 5 minutes.
@@ -26,19 +27,8 @@ export function useClaudeUsage() {
   return { usage, loading, refresh }
 }
 
+// Bulle des boutons Claude : CARTE navy (titre, lignes « clé → valeur », virgule décimale)
+// au lieu d'une longue ligne. Contenu dans lib/audit-tips-shell.js (testé côté backend).
 export function formatUsageTooltip(u) {
-  if (!u) return 'Coût Claude : chargement…'
-  const avg = (u.avg_cost_eur || 0).toFixed(3)
-  const total = (u.cost_eur || 0).toFixed(2)
-  const lines = [
-    `Coût moyen ≈ ${avg} € par requête`,
-    `Cumul 30 j : ${total} € sur ${u.requests || 0} requête${u.requests > 1 ? 's' : ''}`,
-  ]
-  if (u.month_cost_eur != null) {
-    lines.push(`Mois en cours : ${(u.month_cost_eur || 0).toFixed(2)} €`)
-  }
-  if (u.monthly_budget_eur && u.remaining_eur != null) {
-    lines.push(`Budget local : ${u.monthly_budget_eur.toFixed(2)} € → ${u.remaining_eur.toFixed(2)} € restants`)
-  }
-  return lines.join(' · ')
+  return claudeUsageTip(u)
 }

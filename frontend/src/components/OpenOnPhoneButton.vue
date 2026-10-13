@@ -68,7 +68,7 @@ async function copyLink() {
       type="button"
       @click="open = !open"
       class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap"
-      v-tooltip="'Ouvrir cet audit sur ton téléphone (QR code + lien)'"
+      v-tooltip="'Ouvrir cet audit sur ton téléphone'"
     >
       <DevicePhoneMobileIcon class="w-3.5 h-3.5 shrink-0" />
       Sur téléphone
@@ -91,7 +91,8 @@ async function copyLink() {
                 Scanne le QR code avec ton iPhone, ou copie le lien.
               </p>
             </div>
-            <button @click="open = false" class="p-1 rounded hover:bg-gray-100 text-gray-500" aria-label="Fermer">
+            <button @click="open = false" class="p-1 rounded hover:bg-gray-100 text-gray-500" aria-label="Fermer cette fenêtre"
+                    v-tooltip="'Fermer cette fenêtre'">
               <XMarkIcon class="w-5 h-5" />
             </button>
           </header>
@@ -115,13 +116,14 @@ async function copyLink() {
             </div>
 
             <p class="text-[11px] text-gray-500 leading-relaxed">
-              Connexion PocketID nécessaire au premier ouverture sur le téléphone.
+              Connexion PocketID nécessaire à la première ouverture sur le téléphone.
             </p>
           </div>
 
           <footer class="px-5 py-3 border-t border-gray-200 flex items-center gap-2 bg-gray-50">
             <button
               @click="copyLink"
+              v-tooltip="'Copier le lien de l’audit'"
               class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
             >
               <CheckIcon v-if="copied" class="w-4 h-4" />
@@ -130,6 +132,7 @@ async function copyLink() {
             </button>
             <a
               :href="mailto"
+              v-tooltip="'Envoyer le lien par e-mail'"
               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
             >
               <EnvelopeIcon class="w-4 h-4" />
@@ -137,6 +140,7 @@ async function copyLink() {
             </a>
             <a
               :href="sms"
+              v-tooltip="'Envoyer le lien par SMS'"
               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
             >
               SMS

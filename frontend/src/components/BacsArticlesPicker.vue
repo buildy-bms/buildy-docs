@@ -11,6 +11,7 @@
  */
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { CheckIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { bacsReferenceTip, bacsArticleTip, BACS_POINTS_TIP } from '@/lib/library-tips'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -98,11 +99,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
                      open ? 'ring-2 ring-purple-500/30 border-purple-500' : 'hover:border-gray-300']">
       <div v-if="refs.length" class="flex flex-wrap items-center gap-1 flex-1 min-w-0">
         <span v-for="r in refs" :key="r.code"
+              v-tooltip="bacsReferenceTip(r.paragraphs ? `${r.code} ${r.paragraphs}` : r.code)"
               class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-full text-[11px]">
           {{ r.code }}<span v-if="r.paragraphs" class="text-purple-500/80">&nbsp;{{ r.paragraphs }}</span>
           <span @click="removeRef(r.code, $event)"
                 class="inline-flex items-center justify-center w-4 h-4 text-purple-400 hover:text-white hover:bg-purple-500 rounded-full transition cursor-pointer"
-                v-tooltip="'Retirer'">
+                v-tooltip="'Retirer cet article'">
             <XMarkIcon class="w-3 h-3" />
           </span>
         </span>
@@ -131,12 +133,13 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
             {{ a.code }}
           </span>
 
-          <span class="text-sm text-gray-700 truncate flex-1">{{ a.title }}</span>
+          <span class="text-sm text-gray-700 truncate flex-1" v-tooltip.right="bacsArticleTip(a.code, a.title)">{{ a.title }}</span>
 
           <input v-if="selectedByCode.has(a.code)"
                  :value="selectedByCode.get(a.code).paragraphs"
                  @input="updateParagraphs(a.code, $event.target.value)"
                  @click.stop
+                 v-tooltip="BACS_POINTS_TIP"
                  type="text" autocomplete="off" data-1p-ignore="true"
                  placeholder="1°, 2°"
                  class="w-32 px-2 py-1 bg-white border border-purple-200 rounded-md text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition" />

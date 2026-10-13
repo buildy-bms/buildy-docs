@@ -13,6 +13,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import FaqRichTextEditor from '@/components/FaqRichTextEditor.vue'
 import FaqArticleHistoryModal from '@/components/FaqArticleHistoryModal.vue'
 import FaqRewriteArticleModal from '@/components/FaqRewriteArticleModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { pullFaqArticleFromCrisp, faqAiRewriteTitle, faqAiRewriteDescription } from '@/api'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
@@ -443,28 +444,33 @@ function back() {
           <ChevronLeftIcon class="w-4 h-4 shrink-0" />
           Retour FAQ
         </button>
-        <span v-if="original?.dirty" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-orange-50 text-orange-700 text-xs whitespace-nowrap">
+        <span v-if="original?.dirty" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-orange-50 text-orange-700 text-xs whitespace-nowrap"
+              v-tooltip="{ title: 'Modifications non publiées', tone: 'warning', text: 'Cette version n’est pas encore sur Crisp : help.buildy.fr montre l’ancienne, ou rien si l’article n’a jamais été publié.', todo: 'Publie-la avec « Publier vers Crisp » quand elle est prête.' }">
           <span class="w-1.5 h-1.5 rounded-full bg-orange-400" />
           Modifications non publiées
         </span>
-        <span v-else-if="original?.crisp_id && !original?.dirty" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs whitespace-nowrap">
+        <span v-else-if="original?.crisp_id && !original?.dirty" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs whitespace-nowrap"
+              v-tooltip="{ title: 'À jour sur Crisp', tone: 'success', text: 'Rien n’a été modifié ici depuis le dernier échange avec Crisp : il n’y a rien à publier.' }">
           <CheckCircleIcon class="w-3 h-3 shrink-0" />
           Synchronisé avec Crisp
         </span>
-        <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
+        <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap"
+              v-tooltip="{ title: 'Pas encore sur Crisp', tone: 'neutral', text: 'Cet article n’existe qu’ici : il n’a jamais été envoyé sur Crisp.', todo: 'Publie-le avec « Publier vers Crisp » quand il est prêt.' }">
           Local uniquement
         </span>
         <!-- Badge SEO score : vert ≥ 80, ambre 60-79, rouge < 60 -->
         <span v-if="seoScore !== null"
               :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs whitespace-nowrap cursor-help', seoBadgeClass]"
-              :title="seoTooltip">
+              v-tooltip="{ title: `Référencement (SEO) : ${seoScore}/100`, tone: seoScore >= 80 ? 'success' : seoScore >= 60 ? 'warning' : 'error', icon: 'magnifying-glass', text: 'Note du référencement de l’article dans Google, recalculée à chaque enregistrement.',
+                           rows: seoChecks.length ? [{ label: 'Critères remplis', value: `${seoChecks.filter((c) => c.passed).length} sur ${seoChecks.length}` }] : null,
+                           todo: seoChecks.some((c) => !c.passed) ? { title: 'À améliorer', items: seoChecks.filter((c) => !c.passed).slice(0, 3).map((c) => c.message) } : null }">
           SEO {{ seoScore }}/100
         </span>
         <!-- Badge « Lié à une fonctionnalité biblio » (Lot 138) -->
         <RouterLink v-if="linkedFunctionalityId"
                     :to="`/library/functionalities`"
                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs whitespace-nowrap hover:bg-indigo-100 transition"
-                    title="Article généré depuis la bibliothèque de fonctionnalités. Cliquer pour ouvrir la biblio.">
+                    v-tooltip="{ title: 'Lié à une fonctionnalité', icon: 'link', text: 'Cet article a été généré à partir d’une fonctionnalité de la bibliothèque. Le lien ouvre la liste des fonctionnalités.', rows: sourceOverridden ? [{ icon: 'pen', label: '« édité »', value: 'retouché à la main après sa génération' }] : null }">
           <LinkIcon class="w-3 h-3 shrink-0" />
           Lié à la biblio
           <span v-if="sourceOverridden" class="ml-1 text-amber-700">(édité)</span>
@@ -473,40 +479,49 @@ function back() {
           <a v-if="original?.crisp_url && original?.status === 'published'"
              :href="original.crisp_url" target="_blank" rel="noopener"
              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700"
-             title="Voir l'article publié sur help.buildy.fr">
+             v-tooltip="'Ouvrir l’article sur help.buildy.fr'">
             <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" />
             Voir en ligne
           </a>
-          <button @click="openRewriteModal" :disabled="aiRewriting || !draft.content_html"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition whitespace-nowrap disabled:opacity-50"
-                  title="Réécrire l'article entier avec l'IA (instructions optionnelles, snapshot avant)">
-            <SparklesIcon class="w-4 h-4 shrink-0" />
-            {{ aiRewriting ? 'Réécriture…' : 'Réécrire avec IA' }}
-          </button>
-          <button v-if="original?.crisp_id" @click="pullFromCrisp" :disabled="pulling"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700 disabled:opacity-50"
-                  title="Recharger l'article depuis Crisp (écrase la version locale)">
-            <ArrowDownTrayIcon class="w-4 h-4 shrink-0" />
-            {{ pulling ? 'Rechargement…' : 'Recharger' }}
-          </button>
+          <!-- Bulles des boutons grisables portées par une enveloppe <Tooltip> : visibles aussi
+               quand le bouton est grisé (un bouton désactivé ne reçoit pas le survol). -->
+          <Tooltip :text="!draft.content_html ? 'Écris d’abord le contenu de l’article' : { title: 'Réécrire l’article avec l’IA', icon: 'wand-magic-sparkles', text: 'L’IA réécrit tout l’article, en suivant tes consignes si tu en donnes. Vérifie puis enregistre : l’ancienne version reste dans l’historique.' }">
+            <button @click="openRewriteModal" :disabled="aiRewriting || !draft.content_html"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition whitespace-nowrap disabled:opacity-50">
+              <SparklesIcon class="w-4 h-4 shrink-0" />
+              {{ aiRewriting ? 'Réécriture…' : 'Réécrire avec IA' }}
+            </button>
+          </Tooltip>
+          <Tooltip v-if="original?.crisp_id" :text="{ title: 'Recharger depuis Crisp', tone: 'warning', icon: 'download', text: 'Remplace l’article enregistré ici par sa version sur Crisp. Ce qui a été modifié ici et pas encore publié est perdu.' }">
+            <button @click="pullFromCrisp" :disabled="pulling"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700 disabled:opacity-50">
+              <ArrowDownTrayIcon class="w-4 h-4 shrink-0" />
+              {{ pulling ? 'Rechargement…' : 'Recharger' }}
+            </button>
+          </Tooltip>
           <button @click="historyModalOpen = true"
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700"
-                  title="Voir l'historique des versions">
+                  v-tooltip="{ title: 'Historique des versions', icon: 'clock-rotate-left', text: 'Une version est gardée avant chaque publication, chaque passage de l’IA et chaque restauration. Les simples enregistrements n’en créent pas.' }">
             <ClockIcon class="w-4 h-4 shrink-0" />
             Historique
           </button>
-          <button @click="save" :disabled="!dirty || saving"
-                  class="px-4 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
-            {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-          </button>
-          <button @click="pushToCrisp" :disabled="!credentialsConfigured"
-                  class="inline-flex items-center gap-2 px-4 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap disabled:opacity-50"
-                  :title="credentialsConfigured ? 'Publier vers Crisp' : 'Configurez Crisp dans la page FAQ pour publier'">
-            <ArrowUpOnSquareIcon class="w-4 h-4 shrink-0" />
-            Publier vers Crisp
-          </button>
+          <Tooltip :text="!dirty && !saving ? 'Aucune modification à enregistrer' : null">
+            <button @click="save" :disabled="!dirty || saving"
+                    class="px-4 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
+              {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </Tooltip>
+          <Tooltip :text="credentialsConfigured
+                    ? { title: 'Publier l’article sur Crisp', icon: 'upload', text: draft.status === 'published' ? 'Enregistre si besoin, puis envoie l’article sur Crisp : il sera visible sur help.buildy.fr.' : 'Enregistre si besoin, puis envoie l’article sur Crisp. Son statut « Brouillon » le garde caché sur help.buildy.fr.' }
+                    : { title: 'Crisp n’est pas configuré', tone: 'warning', text: 'Les accès à Crisp ne sont pas encore renseignés.', todo: 'Renseigne-les dans « Paramètres Crisp », sur la page FAQ Buildy.' }">
+            <button @click="pushToCrisp" :disabled="!credentialsConfigured"
+                    class="inline-flex items-center gap-2 px-4 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap disabled:opacity-50">
+              <ArrowUpOnSquareIcon class="w-4 h-4 shrink-0" />
+              Publier vers Crisp
+            </button>
+          </Tooltip>
           <button @click="remove" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
-                  title="Supprimer cet article" aria-label="Supprimer cet article">
+                  v-tooltip="original?.crisp_id ? 'Supprimer cet article, ici et sur Crisp' : 'Supprimer cet article'" aria-label="Supprimer cet article">
             <TrashIcon class="w-4 h-4" />
           </button>
         </div>
@@ -551,13 +566,14 @@ function back() {
         <div>
           <div class="flex items-center justify-between mb-1">
             <label class="block text-sm font-medium text-gray-700">Titre</label>
-            <button @click="rewriteTitleWithAI" :disabled="rewritingTitle || !original"
-                    type="button"
-                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition disabled:opacity-50"
-                    title="Reformuler le titre avec l'IA (SEO)">
-              <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
-              {{ rewritingTitle ? 'Reformulation…' : 'Reformuler avec IA' }}
-            </button>
+            <Tooltip :text="{ title: 'Reformuler le titre avec l’IA', icon: 'wand-magic-sparkles', text: 'L’IA propose un titre plus clair, pensé pour ressortir dans Google. Vérifie-le puis enregistre.' }">
+              <button @click="rewriteTitleWithAI" :disabled="rewritingTitle || !original"
+                      type="button"
+                      class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition disabled:opacity-50">
+                <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
+                {{ rewritingTitle ? 'Reformulation…' : 'Reformuler avec IA' }}
+              </button>
+            </Tooltip>
           </div>
           <input v-model="draft.title" type="text"
                  class="w-full px-3 py-2 text-lg border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
@@ -569,13 +585,14 @@ function back() {
               Meta-description SEO
               <span class="text-xs font-normal text-gray-500">— affichée dans Google et sous le titre Crisp</span>
             </label>
-            <button @click="rewriteDescriptionWithAI" :disabled="rewritingDescription || !original"
-                    type="button"
-                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition disabled:opacity-50"
-                    :title="(draft.description || '').trim() ? 'Reformuler la description avec l\'IA' : 'Générer une description avec l\'IA'">
-              <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
-              {{ rewritingDescription ? 'Génération…' : ((draft.description || '').trim() ? 'Reformuler avec IA' : 'Générer avec IA') }}
-            </button>
+            <Tooltip :text="{ title: (draft.description || '').trim() ? 'Reformuler la description avec l’IA' : 'Générer une description avec l’IA', icon: 'wand-magic-sparkles', text: 'L’IA écrit une phrase de 130 à 145 caractères : celle que Google affiche sous le titre. Vérifie-la puis enregistre.' }">
+              <button @click="rewriteDescriptionWithAI" :disabled="rewritingDescription || !original"
+                      type="button"
+                      class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition disabled:opacity-50">
+                <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
+                {{ rewritingDescription ? 'Génération…' : ((draft.description || '').trim() ? 'Reformuler avec IA' : 'Générer avec IA') }}
+              </button>
+            </Tooltip>
           </div>
           <textarea v-model="draft.description" rows="2" maxlength="160"
                     placeholder="1 phrase courte (140-155 chars idéal, 160 max). Ex : Pilotez à distance le chauffage et la climatisation de vos bâtiments tertiaires depuis Hyperveez."

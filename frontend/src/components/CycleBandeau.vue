@@ -28,6 +28,11 @@ import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from './BaseModal.vue'
 import StatusBadge from './StatusBadge.vue'
 import ServiceLevelBadge from './ServiceLevelBadge.vue'
+import Tooltip from './Tooltip.vue'
+import {
+  RENAME_PROJECT_TIP, CONTRACT_UNDEFINED_TIP, AF_EXPORT_TIP, POINTS_EXPORT_TIP, SYNTHESIS_EXPORT_TIP, EXPORT_MOTIF_TIP,
+  phaseAdvanceTip, docStatusTip, contractShortfallTip, transitionBlockedTip, docFormBlockedTip, serviceLevelTip,
+} from '@/lib/af-tips'
 
 const props = defineProps({
   af: { type: Object, required: true },
@@ -429,15 +434,32 @@ const exportDescription = computed(() => {
   if (exportKind.value === 'synthesis') return "Génère un tableau matriciel A3 paysage : tous les systèmes en lignes, par colonnes les compteurs de points par type, instances, fonctions Hyperveez applicables. Vue d'ensemble synthétique pour DOE."
   return "Génère un PDF A3 portrait avec page de garde Buildy, sommaire par catégorie d'équipement, et toutes les lignes points × instances définies dans la fiche AF."
 })
+
+// Infobulles des boutons grisés : ce qui manque encore (null = rien, ou opération en cours).
+const exportBlockedTip = computed(() => (!submitting.value && !exportMotif.value.trim() ? EXPORT_MOTIF_TIP : null))
+const transitionTip = computed(() => {
+  if (submitting.value) return null
+  return transitionBlockedTip({
+    motifMissing: !transitionMotif.value.trim(),
+    agreementMissing: transitionTo.value === 'validee' && !agreedToContractualCommitment.value,
+  })
+})
+const editBlockedTip = computed(() => {
+  if (submitting.value) return null
+  return docFormBlockedTip({
+    clientMissing: !editForm.value.client_name.trim(),
+    projectMissing: !editForm.value.project_name.trim(),
+  })
+})
 </script>
 
 <template>
   <div class="bg-white border border-gray-200 px-5 py-3 flex items-center gap-3 mb-4">
-    <button @click="emit('back')" class="p-1 -ml-1 text-gray-500 hover:text-gray-800">
+    <button @click="emit('back')" class="p-1 -ml-1 text-gray-500 hover:text-gray-800" v-tooltip="{ label: 'Revenir à la liste des documents', icon: 'arrow-left' }">
       <ArrowLeftIcon class="w-4 h-4" />
     </button>
     <div class="min-w-0 flex-1">
-      <h2 class="text-sm font-semibold text-gray-800 truncate flex items-center gap-1.5">
+      <h2 class="text-sm font-semibold text-gray-800 truncate flex items-center gap-1.5" v-tooltip.overflow>
         <span class="text-gray-500">{{ af.client_name }} —</span>
         <input
           v-if="inlineEdit"
@@ -456,19 +478,19 @@ const exportDescription = computed(() => {
           v-else
           @click="startInlineEdit"
           class="cursor-text hover:bg-gray-100 rounded px-1 -mx-1"
-          v-tooltip="'Cliquer pour renommer rapidement (Entrée valide, Esc annule)'"
+          v-tooltip="RENAME_PROJECT_TIP"
         >{{ af.project_name }}</span>
       </h2>
-      <p v-if="af.site_address" class="text-xs text-gray-500 truncate">{{ af.site_address }}</p>
+      <p v-if="af.site_address" class="text-xs text-gray-500 truncate" v-tooltip.overflow>{{ af.site_address }}</p>
     </div>
     <ServiceLevelBadge v-if="af.service_level" :level="af.service_level" />
-    <span v-else class="text-[10px] text-gray-400 italic px-2 py-0.5 border border-dashed border-gray-200 rounded">contrat à définir</span>
+    <span v-else class="text-[10px] text-gray-400 italic px-2 py-0.5 border border-dashed border-gray-200 rounded" v-tooltip="CONTRACT_UNDEFINED_TIP">contrat à définir</span>
     <StatusBadge :status="af.status" />
     <div class="w-px h-6 bg-gray-200"></div>
     <button
       @click="openExport('af')"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
-      title="Exporter l'analyse fonctionnelle complète en PDF A4"
+      v-tooltip="AF_EXPORT_TIP"
     >
       <DocumentArrowDownIcon class="w-4 h-4" />
       AF
@@ -477,7 +499,7 @@ const exportDescription = computed(() => {
       <button
         @click="openExport('points-list')"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-l-lg hover:bg-indigo-700"
-        v-tooltip="'Exporter la liste de points contractuelle en PDF A4 paysage'"
+        v-tooltip="POINTS_EXPORT_TIP"
       >
         <TableCellsIcon class="w-4 h-4" />
         Points
@@ -486,7 +508,7 @@ const exportDescription = computed(() => {
         type="button"
         @click="showPointsMenu = !showPointsMenu"
         class="inline-flex items-center px-1.5 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-r-lg hover:bg-indigo-700 border-l border-indigo-500"
-        title="Plus d'options"
+        v-tooltip="'Plus de formats d’export'"
       >
         <ChevronDownIcon class="w-4 h-4" />
       </button>
@@ -508,26 +530,28 @@ const exportDescription = computed(() => {
     <button
       @click="openExport('synthesis')"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
-      v-tooltip="'Exporter le tableau de synthèse en PDF A4 paysage'"
+      v-tooltip="SYNTHESIS_EXPORT_TIP"
     >
       <TableCellsIcon class="w-4 h-4" />
-      Synthèse
+      <!-- Sous 1280 px, icône seule (nom lu par les lecteurs d'écran et donné par la bulle) :
+           sinon la barre ne laisse plus de place au titre de l'AF (menu latéral ouvert). -->
+      <span class="sr-only xl:not-sr-only">Synthèse</span>
     </button>
     <button
       @click="showInstances = true"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap"
-      title="Vue tableau de toutes les instances d'équipements de l'AF"
+      v-tooltip="'Voir les équipements installés'"
     >
       <ListBulletIcon class="w-4 h-4 shrink-0" />
-      Instances
+      <span class="sr-only xl:not-sr-only">Instances</span>
     </button>
     <button
       @click="showPoints = true"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap"
-      title="Vue tableau de tous les points de données de l'AF"
+      v-tooltip="'Voir tous les points de données'"
     >
       <Squares2X2Icon class="w-4 h-4 shrink-0" />
-      Points
+      <span class="sr-only xl:not-sr-only">Points</span>
     </button>
     <!-- Plus d'actions (Partager, Activité, Versions) regroupées dans
          un menu pour limiter le nombre de boutons visibles dans la barre. -->
@@ -536,7 +560,7 @@ const exportDescription = computed(() => {
         type="button"
         @click="showMoreMenu = !showMoreMenu"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap"
-        title="Plus d'actions"
+        v-tooltip="'Plus d’actions sur l’analyse'"
       >
         <EllipsisHorizontalIcon class="w-4 h-4 shrink-0" />
         Plus
@@ -590,16 +614,17 @@ const exportDescription = computed(() => {
     </div>
     <!-- Bouton "Faire avancer la phase" (Lot 15) -->
     <div v-if="nextPhase" class="relative">
-      <button
-        @click="openPhaseMenu"
-        :disabled="submitting"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-        title="Faire avancer la phase de l'AF"
-      >
-        <RocketLaunchIcon class="w-4 h-4" />
-        Faire avancer la phase
-        <ChevronDownIcon class="w-3 h-3" />
-      </button>
+      <Tooltip :text="phaseAdvanceTip(af.status, nextPhase)">
+        <button
+          @click="openPhaseMenu"
+          :disabled="submitting"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+        >
+          <RocketLaunchIcon class="w-4 h-4" />
+          <span class="sr-only xl:not-sr-only whitespace-nowrap">Faire avancer la phase</span>
+          <ChevronDownIcon class="w-3 h-3" />
+        </button>
+      </Tooltip>
       <div v-if="showPhaseMenu" class="absolute right-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg rounded-lg z-30">
         <button
           @click="startTransition(nextPhase)"
@@ -619,7 +644,8 @@ const exportDescription = computed(() => {
         </button>
       </div>
     </div>
-    <span v-else class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg border border-emerald-200">
+    <span v-else class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg border border-emerald-200"
+          v-tooltip="docStatusTip('livree')">
       <CheckBadgeIcon class="w-4 h-4" />
       Projet livré
     </span>
@@ -668,7 +694,8 @@ const exportDescription = computed(() => {
           <div v-if="liveRequiredLevel?.required" class="mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-900">
             Avec votre sélection actuelle, le niveau de contrat requis est :
             <strong>{{ LEVEL_LABEL[liveRequiredLevel.required] || liveRequiredLevel.required }}</strong>
-            <span v-if="liveRequiredLevel.shortfall" class="text-red-700 ml-1">
+            <span v-if="liveRequiredLevel.shortfall" class="text-red-700 ml-1"
+                  v-tooltip="contractShortfallTip(LEVEL_LABEL[liveRequiredLevel.contract_level], LEVEL_LABEL[liveRequiredLevel.required])">
               ⚠️ dépasse le contrat ({{ LEVEL_LABEL[liveRequiredLevel.contract_level] }})
             </span>
           </div>
@@ -710,26 +737,28 @@ const exportDescription = computed(() => {
         v-if="exportKind !== 'synthesis'"
         type="button"
         @click="openPreview"
-        v-tooltip="'Aperçu HTML rapide du rendu (sans génération PDF)'"
+        v-tooltip="'Voir l’aperçu sans générer le PDF'"
         class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 text-sm font-medium rounded-lg hover:bg-indigo-100"
       >
         <EyeIcon class="w-4 h-4" />
         Aperçu
       </button>
-      <button
-        @click="submitExport"
-        :disabled="submitting || !exportMotif.trim()"
-        class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-      >
-        <DocumentArrowDownIcon class="w-4 h-4" />
-        {{ submitting ? 'Génération…' : 'Générer le PDF' }}
-      </button>
+      <Tooltip :text="exportBlockedTip">
+        <button
+          @click="submitExport"
+          :disabled="submitting || !exportMotif.trim()"
+          class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        >
+          <DocumentArrowDownIcon class="w-4 h-4" />
+          {{ submitting ? 'Génération…' : 'Générer le PDF' }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 
   <PdfPreviewModal
     v-if="previewOpen"
-    v-tooltip="previewTitle"
+    :title="previewTitle"
     :preview-url="previewUrlComputed"
     :downloading="submitting"
     download-label="Générer le PDF"
@@ -764,7 +793,8 @@ const exportDescription = computed(() => {
             </p>
             <ul v-if="w.details && w.details.length" class="mt-1 ml-4 space-y-0.5">
               <li v-for="d in w.details" :key="d.id" class="text-gray-600">
-                <button type="button" @click="emit('goto-section', { id: d.id, number: d.number })" class="hover:text-indigo-600 hover:underline cursor-pointer text-left">
+                <button type="button" @click="emit('goto-section', { id: d.id, number: d.number })" class="hover:text-indigo-600 hover:underline cursor-pointer text-left"
+                        v-tooltip="'Aller à cette section'">
                   <code class="font-mono text-gray-500">§{{ d.number || '?' }}</code> {{ d.title }}
                 </button>
               </li>
@@ -812,11 +842,13 @@ const exportDescription = computed(() => {
     </form>
     <template #footer>
       <button @click="showTransitionModal = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
-      <button @click="confirmTransition"
-              :disabled="submitting || !transitionMotif.trim() || (transitionTo === 'validee' && !agreedToContractualCommitment)"
-              :class="['px-3 py-1.5 text-xs text-white disabled:opacity-50', transitionTo === 'livree' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700']">
-        {{ submitting ? 'En cours…' : (transitionTo === 'livree' ? 'Livrer le DOE' : 'Valider l\'AF') }}
-      </button>
+      <Tooltip :text="transitionTip">
+        <button @click="confirmTransition"
+                :disabled="submitting || !transitionMotif.trim() || (transitionTo === 'validee' && !agreedToContractualCommitment)"
+                :class="['px-3 py-1.5 text-xs text-white disabled:opacity-50', transitionTo === 'livree' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700']">
+          {{ submitting ? 'En cours…' : (transitionTo === 'livree' ? 'Livrer le DOE' : 'Valider l\'AF') }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 
@@ -928,6 +960,7 @@ const exportDescription = computed(() => {
                 ? opt.selected + ' shadow-sm'
                 : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
             ]"
+            v-tooltip="opt.value ? serviceLevelTip(opt.value) : null"
           >
             <input v-model="editForm.service_level" :value="opt.value" type="radio" class="sr-only" />
             <div class="flex items-center gap-1.5 mb-0.5">
@@ -943,10 +976,12 @@ const exportDescription = computed(() => {
       <button @click="showEdit = false" class="px-4 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
         Annuler
       </button>
-      <button @click="submitEdit" :disabled="submitting || !editForm.client_name.trim() || !editForm.project_name.trim()"
-              class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
-      </button>
+      <Tooltip :text="editBlockedTip">
+        <button @click="submitEdit" :disabled="submitting || !editForm.client_name.trim() || !editForm.project_name.trim()"
+                class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

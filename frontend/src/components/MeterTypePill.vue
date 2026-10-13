@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
   faBolt, faSolarPanel, faFire, faDroplet, faTemperatureHalf, faGauge,
 } from '@fortawesome/pro-solid-svg-icons'
+import { METER_TYPE_PILL_TIPS } from '@/lib/audit-tips'
 
 library.add(faBolt, faSolarPanel, faFire, faDroplet, faTemperatureHalf, faGauge)
 
@@ -29,11 +30,14 @@ const props = defineProps({
 })
 
 const cfg = computed(() => TYPE_CFG[props.type] || TYPE_CFG.other)
+// Explication des types moins évidents (production, thermique) ; rien pour les libellés clairs.
+const tip = computed(() => METER_TYPE_PILL_TIPS[TYPE_CFG[props.type] ? props.type : 'other'] || null)
 </script>
 
 <template>
   <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset whitespace-nowrap',
-                 cfg.bg, cfg.text, cfg.ring]">
+                 cfg.bg, cfg.text, cfg.ring]"
+        v-tooltip="tip">
     <FontAwesomeIcon :icon="['fas', cfg.name]" class="w-3 h-3" />
     {{ cfg.label }}
   </span>

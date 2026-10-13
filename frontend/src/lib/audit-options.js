@@ -55,14 +55,14 @@ export const METER_USAGE_TO_SYSTEM_CATS = {
 // Le décret R175-1 §4 parle d'« éclairage intégré » sans distinguer
 // intérieur/extérieur. Buildy garde la distinction pour pouvoir
 // inventorier l'éclairage extérieur, mais l'auditeur doit savoir qu'il
-// se situe hors périmètre strict du décret.
+// se situe hors périmètre strict du décret (libellé en clair, 2026-10-12).
 export const SYSTEM_CATEGORY_LABELS = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
   ventilation: 'Ventilation',
   dhw: 'Eau chaude sanitaire',
   lighting_indoor: 'Éclairage intérieur',
-  lighting_outdoor: 'Éclairage extérieur (hors R175 strict)',
+  lighting_outdoor: 'Éclairage extérieur (hors décret strict)',
   electricity_production: 'Production photovoltaïque',
 }
 
@@ -320,13 +320,13 @@ export function resolveGranularity(device) {
 export const GRANULARITY_OPTIONS = [
   { value: 'per_room',     label: 'Par pièce' },
   { value: 'per_zone',     label: 'Par zone' },
-  { value: 'central_only', label: 'Centralisée — ⚠ ne satisfait pas R175-6' },
+  { value: 'central_only', label: 'Centralisée — ⚠ non conforme au décret' },
 ]
 
 export const GRANULARITY_LABELS_FR = {
   per_room: 'Par pièce',
   per_zone: 'Par zone',
-  central_only: 'Centralisée (⚠ non conforme R175-6)',
+  central_only: 'Centralisée (⚠ non conforme au décret)',
 }
 export const GRANULARITY_TONES = {
   per_room: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -338,37 +338,81 @@ export const GRANULARITY_TONES = {
 // avec l'enum GRANULARITY_OPTIONS.
 export const GRANULARITY_R175_COMPLIANT = new Set(['per_room', 'per_zone'])
 
-// Le rôle/niveau (Production / Distribution / Émission / Régulation) découle
-// du découpage thermique R175-6 : il n'a de sens que pour les systèmes de
-// chauffage et de climatisation. Pour tous les autres usages (ventilation,
-// ECS, éclairage, photovoltaïque, usages manuels), la colonne Rôle est
-// verrouillée car non pertinente.
+// Usages de chauffage et de climatisation : ceux dont la puissance compte dans
+// le seuil des 70 kW et dont la régulation est jugée pièce par pièce.
 const THERMAL_CATEGORIES = new Set(['heating', 'cooling'])
 export function isThermalCategory(category) {
   return THERMAL_CATEGORIES.has(category)
 }
 
+const yes = (v) => v === true || v === 1
+const no = (v) => v === false || v === 0
+const rolesOf = (device) => (Array.isArray(device?.device_role)
+  ? device.device_role
+  : (device?.device_role ? [device.device_role] : []))
+
+// Rubriques de la fiche équipement (DeviceEditModal), dans l'ordre de la fiche : chaque
+// manque est rangé dans la sienne (état et résumé de chaque rubrique, mise en page guidée).
+export const DEVICE_SECTIONS = ['identification', 'functions', 'regulation', 'communication', 'metering', 'state']
+
 /**
- * Liste des champs encore manquants pour qu'un équipement soit « validé » :
- * identité, énergie, protocole(s), niveau de régulation (usages thermiques)
- * et TOUS les boutons Oui/Non de la modale (conformité R175-3, état). Pour
- * un équipement partagé, le comptage séparable est aussi requis.
- * Retourne un tableau de libellés courts (vide = complet).
+ * Ce qui manque encore pour qu'un équipement soit « validé » : chaque question affichée par la
+ * fiche doit avoir sa réponse (règle de Kévin, 2026-10-13 : « dispose d'une régulation ? »
+ * restait vide sur une fiche déclarée complète). Une entrée par manque :
+ * { key, section, label } — label en clair, sans « (s) » (infobulles, mobile, guide).
+ * `systemCategory` = catégorie de l'usage PRINCIPAL de l'équipement (system_id).
  */
-export function deviceMissingFields(device, systemCategory) {
-  if (!device) return ['équipement introuvable']
+export function deviceMissingItems(device, systemCategory) {
+  if (!device) return [{ key: 'device', section: 'identification', label: 'équipement introuvable' }]
   const out = []
+  const add = (key, section, label) => out.push({ key, section, label })
+  const roles = rolesOf(device)
+  // Production photovoltaïque : la fiche masque fonctions, énergie et comptage séparable.
+  const isPv = systemCategory === 'electricity_production'
+
+  // ── Identification ──
   const hasIdentity = !!((device.name || '').trim()
     || (device.brand || '').trim()
     || (device.model_reference || '').trim())
-  if (!hasIdentity) out.push('un nom, une marque ou une référence')
+  if (!hasIdentity) add('identity', 'identification', 'un nom, une marque ou une référence')
+  // Puissance d'une production de chauffage ou de froid comptée dans le seuil des 70 kW (mêmes
+  // exclusions que le cumul du serveur : secours, hors service, « hors cumul ») : une valeur, ou
+  // « puissance inconnue » cochée.
+  const countsInPower = roles.includes('production') && isThermalCategory(systemCategory)
+    && !yes(device.out_of_service) && !yes(device.is_backup)
+    && device.power_calculation_type !== 'out_of_scope'
+  const hasPower = Number(device.power_kw) > 0 || Number(device.power_kw_cooling) > 0
+  if (countsInPower && !hasPower && !yes(device.power_kw_unknown)) {
+    add('power', 'identification', 'la puissance (ou « puissance inconnue »)')
+  }
+
+  // ── Fonctions et énergie ──
+  if (!isPv && !roles.length) add('roles', 'functions', "la fonction de l'équipement (production, émission…)")
   // Doctrine mig 194 — l'énergie primaire n'est exigée que sur les
   // équipements de production. Un émetteur passif (radiateur, ventilo-
   // convecteur, unité intérieure DRV…) n'a pas d'énergie propre, c'est
   // l'équipement de production amont qui la porte.
-  if (deviceRoleAllowsEnergySource(device.device_role) && !device.energy_source) {
-    out.push("l'énergie")
+  if (!isPv && deviceRoleAllowsEnergySource(roles) && !device.energy_source) {
+    add('energy', 'functions', "l'énergie")
   }
+
+  // ── Régulation ── (types : un par fonction de l'équipement ; celui de l'émission décide du
+  // verdict « pièce par pièce », vide il ferait conclure à une régulation centralisée)
+  if (device.has_regulation == null) add('has_regulation', 'regulation', 'la régulation (oui ou non)')
+  else if (yes(device.has_regulation)) {
+    if (device.regulation_integrated == null) add('regulation_integrated', 'regulation', 'la régulation intégrée ou déportée')
+    if (roles.includes('production') && !device.regulation_type_production) {
+      add('regulation_type_production', 'regulation', 'le type de régulation de la production')
+    }
+    if (roles.includes('distribution') && !device.regulation_type_distribution) {
+      add('regulation_type_distribution', 'regulation', 'le type de régulation de la distribution')
+    }
+    if (roles.includes('emission') && !device.regulation_type_emission) {
+      add('regulation_type_emission', 'regulation', "le type de régulation de l'émission")
+    }
+  }
+
+  // ── Communication et lien avec la GTB ──
   let protocols = []
   try { protocols = JSON.parse(device.communication_protocols || '[]') } catch { protocols = [] }
   const hasProtocol = (Array.isArray(protocols) && protocols.length > 0)
@@ -382,25 +426,38 @@ export function deviceMissingFields(device, systemCategory) {
                     || (device.is_communicating === false || device.is_communicating === 0)
                     || device.communication_protocol === 'non_communicant'
                     || hasProtocol
-  if (!commAnswered) out.push("la communication de l'équipement (oui/non)")
+  if (!commAnswered) add('communication', 'communication', 'la communication (oui ou non)')
   const isCommunicatingYes = (device.is_communicating === true || device.is_communicating === 1)
                           || (hasProtocol && device.communication_protocol !== 'non_communicant')
-  if (isCommunicatingYes && !hasProtocol) out.push('le(s) protocole(s) de communication')
-  if (isThermalCategory(systemCategory)) {
-    const roles = Array.isArray(device.device_role)
-      ? device.device_role
-      : (device.device_role ? [device.device_role] : [])
-    if (!roles.length) out.push('le niveau de régulation R175-6')
+  if (isCommunicatingYes && !hasProtocol) add('protocol', 'communication', 'au moins un protocole de communication')
+  // Équipement sorti du périmètre de la GTB (« Non » à « concerné par l'intégration à la GTB ? ») :
+  // la fiche l'indique « pas évalué », ses trois questions de raccordement ne sont pas exigées.
+  if (!no(device.gtb_scope_override)) {
+    if (device.wired == null) add('wired', 'communication', 'la liaison câblée vers la GTB (oui ou non)')
+    if (device.meets_r175_3_p4 == null) add('manual_stop', 'communication', "l'arrêt à la main depuis la GTB (oui ou non)")
+    if (device.meets_r175_3_p4_autonomous == null) add('autonomous', 'communication', 'le fonctionnement sans la GTB (oui ou non)')
   }
-  // Tous les boutons Oui/Non doivent être renseignés (null = non répondu).
-  if (device.wired == null) out.push('la communication câblée vers la GTB')
-  if (device.meets_r175_3_p4 == null) out.push("l'arrêt manuel possible")
-  if (device.meets_r175_3_p4_autonomous == null) out.push('le fonctionnement autonome après coupure')
-  if (device.is_backup == null) out.push('équipement de secours (oui/non)')
-  if (device.out_of_service == null) out.push('hors service (oui/non)')
+
+  // ── Suivi des consommations ──
+  // Vide, la réponse comptait en silence comme « non » dans la répartition des responsabilités.
+  if (device.serves_multiple_buildings == null) {
+    add('serves_multiple_buildings', 'metering', 'si l’équipement dessert plusieurs bâtiments (oui ou non)')
+  }
   const isShared = Array.isArray(device.extra_system_ids) && device.extra_system_ids.length > 0
-  if (isShared && device.metering_separable == null) out.push('le comptage séparable')
+  if (isShared && !isPv && device.metering_separable == null) add('metering_separable', 'metering', 'le comptage séparable par zone')
+
+  // ── État de l'équipement ──
+  if (device.is_backup == null) add('backup', 'state', 'équipement de secours (oui ou non)')
+  if (device.out_of_service == null) add('out_of_service', 'state', 'hors service (oui ou non)')
   return out
+}
+
+/**
+ * Libellés de ce qui manque (vide = complet), en clair et sans « (s) » : affichés dans les
+ * infobulles (lib/audit-tips-systems.js deviceStatusTip) et le mobile (« il reste à renseigner : … »).
+ */
+export function deviceMissingFields(device, systemCategory) {
+  return deviceMissingItems(device, systemCategory).map(m => m.label)
 }
 
 /**
@@ -413,7 +470,7 @@ export function deviceMissingFields(device, systemCategory) {
 export function isDeviceComplete(device, systemCategory) {
   if (!device) return false
   if (device.validation_forced) return true
-  return deviceMissingFields(device, systemCategory).length === 0
+  return deviceMissingItems(device, systemCategory).length === 0
 }
 
 // Natures de zones — couvre l'enum bacs_requirements_by_zone_nature côté

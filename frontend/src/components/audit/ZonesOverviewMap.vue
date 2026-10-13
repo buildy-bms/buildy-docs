@@ -15,6 +15,14 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { loadGoogleMaps } from '@/lib/google-maps'
 import { ZONE_MAP_PALETTE, zoneMapInitial } from '@/lib/zone-map-legend'
+import { tooltipOpenDelay, TOOLTIP_SKIP_DELAY, tooltipMotion, withBaseTransform, prefersReducedMotion } from '@/lib/tooltip-timing'
+
+// Fondu de l'étiquette d'un repère : même réglage que les infobulles (lib/tooltip-timing.js).
+function fadeLabel(div, entering) {
+  if (!div || typeof div.animate !== 'function') return null
+  const { keyframes, options } = tooltipMotion('top', { entering, reduced: prefersReducedMotion() })
+  return div.animate(withBaseTransform(keyframes, 'translate(-50%, -100%)'), options)
+}
 
 const props = defineProps({
   zones: { type: Array, default: () => [] },
@@ -36,7 +44,82 @@ let map = null
 let markers = []
 let google = null
 
+// Nom de la zone au survol d'un repère : étiquette navy comme toutes les infobulles de l'app
+// (même style que ZoneMapPicker.vue), au lieu de la bulle native grise du navigateur.
+let hoverLabel = null
+let HoverLabelClass = null
+function buildHoverLabelClass() {
+  if (HoverLabelClass) return
+  HoverLabelClass = class extends google.maps.OverlayView {
+    constructor(position, text) {
+      super()
+      this.position = position
+      this.text = text
+      this.div = null
+    }
+    onAdd() {
+      this.div = window.document.createElement('div')
+      Object.assign(this.div.style, {
+        position: 'absolute',
+        background: '#1b2842',
+        color: '#fff',
+        padding: '5px 9px',
+        borderRadius: '12px',
+        fontFamily: "var(--font-sans, 'Poppins', sans-serif)",
+        fontSize: '12px',
+        fontWeight: '500',
+        lineHeight: '1.3',
+        whiteSpace: 'nowrap',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.1), 0 20px 25px -5px rgba(27,40,66,0.3), 0 8px 10px -6px rgba(27,40,66,0.3)',
+        pointerEvents: 'none',
+        transform: 'translate(-50%, -100%)',
+        marginTop: '-20px',
+        zIndex: '9999',
+      })
+      this.div.textContent = this.text
+      this.getPanes().floatPane.appendChild(this.div)
+      fadeLabel(this.div, true)
+    }
+    draw() {
+      if (!this.div) return
+      const pos = this.getProjection()?.fromLatLngToDivPixel(this.position)
+      if (!pos) return
+      this.div.style.left = pos.x + 'px'
+      this.div.style.top = pos.y + 'px'
+    }
+    onRemove() {
+      this.div?.parentNode?.removeChild(this.div)
+      this.div = null
+    }
+  }
+}
+// Même délai d'apparition que les infobulles de l'app (lib/tooltip-timing.js) : sans délai d'un
+// repère au voisin.
+let hoverTimer = 0
+let hoverWarmUntil = 0
+function showHoverLabel(marker, text) {
+  hideHoverLabel()
+  hoverTimer = setTimeout(() => {
+    if (!map) return
+    buildHoverLabelClass()
+    hoverLabel = new HoverLabelClass(marker.getPosition(), text)
+    hoverLabel.setMap(map)
+  }, tooltipOpenDelay({ now: Date.now(), warmUntil: hoverWarmUntil }))
+}
+function hideHoverLabel() {
+  clearTimeout(hoverTimer)
+  const label = hoverLabel
+  hoverLabel = null
+  if (!label) return
+  hoverWarmUntil = Date.now() + TOOLTIP_SKIP_DELAY
+  // Fondu de sortie, puis retrait de la carte.
+  const anim = fadeLabel(label.div, false)
+  if (!anim) return label.setMap(null)
+  anim.onfinish = () => label.setMap(null)
+}
+
 function clearMarkers() {
+  hideHoverLabel()
   for (const m of markers) m.setMap?.(null)
   markers = []
 }
@@ -85,7 +168,6 @@ async function renderMap() {
       position: pos,
       map,
       label: { text: item.initial, color: '#ffffff', fontWeight: '700', fontSize: '12px' },
-      title: z.name,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         scale: 14,
@@ -95,6 +177,8 @@ async function renderMap() {
         strokeWeight: 2,
       },
     })
+    marker.addListener('mouseover', () => showHoverLabel(marker, `${item.initial} · ${item.name}`))
+    marker.addListener('mouseout', hideHoverLabel)
     markers.push(marker)
     bounds.extend(pos)
   })

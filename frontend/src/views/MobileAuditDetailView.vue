@@ -20,6 +20,9 @@ import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
 import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import MobileSynthesisSheet from '@/components/mobile-audit/MobileSynthesisSheet.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { AUDIT_KIND_TIPS, deliveredTip, deliverTip, formatDateTime } from '@/lib/audit-tips-shell'
+import { offlineTip, pendingSyncTip, tabBadgeTip, TAB_FULL_LABELS } from '@/lib/audit-tips-mobile'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -64,6 +67,8 @@ const { isOnline } = useOnlineStatus()
 const { confirm } = useConfirm()
 
 const docId = parseInt(route.params.id, 10)
+// Audit BACS (décret) ou audit GTB classique : badge et titre de repli de la barre du haut.
+const isBacsAudit = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
 
 // Ordre aligné sur le stepper desktop (BacsAuditDetailView STEP_DEFINITIONS) :
 // Site → Zones → Systèmes → Compteurs → GTB. La régulation thermique R175-6
@@ -141,15 +146,17 @@ const tabDot = computed(() => {
   // Même décompte que le plan et le PDF (lib/meter-plan-state.js).
   const missingMeters = m.filter(x => isMeterMissing(x, meterPlanStatus.value)).length
   out.meters = missingMeters > 0 ? { tone: 'red', count: missingMeters } : null
-  // GTB : si BMS vide → amber (pas de compteur, juste un dot)
+  // GTB : mêmes règles que l'étape GTB du bureau (STEP_DEFINITIONS) — rien à signaler si
+  // « Pas de GTB » est répondu, ou si la GTB présente a sa solution renseignée.
   const b = bms.value || {}
-  const bmsHasContent = !!(b.existing_solution || b.existing_solution_brand || b.location || b.overall_compliance)
-  out.bms = !bmsHasContent ? { tone: 'amber' } : null
+  const bmsPresent = b.present === 1 || b.present === true
+  out.bms = (b.present == null || (bmsPresent && !b.existing_solution)) ? { tone: 'amber' } : null
   out.docs = null
   // Plan : nombre d'actions blocking ouvertes (priorité) ou major
-  const actions = actionItems.value || []
-  const blocking = actions.filter(a => a.severity === 'blocking' && a.status !== 'done' && a.status !== 'declined').length
-  const major = actions.filter(a => a.severity === 'major' && a.status !== 'done' && a.status !== 'declined').length
+  // Réserves et informations comptées à part, comme au bureau (itemsBySeverity) et dans le PDF.
+  const actions = (actionItems.value || []).filter(a => !a.is_info && !a.is_reserve && a.status !== 'done' && a.status !== 'declined')
+  const blocking = actions.filter(a => a.severity === 'blocking').length
+  const major = actions.filter(a => a.severity === 'major').length
   out.plan = blocking > 0
     ? { tone: 'red', count: blocking }
     : (major > 0 ? { tone: 'amber', count: major } : null)
@@ -166,7 +173,7 @@ async function refresh() {
   try {
     await auditStore.loadAudit(docId)
   } catch {
-    error('Échec chargement de l\'audit')
+    error('Échec du chargement de l’audit')
   }
 }
 
@@ -231,7 +238,7 @@ function openSynthesis() {
 async function deliver() {
   const ok = await confirm({
     title: 'Livrer cet audit ?',
-    message: 'Le PDF final sera généré et tagué dans Git. Re-livrer plus tard créera une nouvelle version.',
+    message: 'Le rapport PDF définitif sera créé, avec une empreinte qui prouve qu’il n’a pas été modifié, et une version figée de l’audit sera enregistrée. Une nouvelle livraison créera une nouvelle version ; l’historique reste consultable.',
     confirmLabel: 'Livrer',
   })
   if (!ok) return
@@ -257,7 +264,7 @@ async function attemptDelivery(force) {
   delivering.value = true
   try {
     const { data } = await deliverBacsAudit(docId, { force })
-    success(`Audit livré — tag ${data.delivered_git_tag}`)
+    success(data?.delivered_git_tag ? `Audit livré · référence ${data.delivered_git_tag}` : 'Audit livré')
     showSettings.value = false
     await refresh()
     return 'ok'
@@ -330,44 +337,50 @@ async function removeAudit() {
           @click="goBack"
           class="tap-target inline-flex items-center justify-center text-white/90 hover:text-white"
           aria-label="Retour"
+          v-tooltip.bottom="'Revenir à la liste des audits'"
         >
           <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
         </button>
         <div class="flex-1 min-w-0">
-          <h1 class="text-base font-medium truncate leading-tight">
-            {{ document?.project_name || 'Audit BACS' }}
+          <h1 v-tooltip.overflow.bottom class="text-base font-medium truncate leading-tight">
+            {{ document?.project_name || (isBacsAudit ? 'Audit BACS' : 'Audit GTB') }}
           </h1>
-          <p v-if="document?.client_name" class="text-[11px] text-white/70 truncate leading-tight">
+          <p v-if="document?.client_name" v-tooltip.overflow.bottom class="text-[11px] text-white/70 truncate leading-tight">
             {{ document.client_name }}
           </p>
         </div>
         <!-- Indicateur connexion : signal barré rouge pulse si hors-ligne.
              Si des modifs sont en attente (queue offline), badge orange
              avec le compteur. Les 2 sont mutuellement exclusifs (offline =
-             priorité affichage). -->
+             priorité affichage). Cartes : lib/audit-tips-mobile.js (s'ouvrent
+             aussi au doigt, ce ne sont pas des boutons). -->
         <div
           v-if="!isOnline"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-500/30 text-red-100 animate-pulse"
-          v-tooltip="`Hors-ligne — ${offlineQueue.pendingCount.value || 0} modif(s) en attente de sync`"
-          aria-label="Hors-ligne"
+          v-tooltip="offlineTip(offlineQueue.pendingCount.value || 0)"
+          aria-label="Hors ligne"
         >
           <FontAwesomeIcon :icon="['fas', 'signal-slash']" class="w-5 h-5" />
         </div>
         <div
           v-else-if="offlineQueue.pendingCount.value > 0"
           class="inline-flex items-center justify-center min-w-9 h-9 px-2 rounded-full bg-amber-500/30 text-amber-100 text-xs font-semibold"
-          v-tooltip="`${offlineQueue.pendingCount.value} modif(s) en cours de sync vers le serveur`"
-          aria-label="Sync en cours"
+          v-tooltip="pendingSyncTip(offlineQueue.pendingCount.value)"
+          aria-label="Synchronisation en cours"
         >
           ⇪ {{ offlineQueue.pendingCount.value }}
         </div>
-        <div class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/15 text-white/90">
-          BACS
+        <!-- Type d'audit : « BACS » (décret) ou « GTB » (audit GTB classique) ; la carte
+             explique la différence. -->
+        <div class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/15 text-white/90"
+             v-tooltip="isBacsAudit ? AUDIT_KIND_TIPS.bacs : AUDIT_KIND_TIPS.site">
+          {{ isBacsAudit ? 'BACS' : 'GTB' }}
         </div>
         <button
           @click="showSettings = true"
           class="tap-target inline-flex items-center justify-center text-white/90 hover:text-white active:scale-90 transition-transform"
           aria-label="Paramètres de l'audit"
+          v-tooltip.bottom="'Ouvrir les paramètres de l’audit'"
         >
           <FontAwesomeIcon :icon="['fas', 'gear']" class="w-5 h-5" />
         </button>
@@ -385,9 +398,9 @@ async function removeAudit() {
         >
           <FontAwesomeIcon :icon="['fas', 'signal-slash']" class="w-4 h-4 shrink-0" />
           <span class="flex-1">
-            <strong>Hors-ligne.</strong> Tes modifications sont mises en attente
-            <span v-if="offlineQueue.pendingCount.value > 0">({{ offlineQueue.pendingCount.value }} en queue)</span>
-            et seront synchronisées dès le retour réseau.
+            <strong>Hors ligne.</strong> Tes modifications restent sur l’appareil
+            <span v-if="offlineQueue.pendingCount.value > 0">({{ offlineQueue.pendingCount.value }} en attente)</span>
+            et partiront dès le retour du réseau.
           </span>
         </div>
       </transition>
@@ -462,6 +475,7 @@ async function removeAudit() {
           <button
             type="button"
             @click="activeTab = tab.key"
+            v-tooltip="TAB_FULL_LABELS[tab.key] || null"
             :class="[
               'w-full h-full flex flex-col items-center justify-center gap-0.5 transition-colors select-none relative',
               activeTab === tab.key
@@ -490,6 +504,7 @@ async function removeAudit() {
                   tabDot[tab.key].tone === 'red' ? 'bg-red-500' : 'bg-amber-400',
                 ]"
                 :aria-label="tabDot[tab.key].tone === 'red' ? 'Action requise' : 'À compléter'"
+                v-tooltip="tabBadgeTip(tab.key, tabDot[tab.key])"
               >{{ tabDot[tab.key].count || '' }}</span>
             </span>
             <span :class="['text-[11px] leading-none transition-all', activeTab === tab.key ? 'font-semibold' : 'font-medium']">{{ tab.label }}</span>
@@ -529,12 +544,16 @@ async function removeAudit() {
         </button>
 
         <!-- Statut audit -->
-        <div v-if="document?.delivered_at" class="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+        <div v-if="document?.delivered_at" class="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3"
+             v-tooltip="deliveredTip(document.delivered_at)">
           <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div class="flex-1 min-w-0 text-sm">
             <p class="font-medium text-emerald-800">Audit déjà livré</p>
             <p class="text-xs text-emerald-700 mt-0.5">
-              Tag Git {{ document.delivered_git_tag || '—' }} le {{ new Date(document.delivered_at.replace(' ', 'T')).toLocaleDateString('fr-FR') }}
+              Le {{ formatDateTime(document.delivered_at) }}
+            </p>
+            <p v-if="document.delivered_git_tag" class="text-[11px] text-emerald-700/80 mt-0.5 break-all">
+              Référence de la version : {{ document.delivered_git_tag }}
             </p>
           </div>
         </div>
@@ -558,15 +577,18 @@ async function removeAudit() {
         </button>
 
 
-        <!-- Action : Livrer -->
+        <!-- Action : Livrer (carte portée par l'enveloppe : le bouton est grisé
+             pendant la livraison) -->
+        <Tooltip :text="deliverTip(delivering, document?.delivered_at)" class="w-full">
         <button
           @click="deliver"
           :disabled="delivering"
           class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-xl disabled:opacity-50"
         >
           <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-5 h-5" />
-          {{ delivering ? 'Livraison…' : (document?.delivered_at ? 'Re-livrer (nouvelle version)' : 'Livrer cet audit') }}
+          {{ delivering ? 'Livraison…' : (document?.delivered_at ? 'Livrer de nouveau (nouvelle version)' : 'Livrer cet audit') }}
         </button>
+        </Tooltip>
 
         <!-- Action : Forcer le rechargement (cache PWA / SW) -->
         <div class="pt-4 border-t border-gray-200">
@@ -579,7 +601,7 @@ async function removeAudit() {
             Forcer l'actualisation
           </button>
           <p class="text-xs text-gray-500 mt-2 leading-relaxed">
-            Recharge l'app en purgeant le cache. Utile si une mise à jour ne s'affiche pas.
+            Recharge l’application en vidant sa mémoire cache. Utile si une mise à jour ne s’affiche pas.
           </p>
         </div>
 

@@ -19,14 +19,16 @@ const ICONS = {
   electricity_production: { name: 'solar-panel',  color: '#16a34a' },
 }
 
+// Mêmes libellés que les tableaux de l'audit (lib/audit-options.js SYSTEM_CATEGORY_LABELS,
+// backend routes/bacs-audit/_labels.js) : « Refroidissement », « Production photovoltaïque ».
 const LABELS = {
   heating: 'Chauffage',
-  cooling: 'Climatisation',
+  cooling: 'Refroidissement',
   ventilation: 'Ventilation',
   dhw: 'Eau chaude sanitaire',
   lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur',
-  electricity_production: 'Production électrique',
+  electricity_production: 'Production photovoltaïque',
 }
 
 const props = defineProps({

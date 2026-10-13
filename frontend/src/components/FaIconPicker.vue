@@ -12,6 +12,7 @@ import { computed, ref, onMounted } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { XMarkIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { iconChoiceLabel } from '@/lib/library-tips'
 
 // Lazy load de la full lib FA Pro Solid (~1 Mo gzipped) UNIQUEMENT quand
 // le picker est instancie (admin only). Evite de polluer le bundle main.
@@ -97,7 +98,7 @@ function onBlur() { setTimeout(() => { showSuggestions.value = false }, 150) }
       />
       <button v-if="query" type="button" @click="clear"
               class="text-gray-400 hover:text-red-500 p-0.5 shrink-0"
-              title="Retirer l'icône">
+              v-tooltip="'Retirer l’icône'">
         <XMarkIcon class="w-4 h-4" />
       </button>
     </div>
@@ -113,7 +114,7 @@ function onBlur() { setTimeout(() => { showSuggestions.value = false }, 150) }
           @mousedown.prevent="pick(name)"
           :class="['flex flex-col items-center gap-1 p-2 rounded-md hover:bg-indigo-50 transition',
                    validIcon === name ? 'bg-indigo-100 ring-1 ring-indigo-300' : '']"
-          v-tooltip="name"
+          v-tooltip="iconChoiceLabel(name)"
         >
           <FontAwesomeIcon :icon="['fas', name]" class="w-5 h-5 text-gray-700" />
           <span class="text-[9px] text-gray-500 truncate max-w-full">{{ name }}</span>

@@ -24,6 +24,7 @@ import {
   getSystemParties, setSystemParties, getBacsLiability, updateBacsSystem,
 } from '@/api'
 import { PARTY_KINDS } from '@/lib/audit-options'
+import { LIABILITY_TIP, TENANT_WORKS_TIP } from '@/lib/audit-tips-systems'
 
 const props = defineProps({
   system: { type: Object, required: true },
@@ -37,6 +38,15 @@ const { error } = useNotification()
 
 const systemLinks = ref([])
 const liability = ref(null)
+
+// Poids estimé, lisible (virgule décimale, jamais « ~0 % » qui se lisait « -0 % »).
+const weightText = computed(() => {
+  const p = props.systemWeightPct
+  if (p == null) return ''
+  if (p === 0) return '0 % (aucune puissance saisie sur ce système)'
+  if (p < 0.1) return 'moins de 0,1 % de la puissance du site'
+  return `${p.toLocaleString('fr-FR')} % de la puissance du site`
+})
 const partyKindLabel = (k) => PARTY_KINDS.find(p => p.value === k)?.label || k
 const triState = (v) => (v == null ? null : !!v)
 
@@ -147,7 +157,7 @@ async function setJustification(text) {
       <!-- Assujetti calculé (lecture seule) -->
       <div v-if="liability"
            class="flex items-start gap-2 rounded-md bg-slate-100 border border-slate-200 px-3 py-2">
-        <span class="text-base">⚖️</span>
+        <span class="text-base" v-tooltip="LIABILITY_TIP">⚖️</span>
         <div class="text-xs text-gray-700 leading-relaxed">
           <strong class="text-slate-800">{{ liability.label }}</strong>
           <span v-if="liability.explanation" class="text-gray-500"> — {{ liability.explanation }}</span>
@@ -157,7 +167,7 @@ async function setJustification(text) {
       <!-- Surcharge parties assujetties -->
       <section>
         <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-          Surcharge des parties assujetties
+          Rattacher à une partie précise
         </h4>
         <p class="text-xs text-gray-500 mb-2 leading-relaxed">
           Par défaut, le système hérite des parties prenantes de sa zone. Coche ici
@@ -175,11 +185,12 @@ async function setJustification(text) {
               <span class="text-[11px] text-gray-400">({{ partyKindLabel(p.kind) }})</span>
             </label>
             <label v-if="linkFor(p.id) && p.kind === 'tenant'"
-                   class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-amber-700 ml-3">
+                   class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-amber-700 ml-3"
+                   v-tooltip="TENANT_WORKS_TIP">
               <input type="checkbox" :checked="!!linkFor(p.id)?.responsible_for_works"
                      @change="e => toggleWorks(p.id, e.target.checked)"
                      class="rounded border-amber-300" />
-              <span>travaux preneurs</span>
+              <span>installé par ce preneur</span>
             </label>
           </li>
         </ul>
@@ -192,28 +203,32 @@ async function setJustification(text) {
       <!-- Poste négligeable < 5 % -->
       <section class="border-t border-gray-100 pt-4">
         <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-          Règle des 5 % (FAQ ministère)
+          Poste négligeable (règle des 5 %)
         </h4>
-        <div class="qa-grid">
-          <div class="qa-question">
-            Ce poste est-il négligeable (consommations effectives et induites inférieures à 5 % de la consommation totale) ?
+        <!-- Question et Oui / Non sur une ligne qui passe à la ligne au besoin : la question longue
+             ne pousse plus les boutons hors de la fenêtre (ils étaient invisibles). -->
+        <div class="flex items-start gap-4">
+          <div class="qa-question flex-1 min-w-0">
+            Ce poste pèse-t-il moins de 5 % de la consommation du bâtiment (consommations induites comprises) ?
             <span class="qa-desc">
               <template v-if="systemWeightPct != null">
-                Poids estimé ~<span :class="['font-mono', systemWeightPct > 10 ? 'text-amber-600 font-semibold' : 'text-gray-500']">{{ systemWeightPct }} %</span>
-                <R175Tooltip class="ml-1 align-middle">
-                  <div class="font-semibold text-gray-800 mb-1.5">Comment le poids est-il estimé ?</div>
-                  <div class="text-xs text-gray-600 leading-relaxed">
-                    Faute de relevés réels, le poids est approximé à partir de la
-                    <strong>puissance installée</strong> du système rapportée à la
-                    puissance totale du site. La règle des 5 % du décret repose sur
-                    la <strong>consommation réelle</strong> : ce pourcentage n'est
-                    qu'une approximation indicative.
-                  </div>
+                Poids estimé d’après les puissances saisies :
+                <span :class="systemWeightPct > 10 ? 'text-amber-700 font-semibold' : 'text-gray-700'">{{ weightText }}</span>
+                <!-- Aide personnalisée dans la fiche navy (titre en tête, texte relu sur le navy). -->
+                <R175Tooltip class="ml-1 align-middle" title="Comment le poids est-il estimé ?">
+                  <p>
+                    Faute de relevés réels, il est calculé avec la <strong>puissance installée</strong>
+                    du système, rapportée à la puissance totale du site.
+                  </p>
+                  <p class="mt-1.5">
+                    La règle des 5 % porte sur la <strong>consommation réelle</strong> : ce
+                    pourcentage n’est qu’une estimation.
+                  </p>
                 </R175Tooltip>
               </template>
               <template v-else>
-                Un poste sous 5 % de la consommation totale peut être exempté de
-                certaines exigences (FAQ ministère, juin 2025).
+                Un poste sous 5 % de la consommation totale peut être dispensé de
+                raccordement à la GTB (FAQ du ministère, juin 2025).
               </template>
             </span>
           </div>
@@ -224,7 +239,7 @@ async function setJustification(text) {
                type="text"
                :value="system.negligible_justification || ''"
                @change="e => setJustification(e.target.value)"
-               placeholder="Justification (ex : petits ballons ECS individuels, groupe de secours…)"
+               placeholder="Justification (ex : petits ballons d’eau chaude individuels, groupe de secours…)"
                class="w-full mt-2 text-sm rounded-md border border-gray-200 focus:border-indigo-400 focus:ring focus:ring-indigo-400/30 px-3 py-2" />
       </section>
     </div>

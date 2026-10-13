@@ -13,6 +13,12 @@ import { useTableSort } from '@/composables/useTableSort'
 import BaseModal from '@/components/BaseModal.vue'
 import FaqCategoryNode from '@/components/FaqCategoryNode.vue'
 import FaqGenerateModal from '@/components/FaqGenerateModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  SEO_COLUMN_TIP, SEO_NO_SCORE_TIP, seoScoreTip, SYNC_COLUMN_TIP, syncCellTip, ARTICLE_DIRTY_TIP,
+  ARTICLE_STATUS_TIPS, NEW_CATEGORY_TIP, PULL_TIP, pullFailedTip, GENERATE_FROM_CAPTURES_TIP, LIBRARY_FILTER_TIP,
+  SUGGEST_MISSING_TIP,
+} from '@/lib/faq-tips'
 
 const router = useRouter()
 const store = useFaqStore()
@@ -412,21 +418,24 @@ function selectCategory(id) {
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <button @click="runSuggestMissing"
-                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap">
+                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap"
+                v-tooltip="SUGGEST_MISSING_TIP">
           <SparklesIcon class="w-4 h-4 shrink-0" />
           Suggestions IA
         </button>
         <button @click="generateModalOpen = true"
                 class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap"
-                title="Générer un nouvel article FAQ depuis des captures d'écran et une instruction texte">
+                v-tooltip="GENERATE_FROM_CAPTURES_TIP">
           <SparklesIcon class="w-4 h-4 shrink-0" />
           Générer depuis captures
         </button>
-        <button v-if="credentialsConfigured" @click="pull" :disabled="store.loadingPull"
-                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
-          <ArrowDownTrayIcon class="w-4 h-4 shrink-0" :class="store.loadingPull ? 'animate-pulse' : ''" />
-          {{ store.loadingPull ? 'Synchronisation…' : 'Pull depuis Crisp' }}
-        </button>
+        <Tooltip v-if="credentialsConfigured" :text="PULL_TIP">
+          <button @click="pull" :disabled="store.loadingPull"
+                  class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
+            <ArrowDownTrayIcon class="w-4 h-4 shrink-0" :class="store.loadingPull ? 'animate-pulse' : ''" />
+            {{ store.loadingPull ? 'Synchronisation…' : 'Pull depuis Crisp' }}
+          </button>
+        </Tooltip>
         <button @click="settingsOpen = !settingsOpen"
                 class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap">
           <Cog6ToothIcon class="w-4 h-4 shrink-0" />
@@ -439,7 +448,8 @@ function selectCategory(id) {
     <div v-if="settingsOpen" class="mb-6 bg-white border border-gray-200 rounded-lg p-5">
       <div class="flex items-center justify-between mb-4">
         <h2 class="font-medium text-gray-800">Connexion à Crisp Helpdesk</h2>
-        <button v-if="credentialsConfigured" @click="settingsOpen = false" class="p-1 hover:bg-gray-100 rounded shrink-0">
+        <button v-if="credentialsConfigured" @click="settingsOpen = false" class="p-1 hover:bg-gray-100 rounded shrink-0"
+                v-tooltip="'Fermer les paramètres Crisp'">
           <XMarkIcon class="w-5 h-5 text-gray-400" />
         </button>
       </div>
@@ -487,7 +497,8 @@ function selectCategory(id) {
         </button>
         <span v-if="lastPullLabel" class="text-xs text-gray-500 ml-auto">
           Dernier pull : {{ lastPullLabel }}
-          <span v-if="store.settings?.last_pull_status === 'error'" class="text-red-600">(échec)</span>
+          <span v-if="store.settings?.last_pull_status === 'error'" class="text-red-600"
+                v-tooltip="pullFailedTip(store.settings?.last_pull_error)">(échec)</span>
         </span>
       </div>
     </div>
@@ -510,7 +521,7 @@ function selectCategory(id) {
                        @new-child="(parentId) => openCategoryModal(parentId, null)" />
       <button @click="openCategoryModal()"
               class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-full border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition whitespace-nowrap"
-              v-tooltip="'Nouvelle catégorie'">
+              v-tooltip="NEW_CATEGORY_TIP">
         <PlusIcon class="w-3.5 h-3.5 shrink-0" />
         Nouvelle catégorie
       </button>
@@ -526,7 +537,7 @@ function selectCategory(id) {
               <input v-model="searchQuery" type="text" placeholder="Rechercher dans les articles…"
                      class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
             </div>
-            <select v-model="statusFilter"
+            <select v-model="statusFilter" aria-label="Filtrer par statut"
                     class="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition text-sm">
               <option value="">Tous les statuts</option>
               <option value="draft">Brouillons</option>
@@ -534,7 +545,7 @@ function selectCategory(id) {
             </select>
             <select v-model="seoFilter"
                     class="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition text-sm"
-                    title="Filtrer par tranche de score SEO">
+                    aria-label="Filtrer par score SEO">
               <option value="">Tous les scores SEO</option>
               <option value="low">À améliorer (&lt; 60)</option>
               <option value="mid">Moyen (60-79)</option>
@@ -542,14 +553,14 @@ function selectCategory(id) {
               <option value="none">Non scorés</option>
             </select>
             <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer whitespace-nowrap"
-                   title="Filtrer pour ne voir que les articles générés depuis la bibliothèque de fonctionnalités">
+                   v-tooltip="LIBRARY_FILTER_TIP">
               <input v-model="onlyLibrarySource" type="checkbox"
                      class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
               Depuis biblio
             </label>
             <button v-if="activeFilterCount > 0" @click="clearAllFilters"
                     class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition whitespace-nowrap"
-                    title="Effacer tous les filtres">
+                    v-tooltip="'Effacer tous les filtres et la recherche'">
               <XMarkIcon class="w-3.5 h-3.5 shrink-0" />
               Effacer ({{ activeFilterCount }})
             </button>
@@ -576,11 +587,12 @@ function selectCategory(id) {
                   Statut <span class="ml-1 opacity-60">{{ sortKey === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
                 </th>
                 <th @click="toggleSort('seo_score')"
-                    v-tooltip="'Score SEO recalculé à chaque enregistrement, génération ou pull. ≥ 80 vert · 60-79 ambre · < 60 rouge.'"
+                    v-tooltip="SEO_COLUMN_TIP"
                     class="text-left px-4 py-2 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 transition select-none">
                   SEO <span class="ml-1 opacity-60">{{ sortKey === 'seo_score' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
                 </th>
                 <th @click="toggleSort('sync')"
+                    v-tooltip="SYNC_COLUMN_TIP"
                     class="text-left px-4 py-2 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 transition select-none">
                   Sync <span class="ml-1 opacity-60">{{ sortKey === 'sync' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
                 </th>
@@ -594,22 +606,25 @@ function selectCategory(id) {
                 <td class="px-4 py-3">
                   <div class="font-medium text-gray-800 inline-flex items-center gap-2">
                     {{ a.title }}
-                    <span v-if="a.dirty" class="w-2 h-2 rounded-full bg-orange-400" v-tooltip="'Modifié localement, non publié'" />
+                    <span v-if="a.dirty" class="w-2 h-2 rounded-full bg-orange-400" v-tooltip="ARTICLE_DIRTY_TIP" />
                   </div>
                 </td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ a.category_name || '—' }}</td>
                 <td class="px-4 py-3 whitespace-nowrap">
-                  <span v-if="a.status === 'published'" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs">
+                  <span v-if="a.status === 'published'" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs"
+                        v-tooltip="ARTICLE_STATUS_TIPS.published">
                     <CheckCircleIcon class="w-3 h-3 shrink-0" /> Publié
                   </span>
-                  <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
+                  <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs"
+                        v-tooltip="ARTICLE_STATUS_TIPS.draft">
                     Brouillon
                   </span>
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap">
                   <span v-if="a.seo_score === null || a.seo_score === undefined"
-                        class="text-xs text-gray-400">—</span>
+                        class="text-xs text-gray-400" v-tooltip="SEO_NO_SCORE_TIP">—</span>
                   <span v-else
+                        v-tooltip="seoScoreTip(a.seo_score)"
                         :class="[
                           'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium tabular-nums',
                           a.seo_score >= 80 ? 'bg-emerald-50 text-emerald-700' :
@@ -619,7 +634,7 @@ function selectCategory(id) {
                     {{ a.seo_score }}/100
                   </span>
                 </td>
-                <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap" v-tooltip="syncCellTip(a)">
                   <span v-if="a.dirty" class="text-orange-600">À publier</span>
                   <span v-else-if="a.pushed_at">Publié il y a {{ relativeTime(a.pushed_at) }}</span>
                   <span v-else-if="a.crisp_id">Lu depuis Crisp</span>
@@ -628,15 +643,15 @@ function selectCategory(id) {
                 <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
                   <div class="inline-flex items-center gap-1">
                     <button v-if="a.dirty" @click="pushArticle(a)" class="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition"
-                            v-tooltip="'Publier vers Crisp'" :aria-label="`Publier « ${a.title} » vers Crisp`">
+                            v-tooltip="'Publier cet article sur Crisp'" :aria-label="`Publier « ${a.title} » vers Crisp`">
                       <ArrowUpOnSquareIcon class="w-4 h-4" />
                     </button>
                     <button @click="openArticle(a)" class="p-1.5 hover:bg-gray-100 text-gray-600 rounded transition"
-                            v-tooltip="'Éditer'" :aria-label="`Éditer « ${a.title} »`">
+                            v-tooltip="'Modifier cet article'" :aria-label="`Éditer « ${a.title} »`">
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
                     <button @click="deleteArticle(a)" class="p-1.5 hover:bg-red-50 text-red-500 rounded transition"
-                            v-tooltip="'Supprimer'" :aria-label="`Supprimer « ${a.title} »`">
+                            v-tooltip="a.crisp_id ? 'Supprimer cet article, ici et sur Crisp' : 'Supprimer cet article'" :aria-label="`Supprimer « ${a.title} »`">
                       <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>

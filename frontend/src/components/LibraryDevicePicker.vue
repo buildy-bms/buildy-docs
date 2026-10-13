@@ -24,10 +24,13 @@ import EquipmentIcon from './EquipmentIcon.vue'
 import RolePills from './audit/RolePills.vue'
 import EnergyPill from './audit/EnergyPill.vue'
 import SearchableSelect from './SearchableSelect.vue'
+import Tooltip from './Tooltip.vue'
 import { listEquipmentTemplates, createBacsDevice } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
 import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
+import { DEVICE_COLUMN_TIPS, TEMPLATE_ALREADY_ADDED_TIP } from '@/lib/audit-tips-systems'
+import { templateMatches } from '@/lib/library-search'
 
 const props = defineProps({
   system: { type: Object, required: true },
@@ -125,7 +128,7 @@ const ENERGY_FILTER_OPTIONS = computed(() => [
   ...ENERGY_OPTIONS,
 ])
 const ROLE_FILTER_OPTIONS = computed(() => [
-  { value: null, label: 'Tous niveaux' },
+  { value: null, label: 'Toutes fonctions' },
   ...ROLE_OPTIONS,
 ])
 
@@ -139,7 +142,8 @@ function rolesArr(v) {
 const filtered = computed(() => {
   const q = normalizeText(search.value.trim())
   return templates.value.filter(t => {
-    if (q && !normalizeText(t.name).includes(q)) return false
+    // Nom, puis mots du métier gardés en synonymes (« chiller » → groupe d'eau glacée).
+    if (q && !normalizeText(t.name).includes(q) && !templateMatches(t, search.value)) return false
     if (energyFilter.value && t.default_energy_source !== energyFilter.value) return false
     // Multi-rôle (mig 117) : un template apparaît si son array de rôles
     // contient le rôle filtré.
@@ -187,7 +191,7 @@ async function pickTemplate(t) {
   >
     <div class="space-y-3">
       <p class="text-sm text-gray-600">
-        Choisis un modèle pour ajouter rapidement un équipement préconfiguré (énergie, niveau).
+        Choisis un modèle pour ajouter rapidement un équipement préconfiguré (énergie, fonctions).
         Tu pourras ensuite renseigner marque, référence et puissance directement sur l'équipement.
       </p>
 
@@ -214,7 +218,7 @@ async function pickTemplate(t) {
           <SearchableSelect
             v-model="roleFilter"
             :options="ROLE_FILTER_OPTIONS"
-            placeholder="Tous niveaux"
+            placeholder="Toutes fonctions"
             :clearable="false"
             :creatable="true"
           />
@@ -264,20 +268,22 @@ async function pickTemplate(t) {
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            @click="pickTemplate(t)"
-            :disabled="!!adding[t.id] || isUsed(t)"
-            :class="[
-              'w-full inline-flex items-center justify-center gap-1.5 px-4 py-3 min-h-11 text-base font-medium rounded-lg transition',
-              isUsed(t)
-                ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
-                : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50'
-            ]"
-          >
-            <CheckIcon v-if="isUsed(t)" class="w-4 h-4 shrink-0" />
-            {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
-          </button>
+          <Tooltip :text="isUsed(t) ? TEMPLATE_ALREADY_ADDED_TIP : null" class="w-full">
+            <button
+              type="button"
+              @click="pickTemplate(t)"
+              :disabled="!!adding[t.id] || isUsed(t)"
+              :class="[
+                'w-full inline-flex items-center justify-center gap-1.5 px-4 py-3 min-h-11 text-base font-medium rounded-lg transition',
+                isUsed(t)
+                  ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+                  : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50'
+              ]"
+            >
+              <CheckIcon v-if="isUsed(t)" class="w-4 h-4 shrink-0" />
+              {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -287,8 +293,8 @@ async function pickTemplate(t) {
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
             <tr>
               <th class="px-3 py-2 text-left font-medium">Modèle</th>
-              <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Énergie</th>
-              <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Fonction(s)</th>
+              <th class="px-3 py-2 text-left font-medium whitespace-nowrap" v-tooltip="DEVICE_COLUMN_TIPS.energy">Énergie</th>
+              <th class="px-3 py-2 text-left font-medium whitespace-nowrap" v-tooltip="DEVICE_COLUMN_TIPS.roles">Fonctions</th>
               <th class="px-3 py-2 text-right font-medium whitespace-nowrap">Action</th>
             </tr>
           </thead>
@@ -301,7 +307,7 @@ async function pickTemplate(t) {
                     class="shrink-0"
                   />
                   <div class="min-w-0">
-                    <div class="font-medium text-gray-900 truncate">{{ t.name }}</div>
+                    <div class="font-medium text-gray-900 truncate" v-tooltip.overflow>{{ t.name }}</div>
                   </div>
                 </div>
               </td>
@@ -312,20 +318,22 @@ async function pickTemplate(t) {
                 <RolePills :roles="t.default_device_role" size="xs" />
               </td>
               <td class="px-3 py-2.5 text-right whitespace-nowrap">
-                <button
-                  type="button"
-                  @click="pickTemplate(t)"
-                  :disabled="!!adding[t.id] || isUsed(t)"
-                  :class="[
-                    'inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
-                    isUsed(t)
-                      ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
-                  ]"
-                >
-                  <CheckIcon v-if="isUsed(t)" class="w-3.5 h-3.5 shrink-0" />
-                  {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
-                </button>
+                <Tooltip :text="isUsed(t) ? TEMPLATE_ALREADY_ADDED_TIP : null">
+                  <button
+                    type="button"
+                    @click="pickTemplate(t)"
+                    :disabled="!!adding[t.id] || isUsed(t)"
+                    :class="[
+                      'inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
+                      isUsed(t)
+                        ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
+                    ]"
+                  >
+                    <CheckIcon v-if="isUsed(t)" class="w-3.5 h-3.5 shrink-0" />
+                    {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
+                  </button>
+                </Tooltip>
               </td>
             </tr>
           </tbody>

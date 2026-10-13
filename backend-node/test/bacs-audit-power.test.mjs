@@ -8,8 +8,27 @@ import os from 'os';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
-const { devicePowerContribution } = require('../src/lib/bacs-audit-power');
+const { devicePowerContribution, computeAutoPower, resolveTotalPower } = require('../src/lib/bacs-audit-power');
 const PROD = JSON.stringify(['production']);
+
+// Étape Systèmes (mise en page guidée) : les équipements de production sans puissance sont
+// signalés « à vérifier » sur leur ligne, d'après leurs identifiants.
+describe('computeAutoPower — équipements sans puissance', () => {
+  it('liste les identifiants des productions chaud / froid sans puissance (hors secours, hors service, émetteurs)', () => {
+    const auto = computeAutoPower([
+      { id: 1, system_category: 'heating', device_role: PROD, energy_source: 'gas', power_kw: null },
+      { id: 2, system_category: 'cooling', device_role: PROD, energy_source: 'electric', power_kw: 12 },
+      { id: 3, system_category: 'heating', device_role: PROD, energy_source: 'gas', power_kw: null, is_backup: 1 },
+      { id: 4, system_category: 'heating', device_role: PROD, energy_source: 'gas', power_kw: null, out_of_service: 1 },
+      { id: 5, system_category: 'heating', device_role: JSON.stringify(['emission']), power_kw: null },
+      { id: 6, system_category: 'cooling', device_role: PROD, energy_source: 'electric', power_kw: 0, power_kw_cooling: null },
+    ]);
+    expect(auto.incompletePowerIds).toEqual([1, 6]);
+    expect(auto.incompletePowerCount).toBe(2);
+    const resolved = resolveTotalPower({ bacs_total_power_source: 'auto' }, auto);
+    expect(resolved.incompletePowerDeviceIds).toEqual([1, 6]);
+  });
+});
 
 describe('devicePowerContribution — machines thermodynamiques', () => {
   it('Communay : split non réversible en froid → froid seul', () => {

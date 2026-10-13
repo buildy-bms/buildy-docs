@@ -20,7 +20,9 @@ import {
 import { claudeLibraryAssist } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useClaudeUsage, formatUsageTooltip } from '@/composables/useClaudeUsage'
+import { EDITOR_TOOLBAR_TIPS as toolbarTips, linkButtonTip, claudeOptionsTip, corpusPillTip } from '@/lib/editor-tips'
 import LinkInputModal from './LinkInputModal.vue'
+import Tooltip from './Tooltip.vue'
 
 const LIBRARY_CONTEXT_LS_KEY = 'buildy-docs.claude.libraryContext'
 
@@ -192,56 +194,68 @@ function onSaveLink(url) {
     <div v-if="editor" class="flex flex-wrap items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50 rounded-t-lg">
       <button type="button" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('heading', { level: 2 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Titre niveau 2'"><H2Icon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('heading', { level: 2 })"
+              v-tooltip="toolbarTips.h2"><H2Icon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('heading', { level: 3 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Titre niveau 3'"><H3Icon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('heading', { level: 3 })"
+              v-tooltip="toolbarTips.h3"><H3Icon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="editor.chain().focus().toggleBold().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bold') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Gras'"><BoldIcon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('bold')"
+              v-tooltip="toolbarTips.bold"><BoldIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleItalic().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('italic') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Italique'"><ItalicIcon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('italic')"
+              v-tooltip="toolbarTips.italic"><ItalicIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleUnderline().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('underline') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Souligné'"><UnderlineIcon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('underline')"
+              v-tooltip="toolbarTips.underline"><UnderlineIcon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="editor.chain().focus().toggleBulletList().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bulletList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Liste à puces'"><ListBulletIcon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('bulletList')"
+              v-tooltip="toolbarTips.bulletList"><ListBulletIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleOrderedList().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('orderedList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Liste numérotée'"><NumberedListIcon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('orderedList')"
+              v-tooltip="toolbarTips.orderedList"><NumberedListIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleBlockquote().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('blockquote') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Citation'"><ChatBubbleLeftRightIcon class="w-3.5 h-3.5" /></button>
+              :aria-pressed="isActive('blockquote')"
+              v-tooltip="toolbarTips.blockquote"><ChatBubbleLeftRightIcon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="setLink"
               :class="['p-1 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              v-tooltip="'Lien'"><LinkIcon class="w-3.5 h-3.5" /></button>
+              v-tooltip="linkButtonTip(isActive('link'))"><LinkIcon class="w-3.5 h-3.5" /></button>
 
       <div v-if="assistContext" class="rte-library-popover-root ml-auto relative flex items-center">
-        <button type="button" @click="callClaude" :disabled="assisting"
-                class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-l-md transition"
-                v-tooltip="formatUsageTooltip(claudeUsage)">
-          <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
-          {{ assisting
-              ? (isEmpty ? 'Génération…' : 'Reformulation…')
-              : (isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude') }}
-          <span v-if="claudeUsage" class="ml-1 text-[10px] text-violet-500 font-mono">
-            ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
-          </span>
-          <span v-if="libraryContext.enabled"
-                class="ml-1 inline-flex items-center px-1 rounded bg-violet-100 text-violet-700 text-[9px] font-semibold uppercase tracking-wide">
-            corpus
-          </span>
-        </button>
-        <button type="button" @click="showLibraryMenu = !showLibraryMenu" :disabled="assisting"
-                class="px-1 py-0.5 text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-r-md transition border-l border-violet-200"
-                v-tooltip="'Options de contexte bibliothèque'">
-          <ChevronDownIcon class="w-3 h-3" />
-        </button>
+        <!-- Bulles portées par <Tooltip> : les deux boutons sont grisés pendant la rédaction. -->
+        <Tooltip :text="formatUsageTooltip(claudeUsage)">
+          <button type="button" @click="callClaude" :disabled="assisting"
+                  class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-l-md transition">
+            <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
+            {{ assisting
+                ? (isEmpty ? 'Génération…' : 'Reformulation…')
+                : (isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude') }}
+            <span v-if="claudeUsage" class="ml-1 text-[10px] text-violet-500 font-mono">
+              ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
+            </span>
+            <span v-if="libraryContext.enabled"
+                  class="ml-1 inline-flex items-center px-1 rounded bg-violet-100 text-violet-700 text-[9px] font-semibold uppercase tracking-wide"
+                  v-tooltip="corpusPillTip(libraryContext.strategy)">
+              corpus
+            </span>
+          </button>
+        </Tooltip>
+        <Tooltip :text="claudeOptionsTip(assisting)">
+          <button type="button" @click="showLibraryMenu = !showLibraryMenu" :disabled="assisting"
+                  class="px-1 py-0.5 text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-r-md transition border-l border-violet-200">
+            <ChevronDownIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
         <!-- Popover options corpus -->
         <div v-if="showLibraryMenu"
              class="absolute right-0 top-full mt-1 z-50 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 text-[12px] text-gray-700">

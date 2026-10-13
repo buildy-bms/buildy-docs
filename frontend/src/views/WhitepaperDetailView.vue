@@ -10,6 +10,9 @@ import { useWhitepaperStore } from '@/stores/whitepaper'
 import { exportWhitepaperPdf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import Tooltip from '@/components/Tooltip.vue'
+import HelpTip from '@/components/HelpTip.vue'
+import { WP_TRACKER_TIP, WP_UNIQUES_TIP, WP_REFERERS_TIP } from '@/lib/misc-tips'
 
 const route = useRoute()
 const router = useRouter()
@@ -130,16 +133,17 @@ watch(() => route.params.id, async (id) => {
     <!-- Toolbar -->
     <div class="flex items-center justify-between gap-4 mb-5">
       <div class="flex items-center gap-3 min-w-0">
-        <button @click="router.push({ name: 'whitepapers' })" class="p-1.5 text-gray-400 hover:text-gray-700 shrink-0">
+        <button @click="router.push({ name: 'whitepapers' })" class="p-1.5 text-gray-400 hover:text-gray-700 shrink-0"
+                v-tooltip="'Retour aux livres blancs'">
           <ArrowLeftIcon class="w-5 h-5" />
         </button>
-        <h1 class="text-xl font-semibold text-gray-800 truncate">{{ whitepaper.title }}</h1>
+        <h1 class="text-xl font-semibold text-gray-800 truncate" v-tooltip.overflow>{{ whitepaper.title }}</h1>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <button
           @click="refreshPdf"
           class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-          v-tooltip="'Régénérer l\'aperçu PDF'"
+          v-tooltip="'Régénérer l’aperçu du PDF'"
         >
           <ArrowPathIcon class="w-4 h-4 shrink-0" />
           Régénérer
@@ -152,16 +156,18 @@ watch(() => route.params.id, async (id) => {
           <ArrowDownTrayIcon class="w-4 h-4 shrink-0" />
           {{ exporting ? 'Export…' : 'Télécharger' }}
         </button>
-        <button
-          @click="publishOnline"
-          :disabled="publishing"
-          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap disabled:opacity-50"
-          :class="publishedInfo ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
-        >
-          <ArrowUpTrayIcon class="w-4 h-4 shrink-0" />
-          {{ publishing ? 'Publication…' : (publishedInfo ? 'Mettre à jour' : 'Publier en ligne') }}
-        </button>
-        <button @click="removeWhitepaper" class="p-2 text-gray-400 hover:text-red-600" v-tooltip="'Supprimer'">
+        <Tooltip :text="publishing ? null : (publishedInfo ? 'Mettre à jour le PDF en ligne' : 'Publier le PDF sur buildy.fr')">
+          <button
+            @click="publishOnline"
+            :disabled="publishing"
+            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap disabled:opacity-50"
+            :class="publishedInfo ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+          >
+            <ArrowUpTrayIcon class="w-4 h-4 shrink-0" />
+            {{ publishing ? 'Publication…' : (publishedInfo ? 'Mettre à jour' : 'Publier en ligne') }}
+          </button>
+        </Tooltip>
+        <button @click="removeWhitepaper" class="p-2 text-gray-400 hover:text-red-600" v-tooltip="'Supprimer ce livre blanc'">
           <TrashIcon class="w-4 h-4" />
         </button>
       </div>
@@ -173,8 +179,8 @@ watch(() => route.params.id, async (id) => {
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> En ligne
       </span>
       <a :href="publishedInfo.url" target="_blank" rel="noopener"
-         class="text-indigo-600 hover:underline truncate">{{ publishedInfo.url }}</a>
-      <button @click="copyPublishedUrl" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
+         class="text-indigo-600 hover:underline truncate" v-tooltip.overflow>{{ publishedInfo.url }}</a>
+      <button @click="copyPublishedUrl" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien du PDF en ligne'">
         <ClipboardDocumentIcon class="w-4 h-4" />
       </button>
       <span class="text-gray-400 shrink-0 whitespace-nowrap">· publié le {{ formatDateTime(publishedInfo.at) }}</span>
@@ -185,6 +191,7 @@ watch(() => route.params.id, async (id) => {
       <div class="flex items-center justify-between gap-4 mb-4">
         <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
           <ChartBarIcon class="w-5 h-5 text-indigo-500 shrink-0" /> Lien traçable &amp; statistiques
+          <HelpTip :tip="WP_TRACKER_TIP" />
         </h2>
         <button
           @click="refreshClicks"
@@ -199,8 +206,8 @@ watch(() => route.params.id, async (id) => {
       <div class="flex items-center gap-2 mb-4 p-3 bg-indigo-50 rounded-lg text-sm min-w-0">
         <span class="font-medium text-indigo-900 shrink-0">À partager :</span>
         <a :href="whitepaper.tracker_url" target="_blank" rel="noopener"
-           class="text-indigo-600 hover:underline truncate">{{ whitepaper.tracker_url }}</a>
-        <button @click="copyTrackerUrl" class="text-indigo-400 hover:text-indigo-700 shrink-0" v-tooltip="'Copier le lien'">
+           class="text-indigo-600 hover:underline truncate" v-tooltip.overflow>{{ whitepaper.tracker_url }}</a>
+        <button @click="copyTrackerUrl" class="text-indigo-400 hover:text-indigo-700 shrink-0" v-tooltip="'Copier le lien traçable'">
           <ClipboardDocumentIcon class="w-4 h-4" />
         </button>
       </div>
@@ -210,7 +217,7 @@ watch(() => route.params.id, async (id) => {
           <div class="text-2xl font-semibold text-gray-800">{{ clicks?.total ?? 0 }}</div>
           <div class="text-xs text-gray-500 mt-0.5">clic{{ (clicks?.total ?? 0) > 1 ? 's' : '' }} au total</div>
         </div>
-        <div class="rounded-lg bg-gray-50 p-3">
+        <div class="rounded-lg bg-gray-50 p-3" v-tooltip="WP_UNIQUES_TIP">
           <div class="text-2xl font-semibold text-gray-800">{{ clicks?.uniques ?? 0 }}</div>
           <div class="text-xs text-gray-500 mt-0.5">visiteurs uniques</div>
         </div>
@@ -237,10 +244,10 @@ watch(() => route.params.id, async (id) => {
           </div>
         </div>
         <div>
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Provenances</h3>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2" v-tooltip="WP_REFERERS_TIP">Provenances</h3>
           <div class="space-y-1.5">
             <div v-for="r in clicks.by_referer" :key="r.source" class="flex items-center justify-between gap-3 text-sm">
-              <span class="text-gray-600 truncate">{{ r.source }}</span>
+              <span class="text-gray-600 truncate" v-tooltip.overflow>{{ r.source }}</span>
               <span class="text-gray-700 font-medium shrink-0">{{ r.count }}</span>
             </div>
           </div>

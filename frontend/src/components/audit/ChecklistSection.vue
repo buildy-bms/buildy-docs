@@ -35,6 +35,7 @@ import {
 } from '@/api'
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { useAuditStore } from '@/stores/audit'
+import { coverageTileTip, CHECKLIST_STATUS_TIPS, PHOTOS_NEED_SITE_TIP } from '@/lib/audit-tips-site'
 import { useNotification } from '@/composables/useNotification'
 
 // Aperçu d'un PDF ou d'une image dans une fenêtre de l'appli ; Cmd-clic
@@ -201,7 +202,7 @@ async function uploadFiles(files) {
     if (!editingItem.value?.id) return
   }
   if (!document.value?.site_uuid) {
-    error('Audit non rattaché à un site, impossible d\'uploader.')
+    error('Audit non rattaché à un site : impossible d’envoyer des fichiers.')
     return
   }
   for (const file of files) {
@@ -214,7 +215,7 @@ async function uploadFiles(files) {
         bacs_audit_checklist_id: editingItem.value.id,
       })
     } catch (e) {
-      error(`Upload « ${file.name} » impossible`)
+      error(`Envoi de « ${file.name} » impossible`)
     }
   }
   await refreshItemFiles()
@@ -270,7 +271,7 @@ async function onDropFiles(e, item) {
   const files = Array.from(e.dataTransfer?.files || [])
   if (!files.length) return
   if (!document.value?.site_uuid) {
-    error('Audit non rattaché à un site, impossible d\'uploader.')
+    error('Audit non rattaché à un site : impossible d’envoyer des fichiers.')
     return
   }
   // Lazy create de la ligne d'état si besoin (1er upload)
@@ -294,7 +295,7 @@ async function onDropFiles(e, item) {
         category: 'autre',
         bacs_audit_checklist_id: target.id,
       })
-    } catch { error(`Upload « ${file.name} » impossible`) }
+    } catch { error(`Envoi de « ${file.name} » impossible`) }
   }
   // Bascule auto en « Collecté » si on était en pending
   if (target.status === 'pending') {
@@ -340,6 +341,7 @@ defineExpose({ refresh: load })
         <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5">
           <button v-for="kind in ['zones', 'systems', 'meters', 'bms']" :key="kind"
                   type="button"
+                  v-tooltip="popoverOpen === kind ? null : coverageTileTip(kind, coverage[kind])"
                   @click="kind !== 'bms' ? togglePopover(kind) : emit('goto-bms')"
                   :class="['relative rounded-md px-2.5 py-1.5 text-left transition-colors duration-200 flex items-center gap-2 border',
                            coverage[kind].total === 0
@@ -364,6 +366,7 @@ defineExpose({ refresh: load })
                  class="absolute top-full mt-1 left-0 right-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 text-sm">
               <button v-for="m in coverage[kind].missing" :key="m.id"
                       type="button"
+                      v-tooltip.overflow
                       @click.stop="gotoEntity(kind, m.id)"
                       class="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 truncate">
                 {{ m.name }}
@@ -376,7 +379,7 @@ defineExpose({ refresh: load })
       <!-- ── BLOC 2 : Pièces jointes du dossier (1 ligne par item) ──────── -->
       <section>
         <div v-if="!items.length" class="text-sm text-gray-400 italic px-3 py-3 border border-dashed border-gray-200 rounded-md text-center">
-          Aucun item dans le catalogue.
+          Aucune pièce dans le catalogue.
         </div>
         <ul v-else class="space-y-1">
           <li v-for="item in items" :key="item.catalog_key"
@@ -389,15 +392,18 @@ defineExpose({ refresh: load })
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: item.icon_value || 'fa-file', icon_color: item.icon_color || '#6b7280' }"
                            size="sm" class="shrink-0" />
 
-            <div class="flex-1 min-w-0 leading-tight">
-              <p :class="['text-sm font-medium truncate',
+            <div class="flex-1 min-w-0 leading-tight"
+                 v-tooltip="item.description ? { title: item.label, icon: 'file-lines', tone: 'info', text: item.description } : null">
+              <p v-tooltip.overflow
+                 :class="['text-sm font-medium truncate',
                           item.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-800']">
                 {{ item.label }}
               </p>
               <p v-if="item.status === 'available'" class="text-[11px] text-emerald-700 inline-flex items-center gap-1 mt-0.5">
                 <CheckIcon class="w-3 h-3" /> {{ item.files_count }} fichier{{ item.files_count > 1 ? 's' : '' }}
               </p>
-              <p v-else-if="item.status === 'not_available'" class="text-[11px] text-gray-500 inline-flex items-center gap-1 mt-0.5 truncate">
+              <p v-else-if="item.status === 'not_available'" v-tooltip.overflow
+                 class="text-[11px] text-gray-500 inline-flex items-center gap-1 mt-0.5 truncate">
                 <NoSymbolIcon class="w-3 h-3 shrink-0" /> {{ item.not_available_reason || 'Non disponible' }}
               </p>
             </div>
@@ -412,17 +418,17 @@ defineExpose({ refresh: load })
                 size="sm"
                 @changed="load({ silent: true })" />
               <span v-else
-                    v-tooltip="'Rattacher un site à l\'audit pour activer les photos'"
+                    v-tooltip="PHOTOS_NEED_SITE_TIP"
                     class="inline-flex items-center justify-center w-7 h-7 text-gray-300 bg-gray-50 border border-gray-200 rounded-md cursor-not-allowed">
                 <CameraIcon class="w-3.5 h-3.5" />
               </span>
               <button type="button" @click.stop="openItem(item)"
-                      v-tooltip="'Notes & fichiers'"
+                      v-tooltip="'Modifier les notes et fichiers'"
                       class="inline-flex items-center justify-center w-7 h-7 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
                 <PencilSquareIcon class="w-3.5 h-3.5" />
               </button>
               <button type="button" @click.stop="quickToggleNotAvailable(item)"
-                      v-tooltip="item.status === 'not_available' ? 'Réactiver (= À collecter)' : 'Marquer non disponible'"
+                      v-tooltip="item.status === 'not_available' ? 'Rétablir en « À collecter »' : { label: 'Marquer ce document non disponible', icon: 'ban' }"
                       :class="['inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors',
                                item.status === 'not_available'
                                  ? 'text-gray-700 bg-gray-100 border-gray-300 hover:bg-gray-200'
@@ -446,6 +452,7 @@ defineExpose({ refresh: load })
           { v: 'available',      label: 'Collecté',      icon: CheckIcon,             cls: 'emerald' },
           { v: 'not_available',  label: 'Non disponible',icon: NoSymbolIcon,          cls: 'gray' },
         ]" :key="opt.v" type="button" @click="draftStatus = opt.v"
+          v-tooltip="CHECKLIST_STATUS_TIPS[opt.v]"
           :class="['flex flex-col items-center gap-1.5 px-3 py-3 text-sm font-medium rounded-lg border-2 transition',
                    draftStatus === opt.v
                      ? `border-${opt.cls}-500 bg-${opt.cls}-50 text-${opt.cls}-800`
@@ -477,11 +484,12 @@ defineExpose({ refresh: load })
           <li v-for="f in itemFiles" :key="f.id" class="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-gray-50">
             <a :href="isPreviewable(f) ? getSiteDocumentViewUrl(f.id) : getSiteDocumentDownloadUrl(f.id)" target="_blank"
                @click.exact="e => openViewer(e, f)"
+               v-tooltip.overflow
                class="flex-1 truncate text-indigo-700 hover:underline">
               {{ f.title }}
             </a>
             <span class="text-[11px] text-gray-400 shrink-0">{{ Math.round((f.size_bytes || 0) / 1024) }} ko</span>
-            <button type="button" @click="removeFile(f)" v-tooltip="'Supprimer'"
+            <button type="button" @click="removeFile(f)" v-tooltip="'Supprimer ce fichier'"
                     class="btn-icon btn-icon-danger shrink-0"><XMarkIcon class="w-4 h-4" /></button>
           </li>
         </ul>

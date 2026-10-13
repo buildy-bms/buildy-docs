@@ -32,7 +32,12 @@ import {
   claudeLibraryAssist,
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
+import Tooltip from './Tooltip.vue'
 import { CheckBadgeIcon } from '@heroicons/vue/24/outline'
+import {
+  documentKindTip, availTip, CASCADE_KINDS_TIP, SECTION_ICON_TIP, TEXT_HISTORY_TIP,
+  suggestTitleTip, validateBlockedTip, saveTip,
+} from '@/lib/library-tips'
 import { getValidationStatus } from '@/lib/content-validation'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -546,33 +551,39 @@ async function destroy() {
             <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
                    :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
                    class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-            <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.title.trim()"
-                    v-tooltip="form.title.trim() ? 'Proposer un meilleur titre avec Claude' : 'Saisir d\'abord un titre'"
-                    class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
-              <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
-            </button>
+            <!-- Bulle portée par l'enveloppe (bouton grisé sans titre) ; le positionnement absolu
+                 passe sur l'enveloppe pour garder la mise en page. -->
+            <Tooltip class="absolute right-1.5 top-1/2 -translate-y-1/2"
+                     :text="suggestTitleTip({ busy: suggestingTitle, empty: !form.title.trim(), noun: 'titre' })">
+              <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.title.trim()"
+                      aria-label="Proposer un meilleur titre avec Claude"
+                      class="inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
+                <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
+              </button>
+            </Tooltip>
           </div>
           <!-- Suggestion de titre Claude (apres reformulation/generation) -->
           <div v-if="suggestedTitle"
                class="mt-1 flex items-center gap-2 px-2 py-1 bg-violet-50 border border-violet-200 rounded-md text-[11px]">
             <SparklesIcon class="w-3.5 h-3.5 text-violet-600 shrink-0" />
-            <span class="text-violet-900 truncate flex-1">
+            <span class="text-violet-900 truncate flex-1" v-tooltip.overflow>
               Claude propose : <span class="font-medium">« {{ suggestedTitle }} »</span>
             </span>
             <button type="button" @click="applySuggestedTitle"
-                    class="px-2 py-0.5 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded transition shrink-0">
+                    class="px-2 py-0.5 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded transition shrink-0"
+                    v-tooltip="'Remplacer le titre par celui de Claude'">
               Appliquer
             </button>
             <button type="button" @click="dismissSuggestedTitle"
-                    class="text-violet-400 hover:text-violet-700 shrink-0" v-tooltip="'Ignorer'">
+                    class="text-violet-400 hover:text-violet-700 shrink-0" v-tooltip="'Ignorer la proposition de Claude'">
               <XMarkIcon class="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div v-if="mode === 'functionality'">
-            <label class="block text-[11px] font-medium text-gray-600 mb-0.5"
-                   v-tooltip="'Affichée dans la liste, la brochure et le tableau des offres'">
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5 w-fit"
+                   v-tooltip="SECTION_ICON_TIP">
               Icône
             </label>
             <FaIconPicker v-model="form.icon_name" />
@@ -623,7 +634,8 @@ async function destroy() {
             <label class="text-[11px] font-medium text-gray-600">
               Documents où cette {{ labelEntity }} apparaît
             </label>
-            <label v-if="isEdit" class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none whitespace-nowrap">
+            <label v-if="isEdit" class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none whitespace-nowrap"
+                   v-tooltip="CASCADE_KINDS_TIP">
               <input v-model="cascadeDocumentKinds" type="checkbox"
                      class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0 w-3.5 h-3.5" />
               <span>Propager aux sous-sections</span>
@@ -632,7 +644,7 @@ async function destroy() {
           <div class="flex flex-wrap gap-1.5">
             <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
                     @click="toggleDocumentKind(dk.kind)"
-                    v-tooltip="dk.description"
+                    v-tooltip="documentKindTip(dk.kind, dk)"
                     :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition whitespace-nowrap',
                              isDocumentKindActive(dk.kind)
                                ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
@@ -656,16 +668,16 @@ async function destroy() {
         <div class="grid grid-cols-3 gap-2">
           <div v-for="lvl in CONTRACT_LEVELS" :key="lvl.code"
                class="flex items-center justify-between gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1">
-            <span class="inline-flex items-center gap-1.5 text-xs text-gray-700 truncate">
+            <span class="inline-flex items-center gap-1.5 text-xs text-gray-700 truncate" v-tooltip.overflow>
               <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-indigo-50 text-indigo-700 font-mono text-[11px] shrink-0">
                 {{ lvl.code }}
               </span>
-              <span class="truncate">{{ lvl.label }}</span>
+              <span class="truncate" v-tooltip.overflow>{{ lvl.label }}</span>
             </span>
             <div class="inline-flex items-center bg-gray-50 rounded-md p-0.5 shrink-0">
               <button v-for="o in AVAIL_OPTIONS" :key="String(o.value)" type="button"
                       @click="form[lvl.field] = o.value"
-                      v-tooltip="o.label"
+                      v-tooltip="availTip(o.value, lvl.code)"
                       :class="['inline-flex items-center justify-center w-6 h-5 text-xs rounded transition',
                                form[lvl.field] === o.value
                                  ? o.color + ' shadow-sm font-medium'
@@ -685,7 +697,7 @@ async function destroy() {
           </span>
           <button v-if="isEdit" type="button" @click="openHistory"
                   class="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded transition whitespace-nowrap normal-case tracking-normal"
-                  title="Voir l'historique des modifications du texte et restaurer une version antérieure">
+                  v-tooltip="TEXT_HISTORY_TIP">
             <ClockIcon class="w-3.5 h-3.5" /> Historique
           </button>
         </legend>
@@ -753,33 +765,40 @@ async function destroy() {
       </button>
       <!-- Toggle validation du contenu (mig 89). Si la form est dirty,
            le clic enregistre d'abord puis valide (cf. toggleValidation). -->
-      <button v-if="isEdit && currentStatus === 'validated'"
-              @click="toggleValidation" :disabled="!canValidate || validating || submitting"
-              class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
-        Repasser en brouillon
-      </button>
-      <button v-else-if="isEdit"
-              @click="toggleValidation" :disabled="!canValidate || validating || submitting"
-              v-tooltip="canValidate ? '' : 'Aucun contenu à valider'"
-              class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
-        <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider le contenu' }}
-      </button>
+      <Tooltip v-if="isEdit && currentStatus === 'validated'"
+               :text="validating || submitting ? 'Enregistrement en cours…' : null">
+        <button @click="toggleValidation" :disabled="!canValidate || validating || submitting"
+                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+          Repasser en brouillon
+        </button>
+      </Tooltip>
+      <Tooltip v-else-if="isEdit"
+               :text="validateBlockedTip({ canValidate, busy: validating || submitting, what: 'contenu' })">
+        <button @click="toggleValidation" :disabled="!canValidate || validating || submitting"
+                class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+          <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider le contenu' }}
+        </button>
+      </Tooltip>
       <button @click="emit('close')"
               class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
         Annuler
       </button>
       <!-- Double bouton Enregistrer : sans fermer (defaut quand on continue
-           a editer) / avec fermer (validation finale). En creation, un seul. -->
-      <button v-if="isEdit"
-              @click="submitKeepOpen" :disabled="submitting || !form.title.trim()"
-              v-tooltip="'Enregistrer sans fermer'"
-              class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
-        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
-      </button>
-      <button @click="submit" :disabled="submitting || !form.title.trim()"
-              class="px-4 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
-        {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer et fermer' : 'Créer') }}
-      </button>
+           a editer) / avec fermer (validation finale). En creation, un seul.
+           Grisés sans titre : la bulle (portée par <Tooltip>) dit quoi faire. -->
+      <Tooltip v-if="isEdit"
+               :text="saveTip({ busy: submitting, missing: form.title.trim() ? null : 'un titre', label: 'Enregistrer sans fermer' })">
+        <button @click="submitKeepOpen" :disabled="submitting || !form.title.trim()"
+                class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
+          {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </Tooltip>
+      <Tooltip :text="saveTip({ busy: submitting, missing: form.title.trim() ? null : 'un titre' })">
+        <button @click="submit" :disabled="submitting || !form.title.trim()"
+                class="px-4 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
+          {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer et fermer' : 'Créer') }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 
@@ -813,7 +832,7 @@ async function destroy() {
             <span class="text-gray-300">·</span>
             <span>{{ v.body_length }} caractères</span>
           </div>
-          <p class="text-sm text-gray-600 line-clamp-3 leading-relaxed">
+          <p class="text-sm text-gray-600 line-clamp-3 leading-relaxed" v-tooltip.overflow>
             {{ v.preview || '(texte vide)' }}
           </p>
         </div>

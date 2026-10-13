@@ -32,7 +32,7 @@ const emit = defineEmits(['clear'])
       <button
         @click="emit('clear')"
         class="ml-1 inline-flex items-center gap-1 px-2 py-1 text-xs text-white/80 hover:text-white hover:bg-white/10 rounded-md whitespace-nowrap"
-        v-tooltip="'Désélectionner tout'"
+        v-tooltip="'Annuler la sélection'"
       >
         <XMarkIcon class="w-4 h-4" />
         Désélectionner

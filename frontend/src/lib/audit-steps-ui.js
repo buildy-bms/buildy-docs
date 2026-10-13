@@ -74,20 +74,22 @@ export function phaseForStep(key) {
   return PHASE_BY_STEP[key] || null
 }
 
-// Objectif de chaque étape, affiché en tête du bandeau guide.
+// Objectif de chaque étape, affiché en tête du bandeau guide et dans l'infobulle de l'onglet.
+// En français simple, sans référence d'article (2026-10-12, demande de Kévin) : l'article est
+// accessible par l'icône ⓘ du décret à côté du titre de chaque section.
 export const AUDIT_STEP_OBJECTIVES = {
-  identification: 'Rattacher le site et déterminer si le bâtiment est assujetti au décret BACS (R175-2) : puissance chauffage + climatisation et date du permis de construire.',
-  zones: 'Découper le site en zones fonctionnelles homogènes (R175-1 6°) et inventorier les locaux techniques.',
-  systems: 'Pour chaque zone, indiquer les usages présents ou non concernés, puis renseigner complètement chaque équipement.',
-  thermal: 'Pour chaque système de chauffage et de refroidissement, décrire la régulation automatique : production, distribution et émission (R175-6).',
-  meters: 'Pointer les compteurs requis par énergie et par usage : présents, absents ou hors service (R175-3 1°).',
-  bms: "Décrire la GTB en place, puis évaluer ses capacités (R175-3), la maintenance (R175-4) et la formation de l'exploitant (R175-5).",
-  inspections: "Renseigner la dernière inspection périodique de la GTB (R175-5-1), ou indiquer qu'aucune inspection n'est à déclarer.",
-  'docs-checklist': 'Collecter les pièces du dossier (plans, schémas, synoptique GTB, AF…) et une photo de chaque zone, système, compteur et de la GTB.',
+  identification: 'Rattacher le site et vérifier s’il est concerné par le décret : puissance de chauffage et de climatisation, date du permis de construire.',
+  zones: 'Découper le site en zones aux usages homogènes (bureaux, restauration…) et lister les locaux techniques.',
+  systems: 'Pour chaque zone, indiquer les usages présents (chauffage, froid, ventilation…), puis décrire chaque équipement.',
+  thermal: 'Pour le chauffage et le froid, décrire comment la température est régulée : à la source (chaudière, groupe froid…), sur les circuits et pièce par pièce.',
+  meters: 'Recenser les compteurs attendus, par énergie et par usage : présents, absents ou en panne.',
+  bms: 'Décrire la GTB en place, ce qu’elle sait faire, son entretien et la formation de l’exploitant.',
+  inspections: 'Noter la dernière inspection de la GTB par un organisme extérieur, ou indiquer qu’il n’y en a pas.',
+  'docs-checklist': 'Rassembler les pièces du dossier (plans, schémas, vue d’ensemble de la GTB, analyse fonctionnelle…) et une photo de chaque zone, système, compteur et de la GTB.',
   documents: 'Déposer les documents du site : plans, schémas, fiches techniques et manuels.',
-  credentials: 'Renseigner les accès (web, SSH, VPN) à la GTB et aux systèmes. Ils sont stockés chiffrés.',
+  credentials: 'Noter les accès à la GTB et aux équipements (site web, SSH, VPN). Ils sont stockés chiffrés.',
   review: 'Relire le plan de mise en conformité, ajuster les actions et leurs préconisations.',
-  synthesis: "Rédiger la note de synthèse affichée en tête du rapport, à la main ou avec l'aide de Claude.",
+  synthesis: 'Rédiger la note de synthèse placée en tête du rapport, à la main ou avec l’aide de Claude.',
 }
 
 export function stepObjective(key, isBacs = true) {

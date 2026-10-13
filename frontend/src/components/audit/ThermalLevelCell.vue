@@ -25,6 +25,10 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faPenToSquare } from '@fortawesome/pro-solid-svg-icons'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import {
+  thermalNoteTip, INTEGRATED_REGULATION_TIP, deportedRegulationTip,
+  THERMAL_DEVICE_MISSING_TIP, THERMAL_TYPE_MISSING_TIP,
+} from '@/lib/audit-tips-site'
 
 library.add(faPenToSquare)
 
@@ -44,7 +48,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['patch-thermal', 'patch-device', 'open-notes'])
 
-const LEVEL_SHORT = { production: 'production', distribution: 'distribution', emission: 'émission' }
 // Aperçu texte de la note (DOMParser : n'exécute aucun script, ne charge
 // aucune image, contrairement à innerHTML sur un élément détaché).
 const noteText = computed(() => {
@@ -52,12 +55,9 @@ const noteText = computed(() => {
   const doc = new DOMParser().parseFromString(props.noteHtml, 'text/html')
   return (doc.body.textContent || '').replace(/\s+/g, ' ').trim()
 })
-const noteTooltip = computed(() => {
-  const lvl = LEVEL_SHORT[props.level] || props.level
-  if (!noteText.value) return `Ajouter une note (${lvl})`
-  const t = noteText.value.length > 160 ? noteText.value.slice(0, 157) + '…' : noteText.value
-  return `Note ${lvl} :\n${t}`
-})
+// Infobulle du bouton de note : aperçu de la note (carte) ou invitation (étiquette).
+const noteTooltip = computed(() => thermalNoteTip(props.level, noteText.value))
+const noteAriaLabel = computed(() => (noteText.value ? 'Modifier la note de ce niveau' : 'Ajouter une note sur ce niveau'))
 
 const LEVEL_DEVICE_FIELD = {
   production:   'generator_device_id',
@@ -155,18 +155,14 @@ function setRegulationType(v) {
 // (`regulator_brand`, `regulator_model_reference`, `regulator_location_X`).
 const isDeported = computed(() =>
   props.device && (props.device.regulation_integrated === 0 || props.device.regulation_integrated === false))
+// Carte : marque, référence et emplacement du régulateur (ou ce qu'il reste à compléter).
 const deportedTooltip = computed(() => {
-  if (!isDeported.value || !props.device) return ''
-  const lines = ['Régulation déportée']
-  const brand = props.device.regulator_brand
-  const ref = props.device.regulator_model_reference
-  const loc = props.device[`regulator_location_${props.level}`]
-  if (brand) lines.push(`• Marque : ${brand}`)
-  if (ref)   lines.push(`• Référence : ${ref}`)
-  if (loc)   lines.push(`• Localisation : ${loc}`)
-  if (lines.length === 1) lines.push('Détails non renseignés — à compléter dans la modale équipement.')
-  // Le tooltip directive transforme '\n' → <br> (cf. tooltip-directive.js).
-  return lines.join('\n')
+  if (!isDeported.value || !props.device) return null
+  return deportedRegulationTip({
+    brand: props.device.regulator_brand,
+    reference: props.device.regulator_model_reference,
+    location: props.device[`regulator_location_${props.level}`],
+  })
 })
 </script>
 
@@ -178,6 +174,7 @@ const deportedTooltip = computed(() => {
   <div :class="['thermal-level-grid', level === 'emission' ? 'is-emission' : '']">
     <SearchableSelect
       class="tl-eq"
+      v-tooltip="deviceId ? null : THERMAL_DEVICE_MISSING_TIP"
       :model-value="selectedDevices"
       :options="allOptions"
       :multiple="true"
@@ -194,15 +191,21 @@ const deportedTooltip = computed(() => {
     <!-- Type de régulation (porté par l'équipement) — pastille bleue si la
          régulation est intégrée, violette si déportée (détails au survol). -->
     <div v-if="device" class="tl-type flex items-center gap-1.5">
+      <!-- Pastille de 8 px dans une zone de survol de 16 px (marges négatives :
+           la mise en page ne bouge pas). -->
       <span v-if="integrated"
-            class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
-            v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
+            class="-m-1 inline-flex size-4 items-center justify-center shrink-0 cursor-help"
+            v-tooltip="INTEGRATED_REGULATION_TIP">
+        <span class="inline-block w-2 h-2 rounded-full bg-sky-500"></span>
+      </span>
       <span v-else-if="isDeported"
-            class="inline-block w-2 h-2 rounded-full shrink-0"
-            :style="{ background: '#7033d9' }"
-            v-tooltip="deportedTooltip"></span>
+            class="-m-1 inline-flex size-4 items-center justify-center shrink-0 cursor-help"
+            v-tooltip="deportedTooltip">
+        <span class="inline-block w-2 h-2 rounded-full" :style="{ background: '#7033d9' }"></span>
+      </span>
       <SearchableSelect
         class="flex-1 min-w-0"
+        v-tooltip="regulationTypeValue ? null : THERMAL_TYPE_MISSING_TIP"
         :model-value="regulationTypeValue"
         :options="regulationTypeOptions"
         :invalid="!regulationTypeValue"
@@ -212,14 +215,14 @@ const deportedTooltip = computed(() => {
         @update:modelValue="setRegulationType" />
     </div>
     <span v-else class="tl-type px-2 text-xs text-gray-300"
-          v-tooltip="`Choisis d'abord l'équipement (${LEVEL_SHORT[level] || level})`">—</span>
+          v-tooltip="'Choisis d’abord l’équipement'">—</span>
     <slot name="after" />
     <!-- Note du niveau (ex. « sonde d'ambiance à déplacer ») -->
     <button type="button"
             :class="['tl-note inline-flex items-center justify-center w-7 h-7 rounded-md transition',
                      noteText ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100' : 'text-gray-300 hover:text-gray-600 hover:bg-slate-100']"
             v-tooltip="noteTooltip"
-            :aria-label="noteTooltip"
+            :aria-label="noteAriaLabel"
             @click="emit('open-notes')">
       <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3.5 h-3.5" />
     </button>

@@ -111,6 +111,7 @@ onMounted(() => {
           @click="dismiss"
           class="tap-target inline-flex items-center justify-center text-gray-400 shrink-0 -m-2"
           aria-label="Fermer"
+          v-tooltip="'Masquer ce message pendant 30 jours'"
         >
           <XMarkIcon class="w-5 h-5" />
         </button>

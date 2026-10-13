@@ -11,6 +11,13 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 // sur 'cube' (cf. equipment-icons.js).
 import '@/lib/equipment-icons'
 import { resolveFaIconName as _resolveFaIconName } from '@/lib/equipment-icons'
+import {
+  sectionKindTip, categoryNodeTip, LIBRARY_EQUIPMENT_ICON_TIP, LIBRARY_SECTION_ICON_TIP,
+  SECTION_VERIFIED_TIP, SECTION_UNVERIFIED_TIP, paidOptionTip,
+  DEMAND_TIP, UNDEMAND_LABEL, DEMANDED_BADGE_TIP, OPT_OUT_TIP, OPT_IN_LABEL, OPTED_OUT_BADGE_TIP,
+  ADD_PAID_OPTION_TIP, REMOVE_PAID_OPTION_LABEL, PAID_OPTION_ADDED_TIP, EXCLUDED_BADGE_TIP,
+  AD_HOC_SECTION_TIP, PROMOTE_SECTION_TIP, MOVE_TIPS, deleteSectionTip,
+} from '@/lib/editor-tips'
 
 // Numerotation calculee live depuis l'AfDetailView. Fallback sur node.number
 // (sections seedees avant le passage en numerotation auto).
@@ -112,6 +119,8 @@ const hasPaidOption = computed(() => [availE.value, availS.value, availP.value].
 const allPaidOption = computed(() =>
   availE.value === 'paid_option' && availS.value === 'paid_option' && availP.value === 'paid_option'
 )
+// Infobulle de la pastille € : disponibilité par niveau d'offre (lib/editor-tips.js).
+const paidTip = computed(() => paidOptionTip({ e: availE.value, s: availS.value, p: availP.value }))
 // Les toggles "écartée" et "demandée par MOA" n'ont de sens que pour les
 // fonctionnalités optionnelles. Eligibilite :
 //  - feature avec au moins un paid_option (Sérénité, Connectivité 4G…)
@@ -239,8 +248,11 @@ const titleHtml = computed(() => {
 
 <template>
   <div :data-id="node.id" :data-parent-id="node.parent_id || ''">
+    <!-- v-tooltip.overflow.right : titre complet au survol de la ligne (numéro, icône…). Au survol,
+         les actions prennent la place du titre ; sans cette bulle, il n'était plus lisible. -->
     <button
       ref="btnRef"
+      v-tooltip.overflow.right
       :style="indentStyle"
       :class="[
         'group w-full text-left flex items-center gap-1.5 h-6 pr-2 rounded-md transition-colors leading-tight',
@@ -258,6 +270,7 @@ const titleHtml = computed(() => {
         v-if="selectionMode"
         @click.stop="emit('toggle-select', node)"
         class="shrink-0 inline-flex items-center justify-center w-5 h-5 -ml-0.5 rounded cursor-pointer"
+        v-tooltip="isChecked ? 'Décocher cette section' : 'Cocher cette section'"
       >
         <span
           :class="[
@@ -277,12 +290,13 @@ const titleHtml = computed(() => {
         class="section-drag-handle shrink-0 opacity-0 group-hover:opacity-100 cursor-grab text-gray-400 hover:text-gray-700 -ml-0.5"
         @click.stop
         @mousedown.stop
+        v-tooltip="'Glisser pour déplacer cette section'"
       >
         <Bars3Icon class="w-3 h-3" />
       </span>
       <!-- Slot statut "verifie" : toujours rendu (place fixe la plus a gauche)
            pour aligner verticalement les ✓ d'une ligne a l'autre. -->
-      <Tooltip :text="node.fact_check_status === 'verified' ? 'Section vérifiée' : 'À vérifier'">
+      <Tooltip :text="node.fact_check_status === 'verified' ? SECTION_VERIFIED_TIP : SECTION_UNVERIFIED_TIP">
         <CheckCircleIcon
           :class="['w-3.5 h-3.5 shrink-0',
             node.fact_check_status === 'verified' ? 'text-emerald-500' : 'text-gray-300']"
@@ -294,13 +308,14 @@ const titleHtml = computed(() => {
         type="button"
         @click.stop="emit('toggle', node)"
         class="shrink-0 p-0.5 -my-0.5 rounded hover:bg-gray-200"
+        v-tooltip="isCollapsed ? 'Déplier cette section' : 'Replier cette section'"
       >
         <ChevronRightIcon v-if="isCollapsed" class="w-3 h-3 text-gray-500" />
         <ChevronDownIcon v-else class="w-3 h-3 text-gray-500" />
       </button>
       <span v-else class="w-4 h-3 shrink-0"></span>
 
-      <component :is="Icon" :class="['w-3.5 h-3.5 shrink-0', isSelected ? 'text-indigo-600' : 'text-gray-400']" />
+      <component :is="Icon" v-tooltip="sectionKindTip(node.kind)" :class="['w-3.5 h-3.5 shrink-0', isSelected ? 'text-indigo-600' : 'text-gray-400']" />
 
       <span v-if="displayedNumber"
             :class="['text-[11px] shrink-0', isSelected ? 'text-indigo-700 font-bold' : numberClasses]">
@@ -312,12 +327,7 @@ const titleHtml = computed(() => {
            dans l'arborescence). Le detail complet reste visible dans la
            fiche section et l'annexe Tableau des fonctionnalites. -->
       <ServiceLevelBadge v-if="minServiceLevel" :level="minServiceLevel" />
-      <Tooltip
-        v-if="hasPaidOption"
-        :text="allPaidOption
-          ? 'Option payante à tous les niveaux (add-on facturé séparément, type Sérénité, Connectivité 4G, API Connect)'
-          : 'Option payante — facturée en plus du contrat de base'"
-      >
+      <Tooltip v-if="hasPaidOption" :text="paidTip">
         <span :class="['inline-flex items-center px-1 py-0 text-[9px] font-bold rounded border whitespace-nowrap shrink-0',
           allPaidOption
             ? 'bg-orange-100 text-orange-800 border-orange-300'
@@ -331,33 +341,68 @@ const titleHtml = computed(() => {
         v-if="node.system_category_key && node.cat_icon_value"
         :template="{ icon_kind: 'fa', icon_value: node.cat_icon_value, icon_color: node.cat_icon_color }"
         size="xs"
+        v-tooltip="categoryNodeTip(node.cat_label)"
       />
       <!-- Icone equipement coloree (kind='equipment') prioritaire sur tpl_icon_name. -->
       <EquipmentIcon
         v-else-if="node.kind === 'equipment' && node.eq_icon_value"
         :template="{ icon_kind: node.eq_icon_kind, icon_value: node.eq_icon_value, icon_color: node.eq_icon_color }"
         size="xs"
+        v-tooltip="LIBRARY_EQUIPMENT_ICON_TIP"
       />
       <FontAwesomeIcon
         v-else-if="node.tpl_icon_name"
         :icon="['fas', _resolveFaIconName(node.tpl_icon_name)]"
         class="w-3 h-3 shrink-0 text-gray-500"
         :class="isSelected ? 'text-indigo-700' : ''"
+        v-tooltip="LIBRARY_SECTION_ICON_TIP"
       />
-      <span :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', (demanded || optinPaid) ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
+      <!-- Indicateurs permanents AVANT le titre (2026-10-12) : en bout de ligne, les actions qui
+           apparaissent au survol les poussaient hors de la ligne dans un arbre étroit ; l'action
+           « Ajouter une sous-section » prenait leur place sous la souris (et leur bulle). -->
+      <!-- Badge permanent : section ad-hoc (sans pendant biblio). -->
+      <Tooltip v-if="isAdHoc" :text="AD_HOC_SECTION_TIP">
+        <span class="shrink-0 px-1 py-0 text-[9px] font-medium bg-violet-100 text-violet-700 rounded uppercase tracking-wide">AF</span>
+      </Tooltip>
+      <!-- Indicateur permanent si section demandee, en option payante,
+           ecartee, ou exclue. Lot 92 : pastille € verte pour optin_paid_option. -->
+      <Tooltip v-if="optinPaid" :text="PAID_OPTION_ADDED_TIP">
+        <span class="shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold leading-none">€</span>
+      </Tooltip>
+      <Tooltip v-else-if="demanded" :text="DEMANDED_BADGE_TIP">
+        <span class="shrink-0 text-emerald-700">
+          <CheckBadgeIcon class="w-3 h-3" />
+        </span>
+      </Tooltip>
+      <Tooltip v-else-if="optedOut" :text="OPTED_OUT_BADGE_TIP">
+        <span class="shrink-0 text-amber-700">
+          <NoSymbolIcon class="w-3 h-3" />
+        </span>
+      </Tooltip>
+      <Tooltip v-else-if="excluded" :text="EXCLUDED_BADGE_TIP">
+        <span class="shrink-0 text-amber-600">
+          <EyeSlashIcon class="w-3 h-3" />
+        </span>
+      </Tooltip>
+      <span v-tooltip.overflow :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', (demanded || optinPaid) ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
       <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer.
            hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre.
-           Tooltips via <Tooltip> (instantanes, fond sombre) pour remplacer les
-           native title= qui ont un delai de ~500ms et un style basique. -->
-      <span v-if="!selectionMode" class="hidden group-hover:flex items-center gap-0.5 shrink-0">
+           Aussi affichees au focus CLAVIER de la ligne ou d'un de ses boutons
+           (group-focus-visible / group-has-focus-visible) : sans ca, les
+           boutons restent en display:none et inaccessibles au clavier. Pas de
+           group-focus-within : au clic souris (Chrome donne le focus au bouton
+           de ligne), les actions resteraient affichees apres le survol.
+           Infobulles via <Tooltip> (contenus : lib/editor-tips.js). -->
+      <span v-if="!selectionMode" class="hidden group-hover:flex group-focus-visible:flex group-has-focus-visible:flex items-center gap-0.5 shrink-0">
         <Tooltip
           v-if="canDemand"
-          :text="demanded ? 'Annuler la validation MOA' : 'Marquer comme fonction exigée par la MOA (à inclure dans l\'avenant contractuel)'"
+          :text="demanded ? UNDEMAND_LABEL : DEMAND_TIP"
         >
           <button
             type="button"
             @click.stop="emit('toggle-demanded', node)"
+            :aria-label="demanded ? UNDEMAND_LABEL : DEMAND_TIP.title"
             :class="['p-0.5 rounded', demanded ? 'hover:bg-gray-200 text-emerald-700' : 'hover:bg-emerald-200 text-emerald-600']"
           >
             <CheckBadgeIcon class="w-3 h-3" />
@@ -365,11 +410,12 @@ const titleHtml = computed(() => {
         </Tooltip>
         <Tooltip
           v-if="canOptOut"
-          :text="optedOut ? 'Réactiver cette fonctionnalité' : 'Écarter cette fonctionnalité (par la MOA — visible dans le PDF avec encart)'"
+          :text="optedOut ? OPT_IN_LABEL : OPT_OUT_TIP"
         >
           <button
             type="button"
             @click.stop="emit('toggle-opt-out', node)"
+            :aria-label="optedOut ? OPT_IN_LABEL : OPT_OUT_TIP.title"
             :class="['p-0.5 rounded', optedOut ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
           >
             <NoSymbolIcon class="w-3 h-3" />
@@ -379,11 +425,12 @@ const titleHtml = computed(() => {
              Visible uniquement quand la feature est en avail_<af.service_level>='paid_option'. -->
         <Tooltip
           v-if="availAtAfLevel === 'paid_option'"
-          :text="optinPaid ? 'Retirer du contrat (ne plus inclure comme option payante)' : 'Ajouter au contrat comme option payante (sans changer de niveau d\'offre)'"
+          :text="optinPaid ? REMOVE_PAID_OPTION_LABEL : ADD_PAID_OPTION_TIP"
         >
           <button
             type="button"
             @click.stop="emit('toggle-optin-paid-option', node)"
+            :aria-label="optinPaid ? REMOVE_PAID_OPTION_LABEL : ADD_PAID_OPTION_TIP.title"
             :class="['p-0.5 rounded font-bold text-[10px] leading-none w-3.5 h-3.5 flex items-center justify-center', optinPaid ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-200 text-emerald-700']"
           >
             €
@@ -399,7 +446,7 @@ const titleHtml = computed(() => {
             <EyeSlashIcon v-else class="w-3 h-3" />
           </button>
         </Tooltip>
-        <Tooltip text="Remonter d'un cran (↑)">
+        <Tooltip :text="MOVE_TIPS.up">
           <button
             type="button"
             @click.stop="emit('move-up', node)"
@@ -408,7 +455,7 @@ const titleHtml = computed(() => {
             <ArrowUpIcon class="w-3 h-3" />
           </button>
         </Tooltip>
-        <Tooltip text="Descendre d'un cran (↓)">
+        <Tooltip :text="MOVE_TIPS.down">
           <button
             type="button"
             @click.stop="emit('move-down', node)"
@@ -417,7 +464,7 @@ const titleHtml = computed(() => {
             <ArrowDownIcon class="w-3 h-3" />
           </button>
         </Tooltip>
-        <Tooltip text="Sortir d'un niveau (← outdent)">
+        <Tooltip :text="MOVE_TIPS.outdent">
           <button
             type="button"
             @click.stop="emit('outdent', node)"
@@ -426,7 +473,7 @@ const titleHtml = computed(() => {
             <ArrowLeftIcon class="w-3 h-3" />
           </button>
         </Tooltip>
-        <Tooltip text="Indenter dans le précédent (→ indent)">
+        <Tooltip :text="MOVE_TIPS.indent">
           <button
             type="button"
             @click.stop="emit('indent', node)"
@@ -446,17 +493,18 @@ const titleHtml = computed(() => {
         </Tooltip>
         <Tooltip
           v-if="isAdHoc"
-          text="Promouvoir cette section dans la bibliothèque (création d'un section type)"
+          :text="PROMOTE_SECTION_TIP"
         >
           <button
             type="button"
             @click.stop="emit('promote-to-library', node)"
+            :aria-label="PROMOTE_SECTION_TIP.title"
             class="p-0.5 rounded hover:bg-violet-200 text-violet-600"
           >
             <ArrowUpOnSquareIcon class="w-3 h-3" />
           </button>
         </Tooltip>
-        <Tooltip text="Supprimer cette section (et ses enfants)">
+        <Tooltip :text="deleteSectionTip(hasChildren, isSelected)">
           <button
             type="button"
             @click.stop="emit('delete', node)"
@@ -466,30 +514,6 @@ const titleHtml = computed(() => {
           </button>
         </Tooltip>
       </span>
-      <!-- Badge permanent : section ad-hoc (sans pendant biblio). -->
-      <Tooltip v-if="isAdHoc" text="Spécifique à cette AF — sans pendant dans la bibliothèque">
-        <span class="shrink-0 px-1 py-0 text-[9px] font-medium bg-violet-100 text-violet-700 rounded uppercase tracking-wide">AF</span>
-      </Tooltip>
-      <!-- Indicateur permanent si section demandee, en option payante,
-           ecartee, ou exclue. Lot 92 : pastille € verte pour optin_paid_option. -->
-      <Tooltip v-if="optinPaid" text="Option payante ajoutée au contrat (sans changement de niveau d'offre)">
-        <span class="shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold leading-none">€</span>
-      </Tooltip>
-      <Tooltip v-else-if="demanded" text="Fonction exigée par la MOA — à inclure dans l'avenant contractuel">
-        <span class="shrink-0 text-emerald-700">
-          <CheckBadgeIcon class="w-3 h-3" />
-        </span>
-      </Tooltip>
-      <Tooltip v-else-if="optedOut" text="Écartée par la MOA — visible dans le PDF avec encart">
-        <span class="shrink-0 text-amber-700">
-          <NoSymbolIcon class="w-3 h-3" />
-        </span>
-      </Tooltip>
-      <Tooltip v-else-if="excluded" text="Exclue des exports">
-        <span class="shrink-0 text-amber-600">
-          <EyeSlashIcon class="w-3 h-3" />
-        </span>
-      </Tooltip>
     </button>
 
     <!-- Conteneur enfants : rendu meme sans enfants (tant que la section

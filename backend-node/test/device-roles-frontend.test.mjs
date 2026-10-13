@@ -115,3 +115,21 @@ describe('filterAndSortByRole', () => {
     expect(filterAndSortByRole(undefined, 'production')).toEqual([]);
   });
 });
+
+describe('parseRoles : valeur encodée plusieurs fois (modèles de la bibliothèque re-sauvés)', () => {
+  it('déballe chaque niveau, côté navigateur comme côté serveur', async () => {
+    const { createRequire } = await import('node:module');
+    const server = createRequire(import.meta.url)('../src/lib/device-roles.js');
+    const twice = JSON.stringify([JSON.stringify(['production'])]);
+    const four = JSON.stringify([JSON.stringify([JSON.stringify([JSON.stringify(['emission'])])])]);
+    for (const parse of [parseRoles, server.parseRoles]) {
+      expect(parse(twice)).toEqual(['production']);
+      expect(parse(four)).toEqual(['emission']);
+      expect(parse('["production","regulation"]')).toEqual(['production', 'regulation']);
+      expect(parse(['production', 'production'])).toEqual(['production']);
+      expect(parse('regulation')).toEqual(['regulation']);
+      expect(parse(null)).toEqual([]);
+    }
+    expect(server.serializeRoles(server.parseRoles(four))).toBe('["emission"]');
+  });
+});

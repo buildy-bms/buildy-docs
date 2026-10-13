@@ -13,7 +13,12 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { CARD_FLAT_OPTIONS } from '@/lib/action-cards'
+import {
+  SEVERITY_TIPS, ACTION_COLUMN_TIPS, severityCountTip, OPEN_COUNT_TIP, DONE_COUNT_TIP, MANUAL_ACTION_TIP,
+  decreeArticleTip, REGENERATE_PLAN_TIP, EXPORT_CSV_TIP,
+} from '@/lib/audit-tips-shell'
 
 const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
@@ -45,21 +50,23 @@ const EFFORT_OPTS = [
   { value: 'medium', label: 'Moyen' },
   { value: 'high', label: 'Élevé' },
 ]
+// Libellés en clair, alignés sur l'export CSV et le PDF (routes/bacs-audit/_labels.js) ;
+// les valeurs enregistrées ne changent pas.
 const CATEGORY_OPTS = [
-  { value: 'meter_addition', label: 'Ajout compteur' },
-  { value: 'meter_replacement', label: 'Remplacement compteur' },
-  { value: 'meter_connection', label: 'Raccord compteur' },
-  { value: 'system_addition', label: 'Ajout système' },
-  { value: 'system_replacement', label: 'Remplacement système' },
-  { value: 'communication_upgrade', label: 'Upgrade communication' },
-  { value: 'bms_upgrade', label: 'Upgrade GTB' },
-  { value: 'bms_replacement', label: 'Remplacement GTB' },
-  { value: 'bms_addition', label: 'Ajout GTB' },
-  { value: 'data_retention_upgrade', label: 'Rétention données' },
-  { value: 'training', label: 'Formation' },
-  { value: 'documentation', label: 'Documentation' },
-  { value: 'thermal_regulation', label: 'Régulation thermique' },
-  { value: 'thermal_regulation_upgrade', label: 'Upgrade régulation' },
+  { value: 'meter_addition', label: 'Ajout de compteur' },
+  { value: 'meter_replacement', label: 'Remplacement de compteur' },
+  { value: 'meter_connection', label: 'Raccordement de compteur à la GTB' },
+  { value: 'system_addition', label: 'Ajout d\'équipement' },
+  { value: 'system_replacement', label: 'Remplacement d\'équipement' },
+  { value: 'communication_upgrade', label: 'Mise à niveau de la communication' },
+  { value: 'bms_upgrade', label: 'Mise à niveau de la GTB' },
+  { value: 'bms_replacement', label: 'Remplacement de la GTB' },
+  { value: 'bms_addition', label: 'Installation d\'une GTB' },
+  { value: 'data_retention_upgrade', label: 'Conservation des données 5 ans' },
+  { value: 'training', label: 'Formation de l\'exploitant' },
+  { value: 'documentation', label: 'Documentation, consignes écrites' },
+  { value: 'thermal_regulation', label: 'Régulation de la température' },
+  { value: 'thermal_regulation_upgrade', label: 'Mise à niveau de la régulation' },
   { value: 'other', label: 'Autre' },
 ]
 
@@ -164,11 +171,11 @@ async function submitNew() {
 
 async function removeItem(it) {
   if (it.auto_generated) {
-    error('Items auto-générés ne peuvent pas être supprimés. Utilise "Non retenue" comme statut.')
+    error('Les actions calculées automatiquement ne peuvent pas être supprimées : passe-les en « Non retenue ».')
     return
   }
   const ok = await confirm({
-    title: 'Supprimer cet item ?',
+    title: 'Supprimer cette action ?',
     message: `« ${it.title} »`,
     confirmLabel: 'Supprimer', danger: true,
   })
@@ -176,7 +183,7 @@ async function removeItem(it) {
   try {
     await deleteBacsActionItem(it.id)
     items.value = items.value.filter(x => x.id !== it.id)
-    success('Item supprimé')
+    success('Action supprimée')
   } catch {
     error('Suppression impossible')
   }
@@ -205,30 +212,31 @@ onMounted(refresh)
         <button @click="showAdd = true" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
           <PlusIcon class="w-4 h-4" /> Ajouter manuellement
         </button>
-        <button @click="regenerate" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button @click="regenerate" v-tooltip="REGENERATE_PLAN_TIP" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
           <ArrowPathIcon class="w-4 h-4" /> Régénérer depuis l'audit
         </button>
-        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        <button @click="downloadCsv" v-tooltip="EXPORT_CSV_TIP" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
           <DocumentArrowDownIcon class="w-4 h-4" /> Export CSV
         </button>
       </div>
     </div>
 
     <!-- Synthèse -->
+    <!-- Tuiles de décompte : niveaux expliqués au survol (toutes les actions, tous statuts). -->
     <div class="grid grid-cols-6 gap-3 mb-4">
-      <div class="rounded-lg border bg-red-50 border-red-200 p-3">
+      <div class="rounded-lg border bg-red-50 border-red-200 p-3" v-tooltip="severityCountTip('blocking')">
         <div class="text-[10px] font-medium uppercase tracking-wider text-red-700 opacity-70">Bloquantes</div>
         <div class="text-2xl font-semibold text-red-700">{{ stats.blocking }}</div>
       </div>
-      <div class="rounded-lg border bg-orange-50 border-orange-200 p-3">
+      <div class="rounded-lg border bg-orange-50 border-orange-200 p-3" v-tooltip="severityCountTip('major')">
         <div class="text-[10px] font-medium uppercase tracking-wider text-orange-700 opacity-70">Majeures</div>
         <div class="text-2xl font-semibold text-orange-700">{{ stats.major }}</div>
       </div>
-      <div class="rounded-lg border bg-yellow-50 border-yellow-200 p-3">
+      <div class="rounded-lg border bg-yellow-50 border-yellow-200 p-3" v-tooltip="severityCountTip('minor')">
         <div class="text-[10px] font-medium uppercase tracking-wider text-yellow-700 opacity-70">Mineures</div>
         <div class="text-2xl font-semibold text-yellow-700">{{ stats.minor }}</div>
       </div>
-      <div class="rounded-lg border bg-gray-50 border-gray-200 p-3">
+      <div class="rounded-lg border bg-gray-50 border-gray-200 p-3" v-tooltip="OPEN_COUNT_TIP">
         <div class="text-[10px] font-medium uppercase tracking-wider text-gray-600 opacity-70">Ouvertes</div>
         <div class="text-2xl font-semibold text-gray-700">{{ stats.open }}</div>
       </div>
@@ -236,7 +244,7 @@ onMounted(refresh)
         <div class="text-[10px] font-medium uppercase tracking-wider text-blue-700 opacity-70">Chiffrées</div>
         <div class="text-2xl font-semibold text-blue-700">{{ stats.quoted }}</div>
       </div>
-      <div class="rounded-lg border bg-emerald-50 border-emerald-200 p-3">
+      <div class="rounded-lg border bg-emerald-50 border-emerald-200 p-3" v-tooltip="DONE_COUNT_TIP">
         <div class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 opacity-70">Terminées</div>
         <div class="text-2xl font-semibold text-emerald-700">{{ stats.done }}</div>
       </div>
@@ -248,7 +256,7 @@ onMounted(refresh)
         <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
         <input v-model="searchQuery" type="text" placeholder="Rechercher (n°, titre, description, zone…)"
                class="w-full pl-9 pr-9 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
-        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
+        <button v-if="searchQuery" @click="searchQuery = ''" v-tooltip="'Effacer la recherche'" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -283,13 +291,13 @@ onMounted(refresh)
       <table class="w-full text-sm">
         <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
           <tr>
-            <th class="text-left px-3 py-2 w-24">N°</th>
-            <th class="text-left py-2 w-24">Sévérité</th>
-            <th class="text-left py-2 w-24">Article</th>
+            <th class="text-left px-3 py-2 w-24" v-tooltip="ACTION_COLUMN_TIPS.number">N°</th>
+            <th class="text-left py-2 w-24" v-tooltip="ACTION_COLUMN_TIPS.severity">Sévérité</th>
+            <th class="text-left py-2 w-24" v-tooltip="ACTION_COLUMN_TIPS.article">Article</th>
             <th class="text-left py-2">Action</th>
             <th class="text-left py-2 w-28">Zone</th>
-            <th class="text-left py-2 w-24">Effort</th>
-            <th class="text-left py-2 w-28">Statut</th>
+            <th class="text-left py-2 w-24" v-tooltip="ACTION_COLUMN_TIPS.effort">Effort</th>
+            <th class="text-left py-2 w-28" v-tooltip="ACTION_COLUMN_TIPS.status">Statut</th>
             <th class="text-right px-3 py-2 w-12"></th>
           </tr>
         </thead>
@@ -298,15 +306,17 @@ onMounted(refresh)
               :class="[(it.status === 'done' || it.status === 'declined') ? 'opacity-50' : '', 'group']">
             <td class="px-3 py-2 text-[11px] text-gray-500 font-mono whitespace-nowrap">{{ it.display_number || '—' }}</td>
             <td class="py-2">
-              <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border', SEVERITY_LABEL[it.severity].cls]">
+              <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border', SEVERITY_LABEL[it.severity].cls]"
+                    v-tooltip="SEVERITY_TIPS[it.severity]">
                 {{ SEVERITY_LABEL[it.severity].label }}
               </span>
-              <span v-if="!it.auto_generated" class="ml-1 text-[9px] text-purple-600 font-semibold uppercase">Manuel</span>
+              <span v-if="!it.auto_generated" class="ml-1 text-[9px] text-purple-600 font-semibold uppercase"
+                    v-tooltip="MANUAL_ACTION_TIP">Manuel</span>
             </td>
-            <td class="py-2 text-[11px] text-gray-500 font-mono">{{ it.r175_article || '—' }}</td>
+            <td class="py-2 text-[11px] text-gray-500 font-mono"><span v-tooltip="decreeArticleTip(it.r175_article)">{{ it.r175_article || '—' }}</span></td>
             <td class="py-2 pr-3 whitespace-normal">
               <div class="text-gray-800 font-medium">{{ it.title_plain || it.title }}</div>
-              <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{{ it.description_plain || it.description }}</div>
+              <div v-if="it.description" v-tooltip.overflow class="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{{ it.description_plain || it.description }}</div>
             </td>
             <td class="py-2 text-xs text-gray-600">{{ it.zone_name || '—' }}</td>
             <td class="py-2">
@@ -326,7 +336,7 @@ onMounted(refresh)
             <td class="px-3 py-2 text-right">
               <button v-if="!it.auto_generated"
                       @click="removeItem(it)"
-                      class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
+                      class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer cette action'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>
@@ -374,7 +384,7 @@ onMounted(refresh)
           <p class="text-[11px] text-gray-500 mt-1">Choisis la carte dans laquelle cette préconisation doit apparaître. Tu pourras la déplacer plus tard.</p>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Article R175 (optionnel)</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Article du décret (facultatif)</label>
           <input v-model="newItem.r175_article" type="text" placeholder="ex : R175-3 3°"
                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
         </div>
@@ -385,9 +395,11 @@ onMounted(refresh)
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" @click="showAdd = false" class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">Annuler</button>
+          <Tooltip :text="newItem.title.trim() ? null : 'Donne d’abord un titre à l’action'">
           <button type="submit" :disabled="!newItem.title.trim()" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">
             Créer
           </button>
+          </Tooltip>
         </div>
       </form>
     </BaseModal>

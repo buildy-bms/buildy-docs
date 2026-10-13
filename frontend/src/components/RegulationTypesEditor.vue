@@ -14,6 +14,7 @@
  */
 import { computed } from 'vue'
 import { TrashIcon, PlusIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { REGULATION_RESET_LABEL, REGULATION_CLEAR_TIP, REGULATION_ID_COLUMN_TIP } from '@/lib/library-tips'
 
 const props = defineProps({
   modelValue: { type: Array, required: true },     // [{ value, label }]
@@ -80,7 +81,7 @@ const placeholder = computed(() => {
         <thead class="bg-gray-50 text-[11px] uppercase text-gray-500 tracking-wider">
           <tr>
             <th class="text-left px-3 py-1.5">Libellé affiché</th>
-            <th class="text-left px-3 py-1.5">Identifiant technique</th>
+            <th class="text-left px-3 py-1.5" v-tooltip="REGULATION_ID_COLUMN_TIP">Identifiant technique</th>
             <th class="w-10"></th>
           </tr>
         </thead>
@@ -98,7 +99,7 @@ const placeholder = computed(() => {
             </td>
             <td class="px-2 py-1 text-right">
               <button type="button" class="p-1 text-gray-400 hover:text-rose-600 transition"
-                      @click="remove(idx)" title="Supprimer cette ligne">
+                      @click="remove(idx)" v-tooltip="'Supprimer cette suggestion'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>
@@ -115,12 +116,12 @@ const placeholder = computed(() => {
       </button>
       <button v-if="items.length && defaultValues.length" type="button"
               class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition"
-              @click="loadDefaults" title="Remplace par les suggestions par défaut de la catégorie">
+              @click="loadDefaults" v-tooltip="REGULATION_RESET_LABEL">
         <ArrowPathIcon class="w-3.5 h-3.5" /> Remettre les défauts
       </button>
       <button v-if="items.length" type="button"
               class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-rose-600 transition"
-              @click="update([])" title="Supprime la surcharge → retour aux défauts de catégorie">
+              @click="update([])" v-tooltip="REGULATION_CLEAR_TIP">
         Vider la liste
       </button>
     </div>

@@ -12,6 +12,8 @@ import { useNotification } from '@/composables/useNotification'
 import { compressBeforeUpload, extractExifMeta, getDeviceGeolocation } from '@/composables/usePhotoCompression'
 import { useViewport } from '@/composables/useViewport'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import Tooltip from '@/components/Tooltip.vue'
+import { PHOTOS_OFFLINE_TIP, photoButtonTip, photoInfoTip } from '@/lib/audit-tips-shell'
 
 /**
  * Bouton compact (icone camera + compteur) qui sert aussi de zone de drop
@@ -74,7 +76,7 @@ async function refresh() {
     const { data } = await listSiteDocuments(props.siteUuid, filterParams.value)
     photos.value = (data || []).filter(d => d.category === 'photo')
   } catch {
-    notifyError('Erreur chargement photos')
+    notifyError('Erreur de chargement des photos')
   } finally {
     loading.value = false
   }
@@ -157,14 +159,14 @@ async function uploadFiles(files) {
         notes: '',
       })
     }
-    success(files.length > 1 ? `${files.length} photos televersees` : 'Photo televersee')
+    success(files.length > 1 ? `${files.length} photos envoyées` : 'Photo envoyée')
     window.dispatchEvent(new CustomEvent('site-documents:changed'))
     await refresh()
     emit('changed')
     // On ouvre la modal pour ajouter titre + notes par photo
     captionModal.value = { open: true, photos: uploaded }
   } catch (err) {
-    notifyError(err.response?.data?.detail || 'Echec upload photo')
+    notifyError(err.response?.data?.detail || 'Échec de l’envoi de la photo')
   } finally {
     uploading.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -212,7 +214,7 @@ async function removePhoto(p) {
     await refresh()
     emit('changed')
   } catch {
-    notifyError('Echec suppression')
+    notifyError('Échec de la suppression')
   }
 }
 
@@ -234,9 +236,9 @@ async function saveCaptions() {
     }
     captionModal.value.open = false
     await refresh()
-    success('Photos enregistrees')
+    success('Photos enregistrées')
   } catch (err) {
-    notifyError('Sauvegarde des libelles impossible')
+    notifyError('Enregistrement des titres impossible')
   }
 }
 
@@ -280,29 +282,19 @@ function gpsMapUrl(p) {
   if (p?.gps_latitude == null || p?.gps_longitude == null) return null
   return `https://www.google.com/maps/search/?api=1&query=${p.gps_latitude},${p.gps_longitude}`
 }
-function exifTooltip(p) {
-  if (!p) return ''
-  const parts = []
-  if (p.taken_at) parts.push('Pris le ' + fmtTakenAt(p.taken_at))
-  if (p.camera_make || p.camera_model) {
-    parts.push([p.camera_make, p.camera_model].filter(Boolean).join(' '))
-  }
-  if (p.gps_latitude != null && p.gps_longitude != null) {
-    parts.push(`GPS ${p.gps_latitude.toFixed(5)}, ${p.gps_longitude.toFixed(5)}`)
-  }
-  return parts.join(' · ')
-}
+// Bulle du bouton : hors ligne → pourquoi il est grisé ; sinon galerie, glisser-déposer et
+// nombre de photos. Portée par l'enveloppe <Tooltip> (un bouton grisé ne reçoit pas le survol).
+// Vignettes : date, appareil et position de la prise de vue (photoInfoTip).
+const photoTip = computed(() => (isOnline.value ? photoButtonTip(props.label, photos.value.length) : PHOTOS_OFFLINE_TIP))
 </script>
 
 <template>
   <div :class="['relative', isMobile ? 'block w-full' : 'inline-block']" ref="rootEl">
+    <Tooltip :text="photoTip" :class="isMobile ? 'w-full' : ''">
     <button
       type="button"
       :class="btnCls"
       :disabled="!isOnline"
-      v-tooltip="!isOnline
-        ? 'Photos indisponibles hors ligne — reconnecte-toi pour ajouter ou consulter des photos'
-        : (label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos')"
       @click="showGallery = !showGallery"
       @dragover.prevent="onDragOver"
       @dragenter.prevent="onDragEnter"
@@ -321,6 +313,7 @@ function exifTooltip(p) {
         </span>
       </template>
     </button>
+    </Tooltip>
 
     <input
       ref="fileInput"
@@ -369,7 +362,8 @@ function exifTooltip(p) {
               <button
                 @click="showGallery = false"
                 class="p-1 -mr-1 text-gray-400 hover:text-gray-700"
-                aria-label="Fermer">
+                aria-label="Fermer la galerie"
+                v-tooltip="{ label: 'Fermer la galerie', keys: ['Esc'] }">
                 <XMarkIcon class="w-5 h-5" />
               </button>
             </div>
@@ -379,10 +373,10 @@ function exifTooltip(p) {
             <div v-if="loading" class="text-center text-sm text-gray-500 py-12">Chargement…</div>
             <div v-else-if="!photos.length" class="text-center text-sm text-gray-500 py-12 italic">
               Aucune photo pour le moment.<br>
-              Clique sur <strong>« Ajouter une photo »</strong> ou glisse-dépose des images sur l'icone caméra.
+              Clique sur <strong>« Ajouter une photo »</strong> ou glisse-dépose des images sur l'icône caméra.
             </div>
             <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              <div v-for="p in photos" :key="p.id" class="relative group" v-tooltip="exifTooltip(p)">
+              <div v-for="p in photos" :key="p.id" class="relative group" v-tooltip="photoInfoTip(p)">
                 <button type="button" @click="previewPhoto = p" class="block w-full">
                   <img :src="thumbUrl(p)" :alt="p.title || p.original_name || 'Photo'"
                        loading="lazy" decoding="async"
@@ -390,13 +384,13 @@ function exifTooltip(p) {
                 </button>
                 <a v-if="gpsMapUrl(p)" :href="gpsMapUrl(p)" target="_blank" rel="noopener" @click.stop
                    class="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/55 hover:bg-indigo-600 text-white flex items-center justify-center transition"
-                   v-tooltip="`Voir sur Google Maps — ${exifTooltip(p)}`">
+                   v-tooltip="{ label: 'Voir l’emplacement sur Google Maps', icon: 'location-dot' }">
                   <MapPinIcon class="w-3.5 h-3.5" />
                 </a>
                 <button
                   @click="removePhoto(p)"
                   class="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition flex items-center justify-center shadow"
-                  v-tooltip="'Supprimer'">
+                  v-tooltip="'Supprimer cette photo'">
                   <TrashIcon class="w-3.5 h-3.5" />
                 </button>
                 <span v-if="p.taken_at"
@@ -404,7 +398,7 @@ function exifTooltip(p) {
                   <ClockIcon class="w-3 h-3" />
                   {{ fmtTakenAtShort(p.taken_at) }}
                 </span>
-                <p v-if="p.title" class="text-[10px] text-gray-500 truncate mt-1" v-tooltip="p.title">{{ p.title }}</p>
+                <p v-if="p.title" class="text-[10px] text-gray-500 truncate mt-1" v-tooltip.overflow>{{ p.title }}</p>
               </div>
             </div>
           </div>
@@ -427,11 +421,12 @@ function exifTooltip(p) {
               <button
                 @click="showGallery = false"
                 class="tap-target inline-flex items-center justify-center text-gray-600"
-                aria-label="Fermer"
+                aria-label="Fermer la galerie"
+                v-tooltip="'Fermer la galerie'"
               >
                 <XMarkIcon class="w-6 h-6" />
               </button>
-              <h2 class="flex-1 min-w-0 text-base font-medium truncate text-gray-900">
+              <h2 v-tooltip.overflow class="flex-1 min-w-0 text-base font-medium truncate text-gray-900">
                 Photos<span v-if="label"> · {{ label }}</span>
               </h2>
               <span class="text-xs text-gray-500">{{ photos.length }}</span>
@@ -469,7 +464,7 @@ function exifTooltip(p) {
             </div>
             <div v-else class="grid grid-cols-2 gap-2">
               <div v-for="p in photos" :key="p.id" class="relative">
-                <button type="button" @click="previewPhoto = p" class="block w-full">
+                <button type="button" @click="previewPhoto = p" class="block w-full" v-tooltip="'Agrandir la photo'">
                   <img :src="thumbUrl(p)" :alt="p.title || 'Photo'"
                        loading="lazy" decoding="async"
                        class="w-full aspect-square object-cover rounded-xl border border-gray-200" />
@@ -477,11 +472,11 @@ function exifTooltip(p) {
                 <button
                   @click="removePhoto(p)"
                   class="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow"
-                  v-tooltip="'Supprimer'"
+                  v-tooltip="'Supprimer cette photo'"
                 >
                   <TrashIcon class="w-4 h-4" />
                 </button>
-                <p v-if="p.title" class="text-[11px] text-gray-600 truncate mt-1 px-1">{{ p.title }}</p>
+                <p v-if="p.title" v-tooltip.overflow class="text-[11px] text-gray-600 truncate mt-1 px-1">{{ p.title }}</p>
               </div>
             </div>
           </div>
@@ -499,14 +494,15 @@ function exifTooltip(p) {
         <header class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h3 class="text-base font-semibold text-gray-900">
-              {{ captionModal.photos.length }} photo{{ captionModal.photos.length > 1 ? 's' : '' }} televersee{{ captionModal.photos.length > 1 ? 's' : '' }}
+              {{ captionModal.photos.length }} photo{{ captionModal.photos.length > 1 ? 's' : '' }} envoyée{{ captionModal.photos.length > 1 ? 's' : '' }}
             </h3>
             <p class="text-xs text-gray-500 mt-0.5">
-              Ajoute un titre court a chaque photo (visible dans le PDF d'audit).
+              Ajoute un titre court à chaque photo (visible dans le rapport PDF).
               {{ label ? `Contexte : ${label}.` : '' }}
             </p>
           </div>
-          <button @click="captionModal.open = false" class="p-1 rounded hover:bg-gray-100 text-gray-500">
+          <button @click="captionModal.open = false" class="p-1 rounded hover:bg-gray-100 text-gray-500"
+                  v-tooltip="'Fermer sans enregistrer les titres'">
             <XMarkIcon class="w-5 h-5" />
           </button>
         </header>
@@ -527,7 +523,7 @@ function exifTooltip(p) {
               <input
                 v-model="p.title"
                 type="text"
-                placeholder="ex : Vue d'ensemble armoire electrique"
+                placeholder="ex : Vue d'ensemble armoire électrique"
                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
               />
             </div>
@@ -559,8 +555,8 @@ function exifTooltip(p) {
       <div class="relative max-w-6xl max-h-[90vh] w-full flex flex-col">
         <header class="flex items-center justify-between text-white mb-3">
           <div class="min-w-0 flex-1">
-            <h3 class="text-base font-semibold truncate">{{ previewPhoto.title || previewPhoto.original_name }}</h3>
-            <p v-if="label" class="text-xs opacity-70 truncate">{{ label }}</p>
+            <h3 v-tooltip.overflow class="text-base font-semibold truncate">{{ previewPhoto.title || previewPhoto.original_name }}</h3>
+            <p v-if="label" v-tooltip.overflow class="text-xs opacity-70 truncate">{{ label }}</p>
             <div v-if="previewPhoto.taken_at || gpsMapUrl(previewPhoto) || previewPhoto.camera_make || previewPhoto.camera_model"
                  class="mt-1 flex items-center gap-3 flex-wrap text-[11px] opacity-80">
               <span v-if="previewPhoto.taken_at" class="inline-flex items-center gap-1">
@@ -568,6 +564,7 @@ function exifTooltip(p) {
                 {{ fmtTakenAt(previewPhoto.taken_at) }}
               </span>
               <a v-if="gpsMapUrl(previewPhoto)" :href="gpsMapUrl(previewPhoto)" target="_blank" rel="noopener"
+                 v-tooltip="{ label: 'Voir l’emplacement sur Google Maps', icon: 'location-dot' }"
                  class="inline-flex items-center gap-1 text-indigo-200 hover:text-white">
                 <MapPinIcon class="w-3 h-3" />
                 {{ previewPhoto.gps_latitude.toFixed(5) }}, {{ previewPhoto.gps_longitude.toFixed(5) }}
@@ -581,7 +578,8 @@ function exifTooltip(p) {
              class="ml-4 px-3 py-1.5 text-xs font-medium text-white border border-white/40 rounded hover:bg-white/10 inline-flex items-center gap-1">
             <ArrowDownTrayIcon class="w-4 h-4" /> Télécharger
           </a>
-          <button @click="previewPhoto = null" class="ml-2 p-2 text-white hover:bg-white/10 rounded">
+          <button @click="previewPhoto = null" class="ml-2 p-2 text-white hover:bg-white/10 rounded"
+                  v-tooltip="{ label: 'Fermer l’aperçu', keys: ['Esc'] }">
             <XMarkIcon class="w-5 h-5" />
           </button>
         </header>

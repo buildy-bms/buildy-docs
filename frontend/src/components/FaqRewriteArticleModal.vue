@@ -4,6 +4,7 @@
 // Renseigné = priorité absolue, en plus des règles standard.
 import { ref } from 'vue'
 import { XMarkIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import Tooltip from '@/components/Tooltip.vue'
 
 const props = defineProps({
   articleTitle: { type: String, default: '' },
@@ -25,12 +26,14 @@ function onSubmit() {
       <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
         <div class="min-w-0">
           <h2 class="text-lg font-semibold text-gray-900">Réécrire l'article avec l'IA</h2>
-          <p v-if="articleTitle" class="text-xs text-gray-500 mt-0.5 truncate">{{ articleTitle }}</p>
+          <p v-if="articleTitle" class="text-xs text-gray-500 mt-0.5 truncate" v-tooltip.overflow>{{ articleTitle }}</p>
         </div>
-        <button type="button" @click="emit('close')" :disabled="loading"
-                class="text-gray-400 hover:text-gray-600 disabled:opacity-50">
-          <XMarkIcon class="w-5 h-5" />
-        </button>
+        <Tooltip :text="loading ? 'Réécriture en cours, patiente…' : 'Fermer sans réécrire'">
+          <button type="button" @click="emit('close')" :disabled="loading"
+                  class="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+            <XMarkIcon class="w-5 h-5" />
+          </button>
+        </Tooltip>
       </div>
 
       <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3">

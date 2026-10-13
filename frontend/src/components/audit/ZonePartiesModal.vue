@@ -20,9 +20,9 @@ const emit = defineEmits(['close'])
   <BaseModal :title="`Parties prenantes — ${zone.name}`" size="md" @close="emit('close')">
     <div class="space-y-4">
       <p class="text-sm text-gray-600 leading-relaxed">
-        Cochez les parties prenantes (propriétaires, preneurs, syndicat…)
-        rattachées à cette zone. Ce rattachement alimente le calcul
-        automatique de l'assujetti au décret BACS, système par système.
+        Coche les parties prenantes (propriétaires, locataires, syndicat…)
+        présentes dans cette zone. Ce rattachement sert à savoir qui doit
+        appliquer le décret, système par système.
       </p>
 
       <div class="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
@@ -30,8 +30,8 @@ const emit = defineEmits(['close'])
       </div>
 
       <p v-if="!siteParties.length" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-        Aucune partie prenante n'est encore définie sur le site. Ajoutez-les
-        depuis la carte « Structure juridique &amp; parties prenantes ».
+        Aucune partie prenante n'est encore définie sur le site. Ajoute-les
+        dans « Structure juridique et parties prenantes », à l’étape Identification.
       </p>
 
       <div class="flex justify-end">

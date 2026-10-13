@@ -13,6 +13,8 @@ import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
 import { getZoneParties, setZoneParties } from '@/api'
 import { PARTY_KINDS } from '@/lib/audit-options'
+import { ZONE_PARTIES_HELP_TIP } from '@/lib/audit-tips-site'
+import HelpTip from '@/components/HelpTip.vue'
 
 const props = defineProps({
   zoneId: { type: [Number, String], required: true },
@@ -78,7 +80,10 @@ watch(() => props.zoneId, load)
 
 <template>
   <div>
-    <p class="text-xs font-medium text-gray-600 mb-1">Parties prenantes rattachées à cette zone</p>
+    <p class="text-xs font-medium text-gray-600 mb-1">
+      Parties prenantes rattachées à cette zone
+      <HelpTip v-if="siteParties.length" size="xs" class="ml-0.5" :tip="ZONE_PARTIES_HELP_TIP" />
+    </p>
 
     <!-- Aucune partie définie sur le site -->
     <p v-if="!siteParties.length" class="text-[11px] text-gray-400 italic">

@@ -133,7 +133,8 @@ defineExpose({ openPalette, closePalette })
             data-lpignore="true"
             class="flex-1 text-sm focus:outline-none"
           />
-          <kbd class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 font-mono">ESC</kbd>
+          <kbd class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 font-mono"
+               v-tooltip="{ label: 'Fermer la recherche', keys: ['Esc'] }">ESC</kbd>
         </div>
 
         <div class="flex-1 min-h-0 overflow-y-auto">
@@ -146,11 +147,13 @@ defineExpose({ openPalette, closePalette })
                   <ClockIcon class="w-3.5 h-3.5" />
                   Recherches récentes
                 </span>
-                <button @click="clearHistory" class="text-gray-400 hover:text-gray-700 normal-case tracking-normal">Effacer</button>
+                <button @click="clearHistory" class="text-gray-400 hover:text-gray-700 normal-case tracking-normal"
+                        v-tooltip="'Effacer l’historique des recherches'">Effacer</button>
               </div>
               <button
                 v-for="r in recentSearches"
                 :key="r"
+                v-tooltip="'Relancer cette recherche'"
                 @click="reuseSearch(r)"
                 class="w-full text-left px-4 py-1.5 text-sm hover:bg-gray-50 inline-flex items-center gap-2 text-gray-700"
               >
@@ -183,11 +186,11 @@ defineExpose({ openPalette, closePalette })
               >
                 <component :is="KIND_ICON[s.kind] || DocumentTextIcon" class="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                 <div class="min-w-0 flex-1">
-                  <p class="text-sm text-gray-800 truncate">
+                  <p class="text-sm text-gray-800 truncate" v-tooltip.overflow>
                     <span class="text-gray-400 font-mono mr-1">§ {{ s.number || '?' }}</span>
                     {{ s.title }}
                   </p>
-                  <p v-if="s.snippet" class="text-[11px] text-gray-500 mt-0.5 truncate" v-html="s.snippet"></p>
+                  <p v-if="s.snippet" class="text-[11px] text-gray-500 mt-0.5 truncate" v-tooltip.overflow v-html="s.snippet"></p>
                 </div>
               </button>
             </template>
@@ -199,7 +202,7 @@ defineExpose({ openPalette, closePalette })
             <span><kbd class="px-1 py-0.5 bg-gray-100 font-mono">↑</kbd> <kbd class="px-1 py-0.5 bg-gray-100 font-mono">↓</kbd> naviguer</span>
             <span><kbd class="px-1 py-0.5 bg-gray-100 font-mono">↵</kbd> ouvrir</span>
           </div>
-          <span><kbd class="px-1 py-0.5 bg-gray-100 font-mono">⌘ K</kbd> bascule</span>
+          <span v-tooltip="{ label: 'Ouvrir ou fermer la recherche', keys: ['Mod', 'K'], icon: 'magnifying-glass' }"><kbd class="px-1 py-0.5 bg-gray-100 font-mono">⌘ K</kbd> bascule</span>
         </div>
       </div>
     </div>

@@ -20,7 +20,7 @@ const router = useRouter()
 // Mapping kind → icone + couleur. Sert au visuel par highlight.
 const KIND_META = {
   feature: { icon: SparklesIcon,             bg: 'bg-emerald-50',  text: 'text-emerald-700',  border: 'border-emerald-200', label: 'Nouveauté' },
-  ux:      { icon: ArrowsPointingOutIcon,    bg: 'bg-indigo-50',   text: 'text-indigo-700',   border: 'border-indigo-200',  label: 'UX' },
+  ux:      { icon: ArrowsPointingOutIcon,    bg: 'bg-indigo-50',   text: 'text-indigo-700',   border: 'border-indigo-200',  label: 'UX', tip: 'Amélioration du confort d’utilisation' },
   fix:     { icon: BugAntIcon,               bg: 'bg-amber-50',    text: 'text-amber-700',    border: 'border-amber-200',   label: 'Correctif' },
   perf:    { icon: WrenchScrewdriverIcon,    bg: 'bg-violet-50',   text: 'text-violet-700',   border: 'border-violet-200',  label: 'Performance' },
 }
@@ -76,7 +76,8 @@ const versions = computed(() => notes.versions || [])
               </span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <span :class="['text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full', metaFor(h.kind).bg, metaFor(h.kind).text]">
+                  <span :class="['text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full', metaFor(h.kind).bg, metaFor(h.kind).text]"
+                        v-tooltip="metaFor(h.kind).tip || null">
                     {{ metaFor(h.kind).label }}
                   </span>
                   <h3 class="text-base font-semibold text-gray-800">{{ h.title }}</h3>

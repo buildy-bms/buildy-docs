@@ -16,12 +16,20 @@
  * « autre »/personnalisé) étaient possibles, via un workaround `custom:uuid`.
  */
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseModal from '@/components/BaseModal.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import { createBacsSystem } from '@/api'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { SYSTEM_CATEGORY_LABELS } from '@/lib/audit-options'
+import { resolveFaIconName } from '@/lib/equipment-icons'
+import { createSystemDisabledTip } from '@/lib/audit-tips-systems'
+import {
+  GUIDE_TEXTS, CREATE_SYSTEM_NAME_HINT, OTHER_USAGES_TITLE, usageTileStatus,
+} from '@/lib/audit-tips-systems-guide'
 
 const props = defineProps({
   zone: { type: Object, required: true }, // { id, name }
@@ -30,6 +38,10 @@ const props = defineProps({
   // Pré-remplissage optionnel pour le raccourci « + Système similaire » :
   // { category: 'heating' | '__custom__' | 'lib:<key>', label: 'Chaudière gaz (2)' }.
   initial: { type: Object, default: null },
+  // Mise en page guidée de l'étape Systèmes : usages en tuiles (un clic), avec ce qui existe
+  // déjà dans la zone (`zoneSystems`). Sans elle : liste déroulante, fenêtre inchangée.
+  variant: { type: String, default: 'select' },  // 'select' | 'tiles'
+  zoneSystems: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['close', 'created'])
 const audit = useAuditStore()
@@ -89,6 +101,25 @@ onMounted(() => {
 // Lorsqu'une catégorie BACS est choisie, on pré-remplit le label avec son nom
 // (« Chauffage », « Refroidissement »…) — l'auditeur peut le préciser
 // derrière (« Chauffage gaz », « Chauffage PAC »…).
+// Tuiles : ce qui existe déjà dans la zone pour chaque usage BACS.
+const tiles = computed(() => BACS_STANDARD.map(c => {
+  const all = props.zoneSystems.filter(s => s.is_bacs && s.system_category === c.value)
+  const count = all.filter(s => !s.not_concerned).length
+  // Libellé court dans la tuile (« Éclairage extérieur »), complet dans sa bulle.
+  return { ...c, short: c.label.replace(/\s*\(.*\)$/, ''), status: usageTileStatus({ count, notConcerned: all.length > 0 && !count }) }
+}))
+// Tuiles : changer d'usage remplace le nom proposé par défaut (jamais un nom saisi).
+function defaultLabelOf(v) {
+  if (!v || v === '__custom__') return ''
+  if (v.startsWith('lib:')) return (libraryOpts.value.find(o => o.value === v)?.label || '').replace(' (hors décret)', '')
+  return BACS_STANDARD.find(c => c.value === v)?.label || ''
+}
+function pickTile(v) {
+  const prevDefault = defaultLabelOf(categoryValue.value)
+  if (labelValue.value && labelValue.value === prevDefault) labelValue.value = ''
+  categoryValue.value = v
+}
+
 watch(categoryValue, (v) => {
   if (!v) return
   if (v === '__custom__') {
@@ -132,14 +163,60 @@ async function save() {
 </script>
 
 <template>
-  <BaseModal :title="`Ajouter un système — ${zone.name}`" size="md"
+  <BaseModal :title="`Ajouter un système — ${zone.name}`" :size="variant === 'tiles' ? 'lg' : 'md'"
              :dismiss-on-backdrop="false"
              @close="emit('close')">
-    <div class="space-y-4 pb-2">
+    <!-- Mise en page guidée : usages en tuiles, avec ce qui existe déjà dans la zone. -->
+    <div v-if="variant === 'tiles'" class="space-y-4 pb-2" data-create-system-tiles>
+      <p class="text-sm text-gray-600">{{ GUIDE_TEXTS.createSystemIntro }}</p>
+      <div role="radiogroup" aria-label="Usage du système" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <button v-for="c in tiles" :key="c.value" type="button" role="radio"
+                :aria-checked="categoryValue === c.value ? 'true' : 'false'"
+                v-tooltip="c.short !== c.label ? c.label : null"
+                @click="pickTile(c.value)"
+                :class="['flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50',
+                         categoryValue === c.value ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600' : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50']">
+          <SystemCategoryIcon :category="c.value" size="md" :with-tooltip="false" />
+          <span class="text-[13px] font-medium text-gray-900 leading-tight">{{ c.short }}</span>
+          <span class="text-[11px] text-gray-500">{{ c.status }}</span>
+        </button>
+        <button type="button" role="radio"
+                :aria-checked="categoryValue === '__custom__' ? 'true' : 'false'"
+                @click="pickTile('__custom__')"
+                :class="['flex flex-col items-start gap-1 rounded-xl border border-dashed px-3 py-2.5 text-left transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50',
+                         categoryValue === '__custom__' ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600' : 'border-gray-300 bg-white hover:bg-gray-50']">
+          <FontAwesomeIcon :icon="['fas', 'cube']" class="w-5 h-5 text-gray-500" />
+          <span class="text-[13px] font-medium text-gray-900 leading-tight">Autre usage</span>
+          <span class="text-[11px] text-gray-500">{{ usageTileStatus({ other: true }) }}</span>
+        </button>
+      </div>
+      <div v-if="libraryOpts.length">
+        <p class="text-[11px] font-medium text-gray-600 mb-1.5">{{ OTHER_USAGES_TITLE }}</p>
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="o in libraryOpts" :key="o.value" type="button"
+                  :aria-pressed="categoryValue === o.value ? 'true' : 'false'"
+                  @click="pickTile(o.value)"
+                  :class="['inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition',
+                           categoryValue === o.value ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50']">
+            <FontAwesomeIcon v-if="o.icon" :icon="['fas', resolveFaIconName(o.icon)]" class="w-3 h-3" :style="o.color ? { color: o.color } : null" />
+            {{ o.label.replace(' (hors décret)', '') }}
+          </button>
+        </div>
+      </div>
+      <div>
+        <label for="create-system-name" class="block text-[11px] font-medium text-gray-600 mb-0.5">Nom du système</label>
+        <input id="create-system-name" ref="labelInput" type="text" v-model="labelValue"
+               placeholder="Par exemple : chaudière gaz d’appoint"
+               class="h-9 px-2.5 w-full border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
+               @keydown.enter="save" />
+        <p class="text-[11px] text-gray-500 mt-1">{{ CREATE_SYSTEM_NAME_HINT }}</p>
+      </div>
+    </div>
+    <div v-else class="space-y-4 pb-2">
       <p class="text-xs text-gray-500 leading-relaxed">
         Plusieurs systèmes peuvent coexister dans la même zone : par exemple deux chaudières indépendantes,
-        ou une PAC réversible (refroidissement) avec un chauffage gaz d'appoint. Chaque système est évalué
-        séparément au regard de R175-6.
+        ou une pompe à chaleur réversible (refroidissement) avec un chauffage gaz d'appoint. Chaque système
+        est évalué séparément, notamment pour la régulation de la température pièce par pièce.
       </p>
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Catégorie</label>
@@ -149,7 +226,7 @@ async function save() {
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Nom du système</label>
         <input ref="labelInput" type="text" v-model="labelValue"
-               placeholder="ex : Chaudière gaz centrale, PAC bureaux RDC…"
+               placeholder="ex : Chaudière gaz centrale, pompe à chaleur bureaux RDC…"
                class="h-9 px-2.5 w-full border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
                @keydown.enter="save" />
         <p class="text-[11px] text-gray-500 mt-1">
@@ -163,10 +240,12 @@ async function save() {
                 class="h-9 px-3 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition">
           Annuler
         </button>
-        <button type="button" @click="save" :disabled="!canSave"
-                class="h-9 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition">
-          Ajouter
-        </button>
+        <Tooltip :text="busy ? null : createSystemDisabledTip({ hasCategory: !!categoryValue, hasName: labelValue.trim().length > 0 })">
+          <button type="button" @click="save" :disabled="!canSave"
+                  class="h-9 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition">
+            Ajouter
+          </button>
+        </Tooltip>
       </div>
     </template>
   </BaseModal>

@@ -27,6 +27,8 @@ import { useBulkSelection } from '@/composables/useBulkSelection'
 import BulkActionBar from '@/components/BulkActionBar.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { POINT_COLUMN_TIPS, POINTS_IMPORT_TIP, pointsSelectAllTip, dragTip } from '@/lib/library-tips'
 
 const props = defineProps({
   templateId: { type: Number, required: true },
@@ -392,11 +394,12 @@ onBeforeUnmount(teardownSortables)
                autocomplete="off"
                class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         <button v-if="filterText" @click="filterText = ''"
-                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs">×</button>
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs"
+                aria-label="Effacer le filtre" v-tooltip="'Effacer le filtre'">×</button>
       </div>
       <button type="button" @click="openImportModal"
               class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-indigo-700 border border-indigo-200 hover:bg-indigo-50 rounded-lg transition shrink-0"
-              v-tooltip="'Copier les données lues / écrites d\'un système similaire'">
+              v-tooltip="POINTS_IMPORT_TIP">
         <ArrowDownOnSquareIcon class="w-3.5 h-3.5" /> Importer d'un autre système
       </button>
     </div>
@@ -418,10 +421,12 @@ onBeforeUnmount(teardownSortables)
                   class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">
             Annuler
           </button>
-          <button type="button" @click="submitImport" :disabled="!importSourceId || importing"
-                  class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50">
-            {{ importing ? 'Import en cours…' : 'Importer les points' }}
-          </button>
+          <Tooltip :text="!importing && !importSourceId ? 'Choisis d’abord le modèle source' : null">
+            <button type="button" @click="submitImport" :disabled="!importSourceId || importing"
+                    class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50">
+              {{ importing ? 'Import en cours…' : 'Importer les points' }}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </BaseModal>
@@ -433,10 +438,12 @@ onBeforeUnmount(teardownSortables)
           Données lues
           <span class="text-gray-400 font-normal">— {{ reads.length }} point{{ reads.length > 1 ? 's' : '' }}</span>
         </h4>
-        <button type="button" @click="startAdd('read')" :disabled="adding"
-                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 rounded-md transition disabled:opacity-50">
-          <PlusIcon class="w-3.5 h-3.5" /> Ajouter une lecture
-        </button>
+        <Tooltip :text="adding ? 'Termine d’abord l’ajout en cours' : null">
+          <button type="button" @click="startAdd('read')" :disabled="adding"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 rounded-md transition disabled:opacity-50">
+            <PlusIcon class="w-3.5 h-3.5" /> Ajouter une lecture
+          </button>
+        </Tooltip>
       </div>
 
       <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -445,29 +452,34 @@ onBeforeUnmount(teardownSortables)
             <tr>
               <th class="w-9 px-2 py-2 text-center" @click.stop>
                 <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
-                       v-tooltip="'Tout cocher / décocher'"
+                       v-tooltip="pointsSelectAllTip(sel.allChecked.value)"
                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
               </th>
               <th class="w-8"></th>
-              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'slug')">
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'slug')"
+                  v-tooltip="POINT_COLUMN_TIPS.slug">
                 Identifiant {{ sortBy['read'] === 'slug' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'tech_name')">
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'tech_name')"
+                  v-tooltip="POINT_COLUMN_TIPS.techName">
                 Nom technique {{ sortBy['read'] === 'tech_name' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'label')">
                 Nom {{ sortBy['read'] === 'label' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'data_type')">
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'data_type')"
+                  v-tooltip="POINT_COLUMN_TIPS.type">
                 Type {{ sortBy['read'] === 'data_type' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-left px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'unit')">
                 Unité {{ sortBy['read'] === 'unit' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'nature')">
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'nature')"
+                  v-tooltip="POINT_COLUMN_TIPS.nature">
                 Nature {{ sortBy['read'] === 'nature' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'is_optional')">
+              <th class="text-center px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'is_optional')"
+                  v-tooltip="POINT_COLUMN_TIPS.optional">
                 Optionnel {{ sortBy['read'] === 'is_optional' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="w-16"></th>
@@ -484,7 +496,7 @@ onBeforeUnmount(teardownSortables)
                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
-                    @click.stop>
+                    @click.stop v-tooltip="dragTip(dragEnabled, 'sort')">
                   <Bars3Icon class="w-4 h-4 inline-block" />
                 </td>
                 <td class="px-3 py-1.5 text-xs font-mono text-gray-500">{{ p.slug }}</td>
@@ -509,10 +521,10 @@ onBeforeUnmount(teardownSortables)
                   <span v-else class="text-gray-300 text-xs">—</span>
                 </td>
                 <td class="px-3 py-1.5 text-center">
-                  <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
+                  <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" v-tooltip="'Point facultatif'" />
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap" @click.stop>
-                  <button type="button" @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
+                  <button type="button" @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer ce point'">
                     <TrashIcon class="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -554,10 +566,10 @@ onBeforeUnmount(teardownSortables)
                          class="rounded text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button type="button" @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
+                  <button type="button" @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer ce point'">
                     <CheckIcon class="w-4 h-4" />
                   </button>
-                  <button type="button" @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                  <button type="button" @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler les modifications'">
                     <XMarkIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -600,10 +612,10 @@ onBeforeUnmount(teardownSortables)
                        class="rounded text-indigo-600 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                <button type="button" @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
+                <button type="button" @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter ce point'">
                   <CheckIcon class="w-4 h-4" />
                 </button>
-                <button type="button" @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                <button type="button" @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler l’ajout'">
                   <XMarkIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -625,10 +637,12 @@ onBeforeUnmount(teardownSortables)
           Données écrites
           <span class="text-gray-400 font-normal">— {{ writes.length }} point{{ writes.length > 1 ? 's' : '' }}</span>
         </h4>
-        <button type="button" @click="startAdd('write')" :disabled="adding"
-                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 rounded-md transition disabled:opacity-50">
-          <PlusIcon class="w-3.5 h-3.5" /> Ajouter une écriture
-        </button>
+        <Tooltip :text="adding ? 'Termine d’abord l’ajout en cours' : null">
+          <button type="button" @click="startAdd('write')" :disabled="adding"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 rounded-md transition disabled:opacity-50">
+            <PlusIcon class="w-3.5 h-3.5" /> Ajouter une écriture
+          </button>
+        </Tooltip>
       </div>
 
       <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -637,29 +651,34 @@ onBeforeUnmount(teardownSortables)
             <tr>
               <th class="w-9 px-2 py-2 text-center" @click.stop>
                 <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
-                       v-tooltip="'Tout cocher / décocher'"
+                       v-tooltip="pointsSelectAllTip(sel.allChecked.value)"
                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
               </th>
               <th class="w-8"></th>
-              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'slug')">
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'slug')"
+                  v-tooltip="POINT_COLUMN_TIPS.slug">
                 Identifiant {{ sortBy['write'] === 'slug' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'tech_name')">
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'tech_name')"
+                  v-tooltip="POINT_COLUMN_TIPS.techName">
                 Nom technique {{ sortBy['write'] === 'tech_name' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'label')">
                 Nom {{ sortBy['write'] === 'label' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'data_type')">
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'data_type')"
+                  v-tooltip="POINT_COLUMN_TIPS.type">
                 Type {{ sortBy['write'] === 'data_type' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-left px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'unit')">
                 Unité {{ sortBy['write'] === 'unit' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'nature')">
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'nature')"
+                  v-tooltip="POINT_COLUMN_TIPS.nature">
                 Nature {{ sortBy['write'] === 'nature' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'is_optional')">
+              <th class="text-center px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'is_optional')"
+                  v-tooltip="POINT_COLUMN_TIPS.optional">
                 Optionnel {{ sortBy['write'] === 'is_optional' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="w-16"></th>
@@ -675,7 +694,7 @@ onBeforeUnmount(teardownSortables)
                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
-                    @click.stop>
+                    @click.stop v-tooltip="dragTip(dragEnabled, 'sort')">
                   <Bars3Icon class="w-4 h-4 inline-block" />
                 </td>
                 <td class="px-3 py-1.5 text-xs font-mono text-gray-500">{{ p.slug }}</td>
@@ -700,10 +719,10 @@ onBeforeUnmount(teardownSortables)
                   <span v-else class="text-gray-300 text-xs">—</span>
                 </td>
                 <td class="px-3 py-1.5 text-center">
-                  <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
+                  <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" v-tooltip="'Point facultatif'" />
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap" @click.stop>
-                  <button type="button" @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
+                  <button type="button" @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer ce point'">
                     <TrashIcon class="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -744,10 +763,10 @@ onBeforeUnmount(teardownSortables)
                          class="rounded text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button type="button" @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
+                  <button type="button" @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer ce point'">
                     <CheckIcon class="w-4 h-4" />
                   </button>
-                  <button type="button" @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                  <button type="button" @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler les modifications'">
                     <XMarkIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -789,10 +808,10 @@ onBeforeUnmount(teardownSortables)
                        class="rounded text-indigo-600 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                <button type="button" @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
+                <button type="button" @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter ce point'">
                   <CheckIcon class="w-4 h-4" />
                 </button>
-                <button type="button" @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
+                <button type="button" @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler l’ajout'">
                   <XMarkIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -809,22 +828,25 @@ onBeforeUnmount(teardownSortables)
 
     <!-- Barre d'actions bulk : visible quand >=1 ligne cochee. -->
     <BulkActionBar :count="sel.size.value" noun="point" @clear="sel.clear()">
-      <button type="button" @click="bulkSetOptional(true)" :disabled="bulkBusy"
-              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap"
-              v-tooltip="'Marquer la sélection comme optionnels'">
-        Marquer optionnels
-      </button>
-      <button type="button" @click="bulkSetOptional(false)" :disabled="bulkBusy"
-              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap"
-              v-tooltip="'Marquer la sélection comme obligatoires'">
-        Marquer obligatoires
-      </button>
-      <button type="button" @click="bulkDelete" :disabled="bulkBusy"
-              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap"
-              v-tooltip="'Supprimer la sélection'">
-        <TrashIcon class="w-4 h-4" />
-        Supprimer
-      </button>
+      <Tooltip :text="bulkBusy ? 'Action en cours…' : 'Marquer les points cochés optionnels'">
+        <button type="button" @click="bulkSetOptional(true)" :disabled="bulkBusy"
+                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+          Marquer optionnels
+        </button>
+      </Tooltip>
+      <Tooltip :text="bulkBusy ? 'Action en cours…' : 'Marquer les points cochés obligatoires'">
+        <button type="button" @click="bulkSetOptional(false)" :disabled="bulkBusy"
+                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+          Marquer obligatoires
+        </button>
+      </Tooltip>
+      <Tooltip :text="bulkBusy ? 'Action en cours…' : 'Supprimer les points cochés'">
+        <button type="button" @click="bulkDelete" :disabled="bulkBusy"
+                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
+          <TrashIcon class="w-4 h-4" />
+          Supprimer
+        </button>
+      </Tooltip>
     </BulkActionBar>
   </div>
 </template>

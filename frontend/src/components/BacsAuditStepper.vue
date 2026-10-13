@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { CheckCircleIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from '@heroicons/vue/24/outline'
+import { stepperStepTip } from '@/lib/audit-tips-shell'
 
 /**
  * Stepper vertical persistant pour piloter l'audit BACS de bout en
@@ -50,8 +51,8 @@ function connectorClass(s) {
       @click="$emit('toggle-collapsed')"
       :class="['absolute top-2 z-20 w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition',
                collapsed ? 'left-1/2 -translate-x-1/2' : 'right-2']"
-      :aria-label="collapsed ? 'Déplier le stepper' : 'Replier le stepper'"
-      v-tooltip="collapsed ? 'Déplier' : 'Replier'"
+      :aria-label="collapsed ? 'Déplier la progression' : 'Replier la progression'"
+      v-tooltip="collapsed ? 'Déplier la progression' : 'Replier la progression'"
     >
       <ChevronDoubleLeftIcon v-if="!collapsed" class="w-4 h-4" />
       <ChevronDoubleRightIcon v-else class="w-4 h-4" />
@@ -96,7 +97,7 @@ function connectorClass(s) {
           :class="['relative z-10 shrink-0 w-5.5 h-5.5 rounded-full border-2 flex items-center justify-center text-[10px] font-semibold transition shadow-sm',
                    circleClass(s),
                    collapsed ? 'mb-3' : '']"
-          v-tooltip="collapsed ? `${idx + 1}. ${s.label}` : s.description"
+          v-tooltip="stepperStepTip(s, idx, collapsed ? 'right' : 'top')"
         >
           <CheckCircleIcon v-if="s.validated" class="w-3.5 h-3.5" />
           <span v-else>{{ idx + 1 }}</span>
@@ -132,7 +133,7 @@ function connectorClass(s) {
               ✓ Valider cette étape
             </button>
             <p v-if="!s.complete" class="mt-1 text-[10px] text-gray-400 leading-snug">
-              Complétez l'étape avant de la valider.
+              Complète l'étape avant de la valider.
             </p>
           </template>
           <button

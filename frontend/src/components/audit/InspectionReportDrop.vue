@@ -22,6 +22,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { listSiteDocuments, uploadSiteDocument, deleteSiteDocument, getSiteDocumentDownloadUrl, getSiteDocumentViewUrl } from '@/api'
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
+import { longDate } from '@/lib/audit-tips-site'
 
 const props = defineProps({
   inspectionId: { type: Number, required: true },
@@ -136,6 +137,19 @@ function fmtDate(iso) {
   const d = new Date(iso)
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+// Infobulle de la taille et de la date d'ajout d'un rapport (données sans libellé à l'écran).
+function fileInfoTip(d) {
+  const when = longDate(d.uploaded_at)
+  return {
+    title: 'Rapport d’inspection',
+    icon: 'file-pdf',
+    tone: 'info',
+    rows: [
+      { icon: 'calendar', label: 'Ajouté le', value: when || '—' },
+      { icon: 'file', label: 'Taille', value: fmtSize(d.size_bytes) || '—' },
+    ],
+  }
+}
 </script>
 
 <template>
@@ -151,15 +165,16 @@ function fmtDate(iso) {
                          class="w-4 h-4 shrink-0" />
         <a :href="isPreviewable(d) ? getSiteDocumentViewUrl(d.id) : getSiteDocumentDownloadUrl(d.id)" target="_blank" rel="noopener"
            @click.exact="e => openViewer(e, d)"
+           v-tooltip.overflow
            class="flex-1 truncate text-indigo-700 hover:text-indigo-900 hover:underline">
           {{ d.original_name || d.title }}
         </a>
-        <span class="text-xs text-gray-500 shrink-0 hidden sm:inline">
+        <span class="text-xs text-gray-500 shrink-0 hidden sm:inline" v-tooltip="fileInfoTip(d)">
           {{ fmtSize(d.size_bytes) }} · {{ fmtDate(d.uploaded_at) }}
         </span>
         <button type="button" @click="remove(d)"
                 class="p-1.5 text-gray-400 hover:text-red-600 transition shrink-0"
-                title="Supprimer">
+                v-tooltip="'Supprimer ce rapport'">
           <FontAwesomeIcon :icon="['fas', 'trash']" class="w-3.5 h-3.5" />
         </button>
       </div>

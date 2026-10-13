@@ -32,10 +32,12 @@ onUnmounted(() => document.removeEventListener('keydown', onEnter))
       <div class="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:gap-2">
         <button
           @click="resolve(false)"
+          v-tooltip="{ label: state.cancelLabel, keys: ['Esc'] }"
           class="order-1 px-4 py-3 sm:py-2 text-base sm:text-sm font-medium rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors min-h-11 sm:min-h-0"
         >{{ state.cancelLabel }}</button>
         <button
           @click="resolve(true)"
+          v-tooltip="{ label: state.confirmLabel, keys: ['Enter'] }"
           :class="[
             'order-2 px-4 py-3 sm:py-2 text-base sm:text-sm font-medium rounded-lg text-white transition-colors min-h-11 sm:min-h-0',
             state.danger

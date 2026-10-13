@@ -6,6 +6,8 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ChevronDownIcon, CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { plural } from '@/lib/tooltip-content'
+import { protocolTip } from '@/lib/acronym-tips'
 
 const props = defineProps({
   modelValue: { type: String, default: null },
@@ -139,12 +141,13 @@ const buttonCls = computed(() => {
              un badge "+N" seulement au-delà. Click sur le bouton ouvre le
              popover qui les liste tous. -->
         <span v-for="(lbl, i) in selectedLabels.slice(0, 6)" :key="i"
-              class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200 whitespace-nowrap">
+              class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200 whitespace-nowrap"
+              v-tooltip="protocolTip(lbl)">
           {{ lbl }}
         </span>
         <span v-if="selectedLabels.length > 6"
               class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200"
-              :title="selectedLabels.slice(6).join(', ')">
+              v-tooltip="{ title: plural(selectedLabels.length - 6, 'autre protocole', 'autres protocoles'), tone: 'success', icon: 'tower-broadcast', text: selectedLabels.slice(6).join(', ') }">
           +{{ selectedLabels.length - 6 }}
         </span>
       </span>
@@ -160,9 +163,10 @@ const buttonCls = computed(() => {
         class="fixed z-115 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl py-1"
       >
         <div class="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 sticky top-0 bg-white">
-          <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocole(s)</span>
+          <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocoles</span>
           <button v-if="selected.length" @click="clear"
-                  class="text-[10px] text-gray-400 hover:text-red-600 inline-flex items-center gap-0.5">
+                  class="text-[10px] text-gray-400 hover:text-red-600 inline-flex items-center gap-0.5"
+                  v-tooltip="'Effacer tous les protocoles choisis'">
             <XMarkIcon class="w-3 h-3" /> Effacer
           </button>
         </div>

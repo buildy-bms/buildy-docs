@@ -11,6 +11,19 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { CREDENTIAL_TYPE_TIPS } from '@/lib/audit-tips-site'
+
+// Usage d'un système en clair (jamais la clé interne « heating »…).
+const SYSTEM_LABEL_FR = {
+  heating: 'Chauffage', cooling: 'Refroidissement', ventilation: 'Ventilation',
+  dhw: 'Eau chaude sanitaire', lighting_indoor: 'Éclairage intérieur',
+  lighting_outdoor: 'Éclairage extérieur', electricity_production: 'Production photovoltaïque',
+}
+function systemLabel(s) {
+  if (!s) return '?'
+  return SYSTEM_LABEL_FR[s.system_category] || s.custom_label || s.system_category
+}
 
 const props = defineProps({
   siteUuid: { type: String, required: true },
@@ -45,7 +58,7 @@ async function refresh() {
     const { data } = await listSiteCredentials(props.siteUuid)
     credentials.value = data
   } catch {
-    error('Échec du chargement des credentials')
+    error('Échec du chargement des accès')
   } finally {
     loading.value = false
   }
@@ -75,10 +88,10 @@ async function submit() {
     if (!payload.password) delete payload.password // ne pas remplacer si non saisi
     if (editing.value) {
       await updateSiteCredential(editing.value.id, payload)
-      success('Credential mis à jour')
+      success('Accès mis à jour')
     } else {
       await createSiteCredential(props.siteUuid, payload)
-      success('Credential ajouté')
+      success('Accès ajouté')
     }
     showModal.value = false
     refresh()
@@ -103,7 +116,7 @@ async function toggleReveal(c) {
 
 async function removeCred(c) {
   const ok = await confirm({
-    title: 'Supprimer ce credential ?',
+    title: 'Supprimer cet accès ?',
     message: `« ${c.title} » sera supprimé définitivement.`,
     confirmLabel: 'Supprimer', danger: true,
   })
@@ -111,7 +124,7 @@ async function removeCred(c) {
   try {
     await deleteSiteCredential(c.id)
     credentials.value = credentials.value.filter(x => x.id !== c.id)
-    success('Credential supprimé')
+    success('Accès supprimé')
   } catch {
     error('Suppression impossible')
   }
@@ -126,13 +139,13 @@ onMounted(refresh)
     <div class="flex justify-end mb-2">
       <button @click="openCreate"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 whitespace-nowrap">
-        <PlusIcon class="w-3.5 h-3.5" /> Ajouter un credential
+        <PlusIcon class="w-3.5 h-3.5" /> Ajouter un accès
       </button>
     </div>
 
     <div v-if="loading" class="text-center py-6 text-sm text-gray-400">Chargement…</div>
     <div v-else-if="!credentials.length" class="text-center py-6 text-sm text-gray-500">
-      Aucun credential. Ajoute un accès web / SSH / VPN pour la GTB ou les systèmes.
+      Aucun accès enregistré. Ajoute un accès web, SSH ou VPN pour la GTB ou les systèmes.
     </div>
     <table v-else class="w-full text-sm">
       <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -149,13 +162,14 @@ onMounted(refresh)
       <tbody class="divide-y divide-gray-100">
         <tr v-for="c in credentials" :key="c.id" class="group">
           <td class="px-3 py-2 text-center">
-            <span class="inline-block px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded bg-gray-100 text-gray-700">
+            <span class="inline-block px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded bg-gray-100 text-gray-700"
+                  v-tooltip="CREDENTIAL_TYPE_TIPS[c.type] || null">
               {{ c.type }}
             </span>
           </td>
           <td class="py-2 text-center text-gray-700">{{ c.title }}</td>
           <td class="py-2 text-center text-xs text-gray-500">
-            <a v-if="c.url" :href="c.url" target="_blank" class="hover:text-indigo-600 truncate inline-block max-w-50">{{ c.url }}</a>
+            <a v-if="c.url" :href="c.url" target="_blank" class="hover:text-indigo-600 truncate inline-block max-w-50" v-tooltip.overflow>{{ c.url }}</a>
             <span v-else>—</span>
           </td>
           <td class="py-2 text-center text-xs text-gray-700 font-mono">{{ c.username || '—' }}</td>
@@ -166,7 +180,8 @@ onMounted(refresh)
                 {{ revealedById[c.id] }}
               </code>
               <span v-else class="text-xs text-gray-500 font-mono">••••••</span>
-              <button @click="toggleReveal(c)" class="text-gray-400 hover:text-indigo-600">
+              <button @click="toggleReveal(c)" class="text-gray-400 hover:text-indigo-600"
+                      v-tooltip="revealedById[c.id] ? 'Masquer le mot de passe' : 'Afficher le mot de passe'">
                 <EyeIcon v-if="!revealedById[c.id]" class="w-4 h-4" />
                 <EyeSlashIcon v-else class="w-4 h-4" />
               </button>
@@ -174,15 +189,15 @@ onMounted(refresh)
           </td>
           <td class="py-2 text-center text-xs text-gray-500">
             <span v-if="c.bacs_audit_system_id">
-              {{ systems.find(s => s.id === c.bacs_audit_system_id)?.system_category || '?' }}
+              {{ systemLabel(systems.find(s => s.id === c.bacs_audit_system_id)) }}
             </span>
-            <span v-else>— site</span>
+            <span v-else v-tooltip="'Accès valable pour tout le site'">— site</span>
           </td>
           <td class="px-3 py-2 text-center">
-            <button @click="openEdit(c)" class="text-gray-400 hover:text-indigo-600 mx-1" v-tooltip="'Modifier'">
+            <button @click="openEdit(c)" class="text-gray-400 hover:text-indigo-600 mx-1" v-tooltip="'Modifier cet accès'">
               <PencilSquareIcon class="w-4 h-4" />
             </button>
-            <button @click="removeCred(c)" class="text-gray-400 hover:text-red-600 mx-1" v-tooltip="'Supprimer'">
+            <button @click="removeCred(c)" class="text-gray-400 hover:text-red-600 mx-1" v-tooltip="'Supprimer cet accès'">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>
@@ -191,7 +206,7 @@ onMounted(refresh)
     </table>
 
     <BaseModal v-if="showModal"
-               :title="editing ? 'Modifier le credential' : 'Nouveau credential'"
+               :title="editing ? 'Modifier l’accès' : 'Nouvel accès'"
                size="md" @close="showModal = false">
       <form @submit.prevent="submit" class="space-y-3">
         <div class="grid grid-cols-3 gap-3">
@@ -237,7 +252,7 @@ onMounted(refresh)
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
             <option :value="null">— rattaché au site uniquement</option>
             <option v-for="s in systems" :key="s.id" :value="s.id">
-              {{ s.system_category }} / {{ s.zone_name }}
+              {{ systemLabel(s) }} / {{ s.zone_name }}
             </option>
           </select>
         </div>
@@ -251,10 +266,12 @@ onMounted(refresh)
                   class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg whitespace-nowrap">
             Annuler
           </button>
-          <button type="submit" :disabled="!form.title.trim()"
-                  class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
-            {{ editing ? 'Mettre à jour' : 'Créer' }}
-          </button>
+          <Tooltip :text="form.title.trim() ? null : 'Donne d’abord un titre à cet accès'">
+            <button type="submit" :disabled="!form.title.trim()"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
+              {{ editing ? 'Mettre à jour' : 'Créer' }}
+            </button>
+          </Tooltip>
         </div>
       </form>
     </BaseModal>

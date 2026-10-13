@@ -13,6 +13,7 @@ import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline
 import { listBacsArticles } from '@/api'
 import SafeHtml from '@/components/SafeHtml.vue'
 import { useNotification } from '@/composables/useNotification'
+import { decreeArticleTip } from '@/lib/faq-tips'
 
 const { error } = useNotification()
 
@@ -86,13 +87,15 @@ function toggle(code) {
       <article v-for="a in filtered" :key="a.code"
                class="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <button type="button" @click="toggle(a.code)"
-                class="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition">
+                class="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition"
+                v-tooltip="expanded.has(a.code) ? 'Masquer le texte complet' : 'Afficher le texte complet'">
           <ChevronRightIcon
             :class="['w-4 h-4 mt-0.5 text-gray-400 shrink-0 transition-transform',
                      expanded.has(a.code) ? 'rotate-90' : '']" />
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline gap-2 flex-wrap">
-              <span class="font-mono text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+              <span class="font-mono text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded"
+                    v-tooltip="decreeArticleTip(a.code)">
                 {{ a.code }}
               </span>
               <span class="font-semibold text-gray-900 text-sm">{{ a.title }}</span>

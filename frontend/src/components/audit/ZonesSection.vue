@@ -23,6 +23,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { updateZone, deleteZone, listZones, resyncBacsAudit, reorderBacsZones, duplicateZone } from '@/api'
 import { ZONE_OCCUPANCY_PROFILES } from '@/lib/audit-options'
+import { ZONE_COLUMN_TIPS, ZONE_KIND_TIPS, zoneLegendTip, comfortConstraintTip } from '@/lib/audit-tips-site'
 
 // Section Zones — rendue deux fois selon `kind` :
 //   - 'functional' : zones fonctionnelles (R175-1 6°), assujetties BACS,
@@ -64,7 +65,7 @@ const KIND_UI = computed(() => {
     return {
       number: '2',
       title: 'Zones',
-      subtitleBacs: 'R175-1 6° (zones fonctionnelles) + locaux techniques',
+      subtitleBacs: 'Zones aux usages homogènes et locaux techniques',
       subtitleSite: 'Découpage du site (fonctionnel + technique)',
       storageKey: 'zones',
       sectionId: 'section-zones',
@@ -74,7 +75,7 @@ const KIND_UI = computed(() => {
     ? {
         number: '3',
         title: 'Zones techniques',
-        subtitleBacs: 'Hors décret BACS — local technique, TGBT, local compteurs…',
+        subtitleBacs: 'Hors décret : local technique, tableau électrique général, local compteurs…',
         subtitleSite: 'Locaux techniques du site',
         storageKey: 'technical-zones',
         sectionId: 'section-technical-zones',
@@ -82,7 +83,7 @@ const KIND_UI = computed(() => {
     : {
         number: '2',
         title: 'Zones fonctionnelles',
-        subtitleBacs: 'R175-1 6° — usages homogènes',
+        subtitleBacs: 'Locaux regroupés par usage homogène',
         subtitleSite: 'Découpage du site',
         storageKey: 'zones',
         sectionId: 'section-zones',
@@ -271,8 +272,8 @@ onBeforeUnmount(teardownZonesSortable)
       <span v-else class="italic">{{ isTechnical ? 'Aucune zone technique définie' : 'Aucune zone définie' }}</span>
     </template>
     <p v-if="isTechnical" class="px-1 pb-2 text-xs text-gray-500">
-      Locaux hors périmètre du décret BACS. Inventoriés ici, ils ne génèrent
-      pas de systèmes ni de compteurs dans les cards suivantes.
+      Locaux non concernés par le décret. Ils sont seulement inventoriés : ils ne
+      créent ni systèmes ni compteurs aux étapes suivantes.
     </p>
     <!-- Vue satellite pleine largeur — rendue une seule fois (dans la
          section fonctionnelle, qui est ouverte par défaut), elle affiche
@@ -289,10 +290,10 @@ onBeforeUnmount(teardownZonesSortable)
           <tr>
             <th class="w-8"></th>
             <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
-            <th>Nature</th>
-            <th v-if="!isTechnical">Régime d'activité</th>
-            <th v-if="!isTechnical">Contrainte de confort</th>
-            <th>Type</th>
+            <th v-tooltip="ZONE_COLUMN_TIPS.nature">Nature</th>
+            <th v-if="!isTechnical" v-tooltip="ZONE_COLUMN_TIPS.occupancy">Régime d'activité</th>
+            <th v-if="!isTechnical" v-tooltip="ZONE_COLUMN_TIPS.comfort">Contrainte de confort</th>
+            <th v-tooltip="ZONE_COLUMN_TIPS.kind">Type</th>
             <DataTableSortHeader sort-key="surface_m2" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Surface (m²)</DataTableSortHeader>
             <th>Actions</th>
           </tr>
@@ -309,7 +310,7 @@ onBeforeUnmount(teardownZonesSortable)
             <td class="align-middle">
               <button type="button"
                       class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                      v-tooltip="'Glisser pour réordonner'">
+                      v-tooltip="'Glisser pour changer l’ordre'">
                 <Bars3Icon class="w-4 h-4" />
               </button>
             </td>
@@ -321,10 +322,12 @@ onBeforeUnmount(teardownZonesSortable)
                      pas sur la map). -->
                 <span v-if="legendByZone.get(z.zone_id)"
                       class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold text-white shadow shrink-0"
-                      :style="{ background: legendByZone.get(z.zone_id).color }">
+                      :style="{ background: legendByZone.get(z.zone_id).color }"
+                      v-tooltip="zoneLegendTip(legendByZone.get(z.zone_id).initial)">
                   {{ legendByZone.get(z.zone_id).initial }}
                 </span>
                 <input type="text" :value="z.name"
+                       v-tooltip.overflow
                        @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
                        class="w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white font-semibold text-gray-900" />
               </div>
@@ -355,7 +358,7 @@ onBeforeUnmount(teardownZonesSortable)
                      type="text"
                      :value="z.comfort_constraint || ''"
                      placeholder="Optionnel"
-                     v-tooltip="'Contrainte de confort spécifique : température minimale imposée, qualité d\'air…'"
+                     v-tooltip="comfortConstraintTip(z.comfort_constraint)"
                      @keydown.enter="e => e.target.blur()"
                      @blur="e => { const v = e.target.value.trim() || null; if (v !== (z.comfort_constraint || null)) patchZone(z, { comfort_constraint: v }) }"
                      class="w-full text-sm px-2 py-1 bg-white border border-gray-200 rounded-md placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
@@ -364,12 +367,12 @@ onBeforeUnmount(teardownZonesSortable)
             <td class="whitespace-nowrap">
               <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
                 <button type="button" @click="patchZoneKind(z, 'functional')"
-                        v-tooltip="'Zone fonctionnelle — assujettie au décret BACS'"
+                        v-tooltip="ZONE_KIND_TIPS.functional"
                         :class="(z.kind || 'functional') === 'functional'
                           ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
                         class="px-2.5 py-1 font-medium transition whitespace-nowrap">Fonctionnelle</button>
                 <button type="button" @click="patchZoneKind(z, 'technical')"
-                        v-tooltip="'Zone technique — hors décret BACS'"
+                        v-tooltip="ZONE_KIND_TIPS.technical"
                         :class="(z.kind || 'functional') === 'technical'
                           ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
                         class="px-2.5 py-1 font-medium transition whitespace-nowrap border-l border-gray-200">Technique</button>
@@ -390,20 +393,20 @@ onBeforeUnmount(teardownZonesSortable)
                      dès qu'au moins une partie est rattachée ou que le pin est posé. -->
                 <button @click="openPartiesModal(z)"
                         :class="['btn-icon', zoneHasParties(z) && 'is-success']"
-                        v-tooltip="zoneHasParties(z) ? 'Parties prenantes (renseignées)' : 'Parties prenantes de la zone'"
+                        v-tooltip="zoneHasParties(z) ? 'Modifier les parties prenantes' : 'Rattacher des parties prenantes'"
                         aria-label="Parties prenantes de la zone">
                   <UserGroupIcon class="w-4 h-4" />
                 </button>
                 <button @click="openZoneMap(z)"
                         :class="['btn-icon', z.latitude != null && 'is-success']"
-                        v-tooltip="z.latitude != null ? 'Position sur la carte (renseignée)' : 'Positionner sur la carte'">
+                        v-tooltip="z.latitude != null ? 'Modifier la position sur la carte' : 'Positionner la zone sur la carte'">
                   <MapPinIcon class="w-4 h-4" />
                 </button>
                 <button
                   type="button"
                   @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
                   :class="['btn-icon', hasNotes(z.notes_html || z.notes) && 'is-active']"
-                  v-tooltip="hasNotes(z.notes_html || z.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                  v-tooltip="hasNotes(z.notes_html || z.notes) ? 'Modifier les notes de la zone' : 'Ajouter une note sur la zone'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
                 <BacsPhotoButton
@@ -416,10 +419,10 @@ onBeforeUnmount(teardownZonesSortable)
                   :site-uuid="document.site_uuid"
                   :attach-to="{ zone_id: z.zone_id }"
                   :label="z.name" />
-                <button @click="dupZone(z)" class="btn-icon" v-tooltip="'Dupliquer'">
+                <button @click="dupZone(z)" class="btn-icon" v-tooltip="'Dupliquer cette zone'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
-                <button @click="removeZone(z)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
+                <button @click="removeZone(z)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer cette zone'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>
@@ -448,7 +451,7 @@ onBeforeUnmount(teardownZonesSortable)
                  class="flex-1 px-3 py-1 border border-gray-200 rounded-lg" />
           <button @click="removeZone(z)"
                   class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-red-600 rounded-lg"
-                  aria-label="Supprimer la zone">
+                  v-tooltip="'Supprimer cette zone'">
             <TrashIcon class="w-5 h-5" />
           </button>
         </div>
@@ -473,10 +476,12 @@ onBeforeUnmount(teardownZonesSortable)
         />
         <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
           <button type="button" @click="patchZoneKind(z, 'functional')"
+                  v-tooltip="ZONE_KIND_TIPS.functional"
                   :class="(z.kind || 'functional') === 'functional'
                     ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500'"
                   class="px-3 py-1.5 font-medium transition">Fonctionnelle</button>
           <button type="button" @click="patchZoneKind(z, 'technical')"
+                  v-tooltip="ZONE_KIND_TIPS.technical"
                   :class="(z.kind || 'functional') === 'technical'
                     ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500'"
                   class="px-3 py-1.5 font-medium transition border-l border-gray-200">Technique</button>
@@ -501,12 +506,12 @@ onBeforeUnmount(teardownZonesSortable)
           <button @click="openZoneMap(z)"
                   class="tap-target inline-flex items-center justify-center rounded-lg border border-gray-200 px-3"
                   :class="z.latitude != null ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-600'"
-                  aria-label="Positionner sur la carte">
+                  v-tooltip="z.latitude != null ? 'Modifier la position sur la carte' : 'Positionner la zone sur la carte'">
             <MapPinIcon class="w-4 h-4" />
           </button>
           <button @click="dupZone(z)"
                   class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg border border-gray-200 px-3"
-                  aria-label="Dupliquer">
+                  v-tooltip="'Dupliquer cette zone'">
             <DocumentDuplicateIcon class="w-4 h-4" />
           </button>
         </div>

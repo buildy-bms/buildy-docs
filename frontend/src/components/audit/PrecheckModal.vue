@@ -13,6 +13,7 @@
  */
 import { ref, onMounted, computed } from 'vue'
 import BaseModal from '../BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { useNotification } from '@/composables/useNotification'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { resolveFaIconName } from '@/lib/equipment-icons'
@@ -26,10 +27,10 @@ const SYSTEM_CATEGORY_DECOR = {
   heating:                { icon: 'fa-fire',        color: '#dc2626', label: 'Chauffage' },
   cooling:                { icon: 'fa-snowflake',   color: '#0891b2', label: 'Refroidissement' },
   ventilation:            { icon: 'fa-fan',         color: '#64748b', label: 'Ventilation' },
-  dhw:                    { icon: 'fa-faucet',      color: '#0284c7', label: 'ECS' },
+  dhw:                    { icon: 'fa-faucet',      color: '#0284c7', label: 'Eau chaude sanitaire' },
   lighting_indoor:        { icon: 'fa-lightbulb',   color: '#f59e0b', label: 'Éclairage intérieur' },
   lighting_outdoor:       { icon: 'fa-tower-cell',  color: '#f59e0b', label: 'Éclairage extérieur' },
-  electricity_production: { icon: 'fa-solar-panel', color: '#16a34a', label: 'Production PV' },
+  electricity_production: { icon: 'fa-solar-panel', color: '#16a34a', label: 'Production photovoltaïque' },
 }
 const ENTITY_DECOR = {
   document: { icon: 'fa-id-card',        color: '#6b7280' },
@@ -68,7 +69,7 @@ async function load() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     data.value = await res.json()
   } catch (e) {
-    notifyError(`Pré-check échoué : ${e.message}`)
+    notifyError(`Vérification impossible : ${e.message}`)
     data.value = { blocking: [], warnings: [], summary: { blocking_count: 0, warnings_count: 0 } }
   } finally {
     loading.value = false
@@ -123,6 +124,8 @@ const ENTITY_LABEL = {
   synthesis: 'Note de synthèse',
 }
 function entityLabel(e) { return ENTITY_LABEL[e] || e }
+// Étiquette de l'icône d'un point : catégorie d'usage, sinon type d'élément (jamais le code interne).
+function decorLabel(f) { return decorFor(f).label || entityLabel(f.entity) }
 
 // Bouton « Voir » : ouvre l'élément concerné (zone, système, équipement,
 // compteur, ligne de régulation) ou, à défaut, le bloc / l'étape où le
@@ -191,9 +194,10 @@ const plural = (n, one, many) => (n > 1 ? many : one)
         <div v-for="g in groupedBlocking" :key="'b-' + g.entity" class="border border-rose-200 rounded-lg overflow-hidden">
           <div class="bg-rose-50 px-3 py-2 text-sm font-medium text-rose-900">{{ entityLabel(g.entity) }} · {{ g.findings.length }} point{{ g.findings.length > 1 ? 's' : '' }}</div>
           <ul class="divide-y divide-rose-100">
-            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm flex items-start gap-3" :title="f.code">
+            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm flex items-start gap-3">
               <FontAwesomeIcon :icon="['fas', faName(decorFor(f).icon)]"
                                :style="{ color: decorFor(f).color }"
+                               v-tooltip="decorLabel(f)"
                                class="w-4 h-4 shrink-0 mt-0.5" />
               <div class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900">{{ f.message }}</div>
@@ -203,17 +207,21 @@ const plural = (n, one, many) => (n > 1 ? many : one)
                 </div>
                 <div v-if="revealTarget(f) || f.auto_fix_action" class="mt-2 flex flex-wrap items-center gap-2">
                   <button v-if="revealTarget(f)" type="button" @click="reveal(f)"
+                          v-tooltip="'Aller à l’élément concerné'"
                           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-800 bg-white border border-rose-300 hover:bg-rose-50 rounded-lg transition">
                     Voir
                     <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="w-3 h-3" />
                   </button>
-                  <button v-if="f.auto_fix_action" type="button"
-                          :disabled="fixing[f.code + '-' + f.entity_id]"
-                          @click="autoFix(f)"
-                          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
-                    <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
-                    <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
-                  </button>
+                  <Tooltip v-if="f.auto_fix_action"
+                           :text="fixing[f.code + '-' + f.entity_id] ? 'Correction en cours…' : 'Corriger ce point automatiquement'">
+                    <button type="button"
+                            :disabled="fixing[f.code + '-' + f.entity_id]"
+                            @click="autoFix(f)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
+                      <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                      <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </li>
@@ -227,9 +235,10 @@ const plural = (n, one, many) => (n > 1 ? many : one)
         <div v-for="g in groupedWarnings" :key="'w-' + g.entity" class="border border-amber-200 rounded-lg overflow-hidden">
           <div class="bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">{{ entityLabel(g.entity) }} · {{ g.findings.length }} point{{ g.findings.length > 1 ? 's' : '' }}</div>
           <ul class="divide-y divide-amber-100">
-            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm flex items-start gap-3" :title="f.code">
+            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm flex items-start gap-3">
               <FontAwesomeIcon :icon="['fas', faName(decorFor(f).icon)]"
                                :style="{ color: decorFor(f).color }"
+                               v-tooltip="decorLabel(f)"
                                class="w-4 h-4 shrink-0 mt-0.5" />
               <div class="flex-1 min-w-0">
                 <div class="font-medium text-gray-900">{{ f.message }}</div>
@@ -239,17 +248,21 @@ const plural = (n, one, many) => (n > 1 ? many : one)
                 </div>
                 <div v-if="revealTarget(f) || f.auto_fix_action" class="mt-2 flex flex-wrap items-center gap-2">
                   <button v-if="revealTarget(f)" type="button" @click="reveal(f)"
+                          v-tooltip="'Aller à l’élément concerné'"
                           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-900 bg-white border border-amber-300 hover:bg-amber-50 rounded-lg transition">
                     Voir
                     <FontAwesomeIcon :icon="['fas', 'arrow-right']" class="w-3 h-3" />
                   </button>
-                  <button v-if="f.auto_fix_action" type="button"
-                          :disabled="fixing[f.code + '-' + f.entity_id]"
-                          @click="autoFix(f)"
-                          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
-                    <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
-                    <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
-                  </button>
+                  <Tooltip v-if="f.auto_fix_action"
+                           :text="fixing[f.code + '-' + f.entity_id] ? 'Correction en cours…' : 'Corriger ce point automatiquement'">
+                    <button type="button"
+                            :disabled="fixing[f.code + '-' + f.entity_id]"
+                            @click="autoFix(f)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
+                      <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                      <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </li>
@@ -269,8 +282,9 @@ const plural = (n, one, many) => (n > 1 ? many : one)
     <template #footer>
       <div class="flex justify-between items-center w-full">
         <button type="button" @click="load"
+                v-tooltip="'Relancer la vérification'"
                 class="h-9 px-3 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
-          ↻ Re-vérifier
+          ↻ Revérifier
         </button>
         <button type="button" @click="emit('close')"
                 class="h-9 px-4 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">

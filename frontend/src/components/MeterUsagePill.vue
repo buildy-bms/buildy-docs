@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import {
   faFire, faSnowflake, faFaucet, faSolarPanel, faLightbulb, faCircleNotch, faFan,
 } from '@fortawesome/pro-solid-svg-icons'
+import { METER_USAGE_PILL_TIPS } from '@/lib/audit-tips'
 
 library.add(faFire, faSnowflake, faFaucet, faSolarPanel, faLightbulb, faCircleNotch, faFan)
 
@@ -24,11 +25,14 @@ const props = defineProps({
 })
 
 const cfg = computed(() => USAGE_CFG[props.usage] || USAGE_CFG.other)
+// Nom complet des abréviations (ECS, PV, Général…) en infobulle ; rien pour les libellés clairs.
+const tip = computed(() => METER_USAGE_PILL_TIPS[USAGE_CFG[props.usage] ? props.usage : 'other'] || null)
 </script>
 
 <template>
   <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset whitespace-nowrap',
-                 cfg.bg, cfg.text, cfg.ring]">
+                 cfg.bg, cfg.text, cfg.ring]"
+        v-tooltip="tip">
     <FontAwesomeIcon :icon="['fas', cfg.name]" class="w-3 h-3" />
     {{ cfg.label }}
   </span>

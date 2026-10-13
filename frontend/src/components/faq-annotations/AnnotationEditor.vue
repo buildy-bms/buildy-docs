@@ -17,8 +17,12 @@ import {
   CheckIcon, XMarkIcon, ShieldCheckIcon, ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { useNotification } from '@/composables/useNotification'
 import { detectPii } from '@/composables/usePiiBlur'
+import {
+  ANNOTATION_TOOL_TIPS, annotationColorLabel, undoTip, redoTip, PII_BLUR_TIP, PII_RUNNING_LABEL,
+} from '@/lib/faq-tips'
 
 const props = defineProps({
   imageBlob: { type: Blob, required: true },     // Blob image source à annoter
@@ -417,7 +421,8 @@ const TOOLS = [
         <button v-for="t in TOOLS" :key="t.key" type="button" @click="tool = t.key"
                 :class="['p-2 rounded-lg transition flex items-center justify-center w-10 h-10',
                          tool === t.key ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100']"
-                v-tooltip="t.label">
+                :aria-pressed="tool === t.key"
+                v-tooltip.right="ANNOTATION_TOOL_TIPS[t.key] || t.label">
           <component :is="t.icon" class="w-5 h-5" />
         </button>
         <div class="my-1 h-px bg-gray-200" />
@@ -426,26 +431,32 @@ const TOOLS = [
           <button v-for="c in COLORS" :key="c" type="button" @click="color = c"
                   :style="{ backgroundColor: c }"
                   :class="['w-4 h-4 rounded-full border-2 transition',
-                           color === c ? 'border-indigo-600 scale-110' : 'border-gray-300']" />
+                           color === c ? 'border-indigo-600 scale-110' : 'border-gray-300']"
+                  :aria-pressed="color === c"
+                  v-tooltip.right="annotationColorLabel(c)" />
         </div>
         <div class="my-1 h-px bg-gray-200" />
-        <button type="button" @click="undo" :disabled="!canUndo"
-                class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 w-10 h-10 flex items-center justify-center"
-                v-tooltip="'Annuler'">
-          <ArrowUturnLeftIcon class="w-5 h-5" />
-        </button>
-        <button type="button" @click="redo" :disabled="!canRedo"
-                class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 w-10 h-10 flex items-center justify-center"
-                v-tooltip="'Rétablir'">
-          <ArrowUturnRightIcon class="w-5 h-5" />
-        </button>
+        <Tooltip :text="undoTip(canUndo)" placement="right">
+          <button type="button" @click="undo" :disabled="!canUndo"
+                  class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 w-10 h-10 flex items-center justify-center">
+            <ArrowUturnLeftIcon class="w-5 h-5" />
+          </button>
+        </Tooltip>
+        <Tooltip :text="redoTip(canRedo)" placement="right">
+          <button type="button" @click="redo" :disabled="!canRedo"
+                  class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 w-10 h-10 flex items-center justify-center">
+            <ArrowUturnRightIcon class="w-5 h-5" />
+          </button>
+        </Tooltip>
         <div class="my-1 h-px bg-gray-200" />
-        <button type="button" @click="detectPiiAuto" :disabled="piiRunning"
-                class="p-2 rounded-lg text-violet-600 hover:bg-violet-50 disabled:opacity-50 w-10 h-10 flex items-center justify-center"
-                v-tooltip="'Détection PII auto (OCR + flou)'">
-          <ArrowPathIcon v-if="piiRunning" class="w-5 h-5 animate-spin" />
-          <ShieldCheckIcon v-else class="w-5 h-5" />
-        </button>
+        <Tooltip :text="piiRunning ? PII_RUNNING_LABEL : PII_BLUR_TIP" placement="right">
+          <button type="button" @click="detectPiiAuto" :disabled="piiRunning"
+                  aria-label="Flouter automatiquement les données sensibles"
+                  class="p-2 rounded-lg text-violet-600 hover:bg-violet-50 disabled:opacity-50 w-10 h-10 flex items-center justify-center">
+            <ArrowPathIcon v-if="piiRunning" class="w-5 h-5 animate-spin" />
+            <ShieldCheckIcon v-else class="w-5 h-5" />
+          </button>
+        </Tooltip>
       </div>
 
       <!-- Canvas -->

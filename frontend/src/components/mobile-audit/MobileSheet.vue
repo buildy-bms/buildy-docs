@@ -38,10 +38,11 @@ onBeforeUnmount(() => {
               @click="emit('close')"
               class="tap-target inline-flex items-center justify-center text-base text-gray-600 -ml-1"
               aria-label="Fermer"
+              v-tooltip="'Fermer cette fiche'"
             >
               <FontAwesomeIcon :icon="['fas', 'xmark']" class="w-7 h-7" />
             </button>
-            <h2 class="flex-1 min-w-0 text-center text-base font-medium truncate text-gray-900">{{ title }}</h2>
+            <h2 v-tooltip.overflow.bottom class="flex-1 min-w-0 text-center text-base font-medium truncate text-gray-900">{{ title }}</h2>
             <button
               v-if="!hideSave"
               @click="emit('save')"

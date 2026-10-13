@@ -20,6 +20,11 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import AddressAutocomplete from '@/components/AddressAutocomplete.vue'
 import SitePicker from '@/components/SitePicker.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  docKindTip, bacsProgressTip, docFormBlockedTip, serviceLevelTip,
+  CONTRACT_COLUMN_TIP, PROGRESS_COLUMN_TIP, NO_CONTRACT_LABEL, DEV_FIXTURE_TIP,
+} from '@/lib/af-tips'
 
 const router = useRouter()
 const { success, error } = useNotification()
@@ -207,6 +212,25 @@ function onKindChange() {
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
 const submitting = ref(false)
 
+// Infobulles des boutons « Créer » / « Cloner » grisés : ce qui manque encore.
+const createBlockedTip = computed(() => {
+  if (submitting.value) return null
+  const kind = newAf.value.kind
+  return docFormBlockedTip({
+    clientMissing: !newAf.value.client_name.trim(),
+    projectMissing: !newAf.value.project_name.trim(),
+    siteMissing: (kind === 'bacs_audit' || kind === 'maintenance_report') && !newAf.value.site_id,
+    kind,
+  })
+})
+const cloneBlockedTip = computed(() => {
+  if (submitting.value) return null
+  return docFormBlockedTip({
+    clientMissing: !cloneTarget.value.client_name.trim(),
+    projectMissing: !cloneTarget.value.project_name.trim(),
+  })
+})
+
 // Lignes du tableau, groupées si l'utilisateur l'a choisi. Format :
 //   [{ kind: 'header', label, count }, { kind: 'row', af }, ...]
 // Le groupement préserve l'ordre de tri choisi : on collecte les groupes
@@ -359,15 +383,15 @@ onMounted(refresh)
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <button
-          v-if="isDev"
-          @click="createBacsFixture"
-          :disabled="seedingFixture"
-          class="inline-flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 border border-violet-200 disabled:opacity-50"
-          title="Crée un site + audit BACS de démonstration entièrement rempli pour tester l'outil (dev only)"
-        >
-          ✨ {{ seedingFixture ? 'Création…' : 'Audit BACS de test' }}
-        </button>
+        <Tooltip v-if="isDev" :text="DEV_FIXTURE_TIP">
+          <button
+            @click="createBacsFixture"
+            :disabled="seedingFixture"
+            class="inline-flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 border border-violet-200 disabled:opacity-50"
+          >
+            ✨ {{ seedingFixture ? 'Création…' : 'Audit BACS de test' }}
+          </button>
+        </Tooltip>
         <button
           @click="showCreate = true"
           class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 shadow-sm"
@@ -392,7 +416,8 @@ onMounted(refresh)
           data-lpignore="true"
           class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
-        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -404,9 +429,10 @@ onMounted(refresh)
       </span>
       <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 text-xs">
         <button
-          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'brochure',l:'Brochure'}]"
+          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF',tip:'Afficher les analyses fonctionnelles'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'brochure',l:'Brochure'}]"
           :key="opt.v"
           @click="kindFilter = opt.v"
+          v-tooltip="opt.tip"
           :class="[
             'px-2.5 py-1 rounded transition',
             kindFilter === opt.v ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
@@ -473,10 +499,10 @@ onMounted(refresh)
             <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('status')">
               Statut {{ sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('service_level')">
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('service_level')" v-tooltip="CONTRACT_COLUMN_TIP">
               Contrat {{ sortBy === 'service_level' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('bacs_progress')">
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('bacs_progress')" v-tooltip="PROGRESS_COLUMN_TIP">
               Avancement {{ sortBy === 'bacs_progress' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
             <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('updated_by_name')">
@@ -505,21 +531,22 @@ onMounted(refresh)
                 <span
                   v-if="row.af.kind === 'bacs_audit'"
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-orange-100 text-orange-700"
-                  v-tooltip="'Audit BACS — décret R175'"
+                  v-tooltip="docKindTip('bacs_audit')"
                 >BACS</span>
                 <span
                   v-else-if="row.af.kind === 'brochure'"
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
+                  v-tooltip="docKindTip('brochure')"
                 >Brochure</span>
                 <span
                   v-else-if="row.af.kind === 'maintenance_report'"
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-sky-100 text-sky-700"
-                  v-tooltip="'Rapport annuel de maintenance'"
+                  v-tooltip="docKindTip('maintenance_report')"
                 >Maintenance</span>
                 <span
                   v-else
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-green-100 text-green-800"
-                  v-tooltip="'Analyse fonctionnelle — livrable de chantier'"
+                  v-tooltip="docKindTip('af')"
                 >AF</span>
               </td>
               <!-- Client -->
@@ -534,15 +561,15 @@ onMounted(refresh)
                 <span v-else class="text-gray-300 italic">—</span>
               </td>
               <!-- Statut -->
-              <td class="px-4 py-2.5 whitespace-nowrap"><StatusBadge :status="row.af.status" /></td>
+              <td class="px-4 py-2.5 whitespace-nowrap"><StatusBadge :status="row.af.status" :kind="row.af.kind || 'af'" /></td>
               <!-- Contrat (niveau service E/S/P) -->
               <td class="px-4 py-2.5 whitespace-nowrap">
                 <ServiceLevelBadge v-if="row.af.service_level" :level="row.af.service_level" />
-                <span v-else class="text-[11px] text-gray-400 italic">—</span>
+                <span v-else class="text-[11px] text-gray-400 italic" v-tooltip="(row.af.kind || 'af') === 'af' ? NO_CONTRACT_LABEL : null">—</span>
               </td>
               <!-- Avancement (barre BACS) -->
               <td class="px-4 py-2.5 whitespace-nowrap">
-                <div v-if="row.af.kind === 'bacs_audit'" class="flex items-center gap-2">
+                <div v-if="row.af.kind === 'bacs_audit'" class="flex items-center gap-2" v-tooltip="() => bacsProgressTip(bacsProgress(row.af))">
                   <div class="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
                     <div class="h-full bg-emerald-500 transition-all"
                          :style="{ width: bacsProgress(row.af).percent + '%' }"></div>
@@ -565,20 +592,20 @@ onMounted(refresh)
               <td class="px-4 py-2.5 text-right">
                 <div class="inline-flex items-center gap-1">
                   <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="router.push(`/afs/${row.af.id}/versions`)"
-                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Versions'">
+                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Voir les versions de l’analyse'">
                     <BookmarkIcon class="w-4 h-4" />
                   </button>
                   <button v-if="row.af.kind === 'bacs_audit'"
                           @click.stop="router.push(`/bacs-audit/${row.af.id}/audit-trail`)"
-                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Historique'">
+                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Voir l’historique de l’audit'">
                     <ClockIcon class="w-4 h-4" />
                   </button>
                   <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="openClone(row.af)"
-                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Cloner'">
+                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Cloner cette analyse'">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
                   <button @click.stop="confirmDelete(row.af)"
-                          class="text-gray-300 hover:text-red-600 p-1 transition-colors" v-tooltip="'Supprimer'">
+                          class="text-gray-300 hover:text-red-600 p-1 transition-colors" v-tooltip="'Supprimer ce document'">
                     <TrashIcon class="w-4 h-4" />
                   </button>
                 </div>
@@ -774,6 +801,7 @@ onMounted(refresh)
                   ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
                   : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
               ]"
+              v-tooltip="opt.value ? serviceLevelTip(opt.value) : null"
             >
               <input v-model="newAf.service_level" :value="opt.value" type="radio" class="sr-only" />
               {{ opt.label }}
@@ -801,19 +829,21 @@ onMounted(refresh)
       </form>
       <template #footer>
         <button @click="showCreate = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuler</button>
-        <button
-          @click="submitCreate"
-          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || ((newAf.kind === 'bacs_audit' || newAf.kind === 'maintenance_report') && !newAf.site_id)"
-          class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {{
-            submitting ? 'Création…'
-            : newAf.kind === 'bacs_audit' ? 'Créer l\'audit BACS'
-            : newAf.kind === 'brochure' ? 'Créer la brochure'
-            : newAf.kind === 'maintenance_report' ? 'Créer le rapport'
-            : 'Créer l\'AF'
-          }}
-        </button>
+        <Tooltip :text="createBlockedTip">
+          <button
+            @click="submitCreate"
+            :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || ((newAf.kind === 'bacs_audit' || newAf.kind === 'maintenance_report') && !newAf.site_id)"
+            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {{
+              submitting ? 'Création…'
+              : newAf.kind === 'bacs_audit' ? 'Créer l\'audit BACS'
+              : newAf.kind === 'brochure' ? 'Créer la brochure'
+              : newAf.kind === 'maintenance_report' ? 'Créer le rapport'
+              : 'Créer l\'AF'
+            }}
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
 
@@ -839,13 +869,15 @@ onMounted(refresh)
       </form>
       <template #footer>
         <button @click="showClone = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuler</button>
-        <button
-          @click="submitClone"
-          :disabled="submitting || !cloneTarget.client_name.trim() || !cloneTarget.project_name.trim()"
-          class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {{ submitting ? 'Clonage…' : 'Cloner' }}
-        </button>
+        <Tooltip :text="cloneBlockedTip">
+          <button
+            @click="submitClone"
+            :disabled="submitting || !cloneTarget.client_name.trim() || !cloneTarget.project_name.trim()"
+            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {{ submitting ? 'Clonage…' : 'Cloner' }}
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
   </div>

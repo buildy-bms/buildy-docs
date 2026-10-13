@@ -11,6 +11,12 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SitePartiesCard from '@/components/audit/SitePartiesCard.vue'
 import EnergyHistoryCard from '@/components/audit/EnergyHistoryCard.vue'
 import MobileYesNo from './MobileYesNo.vue'
+import HelpTip from '@/components/HelpTip.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  applicabilityTip, fmtKw, POWER_LABEL_HELP, POWER_AUTO_TIP, PERMIT_DATE_TIP, SUBSTATION_TIP,
+} from '@/lib/audit-tips-site'
+import { POWER_MANUAL_MOBILE_TIP } from '@/lib/audit-tips-mobile'
 
 const audit = useAuditStore()
 const { document, site, powerSummary } = storeToRefs(audit)
@@ -19,12 +25,19 @@ const { error, success } = useNotification()
 const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
 
 // Icones FA en kebab-case (passees a FontAwesomeIcon via :icon="['fas', ...]")
+// Libellés identiques au bureau (verdict « Le bâtiment est-il concerné ? »).
 const APPLICABILITY_LABEL = {
-  subject_immediate: { label: 'Soumis immédiatement',            icon: 'triangle-exclamation', cls: 'bg-red-50 text-red-800 border-red-200' },
-  subject_2025:      { label: 'Soumis — échéance 1er janvier 2025', icon: 'triangle-exclamation', cls: 'bg-orange-50 text-orange-800 border-orange-200' },
-  subject_2030:      { label: 'Soumis — échéance 1er janvier 2030', icon: 'triangle-exclamation', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
-  not_subject:       { label: 'Non assujetti (puissance < 70 kW)',  icon: 'circle-check',         cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  subject_immediate: { label: 'Concerné dès la construction',         icon: 'triangle-exclamation', cls: 'bg-red-50 text-red-800 border-red-200' },
+  subject_2025:      { label: 'Concerné depuis le 1er janvier 2025',  icon: 'triangle-exclamation', cls: 'bg-orange-50 text-orange-800 border-orange-200' },
+  subject_2030:      { label: 'Concerné d’ici le 1er janvier 2030',   icon: 'triangle-exclamation', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  not_subject:       { label: 'Non concerné (70 kW ou moins)',        icon: 'circle-check',         cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
 }
+
+// Carte du verdict (présumé concerné quand des puissances d'équipements manquent,
+// cf. bacs-audit-power.js) : même source que le bureau (lib/audit-tips-site.js).
+const verdictTip = computed(() => applicabilityTip(document.value?.bacs_applicability_status, {
+  presumed: !!powerSummary.value?.power_summary?.presumedSubjectDueToMissingData,
+}))
 
 let saveTimer = null
 function saveDebounced(patch) {
@@ -56,11 +69,15 @@ async function recomputePower() {
   recomputing.value = true
   try {
     const { data } = await getBacsPowerSummary(document.value.id)
+    // Même calcul que le bureau (BacsAuditDetailView recomputePowerFromEquipments) : la
+    // PUISSANCE RETENUE (la plus forte entre chauffage et climatisation, émetteurs exclus),
+    // pas la somme brute chaud + froid qui gonflait la puissance et faussait le verdict.
+    const retained = data.power_summary?.autoKw || data.power_summary?.retainedKw || data.heating_cooling_total_kw || 0
     saveDebounced({
-      bacs_total_power_kw: data.heating_cooling_total_kw,
+      bacs_total_power_kw: retained,
       bacs_total_power_source: 'auto',
     })
-    success(`Puissance recalculée : ${data.heating_cooling_total_kw} kW`)
+    success(`Puissance retenue recalculée : ${fmtKw(retained)} (la plus forte entre chauffage et climatisation)`)
   } catch {
     error('Calcul impossible')
   } finally {
@@ -102,7 +119,8 @@ const generatorWorksDone = computed({
       />
     </div>
 
-    <!-- Hero : applicabilité R175-2 -->
+    <!-- Hero : le bâtiment est-il concerné par le décret ? (R175-2). ⓘ = carte
+         du verdict, ouverte aussi au doigt. -->
     <div v-if="isBacs && document?.bacs_applicability_status"
          :class="['rounded-2xl border p-4 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status]?.cls]">
       <FontAwesomeIcon
@@ -110,9 +128,9 @@ const generatorWorksDone = computed({
         class="w-7 h-7 shrink-0 mt-0.5"
       />
       <div class="flex-1 min-w-0">
-        <p class="text-xs uppercase tracking-wider opacity-75 font-medium">Applicabilité R175-2</p>
+        <p class="text-xs uppercase tracking-wider opacity-75 font-medium">Le bâtiment est-il concerné ?</p>
         <p class="text-base font-medium leading-tight mt-0.5">
-          {{ APPLICABILITY_LABEL[document.bacs_applicability_status]?.label }}
+          {{ APPLICABILITY_LABEL[document.bacs_applicability_status]?.label }}<HelpTip v-if="verdictTip" :tip="verdictTip" class="ml-1.5 p-1 -my-1" />
         </p>
       </div>
     </div>
@@ -181,12 +199,13 @@ const generatorWorksDone = computed({
     <template v-if="isBacs">
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100">
-          <h3 class="text-base font-medium text-gray-900">Puissance & dates</h3>
+          <h3 class="text-base font-medium text-gray-900">Puissance et date du permis</h3>
         </div>
         <div class="p-4 space-y-4">
           <MobileField
-            label="Puissance chauffage + clim (kW)"
-            hint="Cumul nominal utile cumulée (R175-2)"
+            label="Puissance de chauffage et de climatisation (kW)"
+            hint="La plus forte des deux puissances, chauffage ou climatisation. Au-delà de 70 kW, un bâtiment tertiaire est concerné par le décret."
+            :tip="POWER_LABEL_HELP"
           >
             <div class="flex gap-2">
               <input
@@ -200,22 +219,27 @@ const generatorWorksDone = computed({
                 class="pwa-input pwa-input--num flex-1"
                 placeholder="—"
               />
+              <Tooltip :text="POWER_AUTO_TIP">
               <button
                 @click="recomputePower"
                 :disabled="recomputing"
+                aria-label="Calculer la puissance depuis les équipements"
                 class="tap-target px-3 py-3 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl disabled:opacity-50"
               >
                 <FontAwesomeIcon :icon="['fas', 'arrows-rotate']" :class="['w-5 h-5', recomputing ? 'animate-spin' : '']" />
               </button>
+              </Tooltip>
             </div>
-            <p v-if="document?.bacs_total_power_source === 'manual_override'" class="text-xs text-amber-700 mt-1">
-              Override manuel
+            <p v-if="document?.bacs_total_power_source === 'manual_override'" class="text-xs text-amber-700 mt-1"
+               v-tooltip="POWER_MANUAL_MOBILE_TIP">
+              Valeur saisie à la main : elle ne suit plus les équipements.
             </p>
           </MobileField>
 
           <MobileField
             label="Date du permis de construire"
-            hint="Date de dépôt du permis de construire. Un bâtiment neuf est soumis dès sa livraison si son permis a été déposé après le 21 juillet 2021 et que sa puissance dépasse 290 kW, ou après le 8 avril 2024 et que sa puissance dépasse 70 kW."
+            hint="Date de dépôt du permis. Avec la puissance, elle fixe la date à laquelle la GTB est exigée."
+            :tip="PERMIT_DATE_TIP"
           >
             <input
               type="date"
@@ -230,13 +254,13 @@ const generatorWorksDone = computed({
       <!-- Toggle : travaux générateur -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <MobileYesNo
-          label="Travaux générateur réalisés ?"
-          description="Y a-t-il eu des travaux de remplacement / installation d'un générateur (chaudière, PAC…) après le 21/07/2021 ? Si oui, R175-6 (régulation thermique) s'applique en plus."
+          label="Des travaux d’installation ou de remplacement d’un générateur de chaleur ont-ils été réalisés ?"
+          description="Chaudière, pompe à chaleur… Après le 21 juillet 2021, ces travaux rendent obligatoire la régulation automatique de la température pièce par pièce."
           :model-value="generatorWorksDone"
           @update:model-value="v => generatorWorksDone = v"
           class="border-0! rounded-none!" />
         <div v-if="document?.bacs_generator_works_date != null" class="px-4 pb-4 border-t border-gray-100 pt-3">
-          <MobileField label="Date des derniers travaux">
+          <MobileField label="Date des derniers travaux sur le générateur">
             <input
               type="date"
               :value="document?.bacs_generator_works_date || ''"
@@ -250,14 +274,14 @@ const generatorWorksDone = computed({
       <!-- Toggle : réseau urbain -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <MobileYesNo
-          label="Raccordé à un réseau urbain ?"
-          description="Le bâtiment reçoit son chauffage ou sa climatisation via une sous-station connectée à un réseau de chaleur / froid de quartier. Dans ce cas, la puissance retenue pour R175-2 = puissance de la station, pas des équipements aval."
+          label="Le bâtiment est-il raccordé à un réseau urbain de chaleur ou de froid ?"
+          description="Par une sous-station reliée au réseau du quartier. Si oui, la puissance retenue est celle de la station d’échange, pas la somme des équipements qu’elle alimente."
           :model-value="districtConnected"
           @update:model-value="v => districtConnected = v"
           class="border-0! rounded-none!" />
         <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
              class="px-4 pb-4 border-t border-gray-100 pt-3">
-          <MobileField label="Puissance station d'échange (kW)">
+          <MobileField label="Puissance de la station d’échange (kW)" :tip="SUBSTATION_TIP">
             <input
               type="number"
               inputmode="decimal"

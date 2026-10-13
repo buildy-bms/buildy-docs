@@ -10,6 +10,10 @@ import Button from '@/components/Button.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import { groupByCard, CARD_FLAT_OPTIONS, cardOfAction } from '@/lib/action-cards'
 import ActionDescription from '@/components/audit/ActionDescription.vue'
+import {
+  levelTip, levelCountTip, actionNumberTip, articleTip, preconisationTip,
+  REGENERATE_PLAN_TIP, COMMERCIAL_VIEW_TIP,
+} from '@/lib/audit-tips-site'
 
 const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
@@ -70,13 +74,8 @@ function levelOf(it) {
   if (it.is_info) return { label: 'Information', cls: 'tone-muted' }
   return props.severityLabels[it.severity] || { label: it.severity, cls: 'tone-muted' }
 }
-// Définition des niveaux : même texte que la légende « Lecture du plan » du PDF.
-const LEVEL_HELP = {
-  blocking: 'Bloquante : écart qui empêche à lui seul la conformité, par exemple l\'absence de GTB ou d\'un compteur requis.',
-  major: 'Majeure : exigence du décret non satisfaite, à traiter pour atteindre la conformité.',
-  minor: 'Mineure : recommandation, ou raccordement exigé seulement sous condition de temps de retour sur investissement.',
-  reserve: 'Réserve : obligation du propriétaire à respecter dans la durée (maintenance, inspection périodique, export des données), sans effet sur la conformité de l\'installation.',
-}
+// Définition des niveaux (même sens que la légende « Lecture du plan » du PDF) : cartes
+// levelTip / levelCountTip de lib/audit-tips-site.js.
 // Décomptes d'une carte : réserves à part (groupByCard compte par sévérité).
 function countsOf(items) {
   const acts = (items || []).filter(x => !x.is_reserve)
@@ -173,7 +172,7 @@ function hasNotes(html) {
             size="sm"
             :loading="regenerating"
             @click.stop="emit('regenerate')"
-            v-tooltip="'Recalcule le plan d\'actions correctives à partir des données saisies (préserve les annotations commerciales)'"
+            v-tooltip="REGENERATE_PLAN_TIP"
           >
             <template v-if="!regenerating" #icon-left>
               <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" />
@@ -181,6 +180,7 @@ function hasNotes(html) {
             {{ regenerating ? 'Régénération…' : 'Régénérer' }}
           </Button>
           <button @click.stop="emit('open-commercial')"
+                  v-tooltip="COMMERCIAL_VIEW_TIP"
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
             Vue commerciale →
           </button>
@@ -207,24 +207,25 @@ function hasNotes(html) {
            la légende « Lecture du plan » du PDF), sources repliables,
            tout déplier / replier. -->
       <div v-if="visibleActionItems.length" class="flex flex-wrap items-center gap-2">
-        <span v-if="itemsBySeverity.blocking?.length" class="pill sev-blocking" v-tooltip="LEVEL_HELP.blocking">
+        <span v-if="itemsBySeverity.blocking?.length" class="pill sev-blocking" v-tooltip="levelCountTip('blocking', itemsBySeverity.blocking.length)">
           {{ itemsBySeverity.blocking.length }} {{ plural(itemsBySeverity.blocking.length, 'bloquante', 'bloquantes') }}
         </span>
-        <span v-if="itemsBySeverity.major?.length" class="pill sev-major" v-tooltip="LEVEL_HELP.major">
+        <span v-if="itemsBySeverity.major?.length" class="pill sev-major" v-tooltip="levelCountTip('major', itemsBySeverity.major.length)">
           {{ itemsBySeverity.major.length }} {{ plural(itemsBySeverity.major.length, 'majeure', 'majeures') }}
         </span>
-        <span v-if="itemsBySeverity.minor?.length" class="pill sev-minor" v-tooltip="LEVEL_HELP.minor">
+        <span v-if="itemsBySeverity.minor?.length" class="pill sev-minor" v-tooltip="levelCountTip('minor', itemsBySeverity.minor.length)">
           {{ itemsBySeverity.minor.length }} {{ plural(itemsBySeverity.minor.length, 'mineure', 'mineures') }}
         </span>
-        <span v-if="itemsBySeverity.reserves?.length" class="pill tone-info" v-tooltip="LEVEL_HELP.reserve">
+        <span v-if="itemsBySeverity.reserves?.length" class="pill tone-info" v-tooltip="levelCountTip('reserve', itemsBySeverity.reserves.length)">
           {{ itemsBySeverity.reserves.length }} {{ plural(itemsBySeverity.reserves.length, 'réserve', 'réserves') }}
         </span>
         <span v-if="infoItems.length" class="pill tone-muted"
-              v-tooltip="'Exemptions et points de vigilance : hors plan, sans numéro, comme dans le rapport.'">
+              v-tooltip="levelCountTip('info', infoItems.length)">
           {{ infoItems.length }} {{ plural(infoItems.length, 'information', 'informations') }}
         </span>
         <span class="ml-auto flex items-center gap-4">
           <button type="button" @click="sourcesOpen = !sourcesOpen"
+                  v-tooltip="sourcesOpen ? 'Masquer les sources du plan' : 'Afficher les sources du plan'"
                   class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800">
             <InformationCircleIcon class="w-3.5 h-3.5 shrink-0" />
             Sources
@@ -240,7 +241,7 @@ function hasNotes(html) {
       <div v-if="visibleActionItems.length && sourcesOpen" class="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200">
         <InformationCircleIcon class="w-4 h-4 shrink-0 text-indigo-500 mt-0.5" />
         <div class="text-xs leading-relaxed text-indigo-900/90">
-          <p><strong class="font-semibold">Sources d'aide à l'interprétation (non opposables).</strong> Les actions ci-dessous reposent sur le décret BACS (articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l'habitation, et arrêté du 7 avril 2023 : seuls textes juridiquement opposables), éclairé par :</p>
+          <p><strong class="font-semibold">Sources qui aident à lire le décret (sans valeur légale).</strong> Les actions ci-dessous reposent sur le décret BACS (articles L. 174-3, L. 175-2 et R. 175-1 à R. 175-6 du code de la construction et de l'habitation, et arrêté du 7 avril 2023 : les seuls textes qui s’imposent légalement), éclairé par :</p>
           <ul class="mt-1 space-y-0.5 list-disc pl-4">
             <li>Guide d'application du décret BACS — ministère, version 2, janvier 2026.</li>
             <li>FAQ BACS du ministère.</li>
@@ -251,7 +252,7 @@ function hasNotes(html) {
       <div v-if="!visibleActionItems.length" class="py-10 text-center">
         <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
         <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
-        <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
+        <p class="text-xs text-gray-500">Saisis les systèmes et la GTB aux étapes précédentes : le plan se construit à partir d’eux.</p>
       </div>
       <!-- Actions regroupees par CARTE de l'audit (stepper). Carte GTB
            sous-divisee en sous-sections (Capacites, Integration
@@ -295,17 +296,18 @@ function hasNotes(html) {
         <div class="px-3 py-2 flex items-start gap-2.5">
           <button type="button" @click="toggleOpen(it)" :aria-expanded="isOpen(it)"
                   class="mt-0.5 p-0.5 text-gray-400 hover:text-gray-700 shrink-0"
-                  v-tooltip="isOpen(it) ? 'Masquer le détail' : 'Afficher le détail : constat, exigence, recommandation'">
+                  v-tooltip="isOpen(it) ? 'Masquer le détail de l’action' : 'Afficher le détail de l’action'">
             <FontAwesomeIcon :icon="['fas', isOpen(it) ? 'chevron-down' : 'chevron-right']" class="w-3 h-3" />
           </button>
           <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
-            <span class="inline-flex items-center justify-center w-19 px-1.5 py-0.5 text-[10px] font-mono rounded bg-gray-800 text-white whitespace-nowrap">
+            <span class="inline-flex items-center justify-center w-19 px-1.5 py-0.5 text-[10px] font-mono rounded bg-gray-800 text-white whitespace-nowrap"
+                  v-tooltip="actionNumberTip(it.display_number)">
               {{ it.display_number || '—' }}
             </span>
-            <span :class="['pill justify-center w-25', levelOf(it).cls]">
+            <span :class="['pill justify-center w-25', levelOf(it).cls]" v-tooltip="levelTip(it)">
               {{ levelOf(it).label }}
             </span>
-            <span v-truncate-tooltip class="w-26 truncate text-[10px] text-gray-500 font-mono whitespace-nowrap">{{ it.r175_article || '—' }}</span>
+            <span v-tooltip="articleTip(it.r175_article)" class="w-26 truncate text-[10px] text-gray-500 font-mono whitespace-nowrap">{{ it.r175_article || '—' }}</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm text-gray-800 font-medium leading-snug cursor-pointer" @click="toggleOpen(it)">
@@ -327,7 +329,7 @@ function hasNotes(html) {
               :value="manualAssignedValue(it)"
               @change="e => reassignManual(it, e.target.value)"
               class="text-[11px] rounded border border-gray-200 bg-white px-1.5 py-1 text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-              title="Affecter cette préconisation à une carte de l'audit"
+              v-tooltip="'Affecter cette action à une rubrique'"
             >
               <option value="">Divers</option>
               <option v-for="opt in CARD_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -341,7 +343,7 @@ function hasNotes(html) {
                   : (it.status === 'open'
                     ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100'
                     : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
-              v-tooltip="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations Buildy' : 'Aucune préconisation — cliquer pour rédiger'">
+              v-tooltip="preconisationTip({ has: hasNotes(it.alternative_solutions_html), open: it.status === 'open' })">
               <PencilSquareIcon class="w-3.5 h-3.5 shrink-0" />
               {{ hasNotes(it.alternative_solutions_html) ? 'Préconisations' : 'Préconiser' }}
             </button>
@@ -378,10 +380,10 @@ function hasNotes(html) {
           <div class="px-3 py-2 flex items-start gap-2.5">
             <button type="button" @click="toggleOpen(it)" :aria-expanded="isOpen(it)"
                     class="mt-0.5 p-0.5 text-gray-400 hover:text-gray-700 shrink-0"
-                    v-tooltip="isOpen(it) ? 'Masquer le détail' : 'Afficher le détail'">
+                    v-tooltip="isOpen(it) ? 'Masquer le détail de l’information' : 'Afficher le détail de l’information'">
               <FontAwesomeIcon :icon="['fas', isOpen(it) ? 'chevron-down' : 'chevron-right']" class="w-3 h-3" />
             </button>
-            <span class="pill justify-center w-25 shrink-0 tone-muted">Information</span>
+            <span class="pill justify-center w-25 shrink-0 tone-muted" v-tooltip="levelTip(it)">Information</span>
             <div class="flex-1 min-w-0">
               <div class="text-sm text-gray-800 font-medium leading-snug cursor-pointer" @click="toggleOpen(it)">
                 <ActionDescription :text="it.title" />

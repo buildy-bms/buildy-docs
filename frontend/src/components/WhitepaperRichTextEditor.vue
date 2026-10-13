@@ -113,45 +113,54 @@ const btnActive = 'p-1.5 rounded bg-indigo-100 text-indigo-700 transition'
   <div v-if="editor" class="border border-gray-200 rounded-lg bg-white">
     <!-- Toolbar — sticky pour rester visible sur les chapitres longs -->
     <div class="sticky top-0 z-10 flex items-center gap-0.5 flex-wrap px-2 py-1.5 border-b border-gray-200 bg-gray-50/95 backdrop-blur-sm rounded-t-lg">
-      <button type="button" v-tooltip="'Titre de section'"
+      <button type="button" v-tooltip="{ label: 'Titre de section', keys: ['Mod', 'Alt', '2'] }"
               :class="isActive('heading', { level: 2 }) ? btnActive : btn"
+              :aria-pressed="isActive('heading', { level: 2 })"
               @click="editor.chain().focus().toggleHeading({ level: 2 }).run()">
         <span class="text-xs font-bold px-0.5">T1</span>
       </button>
-      <button type="button" v-tooltip="'Sous-titre'"
+      <button type="button" v-tooltip="{ label: 'Sous-titre', keys: ['Mod', 'Alt', '3'] }"
               :class="isActive('heading', { level: 3 }) ? btnActive : btn"
+              :aria-pressed="isActive('heading', { level: 3 })"
               @click="editor.chain().focus().toggleHeading({ level: 3 }).run()">
         <span class="text-xs font-bold px-0.5">T2</span>
       </button>
       <span class="w-px h-5 bg-gray-200 mx-1"></span>
-      <button type="button" v-tooltip="'Gras'" :class="isActive('bold') ? btnActive : btn"
+      <button type="button" v-tooltip="{ label: 'Gras', keys: ['Mod', 'B'] }" :class="isActive('bold') ? btnActive : btn"
+              :aria-pressed="isActive('bold')"
               @click="editor.chain().focus().toggleBold().run()"><BoldIcon class="w-4 h-4" /></button>
-      <button type="button" v-tooltip="'Italique'" :class="isActive('italic') ? btnActive : btn"
+      <button type="button" v-tooltip="{ label: 'Italique', keys: ['Mod', 'I'] }" :class="isActive('italic') ? btnActive : btn"
+              :aria-pressed="isActive('italic')"
               @click="editor.chain().focus().toggleItalic().run()"><ItalicIcon class="w-4 h-4" /></button>
       <span class="w-px h-5 bg-gray-200 mx-1"></span>
-      <button type="button" v-tooltip="'Liste à puces'" :class="isActive('bulletList') ? btnActive : btn"
+      <button type="button" v-tooltip="{ label: 'Liste à puces', keys: ['Mod', 'Shift', '8'] }" :class="isActive('bulletList') ? btnActive : btn"
+              :aria-pressed="isActive('bulletList')"
               @click="editor.chain().focus().toggleBulletList().run()"><ListBulletIcon class="w-4 h-4" /></button>
-      <button type="button" v-tooltip="'Liste numérotée'" :class="isActive('orderedList') ? btnActive : btn"
+      <button type="button" v-tooltip="{ label: 'Liste numérotée', keys: ['Mod', 'Shift', '7'], icon: 'list-ol' }" :class="isActive('orderedList') ? btnActive : btn"
+              :aria-pressed="isActive('orderedList')"
               @click="editor.chain().focus().toggleOrderedList().run()"><NumberedListIcon class="w-4 h-4" /></button>
       <span class="w-px h-5 bg-gray-200 mx-1"></span>
       <button type="button" v-tooltip="'Lien'" :class="isActive('link') ? btnActive : btn"
               @click="setLink"><LinkIcon class="w-4 h-4" /></button>
-      <button type="button" v-tooltip="'Image'" :class="btn" @click="insertImage">
+      <button type="button" v-tooltip="'Image depuis une adresse web'" :class="btn" @click="insertImage">
         <PhotoIcon class="w-4 h-4" />
       </button>
       <span class="w-px h-5 bg-gray-200 mx-1"></span>
-      <button type="button" v-tooltip="'Encadré information'"
+      <button type="button" v-tooltip="{ label: 'Encadré « Information »', icon: 'circle-info' }"
               :class="isActive('blockquote', { variant: 'info' }) ? btnActive : btn"
+              :aria-pressed="isActive('blockquote', { variant: 'info' })"
               @click="editor.chain().focus().toggleCalloutVariant('info').run()">
         <InformationCircleIcon class="w-4 h-4 text-slate-500" />
       </button>
-      <button type="button" v-tooltip="'Encadré conseil'"
+      <button type="button" v-tooltip="{ label: 'Encadré « Conseil »', icon: 'lightbulb' }"
               :class="isActive('blockquote', { variant: 'tip' }) ? btnActive : btn"
+              :aria-pressed="isActive('blockquote', { variant: 'tip' })"
               @click="editor.chain().focus().toggleCalloutVariant('tip').run()">
         <LightBulbIcon class="w-4 h-4 text-emerald-600" />
       </button>
-      <button type="button" v-tooltip="'Encadré attention'"
+      <button type="button" v-tooltip="{ label: 'Encadré « Attention »', icon: 'triangle-exclamation' }"
               :class="isActive('blockquote', { variant: 'warning' }) ? btnActive : btn"
+              :aria-pressed="isActive('blockquote', { variant: 'warning' })"
               @click="editor.chain().focus().toggleCalloutVariant('warning').run()">
         <ExclamationTriangleIcon class="w-4 h-4 text-amber-600" />
       </button>

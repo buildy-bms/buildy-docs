@@ -17,6 +17,8 @@ import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import { isMeterMissing, isMeterUnanswered, meterPlanNote, requiredCellLabel } from '@/lib/meter-plan-state'
 import { REQUIRED_LOCKED_TIP, thermalMeterName } from '@/lib/meter-options'
+import { REQUIRED_LOCKED_CARD, NO_METER_ENERGY_TIP } from '@/lib/audit-tips'
+import Tooltip from '@/components/Tooltip.vue'
 
 const audit = useAuditStore()
 const { document, meters, zones, meterPlanStatus } = storeToRefs(audit)
@@ -406,9 +408,11 @@ function toggleProtocol(p) {
 
       <!-- Cards énergies -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <!-- Énergie sans compteur : ligne grisée, la raison est portée par l'enveloppe
+             (s'ouvre aussi au doigt). -->
+        <Tooltip v-for="e in energyCards" :key="e.value" class="flex w-full"
+                 :text="e.total === 0 ? NO_METER_ENERGY_TIP : null">
         <button
-          v-for="e in energyCards"
-          :key="e.value"
           type="button"
           @click="e.total > 0 && goToEnergy(e.value)"
           :disabled="e.total === 0"
@@ -420,7 +424,7 @@ function toggleProtocol(p) {
             <FontAwesomeIcon :icon="['fas', e.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
           </span>
           <div class="flex-1 min-w-0">
-            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ e.label }}</p>
+            <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">{{ e.label }}</p>
             <p class="text-xs text-gray-500 mt-0.5">
               <span v-if="e.total === 0">Aucun compteur</span>
               <template v-else>
@@ -436,6 +440,7 @@ function toggleProtocol(p) {
           </div>
           <FontAwesomeIcon v-if="e.total > 0" :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
         </button>
+        </Tooltip>
       </div>
 
       <!-- Compteurs généraux (raccourci, hors énergie) -->
@@ -468,7 +473,7 @@ function toggleProtocol(p) {
         <div class="flex items-center gap-2">
           <button type="button" @click="goBackToEnergies"
                   class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
-                  aria-label="Retour aux énergies">
+                  aria-label="Retour aux énergies" v-tooltip="'Revenir à la liste des énergies'">
             <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
           </button>
           <span class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0"
@@ -477,7 +482,7 @@ function toggleProtocol(p) {
           </span>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Énergies › {{ groupBy === 'usage' ? 'Par usage' : 'Par zone' }}</p>
-            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedEnergyMeta.label }}</p>
+            <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedEnergyMeta.label }}</p>
           </div>
         </div>
       </div>
@@ -518,7 +523,7 @@ function toggleProtocol(p) {
             <FontAwesomeIcon :icon="['fas', g.kind === 'general' ? 'building-circle-arrow-right' : g.kind === 'technical' ? 'screwdriver-wrench' : 'map-pin']" class="w-5 h-5" />
           </span>
           <div class="flex-1 min-w-0">
-            <p class="text-base font-medium text-gray-900 truncate leading-tight">
+            <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate leading-tight">
               {{ g.label }}
               <span v-if="g.kind === 'technical'" class="ml-1 text-xs font-normal text-gray-400">(technique)</span>
             </p>
@@ -544,7 +549,7 @@ function toggleProtocol(p) {
         <div class="flex items-center gap-2">
           <button type="button" @click="goBackToGroup"
                   class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
-                  aria-label="Retour">
+                  aria-label="Retour" v-tooltip="'Revenir à la liste précédente'">
             <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
           </button>
           <span v-if="isGeneralListMode"
@@ -557,13 +562,13 @@ function toggleProtocol(p) {
             <FontAwesomeIcon :icon="['fas', selectedEnergyMeta.icon.replace(/^fa-/, '')]" class="w-4 h-4" />
           </span>
           <div class="flex-1 min-w-0">
-            <p v-if="isGeneralListMode" class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
+            <p v-tooltip.overflow v-if="isGeneralListMode" class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
               Hors zone · toutes énergies
             </p>
-            <p v-else class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
+            <p v-tooltip.overflow v-else class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
               {{ selectedEnergyMeta.label }} › {{ groupBy === 'usage' ? 'Usage' : 'Zone' }}
             </p>
-            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedGroupLabel }}</p>
+            <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedGroupLabel }}</p>
           </div>
           <span class="shrink-0 text-xs text-gray-500">{{ filteredMeters.length }}</span>
         </div>
@@ -585,14 +590,14 @@ function toggleProtocol(p) {
             class="w-6 h-6 text-red-500 shrink-0"
           />
           <div class="flex-1 min-w-0">
-            <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
+            <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
             <div class="flex items-center gap-1.5 mt-2 flex-wrap">
               <span v-if="m.zone_id && thermalMeterName(m)" class="text-sm font-medium text-gray-700">{{ thermalMeterName(m) }}</span>
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
               <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
               <span v-if="m.communicating" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">Communicant</span>
-              <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
+              <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">Hors service</span>
               <span v-if="isUnanswered(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">Présence à vérifier</span>
               <span v-if="planNote(m)" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">{{ planNote(m).label }}</span>
             </div>
@@ -646,7 +651,7 @@ function toggleProtocol(p) {
           />
         </div>
 
-        <MobileField label="Zone" hint="Le local fonctionnel où se trouve ce compteur. « Compteur général » = compteur principal du site, pas attaché à une zone précise.">
+        <MobileField label="Zone" hint="La zone dont ce compteur mesure la consommation. « Compteur général » : compteur principal du site, rattaché à aucune zone.">
           <MobileSelectSheet
             v-model="editForm.zone_id"
             :options="ZONE_OPTIONS"
@@ -656,7 +661,7 @@ function toggleProtocol(p) {
         </MobileField>
 
         <MobileField :label="editForm.zone_id ? 'Type d\'énergie' : 'Énergie mesurée'"
-                     hint="Quelle énergie ce compteur mesure : électrique, gaz, eau, ou thermique (kWh chaud/froid via débit + ΔT).">
+                     hint="L’énergie mesurée : électricité, gaz, eau, ou énergie thermique (chaleur ou froid fournis par un réseau d’eau).">
           <MobileSelectSheet
             v-model="editForm.meter_type"
             :options="METER_TYPES"
@@ -668,7 +673,7 @@ function toggleProtocol(p) {
         <!-- Compteur général (zone null) : pas d'usage à choisir, la notion
              n'a pas de sens pour un compteur de tête de site (cohérent avec
              le desktop). -->
-        <MobileField v-if="editForm.zone_id" label="Catégorie" hint="À quoi sert l'énergie mesurée : chauffage, climatisation, ECS (eau chaude sanitaire), production photovoltaïque, éclairage…">
+        <MobileField v-if="editForm.zone_id" label="Catégorie" hint="À quoi sert l’énergie mesurée : chauffage, climatisation, eau chaude sanitaire, production photovoltaïque, éclairage…">
           <MobileSelectSheet
             v-model="editForm.usage"
             :options="METER_USAGES"
@@ -681,22 +686,22 @@ function toggleProtocol(p) {
           <div class="space-y-2">
             <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
               <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-700">Requis par R175 ?</p>
+                <p class="text-base font-medium text-gray-700">Requis par le décret ?</p>
                 <p v-if="requiredLocked && editing?.mode === 'edit' && requiredCellLabel(editing.meter, meterPlanStatus)"
                    class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  {{ meterPlanNote(editing.meter, meterPlanStatus)?.tooltip }}
+                  {{ meterPlanNote(editing.meter, meterPlanStatus)?.text }}
                 </p>
                 <p v-else-if="requiredLocked" class="text-xs text-gray-500 mt-1 leading-relaxed">
                   {{ editing?.mode === 'create' ? 'Déterminé à l’enregistrement. ' : '' }}{{ REQUIRED_LOCKED_TIP }}
                 </p>
                 <p v-else class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Répondre Oui si ce compteur EST requis par le décret.
+                  Le décret demande un compteur pour chaque usage concerné (chauffage, climatisation, eau chaude, éclairage…). Réponds Oui si ce compteur est attendu.
                 </p>
               </div>
               <span v-if="requiredLocked && editing?.mode === 'edit' && requiredCellLabel(editing.meter, meterPlanStatus)"
                     class="mt-1 shrink-0 text-base text-slate-500 italic">{{ requiredCellLabel(editing.meter, meterPlanStatus) }}</span>
               <SegmentedToggle v-else-if="requiredLocked && editing?.mode === 'edit'" size="lg" disabled neutral-no
-                               :model-value="!!editForm.required" class="mt-1 shrink-0" />
+                               :model-value="!!editForm.required" class="mt-1 shrink-0" :tooltip="REQUIRED_LOCKED_CARD" />
               <SegmentedToggle v-else-if="!requiredLocked" size="lg" :model-value="!!editForm.required"
                                @update:model-value="v => (editForm.required = v)" class="mt-1 shrink-0" />
             </div>
@@ -752,7 +757,7 @@ function toggleProtocol(p) {
               <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
                   <p class="text-base font-medium text-red-600">Hors service ?</p>
-                  <p class="text-xs text-gray-500 mt-1">Compteur HS, débranché, ou inaccessible. Sera ignoré dans le plan d'action.</p>
+                  <p class="text-xs text-gray-500 mt-1">Compteur en panne, débranché ou inaccessible. S’il est requis, le plan d’action propose de le réparer ou de le remplacer.</p>
                 </div>
                 <SegmentedToggle size="lg" yes-danger :model-value="!!editForm.out_of_service"
                                  @update:model-value="v => (editForm.out_of_service = v)" class="mt-1 shrink-0" />
@@ -765,7 +770,7 @@ function toggleProtocol(p) {
              visible uniquement si Présent. Utile pour le ratissage terrain. -->
         <MobileField v-if="editing?.mode === 'edit' && editForm.present_actual"
                      label="Localisation"
-                     hint="Où le compteur est-il physiquement installé (local technique, TGBT, armoire…) ? Distinct de la zone desservie.">
+                     hint="Où le compteur est-il installé (local technique, tableau électrique, armoire…) ? Ce n’est pas forcément la zone qu’il mesure.">
           <MobileSelectSheet
             v-model="editForm.location_zone_id"
             :options="LOCATION_OPTIONS"

@@ -83,7 +83,7 @@ Tu utilises EXCLUSIVEMENT l'outil `Edit` avec `old_string` cible sur les composa
 
 Imports requis : `FaqArticleHistoryModal`, `pullFaqArticleFromCrisp`, icones `ArrowDownTrayIcon`, `ClockIcon` + 5 autres heroicons.
 
-**`frontend/src/components/FaqRichTextEditor.vue`** — toolbar avec **callouts (tip/info/warning) via FaqBlockquote**, image upload + placeholder, **lien interne via `FaqArticleLinkModal`**, **BubbleMenu Tiptap** sur selection (bouton "Reecrire avec IA"), bouton "Generer depuis captures" (ouvre `FaqGenerateModal` mode insert). Imports : `FaqArticleLinkModal`, `FaqGenerateModal`, `FaqRewriteSelectionModal`, `BubbleMenu` de `@tiptap/vue-3/menus`.
+**`frontend/src/components/FaqRichTextEditor.vue`** — toolbar avec **callouts (tip/info/warning) via FaqBlockquote**, image upload + placeholder, **lien interne via `FaqArticleLinkModal`**, **BubbleMenu Tiptap** sur selection (bouton "Reecrire avec IA"). Imports : `FaqArticleLinkModal`, `FaqRewriteSelectionModal`, `BubbleMenu` de `@tiptap/vue-3/menus`. Le bouton "Inserer depuis captures" (`FaqGenerateModal` mode insert) a ete retire volontairement en 0.1.42 (doublon avec "Generer depuis captures" de la page FAQ, qui ouvre `FaqGenerateModal` en mode create) : son absence n'est PAS un ecrasement, ne pas le restaurer.
 
 ### Avant de modifier l'un de ces 2 fichiers
 ```bash
@@ -479,12 +479,194 @@ mais avec un look adapté). Pas un doublon problématique — chacun a sa niche 
 **Patterns d'usage** :
 - Question = label + toggle à droite : `<div class="flex items-center justify-between"><span>Question ?</span><Toggle ... /></div>`.
 - Reformuler les labels en QUESTIONS explicites (pas en affirmations) : `Présent ?` plutôt que `Présent`, sinon le toggle est ambigu (« coché Oui = présent ou pas ? »).
-- Pour les disabled (prérequis manquant) : tooltip `« Réponds d'abord X »` + `:disabled="!prereq"`.
+- Pour les disabled (prérequis manquant) : `:disabled="!prereq"` + `:tooltip="'Réponds d’abord X'"`
+  (propriété `tooltip` des deux SegmentedToggle, portée par le conteneur : visible même grisé ;
+  jamais `title`). Bouton grisé ordinaire : enveloppe `<Tooltip :text="raison">` (cf. § Infobulles).
 - Pour les cards multi-select cliquables (5 usages traités par la GTB), faire la **card entière** click-toggle plutôt que de mettre une checkbox dedans.
 
 **Patch côté serveur** : envoyer **boolean strict** (`true`/`false`), pas
 `0`/`1`. Le schema Zod serveur est `z.boolean().nullable().optional()` et
 refuse les entiers → 400 Bad Request silencieux.
+
+## Infobulles (UI) — système unique `v-tooltip` (2026-10-12)
+
+Porté de Buildy Tools (même rendu, charte commune). Demande de Kévin : toutes les infobulles
+navy, aérées, icônes colorées, langage simple pour un non-expert du décret BACS, très peu de
+retours à la ligne, placement parfait (jamais sur l'élément survolé, toujours entières).
+
+- **Une directive globale** `v-tooltip` (`frontend/src/lib/tooltip.js`, `installTooltips` dans
+  `main.js`) et **une seule bulle** rendue par `components/tooltip/TooltipHost.vue` (montée dans
+  `App.vue`, chargée au premier survol ou au repos : hors du bundle de démarrage). Jamais
+  `title=` natif (lent, gris, invisible au doigt), jamais de bulle faite main.
+- **Deux formats, tous deux navy** (`bg-primary` = #1b2842) :
+  - **étiquette** : `v-tooltip="'Supprimer ce compteur'"` ou `{ label, keys: ['Mod','B'], icon }`.
+    12 px, jusqu'à 460 px de large (640 px pour le texte complet d'un texte coupé, `.overflow`), icône choisie d'après le premier mot (`labelIcon` /
+    `VERB_ICONS` de `lib/tooltip-content.js` : poubelle rouge pour « Supprimer »…) ;
+  - **carte** : `v-tooltip="{ title, text, tone, accent, icon, rows, todo, article, meta }"`,
+    300 à 540 px. `tone` ∈ success / warning / error / info / neutral (alias de pastilles
+    acceptés). `accent` = couleur et icône métier (`heating`, `cooling`, `ventilation`, `dhw`,
+    `lighting`, `pv`, `electric`, `gas`, `water`, `thermal`, phases `site` / `equipment` /
+    `supervision` / `dossier`). `rows: [{ label, value, icon?, tone?|accent? }]` = faits
+    « clé → valeur ». `todo` = encadré « À faire ». `article: 'R175-3'` → pied discret
+    « Décret BACS · article R175-3 ».
+- **Modificateurs** : `.right` `.bottom` `.left` (côté préféré), `.keep` (reste après un clic),
+  `.touch` (s'ouvre au doigt), `.overflow` (seulement si le texte est coupé ; sans valeur =
+  texte visible de l'élément). Valeur fonction = évaluée au survol. Valeur vide = pas de bulle
+  (l'ancre devient transparente : la bulle du parent s'affiche).
+- **Bouton grisé** : un bouton désactivé ne reçoit pas le survol → la raison est portée par
+  l'enveloppe `<Tooltip :text="raison"><button :disabled>…</button></Tooltip>` (`data-tip-wrap`,
+  règle CSS dans `main.css`). Interrupteurs Oui/Non : propriété `tooltip` de `SegmentedToggle`
+  (les deux), portée par le conteneur.
+- **Délai d'apparition** (demande de Kévin, « comme le veut la norme ») : `lib/tooltip-timing.js`,
+  source unique pour `v-tooltip`, la fiche du décret et les repères des cartes Google Maps.
+  400 ms avant la première bulle (survol ou focus clavier) ; ensuite **aucun délai** vers
+  l'élément voisin tant qu'une bulle est ouverte ou fermée depuis moins de 300 ms ; **immédiat**
+  au toucher et au clic sur un ⓘ / une pastille / un bouton grisé (demande explicite). Un clic
+  d'action pendant l'attente, Échap, le défilement ou un changement de page annulent la bulle
+  en attente. Ne jamais réintroduire d'affichage instantané au survol.
+- **Fondu** (demande de Kévin, « comme ce qu'il se fait de mieux ») : `tooltipMotion()` de
+  `lib/tooltip-timing.js` (Web Animations API), utilisé par `TooltipHost`, la fiche du décret et
+  les étiquettes des cartes.
+  - Ouverture en 160 ms : fondu, glissement de 4 px depuis l'élément survolé (côté calculé
+    après placement), zoom 0,97 → 1 depuis la flèche, courbe `cubic-bezier(0.16, 1, 0.3, 1)`.
+  - Fermeture en 110 ms, courbe « ease in » : la bulle reste affichée, contenu figé, le temps de
+    s'effacer.
+  - D'un élément au voisin, ou si une bulle s'ouvre pendant l'effacement : changement sur place,
+    sans fondu.
+  - `hideTip({ instant: true })` (défilement, redimensionnement, changement de page, élément
+    retiré) : sans fondu.
+  - « Réduire les animations » du système : fondu seul, sans mouvement.
+  - Le placement reste sur la boîte `#bd-tooltip`, l'animation sur son enveloppe intérieure :
+    pour mesurer la position d'une bulle (tests), attendre la fin du fondu (≈ 200 ms).
+- **Comportement** : une bulle à la fois, retournement et 8 px des bords, centrée sur
+  le curseur pour une ancre large, jamais par-dessus l'ancre ; clavier (focus visible, Échap
+  ferme la bulle sans fermer la fenêtre) ; au doigt (PWA) : cartes seulement, sur un ⓘ
+  (`HelpTip`, `.touch`) ou une pastille hors bouton ; `aria-label` automatique sur un bouton à
+  icône seule, `aria-describedby`, `aria-keyshortcuts`. Couche `z-[1100]` (au-dessus des
+  modales 110–120 et des notifications 200) ; fiche du décret `R175Tooltip` en `z-[1090]`.
+- **Fiche du décret** (`components/R175Tooltip.vue`, ⓘ à côté des titres) : même navy, bloc
+  « En clair » (`lib/decree-plain.js`), puis texte officiel (bacs_knowledge), puis « Ce que
+  vérifie l'audit ».
+
+### Rédaction (règles de Kévin, 2026-10-12)
+- **Étiquette** : infinitif + objet, ≤ 40 caractères, sans point, jamais « Cliquer pour ».
+- **Carte** : titre ≤ 6 mots ; 1–2 phrases simples (≤ 160 caractères) ; faits dans `rows`,
+  conseil dans `todo`. Une bulle de bouton grisé dit **pourquoi** et **quoi faire**.
+- **Sans jargon** : jamais « R175-3 1° », « P3 », « HS »… dans le texte. On dit l'idée ; l'article
+  va en pied (`article`). Acronymes développés (CTA, ECS, DRV, PCBT, PV…). Vocabulaire maison :
+  système / équipement / catégorie d'usage / GTB. Aucun anglais (snapshot, sync, chiller,
+  template, credential, override, process, firmware…).
+- **Tutoiement** quand la bulle s'adresse à l'utilisateur (convention BD).
+- **Typographie** : accents, ’, « », espace insécable devant « : », jamais « (s) »
+  (`plural(n, 'compteur', 'compteurs')`), pas de `\n` (→ carte), « … » (pas « ... »), dates
+  lisibles, chiffres dans la police de l'app (pas de `font-mono`).
+- **Glossaire du décret en clair** (aussi pour les textes visibles de l'audit) :
+  R175-2 = le bâtiment est concerné (tertiaire, > 70 kW) · R175-1 6° = zone fonctionnelle
+  (locaux aux usages homogènes) · R175-3 1° = suivre les consommations heure par heure, par zone
+  et par usage · 2° = repérer les dérives · 3° = dialoguer avec les équipements, quelle que soit
+  leur marque · 4° = arrêt manuel et fonctionnement autonome · R175-4 = vérifier la GTB
+  régulièrement · R175-5 = former l'exploitant · R175-5-1 = inspection périodique · R175-6 =
+  réguler la température pièce par pièce.
+- **Contenus à côté de leur logique** (fonctions pures, imports relatifs, testées côté backend ;
+  un module par domaine, réutilisé par le bureau ET le mobile) :
+  - audit : `lib/audit-tips.js` (étapes, compteurs), `lib/audit-tips-systems.js` (systèmes,
+    équipements, fonctions, GTB, tableau de présence), `lib/audit-tips-site.js` (site et verdict
+    d'assujettissement, zones, régulation, check-list, inspections, plan d'actions, documents,
+    accès), `lib/audit-tips-shell.js` (cadre de l'audit, barre d'outils, photos, notes vocales,
+    partage, coût de Claude), `lib/meter-plan-state.js` (comptage commun / non exigé) ;
+  - décret en clair : `lib/decree-plain.js` (une phrase par article, aussi pour la fiche ⓘ) ;
+  - hors audit : `lib/af-tips.js` (AF, statuts, offres), `lib/editor-tips.js` (arbre des
+    sections, éditeur, points), `lib/library-tips.js` (bibliothèque), `lib/faq-tips.js` (FAQ,
+    administration), `lib/misc-tips.js` (sites, accueil, livres blancs, brochures, dates lisibles) ;
+  - sigles et protocoles affichés tels quels : `lib/acronym-tips.js` (`protocolTip`, `abbreviationTip` ;
+    un sigle de zone ou de catégorie resté sans bulle → l'ajouter à `ABBREVIATIONS`).
+- **Icône d'une étiquette** : `VERB_ICONS` est lu sur les deux premiers mots, puis sur le premier
+  (`'eau chaude'` → robinet, `eau` → goutte). Un premier mot sans icône → l'ajouter à `VERB_ICONS`.
+- **Icônes** des bulles : `lib/tooltip-icons.js` est GÉNÉRÉ (`node frontend/scripts/gen-tooltip-icons.mjs`,
+  à relancer après avoir cité une nouvelle icône ; `--check` pour vérifier). Import depuis
+  free-solid, hors du chunk pro de 2,5 Mo.
+- Typographie automatique (`typo()` de `tooltip-content.js`) : apostrophe ’, espaces insécables
+  dans « », devant « : ; ! ? » et entre un nombre et son unité.
+
+### Garde-fous
+- `node frontend/scripts/tooltip-lint.mjs [--files|--list] [--strict] [cibles]` : lit les
+  gabarits (`@vue/compiler-sfc`) et les expressions (`@babel/parser`). Règles : `html-title`,
+  `iframe-title`, `component-title-prop` (v-tooltip posé à la place du `title` d'une modale :
+  bug historique), `tip-on-fragment`, `old-tooltip`, `icon-button-no-tip`, `truncate-no-tip`,
+  `tip-copy`, `tip-raw-data` ; avertissements `disabled-tip-on-control`, `tip-long-label`.
+  Objectif : **0 erreur**.
+- Tests : `backend-node/test/tooltip-{position,content,timing}.test.mjs` (+ contenus métier), lancés
+  par `cd backend-node && npx vitest run`.
+- Galerie : route cachée `/style-guide` (étiquettes, cartes, tons, accents, cas limites).
+
+## Étape Systèmes : deux mises en page (2026-10-13)
+
+Bouton « Mise en page : Actuelle / Nouvelle » à droite de la barre des zones (choix mémorisé dans
+le navigateur, `localStorage` `bacs-systems-layout` = `classic` | `guided`, actuelle par défaut).
+Même données, mêmes actions ; règle de Kévin : la nouvelle ne doit jamais être moins pratique
+(aucune fonction perdue, jamais plus de clics) et **aucune réponse en masse**.
+
+- **Actuelle** : inchangée au pixel près (vérifié par captures avant / après, bouton masqué).
+- **Guidée** (« piste D ») : trois états partout — « à compléter » (information manquante),
+  « à vérifier » (règles du pré-contrôle de livraison `GET /bacs-audit/:id/precheck` + production
+  sans puissance `power_summary.incompletePowerDeviceIds`), « sans réponse » (ni présent ni non
+  concerné). Pastilles sur les onglets, guide des usages à gauche (`SystemsGuideRail`), lignes
+  « reste à faire » et filtre (`SystemsGuideSummary`), un seul tableau par zone
+  (`SystemDeviceList` `guided` / `header-only` / `compact`), fiche seulement ouverte
+  (`SystemsGuidePanel` : cartes « à vérifier », « Suivant à reprendre » qui enchaîne les points de
+  toute l'étape), synthèse avec totaux et colonne « Reste à faire » (`SystemsPresenceMatrix`
+  `guide`), fenêtres guidées (`DeviceAddGuidedModal`, `CreateSystemModal` `variant="tiles"`,
+  `DeviceMoveShare` `searchable`).
+- Logique pure : `lib/systems-guide.js` (états, compteurs, parcours ; mêmes règles de comptage que
+  l'ancienne mise en page). Textes : `lib/audit-tips-systems-guide.js` (un texte en clair par
+  code du pré-contrôle). Tests : `backend-node/test/systems-guide.test.mjs`,
+  `audit-tips-systems-guide.test.mjs`. Un nouveau code du pré-contrôle à afficher dans l'étape :
+  l'ajouter à `CHECK_DEVICE_CODES` / `CHECK_SYSTEM_CODES` ET son texte dans `CHECKS` (le test
+  échoue sinon).
+
+### Complétude d'un équipement : une seule règle (décisions de Kévin, 2026-10-13)
+Toute question affichée par la fiche doit avoir sa réponse (bug d'origine : « dispose d'une
+régulation ? » vide sur une fiche « complète »). Source unique : `deviceMissingItems(device,
+catégorie de l'usage d'ORIGINE)` de `lib/audit-options.js` → `{ key, section, label }`, rubriques
+`DEVICE_SECTIONS` ; `deviceMissingFields` / `isDeviceComplete` en dérivent (deux mises en page,
+mobile, bandeau de l'étape, guide).
+- Régulation Oui/Non ; si Oui : intégrée ou déportée, et le type de régulation de chaque fonction
+  (production, distribution, émission). « Régulation : Non » efface les réponses devenues cachées.
+- « Dessert plusieurs bâtiments ? » (vide comptait « non » dans la répartition des responsabilités).
+- Puissance (ou « puissance inconnue ») d'une production de chauffage ou de froid comptée dans le
+  seuil des 70 kW (hors secours, hors service, « hors cumul »).
+- Fonction exigée pour tous les usages sauf la production PV (PV : ni fonction, ni énergie, ni
+  comptage séparable : la fiche les masque).
+- Équipement hors du périmètre GTB (« Non ») : liaison câblée, arrêt à la main, fonctionnement
+  seul non exigés.
+- Usage d'eau chaude présent : bouclage (Bouclée / Non bouclée / Inconnu) exigé.
+Un nouveau manque → son libellé court dans `MISSING_SHORT` (`lib/systems-guide.js`, test).
+
+**Bandeau de l'étape** (`STEP_DEFINITIONS.systems`) = `systemsStepTodo` (`lib/systems-guide.js`) :
+usages sans réponse, usages présents sans équipement, bouclage manquant, équipements incomplets ;
+un équipement partagé compte une fois (usage d'origine s'il est présent, sinon le premier usage
+présent qui le partage). « À vérifier » ne bloque pas (contrôlé à la livraison). Le verrou serveur
+`bacs-audit-step-completion.js` reste plus souple (validation par l'API / MCP) : à aligner.
+
+**Mise en page guidée, maquette « piste D »** : fiche en rubriques (`DeviceEditModal` props
+`rubrics` + `checks`, en-têtes `DeviceSectionHeader.vue` : état ✓ / à compléter / à vérifier,
+résumé d'une ligne ; « Le reste à faire » / « Toute la fiche », `localStorage`
+`bacs-device-rubrics` ; `openRubric()` pour les boutons « Corriger dans … ») ; ligne de faits sous
+le nom ; fiche de 440 à 620 px ; « Déplacer ou partager » en une fenêtre à onglets
+(`DeviceMoveShare` prop `dialog`) ; pastille « N puissances manquantes » dans l'en-tête ; fondu
+sur le bord de la barre des zones (`AuditSubTabs` prop `scrollHints`).
+
+**Hiérarchie visuelle (retour de Kévin : « tout se mélange »)** — trois niveaux, trois traitements,
+comme un schéma technique où chaque circuit a sa couleur (`lib/system-fluids.js`, mêmes teintes que
+`SystemCategoryIcon`) : un usage = une carte séparée (fond gris clair autour), bandeau de tête teinté
+de sa couleur (`--fluid-tint`) ; un équipement = une ligne, production en tête (point plein, nom en
+gras), équipements desservis décalés et reliés par le trait du circuit (`--fluid`) ; une rubrique de
+la fiche = une carte (icône, titre, résumé sur une 2e ligne, état à droite, bandeau teinté selon
+l'état quand elle est ouverte). La mise en page actuelle n'en est pas affectée.
+**Filtre par usage** (demande de Kévin, 13/10) : en tête du guide de gauche, « Tous les usages »
+(par défaut) ; un clic sur un usage n'affiche plus que ce système (rappel « Seulement l'usage … »
+au-dessus de la liste), le résumé, les compteurs et précédent / suivant de la fiche suivent ; le
+parcours « Reprendre » déplace le filtre ; remis à « Tous » à chaque changement de zone.
 
 ## Listes "intégré à la GTB" filtrées par usages traités
 
@@ -540,7 +722,7 @@ rate-limit absorbe.
 - **Routage** : `views/AuditDetailRouter.vue` choisit dynamiquement entre `BacsAuditDetailView.vue` (desktop ≥ 1024px) et `views/MobileAuditDetailView.vue` (mobile < 1024px) via `useViewport().isNarrow`. Routes `/bacs-audit/:id` et `/site-audit/:id` ont `meta.fullscreenMobile: true` → `App.vue` skip `AppLayout` (header navy + sidebar) en mobile pour donner tout l'écran à la vue native.
 - **Idem home** : `views/HomeRouter.vue` → `MobileHomeView.vue` (audits uniquement, pas d'AF/brochures) sur mobile, `AfsListView.vue` sur desktop.
 - **5 onglets bottom nav** : Site / Zones / Compteurs / Systèmes / GTB. Régulation thermique R175-6 nichée dans Systèmes (panneau ambré sous chaque heating/cooling). Plan d'action et synthèse Claude restent desktop-only.
-- **Composants mobiles** dans `frontend/src/components/mobile-audit/` : `MobileSheet` (slide-up plein écran avec close+save iOS-natif), `MobileField` (label uppercase tracking-wider + slot), `MobileFab`, `MobileShareSheet`, et 5 `Mobile<Tab>.vue` (Site / Zones / Meters / Systems / Bms).
+- **Composants mobiles** dans `frontend/src/components/mobile-audit/` : `MobileSheet` (slide-up plein écran avec close+save iOS-natif), `MobileField` (label uppercase tracking-wider + slot), `MobileShareSheet`, et 5 `Mobile<Tab>.vue` (Site / Zones / Meters / Systems / Bms).
 - **Store partagé** : `stores/audit.js` charge le site via `getSite(site_uuid)` au boot, expose `updateSiteFields(patch)` qui appelle `PATCH /api/sites/:uuid` (propagation FM via sync existant).
 
 ### Breakpoints (`composables/useViewport.js`)

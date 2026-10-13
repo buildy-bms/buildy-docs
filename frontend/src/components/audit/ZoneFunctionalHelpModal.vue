@@ -8,6 +8,7 @@
  * d'ajout de zone. Pleine largeur en PWA pour rester lisible au tactile.
  */
 import BaseModal from '@/components/BaseModal.vue'
+import { FIVE_PERCENT_TIP } from '@/lib/audit-tips-site'
 
 defineEmits(['close'])
 </script>
@@ -52,7 +53,8 @@ defineEmits(['close'])
           </li>
           <li class="flex gap-2.5">
             <span class="shrink-0 w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-semibold inline-flex items-center justify-center">2</span>
-            <span>Le poste <strong>pèse assez lourd</strong> pour mériter un suivi (cf. règle des 5 %).</span>
+            <span>Le poste <strong>pèse assez lourd</strong> pour mériter un suivi (voir la
+              <span class="underline decoration-dotted underline-offset-2 cursor-help" v-tooltip.touch="FIVE_PERCENT_TIP">règle des 5 %</span>).</span>
           </li>
           <li class="flex gap-2.5">
             <span class="shrink-0 w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-semibold inline-flex items-center justify-center">3</span>
@@ -110,7 +112,7 @@ defineEmits(['close'])
           </p>
           <p class="text-gray-700 mb-1.5">Dans un plot de bureaux :</p>
           <ul class="space-y-1 list-disc list-inside text-gray-700">
-            <li>une salle serveurs / data center (clim dédiée 24/7, horaires différents, poids réel) ;</li>
+            <li>une salle serveurs (climatisation dédiée 24 h/24, horaires différents, poids réel) ;</li>
             <li>un restaurant d'entreprise avec cuisine (gros poste, horaires décalés).</li>
           </ul>
         </div>

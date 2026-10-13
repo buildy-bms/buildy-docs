@@ -17,6 +17,7 @@ import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileField from '@/components/mobile-audit/MobileField.vue'
 import SitePicker from '@/components/SitePicker.vue'
+import { OFFLINE_TIP, accountTip, dateLabel } from '@/lib/misc-tips'
 
 const router = useRouter()
 const { error, success } = useNotification()
@@ -139,7 +140,7 @@ const initials = computed(() => {
         <div
           v-if="!isOnline"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-500/30 text-red-100 animate-pulse"
-          v-tooltip="'Hors-ligne'"
+          v-tooltip.bottom="OFFLINE_TIP"
           aria-label="Hors-ligne"
         >
           <ClockIcon class="w-5 h-5" />
@@ -147,7 +148,7 @@ const initials = computed(() => {
         <div
           v-if="initials"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/15 text-white text-sm font-medium"
-          v-tooltip="currentUser?.display_name || currentUser?.email"
+          v-tooltip.bottom="accountTip(currentUser)"
         >
           {{ initials }}
         </div>
@@ -201,21 +202,22 @@ const initials = computed(() => {
           <!-- Contenu -->
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2">
-              <p class="text-base font-medium text-gray-900 truncate leading-tight">
+              <p class="text-base font-medium text-gray-900 truncate leading-tight" v-tooltip.overflow>
                 {{ a.project_name || 'Audit BACS' }}
               </p>
               <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0 mt-0.5" />
             </div>
-            <p v-if="a.client_name" class="text-sm text-gray-600 truncate mt-0.5">{{ a.client_name }}</p>
+            <p v-if="a.client_name" class="text-sm text-gray-600 truncate mt-0.5" v-tooltip.overflow>{{ a.client_name }}</p>
             <div class="flex items-center gap-2 mt-2 flex-wrap">
               <span :class="['inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full', STATUS_LABEL[a.status]?.cls || 'bg-gray-100 text-gray-700']">
                 {{ STATUS_LABEL[a.status]?.label || a.status }}
               </span>
-              <span class="text-xs text-gray-500">
+              <span class="text-xs text-gray-500" v-tooltip="dateLabel('Modifié le', a.updated_at)">
                 <ClockIcon class="w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5" />
                 {{ relativeTime(a.updated_at) }}
               </span>
-              <span v-if="a.delivered_at" class="text-xs text-emerald-700 inline-flex items-center gap-1">
+              <span v-if="a.delivered_at" class="text-xs text-emerald-700 inline-flex items-center gap-1"
+                    v-tooltip="dateLabel('Livré le', a.delivered_at)">
                 <CheckCircleIcon class="w-3.5 h-3.5" /> Livré
               </span>
             </div>

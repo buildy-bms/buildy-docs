@@ -29,7 +29,11 @@ import { updateBacsThermal } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
+import HelpTip from '@/components/HelpTip.vue'
+import R175Tooltip from '@/components/R175Tooltip.vue'
 import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
+import { THERMAL_LEVEL_TIPS, WOOD_EXEMPT_TIP, thermalNoteTip } from '@/lib/audit-tips-site'
+import { THERMAL_SCALE_TIP } from '@/lib/audit-tips-mobile'
 
 const LEVEL_NOTES_FIELD = {
   production: 'production_notes_html',
@@ -108,19 +112,20 @@ const regulationDeviceOptions = computed(() =>
 )
 
 const GENERATOR_OPTIONS = [
-  { value: 'gas',              label: 'Gaz',                              icon: 'fa-fire-flame-curved', color: '#f97316' },
-  { value: 'electric',         label: 'Effet Joule',                      icon: 'fa-bolt',              color: '#eab308' },
-  { value: 'heat_pump',        label: 'Pompe à chaleur',                  icon: 'fa-temperature-half',  color: '#0ea5e9' },
-  { value: 'wood_appliance',   label: 'Appareil bois (exempté R175-6)',   icon: 'fa-tree',              color: '#65a30d' },
-  { value: 'district_heating', label: 'Réseau de chaleur',                icon: 'fa-pipe',              color: '#dc2626' },
-  { value: 'other',            label: 'Autre',                            icon: 'fa-circle-question',   color: '#6b7280' },
+  { value: 'gas',              label: 'Gaz',                                   icon: 'fa-fire-flame-curved', color: '#f97316' },
+  { value: 'electric',         label: 'Effet Joule',                           icon: 'fa-bolt',              color: '#eab308' },
+  { value: 'heat_pump',        label: 'Pompe à chaleur',                       icon: 'fa-temperature-half',  color: '#0ea5e9' },
+  { value: 'wood_appliance',   label: 'Appareil indépendant au bois (dispensé)', icon: 'fa-tree',            color: '#65a30d' },
+  { value: 'district_heating', label: 'Réseau de chaleur',                     icon: 'fa-pipe',              color: '#dc2626' },
+  { value: 'other',            label: 'Autre',                                 icon: 'fa-circle-question',   color: '#6b7280' },
 ]
-// Granularité de régulation : pilules colorées selon niveau de finesse.
+// Échelle de la régulation : pilules colorées selon niveau de finesse
+// (libellés seulement ; valeurs inchangées).
 const REGULATION_TYPE_OPTIONS = [
-  { value: 'per_room',     label: 'Par pièce',           pill: 'Fin',         pillTone: 'emerald' },
-  { value: 'per_zone',     label: 'Par zone',            pill: 'Zone',        pillTone: 'amber'   },
-  { value: 'central_only', label: 'Centrale uniquement', pill: 'Centrale',    pillTone: 'rose'    },
-  { value: 'none',         label: 'Aucune',              pill: 'Aucune',      pillTone: 'slate'   },
+  { value: 'per_room',     label: 'Par pièce',              pill: 'Pièce',       pillTone: 'emerald' },
+  { value: 'per_zone',     label: 'Par zone',               pill: 'Zone',        pillTone: 'amber'   },
+  { value: 'central_only', label: 'Centralisée uniquement', pill: 'Centrale',    pillTone: 'rose'    },
+  { value: 'none',         label: 'Aucune',                 pill: 'Aucune',      pillTone: 'slate'   },
 ]
 
 let saveTimer = null
@@ -187,24 +192,25 @@ async function saveLevelNote() {
     <div v-if="thermalRow" class="p-4 space-y-4">
       <!-- Carte d'aide contextuelle -->
       <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-        <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1">
-          R175-6
+        <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
+          Régulation de la température
+          <R175Tooltip article="R175-6" />
         </p>
         <p class="text-sm text-amber-900 leading-relaxed">
-          Régulation automatique de la température, par pièce ou par zone homogène.
-          Renseigne ci-dessous l'état réel constaté sur site.
+          La température doit être réglée automatiquement pièce par pièce, ou par zone quand c’est justifié.
+          Renseigne ci-dessous ce que tu constates sur place.
         </p>
       </div>
 
       <!-- Granularité de la régulation (la présence d'une régulation se
            déduit du type choisi : « Aucune » = pas de régulation). -->
       <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2">
-          <MobileField label="Granularité de la régulation">
+          <MobileField label="Échelle de la régulation" :tip="THERMAL_SCALE_TIP">
             <MobileSelectSheet
               :model-value="thermalRow.regulation_type"
               @update:modelValue="v => patch({ regulation_type: v || null })"
               :options="REGULATION_TYPE_OPTIONS"
-              title="Granularité"
+              title="Échelle de la régulation"
               placeholder="— Sélectionner —"
             />
           </MobileField>
@@ -212,7 +218,7 @@ async function saveLevelNote() {
 
         <!-- Production -->
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
-          <p class="text-sm font-semibold text-gray-700">🔧 Production</p>
+          <p class="text-sm font-semibold text-gray-700">🔧 Production<HelpTip :tip="THERMAL_LEVEL_TIPS.production" class="ml-1 p-1 -my-1" /></p>
           <MobileField label="Équipement de production">
             <MobileSelectSheet
               :model-value="thermalRow.generator_device_id"
@@ -224,7 +230,8 @@ async function saveLevelNote() {
           </MobileField>
           <div class="space-y-3 pl-4 border-l-4 border-amber-300">
             <template v-if="thermalRow.generator_device_id">
-              <MobileField label="Type de production">
+              <MobileField label="Type de production"
+                           :tip="thermalRow.generator_type === 'wood_appliance' ? WOOD_EXEMPT_TIP : null">
                 <MobileSelectSheet
                   :model-value="thermalRow.generator_type"
                   @update:modelValue="v => patch({ generator_type: v || null })"
@@ -232,7 +239,7 @@ async function saveLevelNote() {
                   creatable
                   title="Type de production"
                   placeholder="— Sélectionner —"
-                  custom-placeholder="ex : chaudière condensation, PAC air-eau…"
+                  custom-placeholder="ex : chaudière à condensation, pompe à chaleur air-eau…"
                 />
               </MobileField>
               <MobileField label="Âge de l'équipement (années)">
@@ -257,6 +264,7 @@ async function saveLevelNote() {
             <button
               type="button"
               @click="openLevelNote('production')"
+              v-tooltip="thermalNoteTip('production', htmlToText(thermalRow.production_notes_html))"
               :class="['w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition',
                 hasLevelNote('production')
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
@@ -270,14 +278,14 @@ async function saveLevelNote() {
 
         <!-- Distribution -->
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
-          <p class="text-sm font-semibold text-gray-700">🚰 Distribution</p>
+          <p class="text-sm font-semibold text-gray-700">🚰 Distribution<HelpTip :tip="THERMAL_LEVEL_TIPS.distribution" class="ml-1 p-1 -my-1" /></p>
           <MobileField label="Équipement de distribution">
             <MobileSelectSheet
               :model-value="thermalRow.distribution_device_id"
               @update:modelValue="v => patch({ distribution_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="distributionDeviceOptions"
               title="Équipement de distribution"
-              placeholder="— aucune (DRV, poêle…)"
+              placeholder="— aucun (poêle, climatisation…)"
             />
           </MobileField>
           <div class="space-y-3 pl-4 border-l-4 border-amber-300">
@@ -293,6 +301,7 @@ async function saveLevelNote() {
             <button
               type="button"
               @click="openLevelNote('distribution')"
+              v-tooltip="thermalNoteTip('distribution', htmlToText(thermalRow.distribution_notes_html))"
               :class="['w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition',
                 hasLevelNote('distribution')
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
@@ -306,7 +315,7 @@ async function saveLevelNote() {
 
         <!-- Émission -->
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
-          <p class="text-sm font-semibold text-gray-700">♨️ Émission</p>
+          <p class="text-sm font-semibold text-gray-700">♨️ Émission<HelpTip :tip="THERMAL_LEVEL_TIPS.emission" class="ml-1 p-1 -my-1" /></p>
           <MobileField label="Équipement d'émission">
             <MobileSelectSheet
               :model-value="thermalRow.emission_device_id"
@@ -329,6 +338,7 @@ async function saveLevelNote() {
             <button
               type="button"
               @click="openLevelNote('emission')"
+              v-tooltip="thermalNoteTip('emission', htmlToText(thermalRow.emission_notes_html))"
               :class="['w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition',
                 hasLevelNote('emission')
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
@@ -346,7 +356,7 @@ async function saveLevelNote() {
 
     <!-- Cas où aucune ligne n'existe encore (ne devrait pas arriver mais protège) -->
     <div v-else class="p-8 text-center text-sm text-gray-500">
-      Aucune régulation thermique enregistrée pour cette zone.
+      Aucune régulation de la température enregistrée pour cette zone.
     </div>
   </MobileSheet>
 
@@ -356,7 +366,7 @@ async function saveLevelNote() {
                @close="closeLevelNote" @save="saveLevelNote">
     <div class="p-4 space-y-3">
       <p class="text-xs text-gray-500 leading-relaxed">
-        Note libre pour ce niveau (état observé, défauts, contournements). Apparaîtra dans le PDF rapport sous cette sous-section.
+        Ce que tu observes à ce niveau : état, défauts, contournements… La note apparaîtra dans le rapport PDF, sous cette rubrique.
       </p>
       <textarea
         v-model="noteSheetText"
@@ -365,7 +375,7 @@ async function saveLevelNote() {
         class="w-full text-sm rounded-lg border border-gray-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
       ></textarea>
       <p class="text-xs text-gray-500 italic">
-        Formatage simplifié sur mobile (pas de gras / listes). Saisir une note riche depuis le poste de bureau si besoin.
+        Sur mobile, le texte reste simple (ni gras ni listes). Pour une mise en forme, rédige la note depuis un ordinateur.
       </p>
     </div>
   </MobileSheet>

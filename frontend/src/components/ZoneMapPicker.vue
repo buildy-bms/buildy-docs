@@ -10,6 +10,14 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { Cog6ToothIcon } from '@heroicons/vue/24/outline'
 import { loadGoogleMaps, ZONE_PIN_COLORS } from '@/lib/google-maps'
+import { tooltipOpenDelay, TOOLTIP_SKIP_DELAY, tooltipMotion, withBaseTransform, prefersReducedMotion } from '@/lib/tooltip-timing'
+
+// Fondu de l'étiquette d'un repère : même réglage que les infobulles (lib/tooltip-timing.js).
+function fadeLabel(div, entering) {
+  if (!div || typeof div.animate !== 'function') return null
+  const { keyframes, options } = tooltipMotion('top', { entering, reduced: prefersReducedMotion() })
+  return div.animate(withBaseTransform(keyframes, 'translate(-50%, -100%)'), options)
+}
 // Import paresseux : ZoneMapPicker ↔ EditSiteModal se référencent
 // mutuellement (EditSiteModal embarque une carte). L'import async casse
 // le cycle de dépendances.
@@ -64,7 +72,9 @@ let TooltipOverlayClass = null
 
 // Construit la classe `OverlayView` custom (à appeler après loadGoogleMaps).
 // Affiche un div HTML positionné au-dessus du marker, stylé comme les
-// tooltips Buildy (gris foncé, blanc, rounded, font Inter).
+// infobulles de l'app (2026-10-12) : fond navy #1b2842, texte blanc, police de
+// l'app (--font-sans), même arrondi (12 px), même ombre et même liseré que les
+// étiquettes v-tooltip (components/tooltip/TipLabel.vue).
 function buildTooltipOverlayClass() {
   if (TooltipOverlayClass) return
   TooltipOverlayClass = class extends google.maps.OverlayView {
@@ -86,16 +96,16 @@ function buildTooltipOverlayClass() {
       this.div = document.createElement('div')
       Object.assign(this.div.style, {
         position: 'absolute',
-        background: '#1f2937',
+        background: '#1b2842',
         color: '#fff',
         padding: '5px 9px',
-        borderRadius: '6px',
-        fontFamily: 'Inter, sans-serif',
+        borderRadius: '12px',
+        fontFamily: "var(--font-sans, 'Poppins', sans-serif)",
         fontSize: '12px',
         fontWeight: '500',
         lineHeight: '1.3',
         whiteSpace: 'nowrap',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.1), 0 20px 25px -5px rgba(27,40,66,0.3), 0 8px 10px -6px rgba(27,40,66,0.3)',
         pointerEvents: 'none',
         transform: 'translate(-50%, -100%)',
         marginTop: '-12px',
@@ -103,6 +113,7 @@ function buildTooltipOverlayClass() {
       })
       this.div.textContent = this.text
       this.getPanes().floatPane.appendChild(this.div)
+      fadeLabel(this.div, true)
     }
     draw() {
       if (!this.div || !this.position) return
@@ -120,19 +131,33 @@ function buildTooltipOverlayClass() {
   }
 }
 
-// Hover handler : affiche un OverlayView positionné sur le marker.
+// Hover handler : affiche un OverlayView positionné sur le marker, avec le même délai
+// d'apparition que les infobulles de l'app (lib/tooltip-timing.js) : sans délai d'un repère au voisin.
+let tooltipTimer = 0
+let tooltipWarmUntil = 0
 function bindHoverTooltip(marker, label) {
   if (!label) return
   marker.addListener('mouseover', () => {
-    if (!tooltipOverlay) {
-      tooltipOverlay = new TooltipOverlayClass()
-      tooltipOverlay.setMap(map)
-    }
-    tooltipOverlay.setLabel(marker.getPosition(), label)
+    clearTimeout(tooltipTimer)
+    tooltipTimer = setTimeout(() => {
+      if (!map) return
+      if (!tooltipOverlay) {
+        tooltipOverlay = new TooltipOverlayClass()
+        tooltipOverlay.setMap(map)
+      }
+      tooltipOverlay.setLabel(marker.getPosition(), label)
+    }, tooltipOpenDelay({ visible: !!tooltipOverlay, now: Date.now(), warmUntil: tooltipWarmUntil }))
   })
   marker.addListener('mouseout', () => {
-    if (tooltipOverlay) tooltipOverlay.setMap(null)
+    clearTimeout(tooltipTimer)
+    const overlay = tooltipOverlay
     tooltipOverlay = null
+    if (!overlay) return
+    tooltipWarmUntil = Date.now() + TOOLTIP_SKIP_DELAY
+    // Fondu de sortie, puis retrait de la carte.
+    const anim = fadeLabel(overlay.div, false)
+    if (!anim) return overlay.setMap(null)
+    anim.onfinish = () => overlay.setMap(null)
   })
 }
 
@@ -378,6 +403,7 @@ onBeforeUnmount(() => {
   contextMarkers.forEach(m => m.setMap(null))
   if (currentMarker) currentMarker.setMap(null)
   if (siteMarker) siteMarker.setMap(null)
+  clearTimeout(tooltipTimer)
   if (tooltipOverlay) tooltipOverlay.setMap(null)
 })
 </script>
@@ -387,6 +413,7 @@ onBeforeUnmount(() => {
     <!-- Barre d'outils : éditer l'adresse du site (sert au centrage carte) -->
     <div v-if="status === 'ready' && canEditSite && allowSiteEdit && !readonly" class="mb-2 flex justify-end">
       <button type="button" @click="showEditSite = true"
+              v-tooltip="{ title: 'Adresse du site', icon: 'location-dot', tone: 'info', text: 'Elle sert à centrer la carte. Corrige-la si la carte s’ouvre au mauvais endroit.' }"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition whitespace-nowrap">
         <Cog6ToothIcon class="w-4 h-4 shrink-0" />
         Modifier l'adresse du site
@@ -405,12 +432,13 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div v-if="status === 'ready' && !readonly" class="mt-1.5 flex items-center justify-between gap-3 text-xs">
-      <span class="text-gray-500 truncate">
+      <span class="text-gray-500 truncate" v-tooltip.overflow>
         {{ latitude != null
-          ? 'Déplacez le pin ou cliquez ailleurs pour ajuster la position.'
-          : `Cliquez sur la carte pour positionner ${pointLabel}.` }}
+          ? 'Déplace le repère ou clique ailleurs pour ajuster la position.'
+          : `Clique sur la carte pour positionner ${pointLabel}.` }}
       </span>
       <button v-if="latitude != null" type="button" @click="clearPoint"
+              v-tooltip="'Retirer le repère de la carte'"
               class="text-gray-400 hover:text-red-600 whitespace-nowrap shrink-0">
         Retirer le point
       </button>

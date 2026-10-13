@@ -9,6 +9,9 @@ import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
+import HelpTip from './HelpTip.vue'
+import Tooltip from './Tooltip.vue'
+import { iconChoiceLabel, colorLabel, CUSTOM_COLOR_LABEL, CATEGORY_KEY_HELP, saveTip } from '@/lib/library-tips'
 import { createSystemCategory, updateSystemCategory, deleteSystemCategory, getSystemCategoryUsage, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -161,12 +164,13 @@ async function destroy() {
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">
             Key (interne) *
+            <HelpTip size="xs" :tip="CATEGORY_KEY_HELP" />
             <span v-if="isEdit" class="text-gray-400 font-normal">— éditable, propagation auto</span>
           </label>
           <input v-model="form.key" type="text" required autocomplete="off"
                  placeholder="chauffage"
                  pattern="[a-zA-Z0-9_]+"
-                 title="Lettres, chiffres et underscore uniquement"
+                 title="Lettres, chiffres et tiret bas (_) uniquement"
                  class="w-full px-3 py-2 border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <p v-if="isEdit" class="mt-1 text-[10px] text-amber-700">
             ⚠️ Modifier la clé met à jour en cascade tous les systèmes biblio,
@@ -196,7 +200,7 @@ async function destroy() {
         <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
           <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
                   :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
-                  v-tooltip="name">
+                  v-tooltip="iconChoiceLabel(name)">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
           </button>
           <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
@@ -207,8 +211,8 @@ async function destroy() {
           <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
           <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
                   :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
-                  :style="{ background: c }" v-tooltip="c"></button>
-          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" />
+                  :style="{ background: c }" v-tooltip="colorLabel(c)"></button>
+          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" v-tooltip="CUSTOM_COLOR_LABEL" />
         </div>
       </div>
 
@@ -221,7 +225,7 @@ async function destroy() {
                           form.slugs.includes(tpl.slug) ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100']">
             <input type="checkbox" :checked="form.slugs.includes(tpl.slug)" @change="toggleSlug(tpl.slug)" class="shrink-0" />
             <EquipmentIcon :template="tpl" size="sm" />
-            <span class="truncate">{{ tpl.name }}</span>
+            <span class="truncate" v-tooltip.overflow>{{ tpl.name }}</span>
           </label>
         </div>
       </div>
@@ -232,10 +236,12 @@ async function destroy() {
         <TrashIcon class="w-3.5 h-3.5" /> Supprimer
       </button>
       <button @click="emit('close')" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
-      <button @click="submit" :disabled="submitting || !form.label.trim() || !form.key.trim()"
-              class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
-        {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer' : 'Créer') }}
-      </button>
+      <Tooltip :text="saveTip({ busy: submitting, missing: !form.label.trim() ? 'un libellé' : !form.key.trim() ? 'une clé interne' : null })">
+        <button @click="submit" :disabled="submitting || !form.label.trim() || !form.key.trim()"
+                class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+          {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer' : 'Créer') }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

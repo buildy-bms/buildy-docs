@@ -27,6 +27,12 @@ import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import BulkActionBar from '@/components/BulkActionBar.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  PENDING_FILTER_TIP, PHOTOS_COLUMN_TIP, EQUIPMENT_COLUMN_TIPS, EQUIPMENT_SLUG_LABEL, AF_UP_TO_DATE_TIP,
+  photosTip, equipmentUsageTip, equipmentDeleteTip, versionTip, afSectionVersionTip, afOutdatedTip,
+  dragTip, regenerateTip,
+} from '@/lib/library-tips'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useNotification } from '@/composables/useNotification'
 import { useSystemCategories } from '@/composables/useSystemCategories'
@@ -563,10 +569,12 @@ onMounted(async () => {
           {{ templates.length }} modèle{{ templates.length > 1 ? 's' : '' }} d'équipement partagé{{ templates.length > 1 ? 's' : '' }}.
         </p>
         <div class="flex items-center gap-2">
-          <button @click="showBulk = true" :disabled="!bulkItems.length"
-                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
-            <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
-          </button>
+          <Tooltip :text="regenerateTip(bulkItems.length, 'equipment')">
+            <button @click="showBulk = true" :disabled="!bulkItems.length"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+              <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
+            </button>
+          </Tooltip>
           <button @click="openCreate"
                   class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
             <PlusIcon class="w-4 h-4" />
@@ -581,7 +589,8 @@ onMounted(async () => {
           <input v-model="searchQuery" type="text" placeholder="Rechercher (nom, slug, catégorie, protocole)…"
                  autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                  class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-          <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+          <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  v-tooltip="'Effacer la recherche'">
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
@@ -610,7 +619,7 @@ onMounted(async () => {
             Vides <span class="text-gray-400 font-normal">{{ validationCounts.empty }}</span>
           </button>
           <button @click="validationFilter = 'pending'"
-                  title="Vide + brouillon (tout ce qui n'est pas encore validé)"
+                  v-tooltip="PENDING_FILTER_TIP"
                   :class="['px-2.5 py-1 rounded-md transition font-medium',
                            validationFilter === 'pending' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
             À traiter <span class="text-gray-400 font-normal">{{ validationCounts.empty + validationCounts.draft }}</span>
@@ -641,21 +650,26 @@ onMounted(async () => {
               <th class="text-left px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('name')">
                 Nom {{ sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_energy_source')">
+              <th class="text-center px-2 py-2.5 w-10" v-tooltip="PHOTOS_COLUMN_TIP">Photos</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_energy_source')"
+                  v-tooltip="EQUIPMENT_COLUMN_TIPS.energy">
                 Énergie {{ sortBy === 'default_energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_device_role')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_device_role')"
+                  v-tooltip="EQUIPMENT_COLUMN_TIPS.roles">
                 Fonction(s) {{ sortBy === 'default_device_role' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')"
+                  v-tooltip="EQUIPMENT_COLUMN_TIPS.points">
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('sections_using_count')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('sections_using_count')"
+                  v-tooltip="EQUIPMENT_COLUMN_TIPS.documents">
                 Documents {{ sortBy === 'sections_using_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap">Protocoles exigés</th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap" v-tooltip="EQUIPMENT_COLUMN_TIPS.protocols">Protocoles exigés</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')"
+                  v-tooltip="EQUIPMENT_COLUMN_TIPS.version">
                 Version {{ sortBy === 'current_version' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
@@ -702,7 +716,7 @@ onMounted(async () => {
                   </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
                     <div class="inline-flex items-center gap-1.5">
-                      <span class="drag-handle cursor-move text-gray-300 hover:text-gray-500" @click.stop title="Glisser pour réorganiser dans la catégorie">
+                      <span class="drag-handle cursor-move text-gray-300 hover:text-gray-500" @click.stop v-tooltip="dragTip(true)">
                         <Bars3Icon class="w-3.5 h-3.5" />
                       </span>
                       <EquipmentIcon :template="t" size="sm" />
@@ -716,7 +730,7 @@ onMounted(async () => {
                   <td class="px-2 py-2 text-center align-middle" @click.stop>
                     <button type="button" @click="openPhotos(t)"
                       :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition', t.attachments_count > 0 ? 'text-emerald-600 hover:bg-emerald-100' : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
-                      :title="t.attachments_count > 0 ? `${t.attachments_count} capture${t.attachments_count > 1 ? 's' : ''}` : 'Aucune capture'">
+                      v-tooltip="photosTip(t.attachments_count)">
                       <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
                       <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
                     </button>
@@ -731,36 +745,42 @@ onMounted(async () => {
                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
                   </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
-                    <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="`Utilisé dans ${t.sections_using_count} section(s) AF`">
+                    <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="equipmentUsageTip(t.sections_using_count)">
                       <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                     </span>
-                    <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="'Jamais utilisé'">∅ inutilisé</span>
+                    <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="equipmentUsageTip(0)">∅ inutilisé</span>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />
                     <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
                   </td>
-                  <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
+                  <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">
+                    <span v-tooltip="versionTip(t.current_version)">v{{ t.current_version }}</span>
+                  </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
                     <div class="inline-flex items-center gap-0.5">
-                      <button type="button" @click="moveInCategory(t, 'up')" :disabled="reordering || isFirstInCategory(t)"
-                              class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-                              v-tooltip="'Monter dans la catégorie'"><ArrowUpIcon class="w-3.5 h-3.5" /></button>
-                      <button type="button" @click="moveInCategory(t, 'down')" :disabled="reordering || isLastInCategory(t)"
-                              class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-                              v-tooltip="'Descendre dans la catégorie'"><ArrowDownIcon class="w-3.5 h-3.5" /></button>
+                      <!-- Flèches et corbeille grisées : la raison est portée par <Tooltip>. -->
+                      <Tooltip :text="reordering ? 'Déplacement en cours…' : isFirstInCategory(t) ? 'Déjà en tête de la catégorie' : 'Monter dans la catégorie'">
+                        <button type="button" @click="moveInCategory(t, 'up')" :disabled="reordering || isFirstInCategory(t)"
+                                aria-label="Monter dans la catégorie"
+                                class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"><ArrowUpIcon class="w-3.5 h-3.5" /></button>
+                      </Tooltip>
+                      <Tooltip :text="reordering ? 'Déplacement en cours…' : isLastInCategory(t) ? 'Déjà en dernier dans la catégorie' : 'Descendre dans la catégorie'">
+                        <button type="button" @click="moveInCategory(t, 'down')" :disabled="reordering || isLastInCategory(t)"
+                                aria-label="Descendre dans la catégorie"
+                                class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"><ArrowDownIcon class="w-3.5 h-3.5" /></button>
+                      </Tooltip>
                       <button type="button" @click="openClone(t)"
                               class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                              v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
-                      <button type="button" @click="deleteFromList(t)"
-                              :disabled="t.sections_using_count > 0"
-                              class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
-                              :title="t.sections_using_count > 0
-                                ? `Utilisé dans ${t.sections_using_count} section(s) AF active(s) — détache d'abord pour pouvoir supprimer`
-                                : 'Supprimer ce système technique'"
-                              v-tooltip="t.sections_using_count > 0 ? null : 'Supprimer ce système technique'">
-                        <TrashIcon class="w-4 h-4" />
-                      </button>
+                              v-tooltip="'Dupliquer ce modèle d’équipement'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+                      <Tooltip :text="equipmentDeleteTip(t.sections_using_count)">
+                        <button type="button" @click="deleteFromList(t)"
+                                :disabled="t.sections_using_count > 0"
+                                aria-label="Supprimer ce modèle d’équipement"
+                                class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed">
+                          <TrashIcon class="w-4 h-4" />
+                        </button>
+                      </Tooltip>
                     </div>
                   </td>
                 </tr>
@@ -787,12 +807,13 @@ onMounted(async () => {
               </td>
               <td class="px-2 py-2 text-center align-middle" @click.stop>
                 <button type="button" @click="openPhotos(t)"
-                  :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition', t.attachments_count > 0 ? 'text-emerald-600 hover:bg-emerald-100' : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']">
+                  :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition', t.attachments_count > 0 ? 'text-emerald-600 hover:bg-emerald-100' : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
+                  v-tooltip="photosTip(t.attachments_count)">
                   <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
                   <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
                 </button>
               </td>
-              <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
+              <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded" v-tooltip="EQUIPMENT_SLUG_LABEL">{{ t.slug }}</code></td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
                 <span v-if="t.default_energy_source" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">{{ energyLabel(t.default_energy_source) }}</span>
                 <span v-else class="text-[11px] text-gray-300 italic">—</span>
@@ -804,30 +825,32 @@ onMounted(async () => {
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="`Utilisé dans ${t.sections_using_count} section(s) AF`">
+                <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="equipmentUsageTip(t.sections_using_count)">
                   <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                 </span>
-                <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="'Jamais utilisé'">∅ inutilisé</span>
+                <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="equipmentUsageTip(0)">∅ inutilisé</span>
               </td>
               <td class="px-4 py-2 whitespace-nowrap">
                 <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />
                 <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
               </td>
-              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
+              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">
+                <span v-tooltip="versionTip(t.current_version)">v{{ t.current_version }}</span>
+              </td>
               <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
                 <div class="inline-flex items-center gap-0.5">
                   <button type="button" @click="openClone(t)"
                           class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                          v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
-                  <button type="button" @click="deleteFromList(t)"
-                          :disabled="t.sections_using_count > 0"
-                          class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
-                          :title="t.sections_using_count > 0
-                            ? `Utilisé dans ${t.sections_using_count} section(s) AF active(s) — détache d'abord pour pouvoir supprimer`
-                            : 'Supprimer ce système technique'"
-                          v-tooltip="t.sections_using_count > 0 ? null : 'Supprimer ce système technique'">
-                    <TrashIcon class="w-4 h-4" />
-                  </button>
+                          v-tooltip="'Dupliquer ce modèle d’équipement'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+                  <!-- Corbeille grisée tant qu'une AF utilise le modèle : la raison est portée par <Tooltip>. -->
+                  <Tooltip :text="equipmentDeleteTip(t.sections_using_count)">
+                    <button type="button" @click="deleteFromList(t)"
+                            :disabled="t.sections_using_count > 0"
+                            aria-label="Supprimer ce modèle d’équipement"
+                            class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
+                  </Tooltip>
                 </div>
               </td>
             </tr>
@@ -840,16 +863,20 @@ onMounted(async () => {
         </table>
 
         <BulkActionBar :count="bulkSel.size.value" noun="modèle" @clear="bulkSel.clear()">
-          <button @click="bulkClone" :disabled="bulkBusy"
-                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
-            <DocumentDuplicateIcon class="w-4 h-4" />
-            Dupliquer
-          </button>
-          <button @click="bulkDelete" :disabled="bulkBusy"
-                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
-            <TrashIcon class="w-4 h-4" />
-            Supprimer
-          </button>
+          <Tooltip :text="bulkBusy ? 'Action en cours…' : 'Dupliquer les modèles cochés'">
+            <button @click="bulkClone" :disabled="bulkBusy"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+              <DocumentDuplicateIcon class="w-4 h-4" />
+              Dupliquer
+            </button>
+          </Tooltip>
+          <Tooltip :text="bulkBusy ? 'Action en cours…' : { title: 'Supprimer les modèles cochés', tone: 'error', icon: 'trash', text: 'Les modèles encore utilisés dans une AF active sont ignorés.' }">
+            <button @click="bulkDelete" :disabled="bulkBusy"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
+              <TrashIcon class="w-4 h-4" />
+              Supprimer
+            </button>
+          </Tooltip>
         </BulkActionBar>
       </div>
 
@@ -877,12 +904,12 @@ onMounted(async () => {
                                   class="absolute top-2 right-2" />
             <div class="flex items-center justify-between mb-2">
               <EquipmentIcon :template="t" size="lg" />
-              <span class="text-[10px] text-gray-400">v{{ t.current_version }}</span>
+              <span class="text-[10px] text-gray-400" v-tooltip="versionTip(t.current_version)">v{{ t.current_version }}</span>
             </div>
             <p class="text-sm font-semibold text-gray-800 leading-tight mb-1">{{ t.name }}</p>
             <div class="flex items-center justify-between text-[11px] text-gray-500 mt-2 pt-2 border-t border-gray-100">
               <span>{{ t.points_count }} point{{ t.points_count > 1 ? 's' : '' }}</span>
-              <span class="inline-flex items-center gap-0.5">
+              <span class="inline-flex items-center gap-0.5" v-tooltip="equipmentUsageTip(t.sections_using_count)">
                 <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
               </span>
             </div>
@@ -903,7 +930,7 @@ onMounted(async () => {
           <h1 class="text-2xl font-semibold text-gray-800">{{ selected.name }}</h1>
           <p class="text-sm text-gray-500 mt-1">
             <span class="capitalize">{{ categoryLabel(selected.category) }}</span>
-            · v{{ selected.current_version }} · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ selected.slug }}</code>
+            · <span v-tooltip="versionTip(selected.current_version)">v{{ selected.current_version }}</span> · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded" v-tooltip="EQUIPMENT_SLUG_LABEL">{{ selected.slug }}</code>
           </p>
           <div v-if="selected.preferred_protocols" class="mt-3">
             <ProtocolPills :protocols="selected.preferred_protocols" />
@@ -991,7 +1018,7 @@ onMounted(async () => {
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
                 <th class="text-left px-4 py-2 font-medium w-20">Version</th>
-                <th class="text-left px-4 py-2 font-medium">Changelog</th>
+                <th class="text-left px-4 py-2 font-medium" v-tooltip="EQUIPMENT_COLUMN_TIPS.changelog">Changelog</th>
                 <th class="text-left px-4 py-2 font-medium w-40">Auteur</th>
                 <th class="text-left px-4 py-2 font-medium w-44">Date</th>
               </tr>
@@ -1022,13 +1049,14 @@ onMounted(async () => {
                 <th class="text-left px-4 py-2 font-medium">Projet</th>
                 <th class="text-left px-4 py-2 font-medium w-28">Statut</th>
                 <th class="text-left px-4 py-2 font-medium w-44">Sections</th>
-                <th class="text-left px-4 py-2 font-medium w-32">Synchro</th>
+                <th class="text-left px-4 py-2 font-medium w-32" v-tooltip="EQUIPMENT_COLUMN_TIPS.sync">Synchro</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="af in affectedAfs" :key="af.af_id" class="border-t border-gray-100">
                 <td class="px-4 py-2">
-                  <button @click="router.push(`/afs/${af.af_id}`)" class="text-left hover:text-indigo-700">
+                  <button @click="router.push(`/afs/${af.af_id}`)" class="text-left hover:text-indigo-700"
+                          v-tooltip="'Ouvrir cette AF'">
                     <p class="font-semibold text-gray-800">{{ af.client_name }}</p>
                     <p class="text-xs text-gray-500">{{ af.project_name }}</p>
                   </button>
@@ -1036,14 +1064,17 @@ onMounted(async () => {
                 <td class="px-4 py-2 text-xs text-gray-600 capitalize">{{ af.status }}</td>
                 <td class="px-4 py-2 text-xs text-gray-600">
                   <span v-for="(s, i) in af.sections" :key="s.section_id">
-                    <span :class="s.is_outdated ? 'text-amber-700' : 'text-gray-500'">
+                    <span :class="s.is_outdated ? 'text-amber-700' : 'text-gray-500'"
+                          v-tooltip="afSectionVersionTip(s.equipment_template_version, selected.current_version)">
                       § {{ s.number || '?' }} (v{{ s.equipment_template_version || 0 }})
                     </span><span v-if="i < af.sections.length - 1">, </span>
                   </span>
                 </td>
                 <td class="px-4 py-2">
-                  <span v-if="af.outdated_count === 0" class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800">à jour</span>
-                  <span v-else class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800">{{ af.outdated_count }} en retard</span>
+                  <span v-if="af.outdated_count === 0" class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800"
+                        v-tooltip="AF_UP_TO_DATE_TIP">à jour</span>
+                  <span v-else class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800"
+                        v-tooltip="afOutdatedTip(af.outdated_count)">{{ af.outdated_count }} en retard</span>
                 </td>
               </tr>
             </tbody>
@@ -1063,7 +1094,7 @@ onMounted(async () => {
 
     <BulkRegenerateModal
       v-if="showBulk"
-      v-tooltip="'Régénérer les systèmes techniques avec Claude'"
+      :title="'Régénérer les systèmes techniques avec Claude'"
       :items="bulkItems"
       :get-html="bulkGetHtml"
       :on-save-html="bulkSaveHtml"
@@ -1114,10 +1145,12 @@ onMounted(async () => {
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition whitespace-nowrap">
           Annuler
         </button>
-        <button @click="submitClone" :disabled="!cloning.name.trim()"
-                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
-          Dupliquer
-        </button>
+        <Tooltip :text="cloning.name.trim() ? null : 'Saisis d’abord le nom de la copie'">
+          <button @click="submitClone" :disabled="!cloning.name.trim()"
+                  class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
+            Dupliquer
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
   </div>

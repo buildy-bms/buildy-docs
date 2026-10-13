@@ -7,6 +7,9 @@ import {
 import { listWhitepapers, createWhitepaper } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { plural } from '@/lib/tooltip-content'
+import { WP_COMPANIONS_TIP, WP_AUDIENCE_TIPS } from '@/lib/misc-tips'
 
 const router = useRouter()
 const { success, error } = useNotification()
@@ -94,7 +97,7 @@ onMounted(refresh)
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <button @click="refresh" class="p-2 text-gray-500 hover:text-gray-700" v-tooltip="'Rafraîchir'">
+        <button @click="refresh" class="p-2 text-gray-500 hover:text-gray-700" v-tooltip="'Rafraîchir la liste des livres blancs'">
           <ArrowPathIcon class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
         </button>
         <button
@@ -140,7 +143,7 @@ onMounted(refresh)
             <th class="px-4 py-3">Audience</th>
             <th class="px-4 py-3">Statut</th>
             <th class="px-4 py-3 whitespace-nowrap">Version</th>
-            <th class="px-4 py-3 whitespace-nowrap">Compagnons</th>
+            <th class="px-4 py-3 whitespace-nowrap" v-tooltip="WP_COMPANIONS_TIP">Compagnons</th>
             <th class="px-4 py-3 whitespace-nowrap">Modifié</th>
           </tr>
         </thead>
@@ -158,16 +161,18 @@ onMounted(refresh)
               </div>
             </td>
             <td class="px-4 py-3 text-gray-600">
-              {{ AUDIENCE_LABELS[wp.audience] || '—' }}
+              <span v-tooltip="WP_AUDIENCE_TIPS[wp.audience] || null">{{ AUDIENCE_LABELS[wp.audience] || '—' }}</span>
             </td>
             <td class="px-4 py-3">
-              <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold" :class="statusBadge(wp.status).cls">
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold" :class="statusBadge(wp.status).cls"
+                    v-tooltip="wp.status === 'published' ? 'PDF en ligne sur buildy.fr' : 'Pas encore publié en ligne'">
                 {{ statusBadge(wp.status).label }}
               </span>
             </td>
             <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ wp.version || '—' }}</td>
             <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
-              <span v-if="wp.companion_count" class="inline-flex items-center gap-1">
+              <span v-if="wp.companion_count" class="inline-flex items-center gap-1"
+                    v-tooltip="plural(wp.companion_count, 'document compagnon', 'documents compagnons')">
                 <DocumentTextIcon class="w-3.5 h-3.5 text-gray-400" />
                 {{ wp.companion_count }}
               </span>
@@ -211,13 +216,15 @@ onMounted(refresh)
         >
           Annuler
         </button>
-        <button
-          @click="submit"
-          :disabled="submitting || !form.title.trim()"
-          class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {{ submitting ? 'Création…' : 'Créer' }}
-        </button>
+        <Tooltip :text="!submitting && !form.title.trim() ? 'Donne d’abord un titre au livre blanc' : null">
+          <button
+            @click="submit"
+            :disabled="submitting || !form.title.trim()"
+            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {{ submitting ? 'Création…' : 'Créer' }}
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
   </div>

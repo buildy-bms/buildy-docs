@@ -12,6 +12,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { ArrowPathIcon, BookOpenIcon, DocumentTextIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
+import Tooltip from './Tooltip.vue'
+import { librarySyncDisabledTip } from '@/lib/editor-tips'
 import { getEquipmentTemplate, getSectionTemplate, applySectionTemplateUpdate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useAfStore } from '@/stores/af'
@@ -61,6 +63,13 @@ onMounted(async () => {
 const canSubmit = computed(() =>
   !submitting.value && !loading.value && (wantBacs.value || wantFonctionnel.value || wantPoints.value)
 )
+// Raison du grisé de « Mettre à jour » (infobulle portée par <Tooltip>).
+const submitDisabledReason = computed(() => librarySyncDisabledTip({
+  loading: loading.value,
+  submitting: submitting.value,
+  hasTemplate: !!tpl.value,
+  anyChecked: wantBacs.value || wantFonctionnel.value || wantPoints.value,
+}))
 
 async function submit() {
   if (!canSubmit.value) return
@@ -160,11 +169,13 @@ async function submit() {
               class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50">
         Annuler
       </button>
-      <button @click="submit" :disabled="!canSubmit"
-              class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
-        <ArrowPathIcon :class="['w-4 h-4', submitting ? 'animate-spin' : '']" />
-        {{ submitting ? 'Mise à jour…' : 'Mettre à jour' }}
-      </button>
+      <Tooltip :text="submitDisabledReason">
+        <button @click="submit" :disabled="!canSubmit"
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          <ArrowPathIcon :class="['w-4 h-4', submitting ? 'animate-spin' : '']" />
+          {{ submitting ? 'Mise à jour…' : 'Mettre à jour' }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

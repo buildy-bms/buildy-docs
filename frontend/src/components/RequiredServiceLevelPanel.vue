@@ -10,6 +10,10 @@ import { ref, watch, computed } from 'vue'
 import { ExclamationTriangleIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { getAfRequiredLevel } from '@/api'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  REQUIRED_LEVEL_TIP, CONTRACT_UNDEFINED_TIP, contractShortfallTip, contractOkTip, moreJustificationsTip,
+} from '@/lib/af-tips'
 
 /**
  * Aligne le badge de niveau de chaque justification sur celui affiché dans
@@ -79,22 +83,23 @@ defineExpose({ refresh })
 <template>
   <div v-if="data && data.required" :class="['border rounded-lg shadow-xs px-4 py-2.5 transition-colors', cardClass]">
     <div class="flex items-center gap-3 flex-wrap">
-      <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold shrink-0">Niveau requis</p>
+      <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold shrink-0" v-tooltip="REQUIRED_LEVEL_TIP">Niveau requis</p>
       <ServiceLevelBadge :level="data.required" variant="full" />
       <template v-if="verdict?.kind === 'shortfall'">
-        <span class="inline-flex items-center gap-1 text-xs text-red-700 font-medium">
+        <span class="inline-flex items-center gap-1 text-xs text-red-700 font-medium"
+              v-tooltip="contractShortfallTip(LEVEL_LABEL[verdict.contract], LEVEL_LABEL[verdict.required])">
           <ExclamationTriangleIcon class="w-3.5 h-3.5" />
           Dépasse le contrat ({{ LEVEL_LABEL[verdict.contract] }}) — à arbitrer.
         </span>
       </template>
       <template v-else-if="verdict?.kind === 'ok'">
-        <span class="inline-flex items-center gap-1 text-xs text-emerald-700">
+        <span class="inline-flex items-center gap-1 text-xs text-emerald-700" v-tooltip="contractOkTip(LEVEL_LABEL[verdict.contract])">
           <CheckCircleIcon class="w-3.5 h-3.5" />
           Cohérent avec le contrat ({{ LEVEL_LABEL[verdict.contract] }}).
         </span>
       </template>
       <template v-else-if="verdict?.kind === 'no-contract'">
-        <span class="text-xs text-gray-500 italic">Aucun contrat fixé — à choisir au bon de commande.</span>
+        <span class="text-xs text-gray-500 italic" v-tooltip="CONTRACT_UNDEFINED_TIP">Aucun contrat fixé — à choisir au bon de commande.</span>
       </template>
 
       <!-- Pas de justifications quand le niveau requis est Essentiel : la
@@ -113,14 +118,18 @@ defineExpose({ refresh })
           <span class="text-gray-700 font-medium">{{ j.title }}</span>
           <ServiceLevelBadge v-if="minServiceLevel(j.level)" :level="minServiceLevel(j.level)" />
         </button>
-        <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic">
+        <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic"
+              v-tooltip="moreJustificationsTip(data.justifications.slice(6).map(j => j.title))">
           +{{ data.justifications.length - 6 }} autres
         </span>
       </template>
 
-      <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1 ml-auto" v-tooltip="'Recalculer'">
-        <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
-      </button>
+      <!-- Enveloppe : le bouton grisé pendant le calcul garde son infobulle (ml-auto porté par l'enveloppe). -->
+      <Tooltip text="Recalculer le niveau requis" class="ml-auto shrink-0">
+        <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1">
+          <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
+        </button>
+      </Tooltip>
     </div>
   </div>
 </template>

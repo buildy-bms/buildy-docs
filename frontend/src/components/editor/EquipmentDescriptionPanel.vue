@@ -16,6 +16,11 @@ import { PencilSquareIcon, ArrowTopRightOnSquareIcon, ArrowPathIcon, CheckIcon, 
 import { useRouter } from 'vue-router'
 import { getEquipmentTemplate, updateSection } from '@/api'
 import RichTextEditor from '@/components/RichTextEditor.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import {
+  DESCRIPTION_CUSTOM_TIP, DESCRIPTION_INHERITED_TIP, templateDriftTip,
+  RESET_DESCRIPTION_LABEL, ACK_VERSION_LABEL, OPEN_EQUIPMENT_MODEL_LABEL,
+} from '@/lib/editor-tips'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -113,11 +118,13 @@ function openInLibrary() {
         <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold whitespace-nowrap">
           Description fonctionnelle de l'équipement
         </p>
-        <span v-if="hasOverride" class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold whitespace-nowrap">
+        <span v-if="hasOverride" class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-semibold whitespace-nowrap"
+          v-tooltip="DESCRIPTION_CUSTOM_TIP">
           Personnalisée pour cette AF
         </span>
-        <span v-else class="text-[10px] text-gray-400 normal-case">(héritée de la bibliothèque)</span>
-        <span v-if="drift" class="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 font-semibold whitespace-nowrap">
+        <span v-else class="text-[10px] text-gray-400 normal-case" v-tooltip="DESCRIPTION_INHERITED_TIP">(héritée de la bibliothèque)</span>
+        <span v-if="drift" class="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 font-semibold whitespace-nowrap"
+          v-tooltip="templateDriftTip(section.equipment_template_version, template.current_version)">
           <ExclamationTriangleIcon class="w-3 h-3 shrink-0" /> Modèle mis à jour
         </span>
       </div>
@@ -126,16 +133,22 @@ function openInLibrary() {
           class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-indigo-700 hover:bg-indigo-50 whitespace-nowrap">
           <PencilSquareIcon class="w-3.5 h-3.5 shrink-0" /> Modifier dans cette AF
         </button>
-        <button v-if="hasOverride && !editing" @click="resetToTemplate" :disabled="saving"
-          class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap">
-          <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Récupérer depuis le modèle
-        </button>
-        <button v-if="drift && !editing" @click="ackTemplateVersion" :disabled="saving"
-          class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-amber-800 hover:bg-amber-100 disabled:opacity-50 whitespace-nowrap">
-          <CheckIcon class="w-3.5 h-3.5 shrink-0" /> Acquitter la version
-        </button>
+        <!-- Bulles portées par <Tooltip> : boutons grisés pendant un enregistrement. -->
+        <Tooltip v-if="hasOverride && !editing" :text="RESET_DESCRIPTION_LABEL">
+          <button @click="resetToTemplate" :disabled="saving"
+            class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap">
+            <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Récupérer depuis le modèle
+          </button>
+        </Tooltip>
+        <Tooltip v-if="drift && !editing" :text="ACK_VERSION_LABEL">
+          <button @click="ackTemplateVersion" :disabled="saving"
+            class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-amber-800 hover:bg-amber-100 disabled:opacity-50 whitespace-nowrap">
+            <CheckIcon class="w-3.5 h-3.5 shrink-0" /> Acquitter la version
+          </button>
+        </Tooltip>
         <button @click="openInLibrary"
-          class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-gray-600 hover:bg-gray-100 whitespace-nowrap">
+          class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md text-gray-600 hover:bg-gray-100 whitespace-nowrap"
+          v-tooltip="OPEN_EQUIPMENT_MODEL_LABEL">
           <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5 shrink-0" /> Éditer le modèle
         </button>
       </div>

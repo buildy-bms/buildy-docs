@@ -84,7 +84,7 @@ async function submit() {
     <form @submit.prevent="submit" class="p-4 space-y-4">
       <MobileField
         label="Site rattaché"
-        hint="Optionnel — partage adresse / zones / équipements avec les autres documents du site"
+        hint="Facultatif : l’adresse, les zones et les équipements sont alors partagés avec les autres documents du site."
       >
         <SitePicker v-model="form.site_id" @change="onSiteChange" />
       </MobileField>

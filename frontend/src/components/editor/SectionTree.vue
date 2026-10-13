@@ -7,6 +7,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import SectionTreeNode from './SectionTreeNode.vue'
 import Tooltip from '@/components/Tooltip.vue'
+import { unverifiedFilterTip, batchDeleteTip } from '@/lib/editor-tips'
 import Sortable from 'sortablejs'
 
 const props = defineProps({
@@ -236,19 +237,19 @@ onBeforeUnmount(teardownRootSortable)
           data-lpignore="true"
           class="w-full pl-7 pr-7 py-1.5 text-[12px] border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
         />
-        <button v-if="search" @click="search = ''" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+        <button v-if="search" @click="search = ''" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700" v-tooltip="'Effacer la recherche'">
           <XMarkIcon class="w-3.5 h-3.5" />
         </button>
       </div>
       <Tooltip
-        :text="onlyUnverified
-          ? `Afficher toutes les sections (${unverifiedCount} non vérifiée${unverifiedCount > 1 ? 's' : ''})`
-          : `Afficher uniquement les sections non vérifiées (${unverifiedCount} non vérifiée${unverifiedCount > 1 ? 's' : ''})`"
+        :text="unverifiedFilterTip(onlyUnverified, unverifiedCount)"
         placement="bottom"
       >
         <button
           type="button"
           @click="onlyUnverified = !onlyUnverified"
+          :aria-pressed="onlyUnverified"
+          aria-label="Afficher les sections à vérifier"
           :class="[
             'shrink-0 p-1.5 rounded transition-colors',
             onlyUnverified ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700',
@@ -259,7 +260,7 @@ onBeforeUnmount(teardownRootSortable)
       </Tooltip>
       <Tooltip
         v-if="!selectionMode"
-        text="Sélection multiple — cocher des sections pour les supprimer en lot"
+        text="Sélectionner des sections à supprimer"
         placement="bottom"
       >
         <button
@@ -270,7 +271,7 @@ onBeforeUnmount(teardownRootSortable)
           <Squares2X2Icon class="w-4 h-4 shrink-0" />
         </button>
       </Tooltip>
-      <Tooltip text="Ajouter une section racine" placement="bottom">
+      <Tooltip text="Ajouter une section de premier niveau" placement="bottom">
         <button
           @click="emit('add-root')"
           class="shrink-0 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"
@@ -288,7 +289,7 @@ onBeforeUnmount(teardownRootSortable)
       <span class="text-[12px] font-medium text-red-700 whitespace-nowrap">
         {{ selectedIds.size }} sélectionnée{{ selectedIds.size > 1 ? 's' : '' }}
       </span>
-      <Tooltip text="Tout sélectionner" placement="bottom">
+      <Tooltip text="Sélectionner toutes les sections" placement="bottom">
         <button
           type="button"
           @click="emit('select-all')"
@@ -306,7 +307,7 @@ onBeforeUnmount(teardownRootSortable)
           Inverser
         </button>
       </Tooltip>
-      <Tooltip text="Vider la sélection" placement="bottom">
+      <Tooltip text="Décocher toutes les sections" placement="bottom">
         <button
           type="button"
           @click="emit('clear-selection')"
@@ -316,15 +317,17 @@ onBeforeUnmount(teardownRootSortable)
         </button>
       </Tooltip>
       <div class="flex-1" />
-      <button
-        type="button"
-        :disabled="selectedIds.size === 0"
-        @click="emit('batch-delete')"
-        class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed whitespace-nowrap"
-      >
-        <TrashIcon class="w-3.5 h-3.5 shrink-0" />
-        Supprimer
-      </button>
+      <Tooltip :text="batchDeleteTip(selectedIds.size)" placement="bottom">
+        <button
+          type="button"
+          :disabled="selectedIds.size === 0"
+          @click="emit('batch-delete')"
+          class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          <TrashIcon class="w-3.5 h-3.5 shrink-0" />
+          Supprimer
+        </button>
+      </Tooltip>
       <Tooltip text="Quitter le mode sélection" placement="bottom">
         <button
           type="button"

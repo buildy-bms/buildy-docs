@@ -14,6 +14,7 @@ import { listAfs } from '@/api'
 import {
   DocumentTextIcon, ShieldCheckIcon, BookOpenIcon,
 } from '@heroicons/vue/24/outline'
+import { docKindTip } from '@/lib/misc-tips'
 
 const props = defineProps({
   siteId: { type: Number, default: null },
@@ -28,7 +29,8 @@ async function load() {
   loading.value = true
   try {
     const { data } = await listAfs({ site_id: props.siteId })
-    docs.value = (data.items || data).filter(d => d.id !== props.excludeId && !d.deleted_at)
+    // Types inconnus ignorés (garde-fou : un nouveau type ne doit pas faire planter le panneau).
+    docs.value = (data.items || data).filter(d => d.id !== props.excludeId && !d.deleted_at && KIND_META[d.kind])
   } catch (e) {
     docs.value = []
   } finally {
@@ -43,6 +45,11 @@ const KIND_META = {
   af: { label: 'AF', color: 'text-indigo-700 bg-indigo-50 border-indigo-200', icon: DocumentTextIcon, route: id => `/afs/${id}` },
   bacs_audit: { label: 'Audit BACS', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: ShieldCheckIcon, route: id => `/bacs-audit/${id}` },
   brochure: { label: 'Brochure', color: 'text-violet-700 bg-violet-50 border-violet-200', icon: BookOpenIcon, route: id => `/brochures/${id}` },
+  // listAfs({ site_id }) renvoie TOUS les types : sans ces entrées, un audit GTB ou un rapport
+  // de maintenance sur le site faisait planter le panneau (KIND_META[kind] indéfini).
+  site_audit: { label: 'Audit GTB', color: 'text-sky-700 bg-sky-50 border-sky-200', icon: ShieldCheckIcon, route: id => `/site-audit/${id}` },
+  maintenance_report: { label: 'Maintenance', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: DocumentTextIcon, route: id => `/maintenance-reports/${id}` },
+  whitepaper: { label: 'Livre blanc', color: 'text-pink-700 bg-pink-50 border-pink-200', icon: BookOpenIcon, route: id => `/marketing/whitepapers/${id}` },
 }
 
 const grouped = computed(() => {
@@ -67,10 +74,11 @@ const grouped = computed(() => {
                    :to="KIND_META[d.kind].route(d.id)"
                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 text-xs transition">
         <component :is="KIND_META[d.kind].icon" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-        <span :class="['inline-block px-1.5 py-0 text-[9px] rounded border shrink-0', KIND_META[d.kind].color]">
+        <span :class="['inline-block px-1.5 py-0 text-[9px] rounded border shrink-0', KIND_META[d.kind].color]"
+              v-tooltip="docKindTip(d.kind)">
           {{ KIND_META[d.kind].label }}
         </span>
-        <span class="flex-1 min-w-0 truncate text-gray-700">
+        <span class="flex-1 min-w-0 truncate text-gray-700" v-tooltip.overflow>
           {{ d.project_name || d.client_name || `#${d.id}` }}
         </span>
       </router-link>

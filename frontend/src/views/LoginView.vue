@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '@/api'
+import { BUILDY_ID_TIP } from '@/lib/misc-tips'
 
 const route = useRoute()
 const error = ref('')
@@ -39,12 +40,13 @@ function loginOidc() {
       <p v-if="error" class="text-red-600 text-sm mb-4 text-center">{{ error }}</p>
 
       <div v-if="devBypass" class="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-        <strong>Mode dev :</strong> l'authentification est contournee. Vous etes connecte comme utilisateur fictif.
-        <router-link to="/" class="block mt-2 text-amber-900 underline">Acceder a l'app →</router-link>
+        <strong>Mode dev :</strong> l’authentification est contournée. Vous êtes connecté comme utilisateur fictif.
+        <router-link to="/" class="block mt-2 text-amber-900 underline">Accéder à l’app →</router-link>
       </div>
 
       <button
         v-else-if="oidcEnabled"
+        v-tooltip.bottom="BUILDY_ID_TIP"
         @click="loginOidc"
         class="w-full py-3 bg-[#00cd92] text-white text-sm font-semibold rounded-lg hover:bg-[#00b884] transition-colors flex items-center justify-center gap-2"
       >

@@ -28,7 +28,7 @@ async function onReload() {
       <div class="px-4 py-2 flex items-center gap-3">
         <ArrowPathIcon class="w-4 h-4 shrink-0" />
         <span class="flex-1">
-          Une nouvelle version de Buildy Docs<span v-if="newVersion"> (v{{ newVersion }}<span v-if="newBuildSha"> · {{ newBuildSha }}</span>)</span>
+          Une nouvelle version de Buildy Docs<span v-if="newVersion"> (v{{ newVersion }}<span v-if="newBuildSha" v-tooltip.bottom="'Référence technique de la version'"> · {{ newBuildSha }}</span>)</span>
           est disponible. Rechargez pour éviter les erreurs.
         </span>
         <button

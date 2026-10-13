@@ -11,6 +11,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { SparklesIcon, ArrowPathIcon, PhotoIcon, BookOpenIcon } from '@heroicons/vue/24/outline'
 import { listFaqCategories, generateFaqFromFunctionality } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -118,12 +119,15 @@ async function generate() {
                 class="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 transition whitespace-nowrap disabled:opacity-50">
           Annuler
         </button>
-        <button type="button" @click="generate" :disabled="generating || !selectedCategoryId"
-                class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap disabled:opacity-50 shadow-sm">
-          <ArrowPathIcon v-if="generating" class="w-4 h-4 shrink-0 animate-spin" />
-          <SparklesIcon v-else class="w-4 h-4 shrink-0" />
-          {{ generating ? 'Génération…' : 'Générer l\'article' }}
-        </button>
+        <!-- Grisé sans catégorie (liste vide ou en chargement) ; pendant la génération, le bouton l'affiche. -->
+        <Tooltip :text="generating ? null : loadingCategories ? 'Chargement des catégories…' : !selectedCategoryId ? 'Choisis d’abord une catégorie Crisp' : null">
+          <button type="button" @click="generate" :disabled="generating || !selectedCategoryId"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap disabled:opacity-50 shadow-sm">
+            <ArrowPathIcon v-if="generating" class="w-4 h-4 shrink-0 animate-spin" />
+            <SparklesIcon v-else class="w-4 h-4 shrink-0" />
+            {{ generating ? 'Génération…' : 'Générer l\'article' }}
+          </button>
+        </Tooltip>
       </div>
     </div>
   </BaseModal>

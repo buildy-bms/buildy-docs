@@ -51,8 +51,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <header class="flex items-center gap-3 border-b border-gray-200 px-4 py-2.5">
           <DocumentIcon class="h-5 w-5 shrink-0 text-gray-400" />
           <div class="min-w-0 flex-1">
-            <h3 class="truncate text-sm font-semibold text-gray-800">{{ title }}</h3>
-            <p class="truncate text-xs text-gray-500">
+            <h3 class="truncate text-sm font-semibold text-gray-800" v-tooltip.overflow>{{ title }}</h3>
+            <p class="truncate text-xs text-gray-500" v-tooltip.overflow>
               {{ doc.original_name }}<template v-if="doc.size_bytes"> · {{ fmtSize(doc.size_bytes) }}</template>
             </p>
           </div>
@@ -62,12 +62,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <ArrowTopRightOnSquareIcon class="h-4 w-4" /> Nouvel onglet
           </a>
           <a :href="downloadUrl"
-             class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+             class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+             v-tooltip="'Télécharger ce document'">
             <ArrowDownTrayIcon class="h-4 w-4" /> Télécharger
           </a>
           <button type="button" @click="emit('close')"
                   class="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                  v-tooltip="'Fermer (Échap)'">
+                  v-tooltip="{ label: 'Fermer l’aperçu', keys: ['Esc'] }">
             <XMarkIcon class="h-5 w-5" />
           </button>
         </header>

@@ -1,5 +1,5 @@
 // Constantes partagées entre la PWA mobile (MobileMetersTab) et la
-// section desktop (MetersSection + MeterCoverageMatrix + MeterEnergyGroup).
+// section desktop (MetersSection + MeterEnergyGroup).
 // Source unique pour éviter la dérive labels/couleurs/icônes entre les vues.
 //
 // L'ordre des entrées est important : c'est l'ordre d'affichage (colonnes
@@ -52,7 +52,7 @@ export function meterUsageLabel(value) {
 
 // Audit BACS : « Requis » est calculé par le serveur (resync) et recalculé à
 // chaque modification des systèmes — la colonne n'est pas éditable.
-export const REQUIRED_LOCKED_TIP = 'Calculé d’après les systèmes et équipements saisis (R175-3 1°). Pour le changer, corrige l’étape Systèmes.'
+export const REQUIRED_LOCKED_TIP = 'Calculé d’après les systèmes et équipements saisis. Pour le changer, corrige l’étape Systèmes.'
 
 // Nom courant d'un compteur d'énergie thermique : calorimètre (chaleur :
 // chauffage, ECS) ou frigorimètre (froid). Null pour les autres compteurs.

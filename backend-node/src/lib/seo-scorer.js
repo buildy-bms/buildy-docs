@@ -173,10 +173,10 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     weight: 5,
     passed: titleLen >= 30 && titleLen <= 70,
     message: titleLen < 30
-      ? `Titre trop court (${titleLen} chars, idéal 40-60)`
+      ? `Titre trop court : ${titleLen} caractères, idéal entre 40 et 60`
       : titleLen > 70
-      ? `Titre trop long (${titleLen} chars, idéal 40-60, max 70)`
-      : `Titre ${titleLen} chars (idéal 40-60)`,
+      ? `Titre trop long : ${titleLen} caractères, idéal entre 40 et 60 (70 au plus)`
+      : `Titre de ${titleLen} caractères (idéal entre 40 et 60)`,
   });
 
   // 1bis. Meta-description SEO : longueur 130-155 + contient mot-clé métier (10 pts).
@@ -190,16 +190,16 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
   const descCheckPassed = descLengthOk && descKeywordOk;
   checks.push({
     id: 'description-quality',
-    label: 'Meta-description SEO',
+    label: 'Description pour Google',
     weight: 10,
     passed: descCheckPassed,
     message: !desc
-      ? `Aucune meta-description. Cible : 130-155 chars + 1 mot-clé métier (snippet Google).`
+      ? 'Pas de description pour Google : vise 130 à 155 caractères, avec un mot-clé métier.'
       : !descLengthOk
-        ? `Description ${descLen} chars (idéal 130-155, max 160). Snippet Google optimal autour de 150.`
+        ? `Description de ${descLen} caractères : vise 130 à 155 (160 au plus), c’est l’extrait affiché par Google.`
         : !descKeywordOk
-          ? `Description sans mot-clé métier. Ajoute "audit BACS", "logiciel GTB", "supervision GTB" ou un autre terme prioritaire.`
-          : `Description ${descLen} chars avec ${descFoundKw.length} mot-clé(s) métier (${descFoundKw.slice(0, 2).join(', ')}).`,
+          ? 'Description sans mot-clé métier : ajoute « audit BACS », « logiciel GTB », « supervision GTB » ou un autre terme prioritaire.'
+          : `Description de ${descLen} caractères, avec ${descFoundKw.length} mot${descFoundKw.length > 1 ? 's' : ''}-clé${descFoundKw.length > 1 ? 's' : ''} métier (${descFoundKw.slice(0, 2).join(', ')}).`,
   });
 
   // 2. Mot-clé en tête de titre (10 pts)
@@ -209,8 +209,8 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     weight: 10,
     passed: foundInTitle.length > 0,
     message: foundInTitle.length > 0
-      ? `Titre contient : ${foundInTitle.slice(0, 3).join(', ')}`
-      : `Aucun mot-clé métier dans le titre. Ajoute par ex. ${activeKeywords.slice(0, 5).join(', ')}…`,
+      ? `Le titre contient : ${foundInTitle.slice(0, 3).join(', ')}`
+      : `Aucun mot-clé métier dans le titre : ajoute par exemple ${activeKeywords.slice(0, 5).join(', ')}…`,
   });
 
   // 3. 1er paragraphe contient ≥ 1 mot-clé prioritaire (15 pts)
@@ -220,17 +220,17 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     weight: 15,
     passed: foundInFirstP.length > 0,
     message: foundInFirstP.length > 0
-      ? `1er paragraphe contient : ${foundInFirstP.slice(0, 3).join(', ')}`
-      : `Aucun mot-clé métier dans les 250 premiers caractères. Google indexe lourd cette zone.`,
+      ? `Le premier paragraphe contient : ${foundInFirstP.slice(0, 3).join(', ')}`
+      : 'Aucun mot-clé métier dans les 250 premiers caractères, la partie que Google regarde le plus.',
   });
 
   // 4. Au moins 2 H2 (5 pts)
   checks.push({
     id: 'headings-count',
-    label: 'Au moins 2 sections H2',
+    label: 'Au moins 2 intertitres',
     weight: 5,
     passed: h2Count >= 2,
-    message: `${h2Count} H2 trouvé${h2Count > 1 ? 's' : ''}${h2Count < 2 ? ' (minimum 2 recommandé)' : ''}`,
+    message: `${h2Count} intertitre${h2Count > 1 ? 's' : ''} « Titre 2 »${h2Count < 2 ? ' : 2 au moins recommandés' : ''}`,
   });
 
   // 5. ≥ 50% des H2/H3 contiennent un mot-clé (10 pts)
@@ -238,12 +238,12 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
   const headingsKwRatio = headings.length > 0 ? headingsWithKw.length / headings.length : 0;
   checks.push({
     id: 'headings-descriptive',
-    label: 'H2/H3 descriptifs',
+    label: 'Intertitres explicites',
     weight: 10,
     passed: headings.length === 0 ? true : headingsKwRatio >= 0.5,
     message: headings.length === 0
-      ? 'Pas de H2/H3 (ok si article court)'
-      : `${headingsWithKw.length}/${headings.length} titres contiennent un mot-clé métier (${Math.round(headingsKwRatio * 100)}%)`,
+      ? 'Pas d’intertitre (acceptable pour un article court)'
+      : `${headingsWithKw.length} intertitre${headingsWithKw.length > 1 ? 's' : ''} sur ${headings.length} avec un mot-clé métier (${Math.round(headingsKwRatio * 100)} %)`,
   });
 
   // 6. Couverture mots-clés (15 pts) — score linéaire
@@ -253,7 +253,7 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     label: 'Couverture mots-clés métier',
     weight: 15,
     passed: foundKeywords.length >= 3,
-    message: `${foundKeywords.length} mot${foundKeywords.length > 1 ? 's' : ''}-clé${foundKeywords.length > 1 ? 's' : ''} métier dans l'article${foundKeywords.length > 0 ? ` (${foundKeywords.slice(0, 5).join(', ')}${foundKeywords.length > 5 ? '…' : ''})` : ''}. Cible : ≥ 3.`,
+    message: `${foundKeywords.length} mot${foundKeywords.length > 1 ? 's' : ''}-clé${foundKeywords.length > 1 ? 's' : ''} métier dans l’article${foundKeywords.length > 0 ? ` (${foundKeywords.slice(0, 5).join(', ')}${foundKeywords.length > 5 ? '…' : ''})` : ''}. Cible : 3 au moins.`,
     partialScore: Math.round(kwCoveragePct * 15),
   });
 
@@ -268,10 +268,10 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     weight: 10,
     passed: linksDescriptive.length >= 1,
     message: internalLinks.length === 0
-      ? 'Aucun lien interne. Pour le maillage SEO, ajoute ≥ 1 lien vers un autre article FAQ.'
+      ? 'Aucun lien vers un autre article de la FAQ : ajoutes-en au moins un, Google valorise ces liens.'
       : linksDescriptive.length === 0
-      ? `${internalLinks.length} lien(s) interne(s) avec libellés non-descriptifs ("ici", "cliquez ici"). Préférer des libellés explicites.`
-      : `${linksDescriptive.length} lien${linksDescriptive.length > 1 ? 's' : ''} interne${linksDescriptive.length > 1 ? 's' : ''} descriptif${linksDescriptive.length > 1 ? 's' : ''}.`,
+      ? `${internalLinks.length} lien${internalLinks.length > 1 ? 's' : ''} vers la FAQ au libellé vague (« ici », « cliquez ici ») : préfère un libellé explicite.`
+      : `${linksDescriptive.length} lien${linksDescriptive.length > 1 ? 's' : ''} vers la FAQ au libellé explicite.`,
   });
 
   // 8. ≥ 3 <strong> (10 pts)
@@ -280,7 +280,7 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     label: 'Mise en gras des expressions clés',
     weight: 10,
     passed: strongCount >= 3,
-    message: `${strongCount} <strong> dans l'article. Cible : ≥ 3 sur les expressions métier importantes.`,
+    message: `${strongCount} passage${strongCount > 1 ? 's' : ''} en gras dans l’article. Cible : 3 au moins, sur les expressions métier importantes.`,
   });
 
   // 9. Longueur 300-2000 mots (5 pts) — sweet spot 500-1500
@@ -290,10 +290,10 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     weight: 5,
     passed: wordCount >= 300 && wordCount <= 2000,
     message: wordCount < 300
-      ? `Article court (${wordCount} mots). Min 300 recommandé pour Google.`
+      ? `Article court (${wordCount} mot${wordCount > 1 ? 's' : ''}) : Google préfère 300 mots au moins.`
       : wordCount > 2000
-      ? `Article long (${wordCount} mots). Au-delà de 2000, le bénéfice SEO plafonne.`
-      : `${wordCount} mots (sweet spot 500-1500)`,
+      ? `Article long (${wordCount} mots) : au-delà de 2 000, le gain pour Google plafonne.`
+      : `${wordCount} mots (idéal entre 500 et 1 500)`,
   });
 
   // 10. Acronymes développés à la 1re occurrence (5 pts)
@@ -313,7 +313,7 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
       ? 'Aucun acronyme à développer'
       : missingExpansions.length === 0
       ? `Tous les acronymes (${acronymChecks.map((x) => x.a.acronym).join(', ')}) sont développés.`
-      : `Acronymes non développés : ${missingExpansions.join(', ')} (ex : "GTB (Gestion Technique du Bâtiment)").`,
+      : `Acronymes non développés : ${missingExpansions.join(', ')} (exemple : « GTB (gestion technique du bâtiment) »).`,
   });
 
   // 11. Anti keyword stuffing (10 pts)
@@ -322,12 +322,12 @@ function scoreArticle({ title = '', description = '', contentHtml = '', targetKe
     .filter((x) => x.count > 5);
   checks.push({
     id: 'no-stuffing',
-    label: 'Pas de keyword stuffing',
+    label: 'Pas de mot-clé trop répété',
     weight: 10,
     passed: stuffingCounts.length === 0,
     message: stuffingCounts.length === 0
       ? 'Aucune répétition excessive de mot-clé.'
-      : `Mots-clés trop répétés (Google pénalise) : ${stuffingCounts.map((x) => `${x.kw} (${x.count}x)`).join(', ')}`,
+      : `Mots-clés trop répétés, pénalisés par Google : ${stuffingCounts.map((x) => `${x.kw} (${x.count} fois)`).join(', ')}`,
   });
 
   // ── Score total ────────────────────────────────────────────────────

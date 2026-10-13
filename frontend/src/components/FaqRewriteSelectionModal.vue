@@ -72,7 +72,8 @@ async function rewrite() {
                 class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition resize-y mb-2" />
       <div class="flex flex-wrap gap-1.5 mb-5">
         <button v-for="s in SUGGESTIONS" :key="s" type="button" @click="instruction = s"
-                class="px-2.5 py-0.5 text-xs rounded-full border border-gray-200 hover:border-violet-300 hover:bg-violet-50 text-gray-600 transition whitespace-nowrap">
+                class="px-2.5 py-0.5 text-xs rounded-full border border-gray-200 hover:border-violet-300 hover:bg-violet-50 text-gray-600 transition whitespace-nowrap"
+                v-tooltip="'Choisir cette consigne'">
           {{ s }}
         </button>
       </div>

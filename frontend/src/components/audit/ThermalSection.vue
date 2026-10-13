@@ -8,6 +8,10 @@ import {
   GRANULARITY_OPTIONS, GRANULARITY_R175_COMPLIANT, regulationTypesForCategory,
 } from '@/lib/audit-options'
 import { buildPrefillPatch, regulationTypeLabel } from '@/lib/thermal-prefill'
+import {
+  THERMAL_SYSTEM_HEADER_TIP, THERMAL_LEVEL_TIPS, THERMAL_COLUMN_TIPS, WOOD_EXEMPT_TIP, PREFILL_TIP,
+  granularityTip, thermalSystemLinkTip,
+} from '@/lib/audit-tips-site'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -237,6 +241,11 @@ function granularityForRow(t) {
     derivedKey: derivedGranularity(emitter?.regulation_type_emission || null),
   }
 }
+// Sélecteur de granularité en rouge (non conforme) : pourquoi, et quoi faire.
+function granularityTipFor(t) {
+  const info = granularityForRow(t)
+  return granularityTip({ key: info.key, label: info.label, category: t.category || 'heating', hasEmitter: !!info.deviceId })
+}
 // Patch granularité explicite sur le device émetteur. Si l'utilisateur
 // repasse à la valeur dérivée par défaut, on remet le champ à null pour
 // signaler « pas de surcharge » (l'UI re-tombera sur la dérivée).
@@ -459,7 +468,7 @@ onBeforeUnmount(teardownSortable)
   <CollapsibleSection storage-key="thermal" section-id="section-thermal" :active="active">
     <template #header>
       <SectionHeader number="4" :title="'Régulation thermique automatique'"
-                     subtitle="R175-6"
+                     subtitle="Réguler la température pièce par pièce"
                      :icon="FireIcon" icon-color="text-red-500"
                      :step="step"
                      @validate="emit('validate-step', $event)"
@@ -472,7 +481,7 @@ onBeforeUnmount(teardownSortable)
         {{ thermalFiltered.length }} zone{{ thermalFiltered.length > 1 ? 's' : '' }} thermique{{ thermalFiltered.length > 1 ? 's' : '' }}
         · {{ regulatedCount }} régulation{{ regulatedCount > 1 ? 's' : '' }} auto
         <span v-if="woodExemptCount">
-          · {{ woodExemptCount }} exempté{{ woodExemptCount > 1 ? 's' : '' }} bois
+          · {{ woodExemptCount }} dispensé{{ woodExemptCount > 1 ? 's' : '' }} (chauffage au bois)
         </span>
       </span>
       <span v-else class="italic">Aucune régulation thermique relevée</span>
@@ -489,12 +498,14 @@ onBeforeUnmount(teardownSortable)
         <strong class="text-emerald-700">{{ prefillCount }} champ{{ prefillCount > 1 ? 's' : '' }}</strong>
         peu{{ prefillCount > 1 ? 'vent' : 't' }} être pré-rempli{{ prefillCount > 1 ? 's' : '' }} automatiquement depuis les équipements saisis à l'étape « Systèmes ».
       </div>
-      <button type="button" :disabled="prefillBusy"
-              @click="prefillAllFromDevices"
-              class="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0">
-        <SparklesIcon class="w-4 h-4" />
-        Pré-remplir depuis les équipements
-      </button>
+      <Tooltip :text="prefillBusy ? 'Pré-remplissage en cours…' : PREFILL_TIP" class="shrink-0">
+        <button type="button" :disabled="prefillBusy"
+                @click="prefillAllFromDevices"
+                class="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0">
+          <SparklesIcon class="w-4 h-4" />
+          Pré-remplir depuis les équipements
+        </button>
+      </Tooltip>
     </div>
     <!-- Rappel réglementaire R175-6 : replié par défaut (mémorisé) pour
          alléger l'écran ; le texte reste dans la page (v-show). -->
@@ -504,7 +515,7 @@ onBeforeUnmount(teardownSortable)
               @click="toggleIntro"
               class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition">
         <InformationCircleIcon class="w-4 h-4 text-amber-600 shrink-0" />
-        Comprendre R175-6
+        Comprendre la régulation pièce par pièce
         <ChevronDownIcon :class="['w-3.5 h-3.5 transition-transform', introOpen ? 'rotate-180' : '']" />
       </button>
       <!-- Mig 187 v3 — bouton global : sous-cards par zone repliables.
@@ -524,16 +535,16 @@ onBeforeUnmount(teardownSortable)
       <p class="flex items-start gap-1.5">
         <InformationCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <span>
-          <strong>R175-6</strong> impose une <strong>régulation thermique automatique par pièce ou par zone</strong>
-          pour chaque émetteur de chauffage et de refroidissement. Déclencheur : permis de construire après le
-          21 juillet 2021 OU travaux d'installation/remplacement du générateur de chaleur. Les <strong>appareils
-          indépendants de chauffage au bois</strong> sont exemptés (R175-6 II).
+          Le décret impose une <strong>régulation automatique de la température pièce par pièce</strong>
+          (ou par zone quand c’est justifié) pour chaque émetteur de chauffage. Elle s’applique si le permis
+          de construire a été déposé après le 21 juillet 2021, ou lors de l’installation ou du remplacement
+          d’un générateur de chaleur. Les <strong>appareils indépendants de chauffage au bois</strong> (poêle,
+          insert) en sont dispensés. Le froid est décrit ici, mais le plan d’actions ne l’évalue pas sur ce point.
           <br/><br/>
-          <em>Structure d'analyse Buildy basée sur la norme NF EN ISO 52120-1 (non opposable) :</em> pour chaque couple
-          <em>(zone × usage chaud/froid)</em>, on déroule <strong>trois sous-lignes</strong> — Production, Distribution,
-          Émission — qui précisent l'équipement concerné, son équipement de régulation (sonde, thermostat, GTB)
-          et des notes spécifiques. Le décret R175-6 ne détaille pas cette structure ; elle facilite l'analyse mais
-          ne conditionne pas la conformité.
+          <em>Méthode Buildy, inspirée de la norme NF EN ISO 52120-1 (sans valeur réglementaire) :</em> pour chaque
+          système de chauffage ou de froid d’une zone, on décrit <strong>trois niveaux</strong> (production,
+          distribution, émission) avec l’équipement concerné, ce qui le régule (sonde, thermostat, GTB) et des
+          notes. Le décret n’impose pas ce découpage : il aide l’analyse, sans conditionner la conformité.
         </span>
       </p>
     </div>
@@ -559,11 +570,13 @@ onBeforeUnmount(teardownSortable)
                :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + var(--section-header-h, 60px))' }">
           <tr>
             <th rowspan="2"
-                class="rounded-tl-xl bg-slate-50 px-3 py-2 text-left align-bottom text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+                class="rounded-tl-xl bg-slate-50 px-3 py-2 text-left align-bottom text-[10px] uppercase tracking-wider text-gray-500 font-medium"
+                v-tooltip="THERMAL_SYSTEM_HEADER_TIP">
               Système
             </th>
             <th v-for="level in LEVELS" :key="level.key"
-                class="bg-slate-50 px-2 pt-2 pb-0.5 text-left text-[11px] uppercase tracking-wider text-gray-700 font-medium border-l border-slate-200">
+                class="bg-slate-50 px-2 pt-2 pb-0.5 text-left text-[11px] uppercase tracking-wider text-gray-700 font-medium border-l border-slate-200"
+                v-tooltip="THERMAL_LEVEL_TIPS[level.key]">
               <span class="inline-flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: level.color }"></span>
                 {{ level.label }}
@@ -575,10 +588,10 @@ onBeforeUnmount(teardownSortable)
             <th v-for="level in LEVELS" :key="level.key"
                 class="bg-slate-50 px-2 pt-0.5 pb-2 text-left text-[10px] font-normal text-gray-400 border-l border-slate-200">
               <div :class="['thermal-level-grid', level.key === 'emission' ? 'is-emission' : '']">
-                <span class="tl-eq truncate px-2">Équipement</span>
-                <span class="tl-type truncate px-2">Type de régulation</span>
-                <span v-if="level.key === 'emission'" class="tl-gran truncate px-2">Granularité</span>
-                <span class="tl-note text-center">Note</span>
+                <span class="tl-eq truncate px-2" v-tooltip="THERMAL_COLUMN_TIPS.equipment">Équipement</span>
+                <span class="tl-type truncate px-2" v-tooltip="THERMAL_COLUMN_TIPS.type">Type de régulation</span>
+                <span v-if="level.key === 'emission'" class="tl-gran truncate px-2" v-tooltip="THERMAL_COLUMN_TIPS.granularity">Granularité</span>
+                <span class="tl-note text-center" v-tooltip="THERMAL_COLUMN_TIPS.note">Note</span>
               </div>
             </th>
           </tr>
@@ -586,7 +599,8 @@ onBeforeUnmount(teardownSortable)
         <template v-for="g in thermalGroups" :key="g.zoneName">
           <!-- tbody zone-header — bande cliquable pour replier la zone. -->
           <tbody class="thermal-zone-header">
-            <tr @click="toggleZone(g.zoneName)" class="group/zone cursor-pointer select-none">
+            <tr @click="toggleZone(g.zoneName)" class="group/zone cursor-pointer select-none"
+                v-tooltip="collapsedZones[g.zoneName] ? 'Déplier cette zone' : 'Replier cette zone'">
               <td colspan="5" class="px-3 py-1.5 bg-slate-100/70 border-t border-slate-200 group-hover/zone:bg-slate-100 transition">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-1.5">
@@ -612,24 +626,23 @@ onBeforeUnmount(teardownSortable)
                 <div class="flex items-center gap-1.5 min-w-0">
                   <button type="button"
                           class="drag-handle inline-flex p-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
-                          v-tooltip="'Glisser pour réordonner ce système'">
+                          v-tooltip="'Glisser pour changer l’ordre'">
                     <Bars3Icon class="w-4 h-4" />
                   </button>
                   <SystemCategoryIcon :category="t.category || 'heating'" size="sm" class="shrink-0" />
                   <div class="min-w-0">
                     <button type="button"
                             @click="gotoSystemInCard03(t.system_id)"
-                            v-tooltip="`${systemDisplayName(t)}\nAller à ce système (étape 3 · Systèmes)`"
+                            v-tooltip="thermalSystemLinkTip(systemDisplayName(t))"
                             class="block max-w-full truncate text-left text-sm font-medium text-gray-800 hover:text-indigo-700 hover:underline underline-offset-2 cursor-pointer">
                       {{ systemDisplayName(t) }}
                     </button>
                     <div class="flex items-center gap-1.5 flex-wrap text-[10px] font-medium uppercase tracking-wider"
                          :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
                       {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
-                      <Tooltip v-if="exemptAutoFromWood(t)"
-                               text="Exemption R175-6 II : l'équipement de Production est au bois.">
+                      <Tooltip v-if="exemptAutoFromWood(t)" :text="WOOD_EXEMPT_TIP">
                         <span class="inline-flex items-center px-1.5 py-px rounded normal-case tracking-normal bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
-                          Exempté — bois
+                          Dispensé (bois)
                         </span>
                       </Tooltip>
                     </div>
@@ -662,9 +675,11 @@ onBeforeUnmount(teardownSortable)
                        granularité fait visuellement PARTIE de la colonne
                        Émission, comme demandé. -->
                   <template v-if="level.key === 'emission'" #after>
-                    <!-- Rouge = granularité non conforme R175-6 (centralisée). -->
+                    <!-- Rouge = granularité non conforme R175-6 (centralisée) : la
+                         bulle dit pourquoi et quoi faire (aucune bulle si conforme). -->
                     <SearchableSelect
                       class="tl-gran"
+                      v-tooltip="granularityTipFor(t)"
                       :model-value="granularityForRow(t).key"
                       @update:modelValue="(v) => patchGranularity(t, v)"
                       :options="GRANULARITY_OPTIONS"
@@ -686,12 +701,12 @@ onBeforeUnmount(teardownSortable)
                           noteField: 'notes_html',
                         })"
                         :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
-                        v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
+                        v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier la note du système' : 'Ajouter une note sur ce système'">
                   <PencilSquareIcon class="w-4 h-4 shrink-0" />
                 </button>
                 <button type="button" @click="removeEntry(t)"
                         class="btn-icon btn-icon-danger ml-1"
-                        v-tooltip="'Supprimer ce système de régulation'">
+                        v-tooltip="'Supprimer cette ligne de régulation'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -705,8 +720,8 @@ onBeforeUnmount(teardownSortable)
          systèmes présents (heating/cooling). Pour ajouter une régulation,
          on ajoute un système dans la card 03. -->
     <p class="px-3 pb-3 pt-1 text-[11px] text-gray-500 italic">
-      Une ligne par système chauffage / refroidissement présent à l'étape « Systèmes ».
-      Pour ajouter une régulation, crée un système à l'étape 3 · Systèmes.
+      Une ligne par système de chauffage ou de refroidissement présent à l’étape Systèmes.
+      Pour en ajouter une, crée le système à l’étape Systèmes.
     </p>
   </CollapsibleSection>
 </template>

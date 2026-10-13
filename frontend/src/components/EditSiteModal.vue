@@ -10,6 +10,7 @@ import { ref, computed, onMounted } from 'vue'
 import BaseModal from './BaseModal.vue'
 import AddressAutocomplete from './AddressAutocomplete.vue'
 import ZoneMapPicker from './ZoneMapPicker.vue'
+import Tooltip from './Tooltip.vue'
 import { loadGoogleMaps } from '@/lib/google-maps'
 import { updateSite } from '@/api'
 import { useAuditStore } from '@/stores/audit'
@@ -115,7 +116,7 @@ async function submit() {
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1.5">
           Position du site sur la carte
-          <span class="text-gray-400 font-normal">— déplacez le pin si la position issue de l'adresse est imprécise</span>
+          <span class="text-gray-400 font-normal">— déplace le repère si la position issue de l’adresse est imprécise</span>
         </label>
         <ZoneMapPicker
           v-model:latitude="form.latitude"
@@ -141,10 +142,12 @@ async function submit() {
               class="px-4 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
         Annuler
       </button>
-      <button type="button" @click="submit" :disabled="!canSubmit"
-              class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
-      </button>
+      <Tooltip :text="submitting ? 'Enregistrement en cours…' : (!form.name.trim() ? 'Donne d’abord un nom au site' : null)">
+        <button type="button" @click="submit" :disabled="!canSubmit"
+                class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </Tooltip>
     </template>
   </BaseModal>
 </template>

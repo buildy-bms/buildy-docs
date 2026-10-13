@@ -241,6 +241,9 @@ function computeAutoPower(devices) {
   let heat = 0, cool = 0;
   let incompletePowerCount = 0;
   const incompletePowerNames = [];
+  // Identifiants des mêmes équipements : l'étape Systèmes (mise en page guidée) les signale
+  // « à vérifier » sur leur ligne.
+  const incompletePowerIds = [];
   const detailed = [];
   for (const d of devices || []) {
     // Les équipements Hors-Service ne comptent pas dans le cumul.
@@ -264,6 +267,7 @@ function computeAutoPower(devices) {
       const noPower = (d.power_kw == null || d.power_kw === 0) && (d.power_kw_cooling == null || d.power_kw_cooling === 0);
       if (isThermalCat && noPower) {
         incompletePowerCount++;
+        incompletePowerIds.push(d.id);
         const zone = d.zone_name ? ` en zone ${d.zone_name}` : '';
         incompletePowerNames.push(`${d.name || 'Équipement sans nom'}${zone}`);
       }
@@ -276,6 +280,7 @@ function computeAutoPower(devices) {
     retainedKw: round(Math.max(heat, cool)),
     incompletePowerCount,
     incompletePowerNames,
+    incompletePowerIds,
     devices: detailed,
   };
 }
@@ -356,6 +361,7 @@ function resolveTotalPower(document, auto) {
     discrepancy,
     discrepancyPct,
     incompletePowerCount,
+    incompletePowerDeviceIds: auto.incompletePowerIds || [],
     incompletePowerNote,
     presumedSubjectDueToMissingData,
   };

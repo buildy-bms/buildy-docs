@@ -17,6 +17,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { ScaleIcon, PencilSquareIcon, CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { getBacsArticles, updateSection, updateEquipmentTemplate } from '@/api'
+import { bacsJustifyTip } from '@/lib/af-tips'
 import BacsBadge from './BacsBadge.vue'
 
 const props = defineProps({
@@ -107,7 +108,8 @@ watch(() => props.justification, () => { editing.value = false })
         <div class="flex items-center gap-2 flex-wrap">
           <BacsBadge :reference="reference" :context="context" :context-explanation="displayedText" />
           <button v-if="editable && !editing" @click="startEdit"
-                  class="text-xs text-purple-700 hover:text-purple-900 inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-purple-100 transition">
+                  class="text-xs text-purple-700 hover:text-purple-900 inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-purple-100 transition"
+                  v-tooltip="bacsJustifyTip(!!justification, !sectionId)">
             <PencilSquareIcon class="w-3.5 h-3.5" />
             {{ justification ? 'Éditer' : 'Préciser le lien' }}
           </button>

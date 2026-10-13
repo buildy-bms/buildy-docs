@@ -40,6 +40,11 @@ import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import MobileBmsTopicNoteButton from './MobileBmsTopicNoteButton.vue'
 import MobileYesNo from './MobileYesNo.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
+import R175Tooltip from '@/components/R175Tooltip.vue'
+import {
+  BMS_INTEGRATED_TOGGLE_TIP, BMS_STATUS_TIPS, bmsMeterIntegratedTip, bmsOperationalTip, bmsUsageToggleLabel,
+} from '@/lib/audit-tips-systems'
+import { longDate } from '@/lib/audit-tips-site'
 
 const audit = useAuditStore()
 const { document, bms, devices, meters, systems, inspections, todayIso } = storeToRefs(audit)
@@ -60,8 +65,9 @@ const inspectionStatus = computed(() => {
   const overdue = latest.next_inspection_due_date && latest.next_inspection_due_date < todayIso.value
   if (overdue) return { label: '⚠ Échéance dépassée', tone: 'warn' }
   return {
+    // Date lisible (« 12 octobre 2026 »), jamais la date brute de la base.
     label: latest.last_inspection_date
-      ? `Dernière : ${latest.last_inspection_date}${latest.last_inspection_inspector ? ' · ' + latest.last_inspection_inspector : ''}`
+      ? `Dernière le ${longDate(latest.last_inspection_date) || latest.last_inspection_date}${latest.last_inspection_inspector ? ' · ' + latest.last_inspection_inspector : ''}`
       : `${list.length} inspection${list.length > 1 ? 's' : ''} tracée${list.length > 1 ? 's' : ''}`,
     tone: 'ok',
   }
@@ -71,7 +77,7 @@ const SYSTEM_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
   ventilation: 'Ventilation',
-  dhw: 'ECS',
+  dhw: 'Eau chaude sanitaire',
   lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur',
   electricity_production: 'Production photovoltaïque',
@@ -148,6 +154,15 @@ const devicesWithMeta = computed(() => {
 
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
 
+// Bulle de l'interrupteur « Opérationnel » (équipement ou compteur) : grisé → carte qui dit
+// pourquoi et quoi faire (portée par le conteneur, elle s'ouvre aussi au doigt) ; actif →
+// la question en étiquette, pour ne pas ouvrir une carte à chaque toucher. Même condition
+// que :disabled ci-dessous.
+function operationalTip(kind, x) {
+  if (x.managed_by_bms && !x.out_of_service && x.wired) return 'Opérationnel dans la GTB ?'
+  return bmsOperationalTip({ kind, integrated: x.managed_by_bms, outOfService: x.out_of_service, wired: x.wired })
+}
+
 // Filtre par usages GTB : si la GTB ne traite AUCUN usage (rien coché), on
 // n'affiche aucun équipement/compteur — la question "intégrés à la GTB" n'a
 // pas de sens dans ce cas. C'est à l'auditeur de cocher les usages d'abord.
@@ -187,7 +202,7 @@ const USAGES = [
   { key: 'manages_heating', label: 'Chauffage', category: 'heating' },
   { key: 'manages_cooling', label: 'Refroidissement', category: 'cooling' },
   { key: 'manages_ventilation', label: 'Ventilation', category: 'ventilation' },
-  { key: 'manages_dhw', label: 'ECS', category: 'dhw' },
+  { key: 'manages_dhw', label: 'Eau chaude', category: 'dhw' },
   { key: 'manages_lighting', label: 'Éclairage', category: 'lighting_indoor' },
 ]
 </script>
@@ -223,10 +238,10 @@ const USAGES = [
           <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-6 h-6" />
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-base font-medium text-gray-900 truncate">
+          <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate">
             {{ bms?.existing_solution || 'GTB non renseignée' }}
           </p>
-          <p v-if="bms?.existing_solution_brand" class="text-xs text-gray-500 truncate mt-0.5">
+          <p v-if="bms?.existing_solution_brand" v-tooltip.overflow class="text-xs text-gray-500 truncate mt-0.5">
             {{ bms.existing_solution_brand }}
           </p>
         </div>
@@ -251,10 +266,10 @@ const USAGES = [
         </button>
       </div>
       <p v-if="bms.present == null" class="text-xs text-amber-600 mt-2">
-        Indiquez d'abord si une GTB est présente.
+        Indique d’abord si une GTB est présente.
       </p>
       <p v-else-if="bms.present === 0" class="text-xs text-gray-500 mt-2">
-        Aucune GTB — une action « Installer une GTB » est ajoutée au plan.
+        Aucune GTB : une action « Installer une GTB » est ajoutée au plan.
       </p>
     </div>
 
@@ -262,7 +277,7 @@ const USAGES = [
     <!-- Hors-service toggle -->
     <MobileYesNo
       label="La GTB est-elle hors service ?"
-      description="Si la GTB est complètement HS, débranchée ou inutilisable, le plan d'action ignore toutes les exigences GTB du décret."
+      description="Complètement hors service, débranchée ou inutilisable : le plan d’actions ignore alors les exigences du décret sur la GTB. Les rubriques restent modifiables pour garder une trace."
       :model-value="bms.out_of_service"
       @update:model-value="v => { bms.out_of_service = v ? 1 : 0; saveDebounced() }"
     />
@@ -337,6 +352,7 @@ const USAGES = [
             v-for="u in USAGES"
             :key="u.key" type="button"
             @click="bms[u.key] = bms[u.key] ? 0 : 1; saveDebounced()"
+            v-tooltip="bmsUsageToggleLabel(!!bms[u.key])"
             :class="['w-full flex items-center justify-between gap-3 px-3 py-4 rounded-xl border-2 transition active:scale-[0.99]',
                      bms[u.key]
                        ? 'border-[#00cd92] bg-emerald-50/60'
@@ -356,14 +372,17 @@ const USAGES = [
       <template v-if="isBacs">
         <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-2">
-            <h3 class="text-base font-medium text-gray-900">Capacités R175-3</h3>
+            <h3 class="text-base font-medium text-gray-900 inline-flex items-center gap-1">
+              Ce que sait faire la supervision
+              <R175Tooltip article="R175-3" />
+            </h3>
             <MobileBmsTopicNoteButton topic-key="r175_3_capacites"
-                                      topic-label="R175-3 — Capacités de la solution de supervision" />
+                                      topic-label="Ce que sait faire la supervision" />
           </div>
           <div class="p-4 space-y-4">
             <MobileYesNo
-              label="1°. La GTB suit-elle en continu, par zone fonctionnelle et au pas horaire, les consommations, et conserve-t-elle ces données pendant 5 ans ?"
-              description="Enregistrement au pas horaire ou plus fin, conservation 5 ans minimum."
+              label="La GTB suit-elle les consommations heure par heure, par zone et par usage, et garde-t-elle ces données 5 ans ?"
+              description="Relevés au moins toutes les heures, historique gardé mois par mois pendant 5 ans."
               :model-value="bms.meets_r175_3_p1"
               @update:model-value="v => { bms.meets_r175_3_p1 = v ? 1 : 0; saveDebounced() }"
             />
@@ -371,7 +390,7 @@ const USAGES = [
               <input
                 v-model="bms.r175_3_p1_archival_format"
                 type="text"
-                placeholder="Format d'archivage : CSV, SQL, API…"
+                placeholder="Format d’archivage : CSV, base SQL, API…"
                 @input="saveDebounced"
                 class="pwa-input w-full"
               />
@@ -385,8 +404,8 @@ const USAGES = [
             <div class="border-t border-gray-100 pt-3"></div>
 
             <MobileYesNo
-              label="2°. La GTB compare-t-elle l'efficacité énergétique à des valeurs de référence, détecte-t-elle les pertes d'efficacité et en informe-t-elle l'exploitant ?"
-              description="La GTB déclenche des alertes en cas de surconsommation, de panne d'équipement ou de dérive de performance (ex : COP qui chute)."
+              label="La GTB repère-t-elle les dérives (comparaison à des valeurs de référence, pertes d’efficacité) et prévient-elle l’exploitant ?"
+              description="Elle déclenche des alertes en cas de surconsommation, de panne d’équipement ou de baisse de performance (par exemple une pompe à chaleur dont le rendement chute)."
               :model-value="bms.meets_r175_3_p2"
               @update:model-value="v => { bms.meets_r175_3_p2 = v ? 1 : 0; saveDebounced() }"
             />
@@ -406,27 +425,30 @@ const USAGES = [
         <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
             <div class="flex items-start justify-between gap-2">
-              <h3 class="text-base font-medium text-gray-900">Mise à disposition des données</h3>
+              <h3 class="text-base font-medium text-gray-900 inline-flex items-center gap-1">
+                Mise à disposition des données
+                <R175Tooltip article="R175-3" />
+              </h3>
               <MobileBmsTopicNoteButton topic-key="r175_3_mise_dispo"
-                                        topic-label="R175-3 — Mise à disposition des données" />
+                                        topic-label="Mise à disposition des données" />
             </div>
           </div>
           <div class="p-4 space-y-4">
             <p class="text-xs text-gray-500 leading-relaxed">
-              Les données de la GTB appartiennent à son propriétaire, qui les met à
-              disposition du gestionnaire du bâtiment, à sa demande, et transmet à chaque
-              exploitant de système technique relié les données qui le concernent
-              (R175-3, dernier alinéa). Coche ci-dessous ce qui est constaté sur place.
+              Les données de la GTB appartiennent à son propriétaire. Il les met à
+              disposition du gestionnaire du bâtiment quand celui-ci les demande, et transmet
+              à chaque exploitant des systèmes reliés les données qui le concernent.
+              Réponds selon ce que tu constates sur place.
             </p>
             <MobileYesNo
-              label="Les données sont-elles mises à disposition du gestionnaire du bâtiment lorsqu'il les demande ?"
-              description="Gestionnaire = propriétaire / syndic / exploitant principal du bâtiment."
+              label="Les données sont-elles mises à disposition du gestionnaire du bâtiment lorsqu’il les demande ?"
+              description="Le gestionnaire : propriétaire, syndic ou exploitant principal du bâtiment."
               :model-value="bms.data_provision_to_manager"
               @update:model-value="v => { bms.data_provision_to_manager = v ? 1 : 0; saveDebounced() }"
             />
             <MobileYesNo
               label="Chaque exploitant des systèmes techniques reçoit-il les données qui le concernent ?"
-              description="Exploitants = mainteneur GTB, mainteneur CVC, intégrateur supervision."
+              description="Les exploitants : mainteneur de la GTB, mainteneur du chauffage, de la ventilation et de la climatisation, intégrateur de la supervision."
               :model-value="bms.data_provision_to_operators"
               @update:model-value="v => { bms.data_provision_to_operators = v ? 1 : 0; saveDebounced() }"
             />
@@ -441,7 +463,7 @@ const USAGES = [
               <input
                 v-model="bms.data_provision_format"
                 type="text"
-                placeholder="Format : CSV, dashboard, API…"
+                placeholder="Format : CSV, tableau de bord, API…"
                 @input="saveDebounced"
                 class="pwa-input w-full"
               />
@@ -452,8 +474,11 @@ const USAGES = [
         <!-- Item 15 — R175-3 : conservation 5 ans + accès aux données -->
         <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
-            <h3 class="text-base font-medium text-gray-900">Conservation et accès aux données</h3>
-            <p class="text-xs text-gray-500 mt-0.5">R175-3 — archivage 5 ans</p>
+            <h3 class="text-base font-medium text-gray-900 inline-flex items-center gap-1">
+              Conservation et accès aux données
+              <R175Tooltip article="R175-3 1°" />
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">Historique de 5 ans</p>
           </div>
           <div class="p-4 space-y-3">
             <!-- Q1 — Conservation 5 ans (3 valeurs : oui / non / inconnu) -->
@@ -523,8 +548,11 @@ const USAGES = [
         <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
             <div class="flex items-start justify-between gap-2">
-              <h3 class="text-base font-medium text-gray-900">R175-4 — Maintenance</h3>
-              <MobileBmsTopicNoteButton topic-key="r175_4" topic-label="R175-4 — Vérifications périodiques" />
+              <h3 class="text-base font-medium text-gray-900 inline-flex items-center gap-1">
+                Vérifications périodiques de la GTB
+                <R175Tooltip article="R175-4" />
+              </h3>
+              <MobileBmsTopicNoteButton topic-key="r175_4" topic-label="Vérifications périodiques de la GTB" />
             </div>
           </div>
           <div class="p-4 space-y-4">
@@ -557,14 +585,17 @@ const USAGES = [
         <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
             <div class="flex items-start justify-between gap-2">
-              <h3 class="text-base font-medium text-gray-900">R175-5 — Formation exploitant</h3>
-              <MobileBmsTopicNoteButton topic-key="r175_5" topic-label="R175-5 — Formation exploitant" />
+              <h3 class="text-base font-medium text-gray-900 inline-flex items-center gap-1">
+                Formation de l’exploitant
+                <R175Tooltip article="R175-5" />
+              </h3>
+              <MobileBmsTopicNoteButton topic-key="r175_5" topic-label="Formation de l’exploitant" />
             </div>
           </div>
           <div class="p-4 space-y-4">
             <MobileYesNo
-              label="L'exploitant a-t-il été formé au fonctionnement de la GTB, notamment à son paramétrage (attestation ou feuille d'émargement) ?"
-              description="La personne en charge de la GTB a suivi une formation (intégrateur, éditeur, interne) lui permettant de consulter les données et corriger les dérives."
+              label="L’exploitant a-t-il été formé au fonctionnement de la GTB, notamment à son paramétrage (attestation ou feuille d’émargement) ?"
+              description="La personne qui s’occupe de la GTB a suivi une formation (intégrateur, éditeur ou en interne) pour consulter les données et corriger les dérives."
               :model-value="bms.operator_trained"
               @update:model-value="v => { bms.operator_trained = v ? 1 : 0; saveDebounced() }"
             />
@@ -599,11 +630,14 @@ const USAGES = [
             <MobileBmsTopicNoteButton topic-key="equipements" topic-label="Équipements intégrés à la GTB" />
           </div>
           <p v-if="filteredDevices.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
-            <strong>Intégré</strong> = l'équipement est connu de la GTB.
-            <strong>Opérationnel</strong> = tu as vérifié sur place que la GTB voit
-            réellement les valeurs et peut le piloter.
+            <strong>Intégré</strong> : la GTB connaît l’équipement.
+            <strong>Opérationnel</strong> : tu as vérifié sur place que la GTB voit
+            réellement ses valeurs et peut le piloter.
           </p>
-          <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun équipement saisi.</p>
+          <!-- Liste vide : sans usage coché plus haut, rien n'est attendu ici
+               (cf. CLAUDE.md « Listes intégré à la GTB »). -->
+          <p v-else-if="!anyUsageManaged" class="text-xs text-amber-700 mt-1">⚠ Coche d’abord un usage traité par la GTB, plus haut.</p>
+          <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun équipement saisi pour les usages cochés.</p>
         </div>
         <div v-if="filteredDevices.length" class="divide-y divide-gray-100">
           <div
@@ -613,24 +647,28 @@ const USAGES = [
           >
             <div class="flex items-center gap-3 mb-2">
               <SystemCategoryIcon :category="d.system_category" size="md" />
-              <p class="flex-1 min-w-0 text-base font-medium text-gray-900 truncate">
+              <p v-tooltip.overflow class="flex-1 min-w-0 text-base font-medium text-gray-900 truncate">
                 {{ d.name || d.brand || d.model_reference || 'Sans nom' }}
               </p>
             </div>
             <p class="text-sm text-gray-500 mb-3">
               {{ SYSTEM_LABEL[d.system_category] || d.system_category }} · {{ d.zone_name }}
-              <span v-if="d.out_of_service" class="text-red-600"> · Hors service</span>
+              <span v-if="d.out_of_service" class="text-red-600" v-tooltip="BMS_STATUS_TIPS.deviceOutOfService"> · Hors service</span>
             </p>
+            <!-- Interrupteurs : la question, ou la raison du grisé (portée par
+                 le conteneur, elle s'ouvre aussi au doigt sur un interrupteur grisé). -->
             <div class="grid grid-cols-2 gap-2">
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Intégré ?</span>
                 <SegmentedToggle size="lg" :model-value="!!d.managed_by_bms"
+                                 :tooltip="BMS_INTEGRATED_TOGGLE_TIP"
                                  @update:model-value="v => patchDeviceBms(d, { managed_by_bms: v })" />
               </div>
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
                 <SegmentedToggle size="lg" :model-value="!d.managed_by_bms ? null : d.out_of_service ? false : !d.wired ? null : !d.bms_integration_out_of_service"
                                  :disabled="!d.managed_by_bms || !!d.out_of_service || !d.wired"
+                                 :tooltip="operationalTip('device', d)"
                                  @update:model-value="v => patchDeviceBms(d, { bms_integration_out_of_service: !v })" />
               </div>
             </div>
@@ -646,11 +684,12 @@ const USAGES = [
             <MobileBmsTopicNoteButton topic-key="compteurs" topic-label="Compteurs intégrés à la GTB" />
           </div>
           <p v-if="filteredMeters.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
-            Seuls les compteurs marqués « présents » dans l'onglet Compteurs apparaissent ici.
-            <strong>Intégré</strong> = la GTB connaît le compteur.
-            <strong>Opérationnel</strong> = les index remontent vraiment.
+            Seuls les compteurs marqués « présents » dans l’onglet Compteurs apparaissent ici.
+            <strong>Intégré</strong> : la GTB connaît le compteur.
+            <strong>Opérationnel</strong> : ses index remontent vraiment.
           </p>
-          <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun compteur présent à raccorder.</p>
+          <p v-else-if="!anyUsageManaged" class="text-xs text-amber-700 mt-1">⚠ Coche d’abord un usage traité par la GTB, plus haut.</p>
+          <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun compteur présent à raccorder pour les usages cochés.</p>
         </div>
         <div v-if="filteredMeters.length" class="divide-y divide-gray-100">
           <div
@@ -661,21 +700,24 @@ const USAGES = [
             <div class="flex items-center gap-2 mb-3 flex-wrap">
               <MeterTypePill :type="m.meter_type" />
               <MeterUsagePill :usage="m.usage" />
-              <span class="text-sm text-gray-500">{{ m.zone_name || 'général' }}</span>
-              <span v-if="m.out_of_service" class="text-sm text-red-600">Hors service</span>
-              <span v-if="m.communicating === 0 || m.communicating === false" class="text-sm text-gray-500">Non communicant</span>
+              <span class="text-sm text-gray-500">{{ m.zone_name || 'Compteur général' }}</span>
+              <span v-if="m.out_of_service" class="text-sm text-red-600" v-tooltip="BMS_STATUS_TIPS.meterOutOfService">Hors service</span>
+              <span v-if="m.communicating === 0 || m.communicating === false" class="text-sm text-gray-500"
+                    v-tooltip="BMS_STATUS_TIPS.meterNotCommunicating">Non communicant</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Intégré ?</span>
                 <SegmentedToggle size="lg" :model-value="!m.communicating ? null : !!m.managed_by_bms"
                                  :disabled="!m.communicating"
+                                 :tooltip="bmsMeterIntegratedTip(m.communicating)"
                                  @update:model-value="v => patchMeterBms(m, { managed_by_bms: v })" />
               </div>
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
                 <SegmentedToggle size="lg" :model-value="!m.managed_by_bms ? null : m.out_of_service ? false : !m.wired ? null : !m.bms_integration_out_of_service"
                                  :disabled="!m.managed_by_bms || !!m.out_of_service || !m.wired"
+                                 :tooltip="operationalTip('meter', m)"
                                  @update:model-value="v => patchMeterBms(m, { bms_integration_out_of_service: !v })" />
               </div>
             </div>
@@ -694,10 +736,10 @@ const USAGES = [
         <FontAwesomeIcon :icon="['fas', 'clock']" class="w-5 h-5" />
       </span>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold text-amber-900 truncate">
-          Inspections périodiques <span class="font-normal opacity-70">— R175-5-1</span>
+        <p v-tooltip.overflow class="text-sm font-semibold text-amber-900 truncate">
+          Inspection périodique de la GTB
         </p>
-        <p :class="['text-xs mt-0.5 truncate',
+        <p v-tooltip.overflow :class="['text-xs mt-0.5 truncate',
                     inspectionStatus.tone === 'warn' ? 'text-red-600 font-medium' : 'text-emerald-700']">
           {{ inspectionStatus.label }}
         </p>

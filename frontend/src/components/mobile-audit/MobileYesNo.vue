@@ -14,10 +14,13 @@
  * « Non » en slate, « Partiel » en ambre — même convention que le desktop.
  */
 import { computed } from 'vue'
+import HelpTip from '@/components/HelpTip.vue'
 
 const props = defineProps({
   label: { type: String, required: true },
   description: { type: String, default: '' },
+  // Carte d'aide (v-tooltip) : petite icône ⓘ après la question, qui s'ouvre aussi au doigt.
+  tip: { type: [Object, Function], default: null },
   modelValue: { default: null },
   // Active le 3e bouton « Partiel » qui émet null. Utile pour les ternaires
   // métier où l'absence de réponse a une sémantique propre (différente de Non).
@@ -37,7 +40,7 @@ const state = computed(() => (props.modelValue == null ? null : !!props.modelVal
 
 <template>
   <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
-    <p class="text-base text-gray-900 font-medium leading-snug">{{ label }}</p>
+    <p class="text-base text-gray-900 font-medium leading-snug">{{ label }}<HelpTip v-if="tip" :tip="tip" class="ml-1 p-1 -my-1" /></p>
     <p v-if="description" class="pwa-body mt-0.5">{{ description }}</p>
     <div class="flex gap-2 mt-2.5">
       <button

@@ -85,6 +85,14 @@ const routes = [
     component: () => import('@/views/ReleaseNotesView.vue'),
   },
   {
+    // Galerie des infobulles (route cachée, absente du menu) : étiquettes, cartes, tons,
+    // accents métier et cas limites de placement. Cf. CLAUDE.md § « Infobulles (UI) ».
+    path: '/style-guide',
+    name: 'style-guide',
+    meta: { title: 'Galerie des infobulles' },
+    component: () => import('@/views/StyleGuideView.vue'),
+  },
+  {
     path: '/library',
     redirect: '/library/sections',
   },

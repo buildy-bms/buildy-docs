@@ -62,7 +62,8 @@ function pick(a) {
       <ul v-else class="space-y-1 max-h-96 overflow-y-auto border border-gray-100 rounded-lg">
         <li v-for="a in articles" :key="a.id">
           <button @click="pick(a)"
-                  class="w-full text-left px-3 py-2.5 hover:bg-indigo-50 transition border-b border-gray-100 last:border-b-0 group">
+                  class="w-full text-left px-3 py-2.5 hover:bg-indigo-50 transition border-b border-gray-100 last:border-b-0 group"
+                  v-tooltip="'Insérer un lien vers cet article'">
             <div class="font-medium text-gray-800 group-hover:text-indigo-700 inline-flex items-center gap-1.5">
               {{ a.title }}
               <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition" />

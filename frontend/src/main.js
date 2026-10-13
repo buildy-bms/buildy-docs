@@ -13,7 +13,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
-import { tooltipDirective, truncateTooltipDirective } from './lib/tooltip-directive'
+import { installTooltips } from './lib/tooltip'
 
 // Apres un deploy, l'index.html charge en cache pointe vers des chunks
 // dont les hashs ont change cote serveur. L'import dynamique echoue
@@ -43,8 +43,8 @@ router.onError((err) => handleChunkLoadError(err))
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
-app.directive('tooltip', tooltipDirective)
-app.directive('truncate-tooltip', truncateTooltipDirective)
+// Infobulles navy (v-tooltip) : directive globale + écouteurs uniques, cf. lib/tooltip.js.
+installTooltips(app, router)
 app.mount('#app')
 
 // Charge la totalité de la lib FA Pro Solid en arrière-plan, après le

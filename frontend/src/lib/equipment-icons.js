@@ -59,6 +59,9 @@ import {
   faLayerGroup, faSitemap, faFileLines, faAddressBook, faCircleInfo,
   // Fiche équipement : bouton « Agrandir » (grande fenêtre)
   faUpRightAndDownLeftFromCenter,
+  // Catégorie « Occultation » (choisie dans la bibliothèque) : sans elle, l'icône manquait tant
+  // que la bibliothèque complète n'était pas chargée (Safari, 4G).
+  faShutters,
 } from '@fortawesome/pro-solid-svg-icons'
 
 const ICONS = [
@@ -92,6 +95,7 @@ const ICONS = [
   faCloudArrowUp,
   faLayerGroup, faSitemap, faFileLines, faAddressBook, faCircleInfo,
   faUpRightAndDownLeftFromCenter,
+  faShutters,
 ]
 
 library.add(...ICONS)

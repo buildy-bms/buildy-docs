@@ -21,6 +21,9 @@ import RichTextEditor from '@/components/RichTextEditor.vue'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import { EyeIcon, DocumentArrowDownIcon, StarIcon } from '@heroicons/vue/24/outline'
 import { useNotification } from '@/composables/useNotification'
+import {
+  OFFERING_TAGLINE_TIP, OFFERING_HIGHLIGHT_TIP, OFFERINGS_COVER_TIP, OFFERINGS_CTA_TIP,
+} from '@/lib/misc-tips'
 
 const { success, error } = useNotification()
 
@@ -31,15 +34,15 @@ const previewOpen = ref(false)
 const generating = ref(false)
 
 const BOILERPLATE_KINDS = [
-  { kind: 'offerings_cover_promise', label: 'Promesse en cover',
+  { kind: 'offerings_cover_promise', label: 'Promesse en cover', tip: OFFERINGS_COVER_TIP,
     hint: 'Phrase forte sous le titre. Activera le levier émotionnel chez le lecteur.' },
-  { kind: 'offerings_cover_subtitle', label: 'Sous-titre cover',
+  { kind: 'offerings_cover_subtitle', label: 'Sous-titre cover', tip: OFFERINGS_COVER_TIP,
     hint: 'Description plus posée du positionnement Buildy.' },
-  { kind: 'offerings_cta_title', label: 'CTA — titre',
+  { kind: 'offerings_cta_title', label: 'CTA — titre', tip: OFFERINGS_CTA_TIP,
     hint: 'Question ou affirmation engageante en footer du tableau.' },
-  { kind: 'offerings_cta_sub', label: 'CTA — sous-titre',
+  { kind: 'offerings_cta_sub', label: 'CTA — sous-titre', tip: OFFERINGS_CTA_TIP,
     hint: 'Engagement de service (ex: réponse sous 48h).' },
-  { kind: 'offerings_cta_contact', label: 'CTA — contact',
+  { kind: 'offerings_cta_contact', label: 'CTA — contact', tip: OFFERINGS_CTA_TIP,
     hint: 'Email + téléphone, en mono vert dans le PDF.' },
 ]
 
@@ -170,8 +173,8 @@ async function downloadPdf() {
         <div class="grid grid-cols-[200px_1fr_1fr_180px] gap-4 px-5 py-2 border-b border-gray-200 bg-gray-50/60">
           <div class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Niveau</div>
           <div class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Nom affiché</div>
-          <div class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Tagline</div>
-          <div class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold" title="« Décoy » marketing : niveau présenté comme l'offre vedette du tableau.">Mise en avant</div>
+          <div class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold" v-tooltip="OFFERING_TAGLINE_TIP">Tagline</div>
+          <div class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold" v-tooltip="OFFERING_HIGHLIGHT_TIP">Mise en avant</div>
         </div>
 
         <div class="divide-y divide-gray-100">
@@ -184,7 +187,7 @@ async function downloadPdf() {
                   {{ level.slug }}
                 </span>
                 <div class="min-w-0">
-                  <div class="text-sm font-semibold text-gray-800 truncate">{{ level.name }}</div>
+                  <div class="text-sm font-semibold text-gray-800 truncate" v-tooltip.overflow>{{ level.name }}</div>
                   <div class="text-[10px] uppercase tracking-wider text-gray-400">Niveau {{ level.slug }}</div>
                 </div>
               </div>
@@ -198,6 +201,7 @@ async function downloadPdf() {
                      class="input-base text-sm w-full" placeholder="ex : Démarrer simple" />
               <!-- Mise en avant -->
               <button @click="setHighlighted(level)"
+                      v-tooltip="{ label: level.is_highlighted ? 'Niveau mis en avant dans le PDF' : 'Mettre ce niveau en avant dans le PDF', icon: 'star' }"
                       :class="['inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium rounded-lg border transition whitespace-nowrap',
                         level.is_highlighted
                           ? 'bg-emerald-500 text-white border-emerald-500'
@@ -233,8 +237,8 @@ async function downloadPdf() {
           <div v-for="b in BOILERPLATE_KINDS" :key="b.kind" class="p-4">
             <div class="space-y-1.5">
               <div class="flex items-baseline gap-2">
-                <h3 class="text-sm font-semibold text-gray-800">{{ b.label }}</h3>
-                <span class="text-[10px] text-gray-400 font-mono">{{ b.kind }}</span>
+                <h3 class="text-sm font-semibold text-gray-800" v-tooltip="b.tip">{{ b.label }}</h3>
+                <span class="text-[10px] text-gray-400 font-mono" v-tooltip="'Identifiant technique de ce texte'">{{ b.kind }}</span>
               </div>
               <p class="text-[11px] text-gray-500">{{ b.hint }}</p>
               <RichTextEditor v-if="boilerplates[b.kind]"
@@ -250,7 +254,7 @@ async function downloadPdf() {
 
     <PdfPreviewModal
       v-if="previewOpen"
-      v-tooltip="'Aperçu — Tableau des fonctionnalités Buildy'"
+      title="Aperçu — Tableau des fonctionnalités Buildy"
       :preview-url="previewOfferingsUrl()"
       :downloading="generating"
       download-label="Télécharger le PDF"

@@ -17,6 +17,9 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import Sortable from 'sortablejs'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+// Registre des icônes du catalogue (synoptique, contacts…) : sans lui, ces icônes n'étaient
+// connues que si une autre page les avait déjà chargées (« Could not find icon sitemap »).
+import '@/lib/equipment-icons'
 import {
   PlusIcon, PencilSquareIcon, TrashIcon, Bars3Icon,
   EyeIcon, EyeSlashIcon,
@@ -28,6 +31,8 @@ import {
 } from '@/api'
 import BaseModal from '@/components/BaseModal.vue'
 import FaIconPicker from '@/components/FaIconPicker.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { CHECKLIST_KEY_COLUMN_TIP, CHECKLIST_ACTIVE_COLUMN_TIP } from '@/lib/faq-tips'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -195,8 +200,8 @@ async function removeItem(item) {
             <th class="text-center py-2.5 w-16">Icône</th>
             <th class="text-left py-2.5">Libellé</th>
             <th class="text-left py-2.5">Description</th>
-            <th class="text-left py-2.5 w-32">Clé technique</th>
-            <th class="text-center py-2.5 w-20">Actif</th>
+            <th class="text-left py-2.5 w-32" v-tooltip="CHECKLIST_KEY_COLUMN_TIP">Clé technique</th>
+            <th class="text-center py-2.5 w-20" v-tooltip="CHECKLIST_ACTIVE_COLUMN_TIP">Actif</th>
             <th class="text-right px-3 py-2.5 w-24"></th>
           </tr>
         </thead>
@@ -207,7 +212,7 @@ async function removeItem(item) {
             <td class="text-center align-middle">
               <button type="button"
                       class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                      v-tooltip="'Glisser pour réordonner'">
+                      v-tooltip="'Glisser pour changer l’ordre'">
                 <Bars3Icon class="w-4 h-4" />
               </button>
             </td>
@@ -216,7 +221,7 @@ async function removeItem(item) {
                                :icon="['fas', faName(item.icon_value)]"
                                :style="{ color: item.icon_color || '#6b7280' }"
                                class="text-base" />
-              <span v-else class="text-gray-300">—</span>
+              <span v-else class="text-gray-300" v-tooltip="'Aucune icône choisie'">—</span>
             </td>
             <td class="py-2.5 font-medium text-gray-800">{{ item.label }}</td>
             <td class="py-2.5 text-gray-600 text-[13px]">
@@ -227,7 +232,7 @@ async function removeItem(item) {
               <button @click="toggleActive(item)"
                       :class="['inline-flex items-center justify-center p-1 rounded transition',
                                item.active ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100']"
-                      v-tooltip="item.active ? 'Cliquer pour désactiver' : 'Cliquer pour réactiver'">
+                      v-tooltip="item.active ? 'Désactiver pour les nouveaux audits' : 'Réactiver pour les nouveaux audits'">
                 <EyeIcon v-if="item.active" class="w-4 h-4" />
                 <EyeSlashIcon v-else class="w-4 h-4" />
               </button>
@@ -235,12 +240,12 @@ async function removeItem(item) {
             <td class="px-3 py-2.5 text-right whitespace-nowrap">
               <button @click="openEdit(item)"
                       class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition"
-                      v-tooltip="'Modifier'">
+                      v-tooltip="'Modifier cet élément'">
                 <PencilSquareIcon class="w-4 h-4" />
               </button>
               <button @click="removeItem(item)"
                       class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition"
-                      v-tooltip="'Supprimer'">
+                      v-tooltip="'Supprimer cet élément'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>
@@ -299,10 +304,12 @@ async function removeItem(item) {
                 class="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg whitespace-nowrap">
           Annuler
         </button>
-        <button type="button" @click="saveEdit" :disabled="saving || !draftLabel.trim()"
-                class="px-3 py-1.5 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm font-medium disabled:opacity-50 whitespace-nowrap">
-          {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-        </button>
+        <Tooltip :text="!saving && !draftLabel.trim() ? 'Saisis d’abord un libellé' : null">
+          <button type="button" @click="saveEdit" :disabled="saving || !draftLabel.trim()"
+                  class="px-3 py-1.5 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm font-medium disabled:opacity-50 whitespace-nowrap">
+            {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
   </div>

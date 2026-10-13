@@ -6,6 +6,7 @@ import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers, en
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import MobileSheet from './MobileSheet.vue'
+import { SHARE_OWNER_TIP } from '@/lib/audit-tips-shell'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -33,7 +34,7 @@ async function refresh() {
     data.value = pRes.data
     allUsers.value = uRes.data
   } catch {
-    notifyError('Échec chargement des partages')
+    notifyError('Échec du chargement des partages')
   } finally {
     loading.value = false
   }
@@ -109,10 +110,10 @@ onMounted(() => { if (props.open) refresh() })
   >
     <div class="p-4 space-y-4">
       <p class="text-sm text-gray-600 leading-relaxed">
-        Par défaut, cet audit n'est visible que par toi. Ajoute ci-dessous
-        les collaborateurs qui doivent pouvoir l'ouvrir (avec leur login
-        PocketID) en lecture ou en écriture. Seul le propriétaire peut
-        gérer les partages.
+        Par défaut, cet audit n’est visible que par toi. Ajoute ci-dessous
+        les collaborateurs qui doivent pouvoir le consulter (lecture seule)
+        ou le modifier (écriture), avec leur identifiant PocketID. Seul le
+        propriétaire peut gérer les partages.
       </p>
 
       <!-- Personnes ayant accès -->
@@ -125,29 +126,31 @@ onMounted(() => { if (props.open) refresh() })
           <div class="flex items-center gap-3 px-4 py-3 bg-emerald-50">
             <FontAwesomeIcon :icon="['fas', 'circle-user']" class="w-6 h-6 text-emerald-700 shrink-0" />
             <div class="flex-1 min-w-0">
-              <p class="text-base font-medium text-gray-800">Créateur de l'audit</p>
-              <p class="text-xs text-gray-500">user #{{ data.owner_id }} — owner non-révocable</p>
+              <p class="text-base font-medium text-gray-800">Créateur de l’audit</p>
+              <p class="text-xs text-gray-500">Compte n° {{ data.owner_id }} · accès permanent, impossible à retirer</p>
             </div>
-            <span class="inline-flex items-center px-2 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-800 rounded-full">OWNER</span>
+            <span class="inline-flex items-center px-2 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-800 rounded-full"
+                  v-tooltip="SHARE_OWNER_TIP">Propriétaire</span>
           </div>
           <!-- Grants -->
           <div v-for="g in data.grants" :key="g.user_id" class="flex items-center gap-3 px-4 py-3">
             <FontAwesomeIcon :icon="['fas', 'circle-user']" class="w-6 h-6 text-gray-500 shrink-0" />
             <div class="flex-1 min-w-0">
-              <p class="text-base font-medium text-gray-800 truncate">{{ g.user_display_name || g.user_email }}</p>
-              <p class="text-xs text-gray-500 truncate">{{ g.user_email }}</p>
+              <p v-tooltip.overflow class="text-base font-medium text-gray-800 truncate">{{ g.user_display_name || g.user_email }}</p>
+              <p v-tooltip.overflow class="text-xs text-gray-500 truncate">{{ g.user_email }}</p>
             </div>
+            <!-- Pastille du rôle : un toucher bascule lecture seule ↔ écriture. -->
             <button
               @click="changeRole(g)"
               :class="['inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full',
                        g.role === 'write' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800']"
-              v-tooltip="`Cliquer pour passer en ${g.role === 'write' ? 'lecture' : 'écriture'}`"
+              v-tooltip="g.role === 'write' ? 'Passer en lecture seule' : 'Autoriser à modifier'"
             >
               <FontAwesomeIcon :icon="['fas', 'pencil']" v-if="g.role === 'write'" class="w-3 h-3" />
               <FontAwesomeIcon :icon="['fas', 'eye']" v-else class="w-3 h-3" />
               {{ g.role === 'write' ? 'Écriture' : 'Lecture' }}
             </button>
-            <button @click="revoke(g)" class="tap-target text-gray-500 hover:text-red-600 inline-flex items-center justify-center" v-tooltip="`Retirer`">
+            <button @click="revoke(g)" class="tap-target text-gray-500 hover:text-red-600 inline-flex items-center justify-center" v-tooltip="'Retirer l’accès de cette personne'">
               <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
             </button>
           </div>
@@ -167,7 +170,7 @@ onMounted(() => { if (props.open) refresh() })
             <input
               v-model="search"
               type="text"
-              placeholder="Rechercher par nom ou email…"
+              placeholder="Rechercher par nom ou adresse e-mail…"
               autocomplete="off"
               data-1p-ignore="true"
               class="w-full pl-11 pr-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
@@ -203,8 +206,8 @@ onMounted(() => { if (props.open) refresh() })
           >
             <FontAwesomeIcon :icon="['fas', 'circle-user']" class="w-6 h-6 text-gray-500 shrink-0" />
             <div class="flex-1 min-w-0">
-              <p class="text-base text-gray-800 truncate">{{ u.display_name || u.email }}</p>
-              <p class="text-xs text-gray-500 truncate">{{ u.email }}</p>
+              <p v-tooltip.overflow class="text-base text-gray-800 truncate">{{ u.display_name || u.email }}</p>
+              <p v-tooltip.overflow class="text-xs text-gray-500 truncate">{{ u.email }}</p>
             </div>
             <span class="text-sm font-medium text-indigo-600">+ Ajouter</span>
           </button>

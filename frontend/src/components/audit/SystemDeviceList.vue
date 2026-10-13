@@ -14,6 +14,11 @@
  * (même règle que le tableau), avec « └─ » pour les équipements aval.
  * Les équipements partagés depuis un autre système sont listés (teinte verte)
  * ; on peut déposer une photo directement sur une ligne.
+ *
+ * Mise en page guidée (`guided`) : un seul en-tête de colonnes pour toute la zone
+ * (`header-only`), colonne État réduite aux exceptions (à compléter, à vérifier ; un simple ✓
+ * sinon), lignes « à vérifier » marquées, puissance manquante signalée, filtre
+ * (`filter` : all | todo | check) et version compacte (`compact` : nom et état, fiche ouverte).
  */
 import { computed } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -23,9 +28,16 @@ import '@/lib/equipment-icons'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import { useAuditStore } from '@/stores/audit'
 import {
-  ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, deviceMissingFields, isDeviceComplete,
+  ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, deviceMissingFields, deviceMissingItems, isDeviceComplete,
   deviceRoleAllowsEnergySource, regulationTypesForCategory,
 } from '@/lib/audit-options'
+import {
+  DEVICE_COLUMN_TIPS, DEVICE_ROW_LABEL, DEVICE_BACKUP_TIP, DEVICE_OUT_OF_SERVICE_TIP, DEVICE_ROLE_MISSING_TIP,
+  DEVICE_COMM_TIPS, DEVICE_WIRED_TIPS, roleTip, deviceStatusTip, deviceQuantityTip, deviceSharedTip,
+  deviceAlsoInTip, devicePowerCellTip, deviceEnergyCellTip, deviceProtocolsTip, deviceRegulationTip,
+} from '@/lib/audit-tips-systems'
+import { deviceChecksTip, DEVICE_DONE_LABEL, checkCardTip, POWER_REQUIRED_TIP } from '@/lib/audit-tips-systems-guide'
+import { MISSING_POWER_CODE } from '@/lib/systems-guide'
 
 library.add(faPlus, faShieldExclamation)
 
@@ -34,6 +46,12 @@ const props = defineProps({
   devices: { type: Array, default: () => [] },   // équipements propres du système
   selectedId: { type: Number, default: null },
   siteUuid: { type: String, default: null },
+  // Mise en page guidée (voir l'en-tête du fichier).
+  guided: { type: Boolean, default: false },
+  headerOnly: { type: Boolean, default: false },
+  compact: { type: Boolean, default: false },
+  filter: { type: String, default: 'all' },        // all | todo | check
+  checks: { type: Object, default: () => ({}) },   // id d'équipement → points à vérifier
 })
 const emit = defineEmits(['select', 'add-device', 'changed'])
 
@@ -61,16 +79,44 @@ function rolePriority(d) {
 
 const sharedDevices = computed(() => (audit.devices || []).filter(d =>
   d.system_id !== props.system.id && (d.extra_system_ids || []).includes(props.system.id)))
-const rows = computed(() => [...props.devices, ...sharedDevices.value].sort((a, b) => {
+const allRows = computed(() => [...props.devices, ...sharedDevices.value].sort((a, b) => {
   const pa = rolePriority(a)
   const pb = rolePriority(b)
   if (pa !== pb) return pa - pb
   return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
 }))
-const minPriority = computed(() => rows.value.reduce((m, d) => Math.min(m, rolePriority(d)), 5))
+// Mise en page guidée : filtre « à compléter » / « à vérifier ».
+function checksOf(d) { return props.checks?.[d.id] || [] }
+const rows = computed(() => {
+  if (!props.guided || props.filter === 'all') return allRows.value
+  return allRows.value.filter(d => (props.filter === 'check' ? checksOf(d).length : missing(d).length))
+})
+// « manquante » : puissance exigée (production de chauffage ou de froid, « à compléter ») ou
+// point « à vérifier » du cumul (autres productions comptées dans le seuil). null = rien à signaler.
+function powerMissing(d) {
+  if (!props.guided) return null
+  if (!d.validation_forced && deviceMissingItems(d, systemCategoryOf(d)).some(m => m.key === 'power')) return 'required'
+  return checksOf(d).some(f => f.code === MISSING_POWER_CODE) ? 'check' : null
+}
+function rowCheckTip(d) {
+  const c = checksOf(d)
+  return c.length === 1 ? checkCardTip(c[0], d, systemCategoryOf(d)) : deviceChecksTip(c, missing(d).length)
+}
+const minPriority = computed(() => allRows.value.reduce((m, d) => Math.min(m, rolePriority(d)), 5))
 function showConnector(d) {
   const p = rolePriority(d)
   return p > minPriority.value && p <= 4
+}
+// Circuit de l'usage (mise en page guidée) : un trait continu le long des lignes, un point plein sur
+// la production (tête), un coude vers chaque équipement desservi ; le trait part de la 1re ligne et
+// s'arrête à la dernière.
+function circuitClasses(d) {
+  const list = rows.value
+  const i = list.indexOf(d)
+  return [
+    showConnector(d) ? 'is-down' : 'is-head',
+    list.length <= 1 ? 'pipe-solo' : (i === 0 ? 'pipe-first' : (i === list.length - 1 ? 'pipe-last' : '')),
+  ]
 }
 function connectorColor(d) {
   switch (rolePriority(d)) {
@@ -174,21 +220,40 @@ function missing(d) {
   const cat = systemCategoryOf(d)
   return isDeviceComplete(d, cat) ? [] : deviceMissingFields(d, cat)
 }
-function statusTooltip(d) {
+// Carte de la colonne État : complet, forcé, ou la liste de ce qu'il reste à renseigner.
+function statusTip(d) {
   const m = missing(d)
-  if (!m.length) return d.validation_forced ? 'Validation forcée par l\'auditeur' : 'Équipement complet'
-  return `À compléter :\n${m.map(x => `• ${x}`).join('\n')}`
+  return deviceStatusTip(m, { forced: !m.length && !!d.validation_forced })
+}
+// Bulles des cellules vides (« — ») : sans objet, inconnue ou pas encore renseignée.
+function powerTip(d) {
+  const t = powerText(d)
+  if (t == null) return devicePowerCellTip('not_applicable')
+  if (d.power_kw_unknown) return devicePowerCellTip('unknown')
+  return t === '—' ? devicePowerCellTip('empty') : null
+}
+function energyTip(d) {
+  if (!deviceRoleAllowsEnergySource(d.device_role)) return deviceEnergyCellTip('not_applicable')
+  return energyOf(d) ? null : deviceEnergyCellTip('empty')
 }
 </script>
 
 <template>
-  <div class="dev-list border-t border-gray-100 bg-white">
-    <!-- En-têtes de colonnes centrés, comme dans tous les tableaux. -->
-    <div v-if="rows.length"
-         class="dev-grid px-3 py-1.5 text-center text-[10px] font-medium uppercase tracking-wider text-gray-400 border-b border-gray-100">
-      <span>Équipement</span><span>Fonctions</span><span>Puissance</span><span>Énergie</span>
-      <span class="dev-col-comm">Communication</span><span class="dev-col-reg">Régulation</span><span>État</span>
+  <div :class="['dev-list', guided ? 'dev-guided' : 'border-t border-gray-100 bg-white', compact && 'dev-compact']">
+    <!-- En-têtes de colonnes centrés, comme dans tous les tableaux (carte d'aide au survol).
+         Mise en page guidée : un seul en-tête pour toute la zone (header-only). -->
+    <div v-if="guided ? headerOnly : rows.length"
+         :class="['dev-grid px-3 text-center text-[10px] font-medium uppercase tracking-wider',
+                  guided ? 'py-2 text-slate-600 border-b border-slate-200' : 'py-1.5 text-gray-400 border-b border-gray-100']">
+      <span v-tooltip="DEVICE_COLUMN_TIPS.name" :class="guided && 'text-left'">Équipement</span>
+      <span class="dev-opt" v-tooltip="DEVICE_COLUMN_TIPS.roles">Fonctions</span>
+      <span class="dev-opt" v-tooltip="DEVICE_COLUMN_TIPS.power">Puissance</span>
+      <span class="dev-opt" v-tooltip="DEVICE_COLUMN_TIPS.energy">Énergie</span>
+      <span class="dev-col-comm dev-opt" v-tooltip="DEVICE_COLUMN_TIPS.communication">Communication</span>
+      <span class="dev-col-reg dev-opt" v-tooltip="DEVICE_COLUMN_TIPS.regulation">Régulation</span>
+      <span v-tooltip="DEVICE_COLUMN_TIPS.status">État</span>
     </div>
+    <template v-if="!headerOnly">
     <PhotoDropzone
       v-for="d in rows" :key="d.id"
       :site-uuid="siteUuid || ''"
@@ -198,89 +263,127 @@ function statusTooltip(d) {
       <button type="button"
               :data-device-id="d.id"
               @click="emit('select', d)"
-              :class="['dev-grid w-full px-3 py-2 text-left text-sm border-b border-gray-50 transition',
-                       d.id === selectedId ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300'
-                         : (isShared(d) ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'hover:bg-slate-50'),
+              :class="['dev-grid w-full px-3 text-left text-sm transition',
+                       guided ? 'py-2.5 border-b border-slate-100' : 'py-2 border-b border-gray-50',
+                       d.id === selectedId
+                         ? (guided ? 'bg-indigo-50/70 shadow-[inset_3px_0_0_#1b2842]' : 'bg-indigo-50 ring-1 ring-inset ring-indigo-300')
+                         : (guided && checksOf(d).length ? 'bg-rose-50/60 hover:bg-rose-50 shadow-[inset_3px_0_0_#fb7185]'
+                           : (isShared(d) ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'hover:bg-slate-50')),
                        d.out_of_service ? 'opacity-60' : '']"
-              v-tooltip="{ text: `Ouvrir la fiche${isShared(d) ? ` — partagé depuis ${originZone(d)}` : ''}`, placement: 'top' }">
+              v-tooltip="DEVICE_ROW_LABEL">
         <!-- Nom (+ connecteur aval, quantité, secours, partage, hors service),
-             puis marque · référence · localisation · âge -->
-        <span class="flex items-start gap-1.5 min-w-0"
-              :style="{ paddingLeft: Math.max(0, rolePriority(d) - minPriority) * 8 + 'px' }">
-          <span v-if="showConnector(d)" :class="['select-none leading-5 shrink-0', connectorColor(d)]" aria-hidden="true">└─</span>
+             puis marque · référence · localisation · âge. Chaque pastille a sa carte ; la
+             ligne garde une étiquette courte (affichée hors des pastilles). -->
+        <!-- Mise en page guidée : circuit de l'usage (trait de sa couleur) ; production en tête
+             (point plein, nom en gras), équipements desservis en dessous (coude, décalés). -->
+        <span :class="['flex items-start gap-1.5 min-w-0', guided && ['guide-dev-name', ...circuitClasses(d)]]"
+              :style="guided ? null : { paddingLeft: Math.max(0, rolePriority(d) - minPriority) * 8 + 'px' }">
+          <span v-if="!guided && showConnector(d)" :class="['select-none leading-5 shrink-0', connectorColor(d)]" aria-hidden="true">└─</span>
           <span class="min-w-0 flex-1">
             <span class="flex items-center gap-1.5 min-w-0">
-              <span :class="['truncate', d.name ? 'font-medium text-gray-900' : 'italic text-gray-400']">
+              <span v-tooltip.overflow
+                    :class="['truncate', !d.name ? 'italic text-gray-400'
+                      : guided ? (showConnector(d) ? 'font-medium text-[13px] text-slate-700' : 'font-semibold text-[13.5px] text-slate-900')
+                        : 'font-medium text-gray-900']">
                 {{ d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || 'Sans nom' }}
               </span>
               <span v-if="qtyBadge(d)" class="shrink-0 text-[10px] px-1.5 py-px rounded-full bg-slate-100 text-slate-700"
-                    v-tooltip="`${qtyBadge(d)} unités identiques`">
+                    v-tooltip="deviceQuantityTip(qtyBadge(d))">
                 × {{ qtyBadge(d) }}
               </span>
-              <span v-if="isBackup(d)" class="shrink-0 inline-flex" v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
+              <span v-if="isBackup(d)" class="shrink-0 inline-flex" v-tooltip="DEVICE_BACKUP_TIP">
                 <FontAwesomeIcon :icon="['fas', 'shield-exclamation']" class="w-3 h-3 text-amber-600" />
               </span>
-              <span v-if="isShared(d)" class="shrink-0 text-[10px] px-1.5 py-px rounded-full bg-emerald-100 text-emerald-800">
+              <span v-if="isShared(d)" class="shrink-0 text-[10px] px-1.5 py-px rounded-full bg-emerald-100 text-emerald-800"
+                    v-tooltip="deviceSharedTip(originZone(d))">
                 partagé
               </span>
               <span v-else-if="(d.extra_system_ids || []).length" class="shrink-0 text-[10px] px-1.5 py-px rounded-full bg-emerald-100 text-emerald-800"
-                    v-tooltip="`Aussi présent dans ${(d.extra_system_ids || []).length} autre${(d.extra_system_ids || []).length > 1 ? 's' : ''} système${(d.extra_system_ids || []).length > 1 ? 's' : ''}`">
+                    v-tooltip="deviceAlsoInTip((d.extra_system_ids || []).length)">
                 +{{ (d.extra_system_ids || []).length }}
               </span>
-              <span v-if="d.out_of_service" class="shrink-0 text-[10px] px-1.5 py-px rounded-full bg-red-100 text-red-700">HS</span>
+              <span v-if="d.out_of_service" class="shrink-0 text-[10px] px-1.5 py-px rounded-full bg-red-100 text-red-700"
+                    v-tooltip="DEVICE_OUT_OF_SERVICE_TIP">Hors service</span>
             </span>
-            <span v-if="identityLine(d)" class="block truncate text-[11px] text-gray-500 mt-0.5">{{ identityLine(d) }}</span>
+            <span v-if="identityLine(d)" v-tooltip.overflow class="block truncate text-[11px] text-gray-500 mt-0.5">{{ identityLine(d) }}</span>
           </span>
         </span>
-        <!-- Fonctions -->
-        <span class="flex flex-wrap items-center gap-1 min-w-0">
+        <!-- Fonctions (abréviations expliquées par la carte de chaque fonction) -->
+        <span class="dev-opt flex flex-wrap items-center gap-1 min-w-0">
           <span v-for="r in sortedRoles(d)" :key="r"
                 class="inline-flex items-center gap-1 text-[11px] text-gray-700 whitespace-nowrap"
-                v-tooltip="ROLE_BY_VALUE[r]?.label || r">
+                v-tooltip="roleTip(r)">
             <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="{ background: ROLE_BY_VALUE[r]?.color || '#6b7280' }"></span>
             {{ ROLE_SHORT[r] || r }}
           </span>
-          <span v-if="!rolesOf(d).length" class="text-[11px] text-gray-400 italic">à préciser</span>
+          <span v-if="!rolesOf(d).length" class="text-[11px] text-gray-400 italic"
+                v-tooltip="DEVICE_ROLE_MISSING_TIP">à préciser</span>
         </span>
-        <!-- Puissance -->
-        <span class="text-right text-xs whitespace-nowrap"
-              :class="powerText(d) && powerText(d) !== '—' ? 'text-gray-800' : 'text-gray-300'">
+        <!-- Puissance (mise en page guidée : « manquante » pour une production sans puissance) -->
+        <span v-if="powerMissing(d)" class="dev-opt text-right text-xs whitespace-nowrap"
+              :class="powerMissing(d) === 'required' ? 'text-amber-700' : 'text-rose-700'"
+              v-tooltip="() => (powerMissing(d) === 'required' ? POWER_REQUIRED_TIP : checkCardTip({ code: MISSING_POWER_CODE }))">
+          manquante
+        </span>
+        <span v-else class="dev-opt text-right text-xs whitespace-nowrap"
+              :class="powerText(d) && powerText(d) !== '—' ? 'text-gray-800' : 'text-gray-300'"
+              v-tooltip="() => powerTip(d)">
           {{ powerText(d) ?? '—' }}
         </span>
         <!-- Énergie -->
-        <span class="flex items-center gap-1.5 text-xs text-gray-700 min-w-0">
+        <span class="dev-opt flex items-center gap-1.5 text-xs text-gray-700 min-w-0">
           <template v-if="energyOf(d)">
             <FontAwesomeIcon :icon="['fas', energyOf(d).icon.replace(/^fa-/, '')]" class="w-3 h-3 shrink-0" :style="{ color: energyOf(d).color }" />
-            <span class="truncate">{{ energyOf(d).label }}</span>
+            <span class="truncate" v-tooltip.overflow>{{ energyOf(d).label }}</span>
           </template>
-          <span v-else class="text-gray-300">—</span>
+          <span v-else class="text-gray-300" v-tooltip="() => energyTip(d)">—</span>
         </span>
         <!-- Communication : protocole(s), puis liaison câblée à la GTB -->
-        <span class="dev-col-comm flex-col justify-center min-w-0 text-xs">
-          <span v-if="commState(d) === 'yes'" class="flex items-center gap-1 min-w-0">
-            <span class="truncate px-1.5 py-px rounded-md text-[11px] bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200"
-                  v-tooltip="protocolsOf(d).join(', ')">{{ protocolsOf(d)[0] }}</span>
+        <span class="dev-col-comm dev-opt flex-col justify-center min-w-0 text-xs">
+          <span v-if="commState(d) === 'yes'" class="flex items-center gap-1 min-w-0"
+                v-tooltip="() => deviceProtocolsTip(protocolsOf(d))">
+            <span class="truncate px-1.5 py-px rounded-md text-[11px] bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200">{{ protocolsOf(d)[0] }}</span>
             <span v-if="protocolsOf(d).length > 1" class="shrink-0 text-[11px] text-gray-500">+{{ protocolsOf(d).length - 1 }}</span>
           </span>
-          <span v-else-if="commState(d) === 'missing'" class="text-amber-700">Protocole à préciser</span>
-          <span v-else-if="commState(d) === 'no'" class="text-gray-500">Non communicant</span>
-          <span v-else class="text-gray-300">—</span>
+          <span v-else-if="commState(d) === 'missing'" class="text-amber-700" v-tooltip="DEVICE_COMM_TIPS.missing">Protocole à préciser</span>
+          <span v-else-if="commState(d) === 'no'" class="text-gray-500" v-tooltip="DEVICE_COMM_TIPS.no">Non communicant</span>
+          <span v-else class="text-gray-300" v-tooltip="DEVICE_COMM_TIPS.unknown">—</span>
           <span v-if="(commState(d) === 'yes' || commState(d) === 'missing') && wiredText(d)"
-                :class="['truncate text-[11px] mt-0.5', d.wired === 1 || d.wired === true ? 'text-emerald-700' : 'text-gray-500']">
+                :class="['truncate text-[11px] mt-0.5', d.wired === 1 || d.wired === true ? 'text-emerald-700' : 'text-gray-500']"
+                v-tooltip="d.wired === 1 || d.wired === true ? DEVICE_WIRED_TIPS.yes : DEVICE_WIRED_TIPS.no">
             {{ wiredText(d) }}
           </span>
         </span>
         <!-- Régulation : intégrée / déportée / aucune, puis type(s) -->
-        <span class="dev-col-reg flex-col justify-center min-w-0 text-xs">
+        <span class="dev-col-reg dev-opt flex-col justify-center min-w-0 text-xs">
           <template v-if="regulationInfo(d)">
-            <span :class="regulationInfo(d).none ? 'text-gray-500' : 'text-gray-800'">{{ regulationInfo(d).label }}</span>
+            <span :class="regulationInfo(d).none ? 'text-gray-500' : 'text-gray-800'"
+                  v-tooltip="() => deviceRegulationTip(regulationInfo(d))">{{ regulationInfo(d).label }}</span>
             <span v-if="regulationInfo(d).detail" class="truncate text-[11px] text-gray-500 mt-0.5"
-                  v-tooltip="regulationInfo(d).detail">{{ regulationInfo(d).detail }}</span>
+                  v-tooltip.overflow>{{ regulationInfo(d).detail }}</span>
           </template>
-          <span v-else class="text-gray-300">—</span>
+          <span v-else class="text-gray-300" v-tooltip="'Régulation pas encore renseignée'">—</span>
         </span>
-        <!-- État -->
-        <span class="text-xs whitespace-nowrap" v-tooltip="statusTooltip(d)">
+        <!-- État (mise en page guidée : seulement les exceptions, un ✓ discret sinon) -->
+        <span v-if="guided" :class="['flex gap-1 text-xs', compact ? 'flex-col items-end' : 'flex-wrap items-center']"
+              v-tooltip="() => (checksOf(d).length ? rowCheckTip(d) : statusTip(d))">
+          <span v-if="missing(d).length"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap bg-amber-100/70 text-amber-900 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+            {{ missing(d).length }} à compléter
+          </span>
+          <span v-if="checksOf(d).length"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap bg-rose-100/70 text-rose-800 font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden="true"></span>
+            à vérifier
+          </span>
+          <span v-if="!missing(d).length && !checksOf(d).length"
+                class="inline-flex items-center gap-1 text-emerald-700 whitespace-nowrap">
+            <span class="font-bold" aria-hidden="true">✓</span>
+            <span :class="d.validation_forced ? '' : 'sr-only'">{{ d.validation_forced ? 'Forcé' : DEVICE_DONE_LABEL }}</span>
+          </span>
+        </span>
+        <span v-else class="text-xs whitespace-nowrap" v-tooltip="() => statusTip(d)">
           <span v-if="!missing(d).length" class="inline-flex items-center gap-1 text-emerald-700">
             <span class="font-bold">✓</span> {{ d.validation_forced ? 'Forcé' : 'Complet' }}
           </span>
@@ -296,6 +399,7 @@ function statusTooltip(d) {
         <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3 h-3 shrink-0" /> Ajouter un équipement
       </button>
     </div>
+    </template>
   </div>
 </template>
 
@@ -303,12 +407,16 @@ function statusTooltip(d) {
 /* Largeurs fixes (hors nom) : les colonnes s'alignent d'un système à
    l'autre. Communication puis Régulation n'apparaissent que si la liste est
    assez large (écran étroit avec la fiche ouverte à droite). */
-.dev-list { container-type: inline-size; }
+/* Liste étroite (1024 px, fiche ouverte à droite) : les colonnes fixes ne tiennent plus ; la
+   liste défile alors horizontalement (toutes les colonnes gardées) au lieu de passer sous la
+   fiche, où « État » et sa bulle devenaient inaccessibles et les en-têtes se chevauchaient. */
+.dev-list { container-type: inline-size; overflow-x: auto; }
 .dev-grid {
   display: grid;
   align-items: center;
   column-gap: 0.75rem;
   grid-template-columns: minmax(0, 1fr) 7rem 6rem 7rem 7.5rem;
+  min-width: 40rem;
 }
 .dev-col-comm, .dev-col-reg { display: none; }
 @container (min-width: 52rem) {
@@ -319,4 +427,37 @@ function statusTooltip(d) {
   .dev-grid { grid-template-columns: minmax(0, 1fr) 7rem 6rem 7rem 8.5rem 8.5rem 7.5rem; }
   .dev-col-reg { display: flex; }
 }
+/* Mise en page guidée : colonne État plus large (« 5 à compléter » + « à vérifier »). Mêmes
+   largeurs dans toutes les listes de la zone et dans l'en-tête unique : colonnes alignées. */
+.dev-guided .dev-grid { grid-template-columns: minmax(0, 1fr) 7rem 6rem 7rem 10.5rem; }
+@container (min-width: 52rem) {
+  .dev-guided .dev-grid { grid-template-columns: minmax(0, 1fr) 7rem 6rem 7rem 8.5rem 10.5rem; }
+}
+@container (min-width: 64rem) {
+  .dev-guided .dev-grid { grid-template-columns: minmax(0, 1fr) 7rem 6rem 7rem 8.5rem 8.5rem 10.5rem; }
+}
+/* Circuit de l'usage (mise en page guidée) : --fluid vient de la carte d'usage (SystemsSection). */
+.guide-dev-name { position: relative; padding-left: 1.35rem; }
+.guide-dev-name.is-down { padding-left: 2.35rem; }
+.guide-dev-name::before {
+  content: ''; position: absolute; left: 0.4rem; width: 2px; border-radius: 1px;
+  top: calc(-0.625rem - 1px); bottom: calc(-0.625rem - 1px);
+  background: color-mix(in srgb, var(--fluid, #94a3b8) 40%, transparent);
+}
+.guide-dev-name.pipe-first::before { top: 0.7rem; }
+.guide-dev-name.pipe-last::before { bottom: calc(100% - 0.7rem); }
+.guide-dev-name.pipe-solo::before { display: none; }
+.guide-dev-name::after { content: ''; position: absolute; }
+.guide-dev-name.is-head::after {
+  left: calc(0.4rem - 4px); top: calc(0.7rem - 5px); width: 10px; height: 10px; border-radius: 9999px;
+  background: var(--fluid, #94a3b8); box-shadow: 0 0 0 2px #fff;
+}
+.guide-dev-name.is-down::after {
+  left: 0.4rem; top: calc(0.7rem - 1px); width: 1.6rem; height: 2px; border-radius: 1px;
+  background: color-mix(in srgb, var(--fluid, #94a3b8) 40%, transparent);
+}
+/* Fiche ouverte : nom et état seulement (le reste est dans la fiche). */
+.dev-compact { overflow-x: visible; }
+.dev-compact .dev-opt { display: none !important; }
+.dev-compact .dev-grid { grid-template-columns: minmax(0, 1fr) max-content !important; min-width: 0; }
 </style>

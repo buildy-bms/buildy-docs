@@ -15,6 +15,8 @@ import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import { TEMPLATE_ALREADY_ADDED_TIP } from '@/lib/audit-tips-systems'
 import { listEquipmentTemplates, createBacsDevice } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
@@ -181,8 +183,8 @@ const title = computed(() =>
   >
     <div class="px-4 py-4 space-y-4">
       <p class="text-sm text-gray-600 leading-relaxed">
-        Choisis un modèle pour ajouter un équipement préconfiguré (énergie, niveau).
-        Tu pourras ensuite renseigner marque, référence et puissance directement sur l'équipement.
+        Choisis un modèle pour ajouter un équipement déjà préparé (énergie, fonction).
+        Tu pourras ensuite renseigner marque, référence et puissance directement sur l’équipement.
       </p>
 
       <!-- Recherche -->
@@ -207,12 +209,12 @@ const title = computed(() =>
             placeholder="Toutes énergies"
           />
         </MobileField>
-        <MobileField label="Niveau">
+        <MobileField label="Fonction">
           <MobileSelectSheet
             v-model="roleFilter"
             :options="ROLE_FILTER_OPTIONS"
-            title="Filtrer par niveau"
-            placeholder="Tous niveaux"
+            title="Filtrer par fonction"
+            placeholder="Toutes fonctions"
           />
         </MobileField>
       </div>
@@ -242,7 +244,9 @@ const title = computed(() =>
           :key="t.id"
           class="bg-white border border-gray-200 rounded-xl overflow-hidden"
         >
-          <!-- Card complète tappable + bouton Ajouter dédié -->
+          <!-- Card complète tappable + bouton Ajouter dédié. Grisée quand le modèle est déjà
+               ajouté : même raison que le bouton « Déjà ajouté », portée par l'enveloppe. -->
+          <Tooltip :text="isUsed(t) ? TEMPLATE_ALREADY_ADDED_TIP : null" class="w-full">
           <button
             type="button"
             @click="pickTemplate(t)"
@@ -260,12 +264,16 @@ const title = computed(() =>
               </div>
             </div>
           </button>
+          </Tooltip>
           <div
             :class="[
               'px-3 pb-3',
               recentlyAdded.has(t.id) ? '' : '',
             ]"
           >
+            <!-- « Déjà ajouté » grisé : la raison est portée par l'enveloppe
+                 (s'ouvre aussi au doigt). -->
+            <Tooltip :text="isUsed(t) ? TEMPLATE_ALREADY_ADDED_TIP : null" class="w-full">
             <button
               type="button"
               @click="pickTemplate(t)"
@@ -280,6 +288,7 @@ const title = computed(() =>
               <FontAwesomeIcon v-if="isUsed(t)" :icon="['fas', 'check']" class="w-4 h-4 shrink-0" />
               {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
             </button>
+            </Tooltip>
           </div>
         </li>
       </ul>

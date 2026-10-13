@@ -7,6 +7,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useTableSortFilter } from '@/composables/useTableSortFilter'
 import BaseModal from '@/components/BaseModal.vue'
 import Tooltip from '@/components/Tooltip.vue'
+import { bacsCategoryTip, sortTip, checkAllTip, ZONE_NAME_REQUIRED_LABEL } from '@/lib/editor-tips'
 
 const props = defineProps({
   sectionId: { type: Number, required: true },
@@ -211,13 +212,15 @@ async function bulkDuplicate() {
               <option v-for="t in OCCUPATION_TYPES" :key="t">{{ t }}</option>
             </select>
           </div>
-          <button
-            @click="submitAdd"
-            :disabled="!draft.name.trim()"
-            class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            Ajouter
-          </button>
+          <Tooltip :text="draft.name.trim() ? null : ZONE_NAME_REQUIRED_LABEL">
+            <button
+              @click="submitAdd"
+              :disabled="!draft.name.trim()"
+              class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              Ajouter
+            </button>
+          </Tooltip>
           <button
             @click="showAdd = false; draft = emptyDraft()"
             class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
@@ -250,11 +253,12 @@ async function bulkDuplicate() {
           <tr>
             <th class="px-3 py-2 text-center w-9">
               <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
-                     v-tooltip="'Tout cocher / décocher'"
+                     v-tooltip="checkAllTip(sel.allChecked.value, 'toutes les zones')"
                      class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
             </th>
             <th class="text-left px-5 py-2 font-semibold select-none">
-              <button @click="toggleSort('name')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+              <button @click="toggleSort('name')" class="inline-flex items-center gap-1 hover:text-indigo-700"
+                      v-tooltip="sortTip('nom de zone', sortKey === 'name', sortDir)">
                 Zone
                 <ArrowUpIcon v-if="sortKey === 'name' && sortDir === 'asc'" class="w-3 h-3" />
                 <ArrowDownIcon v-else-if="sortKey === 'name' && sortDir === 'desc'" class="w-3 h-3" />
@@ -262,7 +266,8 @@ async function bulkDuplicate() {
               </button>
             </th>
             <th class="text-right px-4 py-2 font-semibold w-28 select-none">
-              <button @click="toggleSort('surface_m2')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+              <button @click="toggleSort('surface_m2')" class="inline-flex items-center gap-1 hover:text-indigo-700"
+                      v-tooltip="sortTip('surface', sortKey === 'surface_m2', sortDir)">
                 Surface
                 <ArrowUpIcon v-if="sortKey === 'surface_m2' && sortDir === 'asc'" class="w-3 h-3" />
                 <ArrowDownIcon v-else-if="sortKey === 'surface_m2' && sortDir === 'desc'" class="w-3 h-3" />
@@ -270,7 +275,8 @@ async function bulkDuplicate() {
               </button>
             </th>
             <th class="text-left px-4 py-2 font-semibold w-52 select-none">
-              <button @click="toggleSort('occupation_type')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+              <button @click="toggleSort('occupation_type')" class="inline-flex items-center gap-1 hover:text-indigo-700"
+                      v-tooltip="sortTip('type d’occupation', sortKey === 'occupation_type', sortDir)">
                 Type d'occupation
                 <ArrowUpIcon v-if="sortKey === 'occupation_type' && sortDir === 'asc'" class="w-3 h-3" />
                 <ArrowDownIcon v-else-if="sortKey === 'occupation_type' && sortDir === 'desc'" class="w-3 h-3" />
@@ -300,18 +306,18 @@ async function bulkDuplicate() {
             </td>
             <td class="px-4 py-1.5 text-gray-600">{{ z.occupation_type || '—' }}</td>
             <td class="px-4 py-1.5 text-right whitespace-nowrap">
-              <Tooltip text="Éditer la zone">
-                <button @click="openEdit(z)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-indigo-100 text-indigo-600 transition-opacity">
+              <Tooltip text="Modifier cette zone">
+                <button @click="openEdit(z)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded hover:bg-indigo-100 text-indigo-600 transition-opacity">
                   <PencilSquareIcon class="w-3.5 h-3.5" />
                 </button>
               </Tooltip>
-              <Tooltip text="Dupliquer la zone">
-                <button @click="duplicateRow(z)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-600 transition-opacity ml-1">
+              <Tooltip text="Dupliquer cette zone">
+                <button @click="duplicateRow(z)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-600 transition-opacity ml-1">
                   <DocumentDuplicateIcon class="w-3.5 h-3.5" />
                 </button>
               </Tooltip>
-              <Tooltip text="Supprimer la zone">
-                <button @click="deleteZone(z)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 text-red-500 transition-opacity ml-1">
+              <Tooltip text="Supprimer cette zone">
+                <button @click="deleteZone(z)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded hover:bg-red-100 text-red-500 transition-opacity ml-1">
                   <TrashIcon class="w-3.5 h-3.5" />
                 </button>
               </Tooltip>
@@ -354,7 +360,8 @@ async function bulkDuplicate() {
               <th v-for="c in matrix.categories" :key="c.key" class="text-center px-3 py-2 font-semibold whitespace-nowrap">
                 <div class="text-gray-700">{{ c.label }}</div>
                 <div class="mt-1">
-                  <span v-if="c.bacs" class="inline-block px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[9px] font-bold normal-case tracking-normal">BACS</span>
+                  <span v-if="c.bacs" class="inline-block px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[9px] font-bold normal-case tracking-normal"
+                        v-tooltip="bacsCategoryTip(c.bacs)">BACS</span>
                 </div>
               </th>
               <th class="text-center px-4 py-2.5 font-semibold bg-emerald-50 text-emerald-700 whitespace-nowrap border-l border-emerald-100">Total</th>
@@ -433,13 +440,15 @@ async function bulkDuplicate() {
       </form>
       <template #footer>
         <button @click="editing = null" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900">Annuler</button>
-        <button
-          @click="submitEdit"
-          :disabled="!editForm.name.trim()"
-          class="px-4 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-        >
-          Enregistrer
-        </button>
+        <Tooltip :text="editForm.name.trim() ? null : ZONE_NAME_REQUIRED_LABEL">
+          <button
+            @click="submitEdit"
+            :disabled="!editForm.name.trim()"
+            class="px-4 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            Enregistrer
+          </button>
+        </Tooltip>
       </template>
     </BaseModal>
   </div>

@@ -5,6 +5,10 @@ import { getSectionPoints, addSectionOverride, deleteSectionOverride, getEquipme
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import ProtocolPills from '@/components/ProtocolPills.vue'
+import {
+  POINT_COLUMN_TIPS, POINT_TYPE_TIPS, POINT_NATURE_TIPS, POINT_SOURCE_TIPS,
+  pointOptionalToggleTip, checkAllTip, RESTORE_POINT_LABEL,
+} from '@/lib/editor-tips'
 
 const props = defineProps({
   sectionId: { type: Number, required: true },
@@ -331,15 +335,15 @@ async function bulkSetOptional(value) {
             <tr>
               <th class="py-1.5 px-2 text-center w-9">
                 <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
-                       v-tooltip="'Tout cocher / décocher'"
+                       v-tooltip="checkAllTip(sel.allChecked.value, 'tous les points')"
                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
               </th>
               <th class="py-1.5 px-2 text-center">Donnée</th>
-              <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
-              <th class="py-1.5 px-2 text-center w-28">Type</th>
-              <th class="py-1.5 px-2 text-center w-32">Nature</th>
+              <th class="py-1.5 px-2 text-center w-40" v-tooltip="POINT_COLUMN_TIPS.techName">Nom technique</th>
+              <th class="py-1.5 px-2 text-center w-28" v-tooltip="POINT_COLUMN_TIPS.type">Type</th>
+              <th class="py-1.5 px-2 text-center w-32" v-tooltip="POINT_COLUMN_TIPS.nature">Nature</th>
               <th class="py-1.5 px-2 text-center w-16">Unité</th>
-              <th class="py-1.5 px-2 text-center w-20" v-tooltip="'Optionnel — la MOA peut décider de ne pas exiger ce point'">Opt.</th>
+              <th class="py-1.5 px-2 text-center w-20" v-tooltip="POINT_COLUMN_TIPS.optional">Opt.</th>
               <th class="py-1.5 px-2 w-16"></th>
             </tr>
           </thead>
@@ -351,7 +355,8 @@ async function bulkSetOptional(value) {
               </td>
               <td class="py-1.5 px-2 text-center text-gray-800">
                 {{ p.label }}
-                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]">
+                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]"
+                      v-tooltip="POINT_SOURCE_TIPS[p.source]">
                   {{ SOURCE_BADGE[p.source].label }}
                 </span>
               </td>
@@ -360,27 +365,29 @@ async function bulkSetOptional(value) {
                 <span v-else class="text-gray-300 italic">non défini</span>
               </td>
               <td class="py-1.5 px-2 text-center">
-                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
+                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]"
+                      v-tooltip="POINT_TYPE_TIPS[p.data_type]">{{ p.data_type }}</span>
               </td>
               <td class="py-1.5 px-2 text-center text-xs">
                 <span v-if="p.nature && NATURE_COLORS[p.nature]"
-                      :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]">
+                      :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]"
+                      v-tooltip="POINT_NATURE_TIPS[p.nature]">
                   {{ p.nature }}
                 </span>
                 <span v-else class="text-gray-300 italic">—</span>
               </td>
               <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
               <td class="py-1.5 px-2 text-center" @click.stop>
-                <label class="inline-flex items-center justify-center cursor-pointer" v-tooltip="'Marquer comme optionnel'">
+                <label class="inline-flex items-center justify-center cursor-pointer" v-tooltip="pointOptionalToggleTip(p)">
                   <input type="checkbox" :checked="p.is_optional" @change="toggleOptional(p)"
                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
                 </label>
               </td>
               <td class="py-1.5 px-2 text-center">
-                <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1" v-tooltip="'Restaurer la valeur du template'">
+                <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-amber-600 hover:text-amber-800 mr-1" v-tooltip="RESTORE_POINT_LABEL">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />
                 </button>
-                <button @click="removePoint(p)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" v-tooltip="'Retirer ce point'">
+                <button @click="removePoint(p)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-red-500 hover:text-red-700" v-tooltip="'Retirer ce point'">
                   <TrashIcon class="w-3.5 h-3.5 inline" />
                 </button>
               </td>
@@ -400,15 +407,15 @@ async function bulkSetOptional(value) {
             <tr>
               <th class="py-1.5 px-2 text-center w-9">
                 <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
-                       v-tooltip="'Tout cocher / décocher'"
+                       v-tooltip="checkAllTip(sel.allChecked.value, 'tous les points')"
                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
               </th>
               <th class="py-1.5 px-2 text-center">Donnée</th>
-              <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
-              <th class="py-1.5 px-2 text-center w-28">Type</th>
-              <th class="py-1.5 px-2 text-center w-32">Nature</th>
+              <th class="py-1.5 px-2 text-center w-40" v-tooltip="POINT_COLUMN_TIPS.techName">Nom technique</th>
+              <th class="py-1.5 px-2 text-center w-28" v-tooltip="POINT_COLUMN_TIPS.type">Type</th>
+              <th class="py-1.5 px-2 text-center w-32" v-tooltip="POINT_COLUMN_TIPS.nature">Nature</th>
               <th class="py-1.5 px-2 text-center w-16">Unité</th>
-              <th class="py-1.5 px-2 text-center w-20" v-tooltip="'Optionnel — la MOA peut décider de ne pas exiger ce point'">Opt.</th>
+              <th class="py-1.5 px-2 text-center w-20" v-tooltip="POINT_COLUMN_TIPS.optional">Opt.</th>
               <th class="py-1.5 px-2 w-16"></th>
             </tr>
           </thead>
@@ -420,7 +427,8 @@ async function bulkSetOptional(value) {
               </td>
               <td class="py-1.5 px-2 text-center text-gray-800">
                 {{ p.label }}
-                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]">
+                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]"
+                      v-tooltip="POINT_SOURCE_TIPS[p.source]">
                   {{ SOURCE_BADGE[p.source].label }}
                 </span>
               </td>
@@ -429,27 +437,29 @@ async function bulkSetOptional(value) {
                 <span v-else class="text-gray-300 italic">non défini</span>
               </td>
               <td class="py-1.5 px-2 text-center">
-                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
+                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]"
+                      v-tooltip="POINT_TYPE_TIPS[p.data_type]">{{ p.data_type }}</span>
               </td>
               <td class="py-1.5 px-2 text-center text-xs">
                 <span v-if="p.nature && NATURE_COLORS[p.nature]"
-                      :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]">
+                      :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]"
+                      v-tooltip="POINT_NATURE_TIPS[p.nature]">
                   {{ p.nature }}
                 </span>
                 <span v-else class="text-gray-300 italic">—</span>
               </td>
               <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
               <td class="py-1.5 px-2 text-center" @click.stop>
-                <label class="inline-flex items-center justify-center cursor-pointer" v-tooltip="'Marquer comme optionnel'">
+                <label class="inline-flex items-center justify-center cursor-pointer" v-tooltip="pointOptionalToggleTip(p)">
                   <input type="checkbox" :checked="p.is_optional" @change="toggleOptional(p)"
                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
                 </label>
               </td>
               <td class="py-1.5 px-2 text-center">
-                <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1">
+                <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-amber-600 hover:text-amber-800 mr-1" v-tooltip="RESTORE_POINT_LABEL">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />
                 </button>
-                <button @click="removePoint(p)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700">
+                <button @click="removePoint(p)" class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-red-500 hover:text-red-700" v-tooltip="'Retirer ce point'">
                   <TrashIcon class="w-3.5 h-3.5 inline" />
                 </button>
               </td>

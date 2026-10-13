@@ -1,7 +1,8 @@
 <script setup>
-import { computed, provide } from 'vue'
+import { computed, provide, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { authReady } from './router'
+import { tooltipHostWanted } from './lib/tooltip'
 import AppLayout from './components/AppLayout.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
@@ -9,6 +10,10 @@ import InstallBanner from './components/InstallBanner.vue'
 import VersionUpdateBanner from './components/VersionUpdateBanner.vue'
 import { useViewport } from './composables/useViewport'
 import { useOfflineQueue } from './composables/useOfflineQueue'
+
+// L'infobulle unique de l'app et ses icônes : chargées au premier survol ou au repos
+// (hors du bundle de démarrage), cf. lib/tooltip.js.
+const TooltipHost = defineAsyncComponent(() => import('./components/tooltip/TooltipHost.vue'))
 
 const route = useRoute()
 const { isNarrow } = useViewport()
@@ -40,4 +45,5 @@ const skipAppLayout = computed(() =>
       <router-view />
     </AppLayout>
   </template>
+  <TooltipHost v-if="tooltipHostWanted" />
 </template>

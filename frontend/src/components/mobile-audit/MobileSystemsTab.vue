@@ -17,20 +17,30 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SystemPartiesPanel from '@/components/audit/SystemPartiesPanel.vue'
 import MobileYesNo from './MobileYesNo.vue'
+import HelpTip from '@/components/HelpTip.vue'
+import Tooltip from '@/components/Tooltip.vue'
 import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel, deviceMissingFields, isDeviceComplete, regulationTypesForCategory, GRANULARITY_OPTIONS, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
+import { plural } from '@/lib/tooltip-content'
+import {
+  DEVICE_BACKUP_TIP, DEVICE_OUT_OF_SERVICE_TIP, DEVICE_COLUMN_TIPS, POWER_CALC_TIP, GRANULARITY_TIP,
+  DHW_LOOP_TIP, DHW_LOOP_LEGIONELLA_TIP, LIABILITY_TIP, devicePowerFieldTip, zoneActiveCountLabel,
+} from '@/lib/audit-tips-systems'
+import { articleTip } from '@/lib/audit-tips-site'
+import { SYSTEMS_POWER_SUM_TIP, ADD_USAGE_DISABLED_TIP } from '@/lib/audit-tips-mobile'
 
 // Item 8 — type de calcul de puissance par équipement. Vide = automatique.
+// Libellés identiques au bureau (DeviceEditModal) ; valeurs inchangées.
 const POWER_CALC_OPTIONS = [
-  { value: 'thermodynamic_max', label: 'Thermodynamique (max chaud/froid)' },
-  { value: 'boiler_sum', label: 'Chaudière (somme nominales)' },
-  { value: 'joule_sum', label: 'Effet joule (somme élec.)' },
-  { value: 'district_heating_substation', label: 'Sous-station réseau' },
-  { value: 'out_of_scope', label: 'Hors cumul (secours, process…)' },
+  { value: 'thermodynamic_max', label: 'Pompe à chaleur, climatisation (la plus forte des puissances)' },
+  { value: 'boiler_sum', label: 'Chaudières (somme des puissances nominales)' },
+  { value: 'joule_sum', label: 'Effet Joule (somme des puissances électriques)' },
+  { value: 'district_heating_substation', label: 'Sous-station de réseau de chaleur' },
+  { value: 'out_of_scope', label: 'Hors cumul (secours, procédés…)' },
 ]
-// Item 3 — bouclage ECS.
+// Item 3 — bouclage de l'eau chaude sanitaire (libellés du bureau).
 const LOOP_OPTIONS = [
-  { value: 'looped', label: 'Boucle ECS' },
-  { value: 'not_looped', label: 'Pas de boucle' },
+  { value: 'looped', label: 'Bouclée' },
+  { value: 'not_looped', label: 'Non bouclée' },
   { value: 'unknown', label: 'Inconnu' },
 ]
 // Item 7c — séparabilité du comptage d'un équipement partagé.
@@ -58,7 +68,7 @@ function thermalFor(zoneId, category) {
 const REGULATION_LABEL = {
   per_room: 'par pièce',
   per_zone: 'par zone',
-  central_only: 'centrale',
+  central_only: 'centralisée',
   none: 'aucune',
 }
 
@@ -70,6 +80,11 @@ function thermalStatus(zoneId, category) {
     return { label: 'À renseigner', tone: 'warn' }
   }
   const granularity = REGULATION_LABEL[t.regulation_type]
+  // Chauffage : une régulation seulement centralisée ne règle pas la température pièce par
+  // pièce — même verdict qu'au bureau (ThermalSection, sélecteur rouge) et que le plan d'actions.
+  if (category === 'heating' && t.regulation_type === 'central_only') {
+    return { label: 'Automatique · centralisée, pas pièce par pièce', tone: 'warn' }
+  }
   return { label: `Automatique · ${granularity || t.regulation_type}`, tone: 'ok' }
 }
 
@@ -114,7 +129,7 @@ const SYSTEM_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
   ventilation: 'Ventilation',
-  dhw: 'ECS',
+  dhw: 'Eau chaude sanitaire',
   lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur',
   electricity_production: 'Production photovoltaïque',
@@ -125,7 +140,7 @@ const SYSTEM_NEGATIVE_LABEL = {
   heating: 'Pas de chauffage dans cette zone',
   cooling: 'Pas de refroidissement',
   ventilation: 'Pas de ventilation mécanique',
-  dhw: 'Pas d\'ECS',
+  dhw: 'Pas d’eau chaude sanitaire',
   lighting_indoor: 'Pas d\'éclairage intérieur',
   lighting_outdoor: 'Pas d\'éclairage extérieur',
   electricity_production: 'Pas de production photovoltaïque',
@@ -294,22 +309,55 @@ function systemWeightPct(s) {
   if (total <= 0) return null
   return Math.round(systemPowerKw(s) / total * 1000) / 10
 }
+// Règle des 5 % : le serveur exige la justification AVEC le marquage (0.1.228, FAQ ministérielle
+// n° 16). Cocher ouvre d'abord le champ de justification ; le marquage part avec elle. Avant,
+// le marquage partait seul : refusé (« Sauvegarde impossible »), la case restait cochée à l'écran
+// alors que rien n'était enregistré.
+const negligibleDraftFor = ref(null) // id du poste coché en attente de sa justification
+const negligibleInput = ref(null)
+const isNegligibleShown = (s) => !!s.marked_negligible_under_5pct || negligibleDraftFor.value === s.id
+watch(openedUsageId, () => { negligibleDraftFor.value = null }) // fiche fermée sans justification : rien n'est coché
+async function onNegligibleTap(s) {
+  if (negligibleDraftFor.value === s.id && !s.marked_negligible_under_5pct) {
+    negligibleDraftFor.value = null // décoché avant d'avoir justifié : rien à enregistrer
+    return
+  }
+  await toggleNegligible(s, !s.marked_negligible_under_5pct)
+}
 async function toggleNegligible(s, checked) {
   if (checked) {
     const pct = systemWeightPct(s)
     if (pct != null && pct > 10) {
       const ok = await confirm({
         title: 'Poste potentiellement significatif',
-        message: `Ce poste représente environ ${pct} % de la puissance du site (estimation). La règle des 5 % se base sur la consommation réelle — vérifiez avant de l'exempter.`,
+        message: `Ce poste représente environ ${pct} % de la puissance du site (estimation). La règle des 5 % se base sur la consommation réelle : vérifie avant de l’exempter.`,
         confirmLabel: 'Marquer quand même',
       })
       if (!ok) return
     }
+    const existing = (s.negligible_justification || '').trim()
+    if (existing) return patchSystem(s, { marked_negligible_under_5pct: true, negligible_justification: existing })
+    negligibleDraftFor.value = s.id
+    await nextTick()
+    negligibleInput.value?.focus()
+    return
   }
-  await patchSystem(s, {
-    marked_negligible_under_5pct: checked,
-    ...(checked ? {} : { negligible_justification: null }),
-  })
+  negligibleDraftFor.value = null
+  await patchSystem(s, { marked_negligible_under_5pct: false, negligible_justification: null })
+}
+function saveNegligibleJustification(s, e) {
+  const text = (e.target.value || '').trim()
+  if (s.marked_negligible_under_5pct) {
+    if (!text) {
+      e.target.value = s.negligible_justification || ''
+      error('Justification obligatoire tant que le poste est marqué négligeable.')
+      return
+    }
+    return patchSystem(s, { negligible_justification: text })
+  }
+  if (!text) return // rien saisi : le poste reste non marqué
+  negligibleDraftFor.value = null
+  return patchSystem(s, { marked_negligible_under_5pct: true, negligible_justification: text })
 }
 
 // Device sheet
@@ -344,7 +392,7 @@ async function moveDeviceToSystem(systemId) {
     const { data } = await moveBacsDevice(dev.id, systemId)
     Object.assign(dev, data)
     if (editingDevice.value) editingDevice.value.system = systems.value.find(s => s.id === systemId) || editingDevice.value.system
-    success('Système déplacé')
+    success('Équipement déplacé')
     await audit.refreshAuditCore()
   } catch (e) {
     error(e.response?.data?.detail || 'Déplacement impossible')
@@ -764,8 +812,10 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
   <div class="p-3 space-y-3">
     <!-- ───────────────── N1 — Liste des zones ───────────────── -->
     <template v-if="currentView === 'zones'">
-      <!-- Stat puissance globale -->
-      <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
+      <!-- Stat puissance globale : somme brute (≠ puissance retenue du verdict,
+           cf. carte), s'ouvre aussi au doigt. -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4"
+           v-tooltip="SYSTEMS_POWER_SUM_TIP">
         <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center">
           <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-6 h-6" />
         </div>
@@ -773,7 +823,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <p class="text-2xl font-medium text-gray-900 leading-none">
             {{ powerSummary.heating_cooling_total_kw || 0 }} <span class="text-sm text-gray-500">kW</span>
           </p>
-          <p class="text-xs text-gray-500 mt-1">Chauffage + climatisation cumulé</p>
+          <p class="text-xs text-gray-500 mt-1">Somme des puissances de chauffage et de climatisation</p>
         </div>
       </div>
 
@@ -794,18 +844,21 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
+                <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
+                <!-- Pastille dans le bouton de la ligne : le texte visible dit
+                     tout (plus de title= natif). -->
                 <span v-if="g.toRenseigner > 0"
-                      class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700"
-                      :title="`${g.toRenseigner} usage(s) à renseigner`">
+                      class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">
                   <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                  {{ g.toRenseigner }} à renseigner
+                  {{ plural(g.toRenseigner, 'usage', 'usages') }} à renseigner
                 </span>
               </div>
+              <!-- Icônes des usages présents : nom de l'usage au survol (iPad,
+                   souris) ; au doigt, le détail s'ouvre en touchant la zone. -->
               <div class="mt-2 flex items-center gap-2 flex-wrap">
                 <span v-for="cat in g.presentCategories" :key="cat.key"
                       class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-50"
-                      :title="cat.label">
+                      v-tooltip="cat.label">
                   <SystemCategoryIcon v-if="cat.category" :category="cat.category" size="sm" :with-tooltip="false" />
                   <FontAwesomeIcon v-else :icon="['fas', 'circle-question']" class="w-4 h-4 text-gray-400" />
                 </span>
@@ -815,7 +868,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               </div>
             </div>
             <div class="flex flex-col items-end shrink-0">
-              <span class="text-sm font-medium text-gray-600">{{ g.presentCount }}/{{ g.totalCount }}</span>
+              <span class="text-sm font-medium text-gray-600" v-tooltip="zoneActiveCountLabel(g.presentCount, g.totalCount)">{{ g.presentCount }}/{{ g.totalCount }}</span>
               <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 mt-1" />
             </div>
           </button>
@@ -838,11 +891,11 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
           >
             <div class="flex-1 min-w-0">
-              <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
+              <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
               <div class="mt-2 flex items-center gap-2 flex-wrap">
                 <span v-for="cat in g.presentCategories" :key="cat.key"
                       class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-50"
-                      :title="cat.label">
+                      v-tooltip="cat.label">
                   <SystemCategoryIcon v-if="cat.category" :category="cat.category" size="sm" :with-tooltip="false" />
                   <FontAwesomeIcon v-else :icon="['fas', 'circle-question']" class="w-4 h-4 text-gray-400" />
                 </span>
@@ -852,7 +905,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               </div>
             </div>
             <div class="flex flex-col items-end shrink-0">
-              <span v-if="g.totalCount" class="text-sm font-medium text-gray-600">{{ g.presentCount }}/{{ g.totalCount }}</span>
+              <span v-if="g.totalCount" class="text-sm font-medium text-gray-600" v-tooltip="zoneActiveCountLabel(g.presentCount, g.totalCount)">{{ g.presentCount }}/{{ g.totalCount }}</span>
               <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 mt-1" />
             </div>
           </button>
@@ -875,14 +928,15 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         <div class="flex items-center gap-2">
           <button type="button" @click="goBackToZones"
                   class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
-                  aria-label="Retour aux zones">
+                  aria-label="Retour aux zones" v-tooltip="'Revenir à la liste des zones'">
             <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
           </button>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Zones › {{ selectedZoneGroup.zone_kind === 'technical' ? 'Technique' : 'Fonctionnelle' }}</p>
-            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedZoneGroup.zone_name }}</p>
+            <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedZoneGroup.zone_name }}</p>
           </div>
-          <span class="shrink-0 text-xs text-gray-500">
+          <span class="shrink-0 text-xs text-gray-500"
+                v-tooltip="zoneActiveCountLabel(selectedZoneUsages.present.length, selectedZoneGroup.items.length)">
             {{ selectedZoneUsages.present.length }}/{{ selectedZoneGroup.items.length }}
           </span>
         </div>
@@ -899,20 +953,22 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                   class="w-full flex items-center gap-3 px-4 pt-4 pb-3 text-left active:bg-gray-50">
             <SystemCategoryIcon :category="s.system_category" size="md" />
             <div class="flex-1 min-w-0">
-              <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
+              <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
               <p class="text-xs text-gray-500 mt-0.5">
                 <span>{{ usageKpi(s).deviceCount }} équipement{{ usageKpi(s).deviceCount > 1 ? 's' : '' }}</span>
                 <span v-if="usageKpi(s).powerKw > 0"> · {{ usageKpi(s).powerKw }} kW</span>
               </p>
               <p v-if="isBacs && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
+                 v-tooltip.overflow
                  :class="['text-xs truncate mt-0.5',
                           thermalStatus(s.zone_id, s.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
                           thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
-                Régulation thermique · {{ thermalStatus(s.zone_id, s.system_category).label }}
+                Régulation de la température · {{ thermalStatus(s.zone_id, s.system_category).label }}
               </p>
             </div>
             <span v-if="s.is_bacs === 0" role="button" tabindex="0"
                   @click.stop="removeUsage(s)" @keydown.enter.stop="removeUsage(s)"
+                  v-tooltip="'Supprimer cet usage personnalisé'"
                   class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600 cursor-pointer"
                   aria-label="Supprimer cet usage">
               <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
@@ -949,10 +1005,11 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <div class="flex items-center gap-3">
             <SystemCategoryIcon :category="s.system_category" size="md" />
             <div class="flex-1 min-w-0">
-              <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
+              <p v-tooltip.overflow class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
               <p class="text-xs text-gray-500 mt-0.5">Présent ou absent dans cette zone ?</p>
             </div>
             <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
+                    v-tooltip="'Supprimer cet usage personnalisé'"
                     class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600"
                     aria-label="Supprimer cet usage">
               <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
@@ -985,10 +1042,14 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             placeholder="— Catégorie ou nom —"
           />
           <div class="flex gap-2">
+            <!-- Grisé tant qu'aucun usage n'est choisi : la raison est portée par
+                 l'enveloppe (s'ouvre aussi au doigt). -->
+            <Tooltip :text="newUsageValue ? null : ADD_USAGE_DISABLED_TIP" class="flex-1">
             <button type="button" @click="confirmAddUsage(selectedZoneGroup.zone_id)" :disabled="!newUsageValue"
                     class="flex-1 min-h-11 py-3 text-base font-medium text-white bg-emerald-600 disabled:opacity-50 rounded-xl">
               Ajouter
             </button>
+            </Tooltip>
             <button type="button" @click="cancelAddUsage"
                     class="px-4 min-h-11 py-3 text-base text-gray-600 bg-gray-100 rounded-xl">
               Annuler
@@ -1020,7 +1081,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             <div class="flex items-center gap-3">
               <SystemCategoryIcon :category="s.system_category" size="sm" />
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-700 truncate leading-tight">{{ usageLabel(s) }}</p>
+                <p v-tooltip.overflow class="text-sm font-medium text-gray-700 truncate leading-tight">{{ usageLabel(s) }}</p>
                 <p class="text-xs text-gray-500 mt-0.5 italic">
                   {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || (s.is_bacs === 0 ? 'Usage non concerné' : 'Non concerné') }}
                 </p>
@@ -1049,10 +1110,10 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <p class="text-sm font-medium">{{ openedUsage.zone_name }}</p>
         </div>
 
-        <!-- Item 3 — bouclage ECS (catégorie dhw) -->
+        <!-- Item 3 — bouclage de l'eau chaude sanitaire (catégorie dhw) -->
         <section v-if="openedUsage.system_category === 'dhw'"
                  class="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
-          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Bouclage ECS</p>
+          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Bouclage de l’eau chaude<HelpTip :tip="DHW_LOOP_TIP" class="ml-1 p-1 -my-1" /></p>
           <div class="grid grid-cols-3 gap-2">
             <button v-for="opt in LOOP_OPTIONS" :key="opt.value" type="button"
                     @click="patchSystem(openedUsage, { is_looped: opt.value })"
@@ -1064,45 +1125,51 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             </button>
           </div>
           <p v-if="openedUsage.is_looped === 'looped'" class="text-xs text-amber-700 leading-relaxed">
-            Boucle ECS : l'arrêt est interdit (arrêté du 30 nov. 2005 — risque légionelle).
+            Eau chaude bouclée : pas d’arrêt en période d’occupation (risque de légionelle).<HelpTip :tip="DHW_LOOP_LEGIONELLA_TIP" class="ml-1 p-1 -my-1" />
           </p>
         </section>
 
         <!-- Item 1 — règle des 5 % : poste considéré comme négligeable -->
         <section class="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
           <button type="button"
-                  @click="toggleNegligible(openedUsage, !openedUsage.marked_negligible_under_5pct)"
+                  @click="onNegligibleTap(openedUsage)"
                   class="w-full text-left tap-target flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <p class="text-base text-gray-900 font-medium">Poste négligeable (&lt; 5 %)</p>
               <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">
-                Exempté de mise en conformité R175-3
+                Usage qui pèse moins de 5 % de la consommation totale : il peut être dispensé de raccordement à la GTB
                 <span v-if="systemWeightPct(openedUsage) != null"
                       :class="systemWeightPct(openedUsage) > 10 ? 'text-amber-600 font-semibold' : ''">
-                  · poids estimé ~{{ systemWeightPct(openedUsage) }} %
+                  · environ {{ systemWeightPct(openedUsage) }} % de la puissance du site (estimation)
                 </span>
               </p>
             </div>
             <span :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
                            openedUsage.marked_negligible_under_5pct
                              ? 'bg-emerald-500 border-emerald-500 text-white'
-                             : 'bg-white border-gray-300']" aria-hidden="true">
-              <svg v-if="openedUsage.marked_negligible_under_5pct" viewBox="0 0 16 16" class="w-5 h-5">
+                             : isNegligibleShown(openedUsage)
+                               ? 'bg-amber-50 border-amber-400 text-amber-600'
+                               : 'bg-white border-gray-300']" aria-hidden="true">
+              <svg v-if="isNegligibleShown(openedUsage)" viewBox="0 0 16 16" class="w-5 h-5">
                 <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </span>
           </button>
-          <input v-if="openedUsage.marked_negligible_under_5pct"
+          <p v-if="isNegligibleShown(openedUsage) && !openedUsage.marked_negligible_under_5pct" class="text-sm text-amber-700 leading-relaxed">
+            Écris la justification : le poste sera marqué négligeable dès qu’elle est enregistrée.
+          </p>
+          <input v-if="isNegligibleShown(openedUsage)"
+                 ref="negligibleInput"
                  type="text"
                  :value="openedUsage.negligible_justification || ''"
-                 @change="e => patchSystem(openedUsage, { negligible_justification: e.target.value })"
-                 placeholder="Justification (ex : petits ballons individuels…)"
+                 @change="e => saveNegligibleJustification(openedUsage, e)"
+                 placeholder="Justification (ex : petits ballons d’eau chaude individuels, groupe de secours…)"
                  class="pwa-input" />
         </section>
 
         <!-- Item 4 — assujettissement : parties prenantes + flags cas E/F -->
         <section class="bg-white rounded-2xl border border-gray-200 p-4">
-          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Assujettissement</p>
+          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Qui doit le mettre en conformité ?<HelpTip :tip="LIABILITY_TIP" class="ml-1 p-1 -my-1" /></p>
           <SystemPartiesPanel :system="openedUsage" />
         </section>
 
@@ -1130,14 +1197,20 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 >
                   Partagé depuis « {{ deviceOriginZoneName(d) }} »
                 </p>
-                <p class="text-base font-semibold text-gray-900 truncate leading-tight">
+                <p v-tooltip.overflow class="text-base font-semibold text-gray-900 truncate leading-tight">
                   {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
                   <span v-if="d.is_backup === 1 || d.is_backup === true"
+                        v-tooltip="DEVICE_BACKUP_TIP"
                         class="inline-flex items-center justify-center align-middle ml-1 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider rounded bg-amber-100 text-amber-700 border border-amber-300">
                     Secours
                   </span>
+                  <span v-if="d.out_of_service === 1 || d.out_of_service === true"
+                        v-tooltip="DEVICE_OUT_OF_SERVICE_TIP"
+                        class="inline-flex items-center justify-center align-middle ml-1 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider rounded bg-red-50 text-red-700 border border-red-200">
+                    Hors service
+                  </span>
                 </p>
-                <p class="text-sm text-gray-500 truncate mt-0.5">
+                <p v-tooltip.overflow class="text-sm text-gray-500 truncate mt-0.5">
                   <span v-if="d.brand">{{ d.brand }}</span>
                   <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
                 </p>
@@ -1145,7 +1218,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
             </button>
             <p v-if="!devicesOf(openedUsage.id).length" class="px-4 py-5 text-sm text-gray-500 text-center">
-              Aucun équipement — ajoute-en ci-dessous.
+              Aucun équipement : ajoute-en un ci-dessous.
             </p>
           </div>
           <div class="p-3 border-t border-gray-200 bg-gray-50 space-y-2">
@@ -1173,10 +1246,10 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         >
           <span class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 inline-flex items-center justify-center text-base shrink-0">🌡️</span>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-amber-900 truncate">
-              Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
+            <p v-tooltip.overflow class="text-sm font-semibold text-amber-900 truncate">
+              Régulation de la température
             </p>
-            <p :class="['text-xs mt-0.5 truncate',
+            <p v-tooltip.overflow :class="['text-xs mt-0.5 truncate',
                         thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'warn' ? 'text-red-600 font-semibold' :
                         thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'ok' ? 'text-emerald-700 font-medium' : 'text-gray-600']">
               {{ thermalStatus(openedUsage.zone_id, openedUsage.system_category).label }}
@@ -1209,12 +1282,12 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                         : 'bg-amber-50 text-amber-800 border border-amber-200']">
           <span class="font-semibold shrink-0">{{ deviceComplete ? '✓' : '⚠' }}</span>
           <span v-if="deviceForced">
-            Validation forcée manuellement — l'équipement est considéré validé.
+            Validation forcée : l’équipement compte comme complet.
             <template v-if="deviceMissing.length"> Non renseigné : <strong>{{ deviceMissing.join(', ') }}</strong>.</template>
           </span>
-          <span v-else-if="deviceComplete">Équipement complet — pris en compte dans la validation de l'étape.</span>
+          <span v-else-if="deviceComplete">Équipement complet : il compte pour la validation de l’étape Systèmes.</span>
           <span v-else>
-            Équipement incomplet — il reste à renseigner : <strong>{{ deviceMissing.join(', ') }}</strong>.
+            Équipement incomplet. Il reste à renseigner : <strong>{{ deviceMissing.join(', ') }}</strong>.
           </span>
         </div>
 
@@ -1226,7 +1299,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         <MobileYesNo
           v-if="!deviceComplete"
           label="Forcer la validation de cet équipement ?"
-          description="À activer si certaines informations resteront définitivement inconnues. L'équipement sera considéré validé même incomplet."
+          description="Réponds Oui quand une information restera inconnue : l’équipement comptera comme complet, et l’étape Systèmes pourra être validée."
           :model-value="deviceForm.validation_forced"
           @update:model-value="v => deviceForm.validation_forced = v"
         />
@@ -1286,7 +1359,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
 
         <!-- Identification — Quantité + Âge (parité desktop). -->
         <div class="grid grid-cols-2 gap-3">
-          <MobileField label="Quantité">
+          <MobileField label="Quantité" :tip="DEVICE_COLUMN_TIPS.quantity">
             <input
               v-model.number="deviceForm.quantity"
               type="number"
@@ -1314,10 +1387,14 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
 
         <!-- Puissance conditionnelle : chaud / froid selon l'usage desservi.
              Les deux champs uniquement pour un équipement réversible
-             (chauffage ET refroidissement). -->
-        <template v-if="showPowerFields">
+             (chauffage ET refroidissement). Comme au bureau (DeviceEditModal),
+             pas de champ de puissance pour un émetteur sans fonction Production :
+             sa puissance est portée par l'équipement de production (encadré
+             « Énergie non saisissable ici » ci-dessous). -->
+        <template v-if="showPowerFields && deviceRoleAllowsEnergySource(deviceForm.device_role)">
           <div :class="showHeatPower && showCoolPower ? 'grid grid-cols-2 gap-3' : ''">
-            <MobileField v-if="showHeatPower" :label="heatPowerLabel">
+            <MobileField v-if="showHeatPower" :label="heatPowerLabel"
+                         :tip="devicePowerFieldTip({ category: hasHeating ? 'heating' : editingDevice?.system?.system_category })">
               <input
                 v-model.number="deviceForm.power_kw"
                 type="number"
@@ -1329,7 +1406,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 class="pwa-input pwa-input--num"
               />
             </MobileField>
-            <MobileField v-if="showCoolPower" label="Puissance froid (kW)">
+            <MobileField v-if="showCoolPower" label="Puissance froid (kW)" :tip="devicePowerFieldTip({ category: 'cooling' })">
               <input
                 v-model.number="deviceForm[coolPowerField]"
                 type="number"
@@ -1343,7 +1420,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             </MobileField>
           </div>
 
-          <MobileField label="Type de calcul de puissance">
+          <MobileField label="Type de calcul de puissance" :tip="POWER_CALC_TIP">
             <MobileSelectSheet
               v-model="deviceForm.power_calculation_type"
               :options="POWER_CALC_OPTIONS"
@@ -1357,17 +1434,17 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
              SEULEMENT si la fonction inclut Production (doctrine mig 194).
              Pour un radiateur à eau chaude ou un ventilo-convecteur, pas
              d'énergie primaire — elle est portée par l'équipement amont. -->
-        <MobileField label="Fonction(s) de l'équipement">
+        <MobileField label="Fonctions de l’équipement">
           <MobileSelectSheet
             :model-value="Array.isArray(deviceForm.device_role) ? deviceForm.device_role : (deviceForm.device_role ? [deviceForm.device_role] : [])"
             @update:model-value="v => deviceForm.device_role = v"
             :options="ROLE_OPTIONS"
             :multiple="true"
-            title="Rôles"
+            title="Fonctions"
             placeholder="Production / Distribution / Émission / Régulation"
           />
           <p class="text-xs text-gray-500 mt-1.5 leading-snug">
-            <strong>Production</strong> = transforme une énergie primaire (gaz, élec, soleil) en chaleur, froid ou lumière. <strong>Émission seule</strong> = reçoit un fluide d'un autre équipement (radiateur à eau, ventilo-convecteur…).
+            <strong>Production</strong> : transforme sur place une énergie (gaz, électricité, soleil, bois…) en chaleur, froid ou lumière. <strong>Émission</strong> : restitue dans la pièce la chaleur ou le froid produits par un autre équipement (radiateur à eau, ventilo-convecteur…).
           </p>
         </MobileField>
 
@@ -1381,7 +1458,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           />
         </MobileField>
         <div v-else class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 leading-snug">
-          Énergie et puissance non saisissables ici — les kW de cet émetteur sont déjà comptabilisés via la puissance du producteur amont (chaudière, UE DRV, chiller, sous-station). Les saisir ici ferait du double comptage R175-2. Si l'équipement transforme directement de l'énergie primaire en chaleur / froid / lumière (convecteur élec direct, VMC, luminaire LED…), ajoute la fonction <strong>Production</strong> ci-dessus.
+          <strong class="text-gray-700">Énergie non saisissable ici</strong> : cet équipement diffuse une chaleur ou un froid produits par un autre équipement (chaudière, unité extérieure de climatisation, groupe d’eau glacée, sous-station), où l’énergie et la puissance sont déjà comptées. Ne saisis pas sa puissance : elle serait comptée deux fois. S’il transforme lui-même une énergie en chaleur, froid ou lumière (convecteur électrique, ventilation mécanique, luminaire…), ajoute la fonction <strong>Production</strong> ci-dessus.
         </div>
 
         <MobileField label="Localisation">
@@ -1400,15 +1477,15 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         <div class="space-y-3 pt-2">
           <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Régulation</p>
           <MobileYesNo
-            label="L'équipement dispose-t-il d'une régulation ?"
-            description="Régulation intégrée (thermostat embarqué) ou externe (régulateur séparé). Si Oui, le niveau « Régulation » est ajouté automatiquement."
+            label="L’équipement dispose-t-il d’une régulation ?"
+            description="Régulation intégrée (thermostat embarqué) ou déportée (régulateur séparé). Si Oui, la fonction « Régulation » est ajoutée automatiquement."
             :model-value="deviceForm.has_regulation"
             @update:model-value="setHasRegulation"
           />
           <template v-if="!!deviceForm.has_regulation">
             <MobileYesNo
-              label="La régulation est-elle intégrée ou déportée ?"
-              description="Intégrée = thermostat embarqué, contrôle natif PAC. Déportée = régulateur séparé (Siemens, GTB, sonde déportée…). Si intégrée, marque/référence sont celles de l'équipement."
+              label="La régulation est-elle intégrée à l’équipement ou déportée ?"
+              description="Intégrée : thermostat embarqué, régulation d’origine de la pompe à chaleur, électronique de la chaudière. Déportée : régulateur séparé (Siemens, GTB, sonde déportée…). Si elle est intégrée, la marque et la référence sont celles de l’équipement."
               :yes-label="'Intégrée'" :no-label="'Déportée'"
               :model-value="deviceForm.regulation_integrated"
               @update:model-value="v => deviceForm.regulation_integrated = v"
@@ -1453,10 +1530,10 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                   :options="regulationEmissionOptions" :creatable="true"
                   title="Type de régulation émission" placeholder="Thermostat, présence…" />
               </MobileField>
-              <MobileField label="Granularité R175-6">
+              <MobileField label="Échelle de la régulation" :tip="GRANULARITY_TIP">
                 <MobileSelectSheet v-model="deviceForm.regulation_granularity"
                   :options="GRANULARITY_OPTIONS" :creatable="true"
-                  title="Granularité R175-6" placeholder="Par pièce / Par zone / Centralisée…" />
+                  title="Échelle de la régulation" placeholder="Par pièce / Par zone / Centralisée…" />
               </MobileField>
               <MobileField v-if="showRegulatorDetails" label="Localisation de la régulation d'émission">
                 <MobileSelectSheet v-model="deviceForm.regulator_location_emission"
@@ -1470,14 +1547,14 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         <!-- Communication : ternaire is_communicating, puis Protocoles
              (masqués si is_communicating !== true), puis liaison câblée. -->
         <div class="space-y-2 pt-2">
-          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Communication &amp; conformité R175-3</p>
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Communication et lien avec la GTB</p>
           <MobileYesNo
-            label="L'équipement est-il communicant ?"
-            description="Réponds Oui ou Non. Si Oui, sélectionne au moins un protocole."
+            label="L’équipement est-il communicant ?"
+            description="Si Oui, choisis au moins un protocole : un équipement qui ne communique avec aucun protocole ne peut être ni piloté ni suivi à distance."
             :model-value="deviceForm.is_communicating"
             @update:model-value="setIsCommunicating"
           />
-          <MobileField v-if="!!deviceForm.is_communicating" label="Protocole(s)">
+          <MobileField v-if="!!deviceForm.is_communicating" label="Protocoles de communication">
             <MobileSelectSheet
               :model-value="protocolsArray"
               :options="protocolOptionsPwa"
@@ -1488,8 +1565,9 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             />
           </MobileField>
           <MobileYesNo
-            label="L'équipement est-il relié à la GTB par une liaison câblée ?"
-            description="Liaison câblée dédiée vers la supervision — la base de l'interopérabilité exigée par le décret (R175-3 3°)."
+            label="L’équipement est-il relié à la GTB par une liaison câblée ?"
+            description="Un câble dédié relie l’équipement à la GTB : c’est la base pour qu’ils dialoguent, comme l’exige le décret."
+            :tip="articleTip('R175-3 3°')"
             :model-value="deviceForm.wired"
             @update:model-value="v => deviceForm.wired = v"
           />
@@ -1497,29 +1575,33 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
 
         <!-- État & conformité R175-3 4° — boutons Oui / Non tri-état. -->
         <div class="space-y-2">
-          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">État &amp; conformité</p>
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Pilotage et état de l’équipement</p>
           <MobileYesNo
-            label="La GTB permet-elle d'arrêter l'équipement manuellement ?"
-            description="R175-3 4° — depuis la GTB : arrêt, remise en marche ou mise en hors gel."
+            label="La GTB permet-elle d’arrêter l’équipement manuellement ?"
+            description="Depuis la GTB, on peut arrêter puis remettre en marche l’équipement, ou le passer en hors gel (par exemple pendant une période d’inoccupation)."
+            :tip="articleTip('R175-3 4°')"
             :model-value="deviceForm.meets_r175_3_p4"
             @update:model-value="v => deviceForm.meets_r175_3_p4 = v"
           />
           <MobileYesNo
-            label="L'équipement fonctionne-t-il seul si la GTB est arrêtée ?"
-            description="R175-3 4° — il continue avec sa régulation locale et repart seul après une coupure."
+            label="L’équipement fonctionne-t-il seul si la GTB est arrêtée ?"
+            description="Si la GTB est arrêtée ou la communication coupée, l’équipement continue avec sa régulation locale, et repart seul après une coupure."
+            :tip="articleTip('R175-3 4°')"
             :model-value="deviceForm.meets_r175_3_p4_autonomous"
             @update:model-value="v => deviceForm.meets_r175_3_p4_autonomous = v"
           />
           <!-- Ordre desktop : is_backup AVANT out_of_service. -->
           <MobileYesNo
             label="Est-ce un équipement de secours ?"
-            description="Normalement à l'arrêt, démarre seulement après un défaut de l'équipement principal (FAQ BACS n° 8). Un générateur en cascade ou en appoint n'est pas un secours : sa puissance est comptée. Seul un vrai secours est exclu du cumul (seuils 70 / 290 kW)."
+            description="Normalement à l’arrêt, il ne démarre qu’en cas de panne de l’équipement principal. Un générateur appelé en cascade ou en renfort n’est pas un secours : sa puissance compte. Seule la puissance d’un vrai secours est retirée du cumul (seuils de 70 et 290 kW)."
+            :tip="DEVICE_BACKUP_TIP"
             :model-value="deviceForm.is_backup"
             @update:model-value="v => deviceForm.is_backup = v"
           />
           <MobileYesNo
-            label="L'équipement est-il hors service ?"
-            description="Équipement hors d'usage — ignoré dans le plan de mise en conformité."
+            label="L’équipement est-il hors service ?"
+            description="Équipement hors d’usage : il n’est pas pris en compte dans le plan de mise en conformité."
+            :tip="DEVICE_OUT_OF_SERVICE_TIP"
             :model-value="deviceForm.out_of_service"
             @update:model-value="v => deviceForm.out_of_service = v"
           />
@@ -1528,7 +1610,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                bâtiments du site (cas F d'assujettissement). -->
           <MobileYesNo
             label="Cet équipement dessert-il plusieurs bâtiments du site ?"
-            description="Chaudière commune, groupe de production de chaleur, sous-station… Tous les propriétaires du site deviennent alors assujettis ensemble (cas F)."
+            description="Chaudière commune, groupe de production de chaleur, sous-station : un équipement central qui sert plusieurs bâtiments du site. Tous les propriétaires du site sont alors responsables ensemble de sa mise en conformité."
             :model-value="deviceForm.serves_multiple_buildings"
             @update:model-value="v => deviceForm.serves_multiple_buildings = v"
           />
@@ -1547,7 +1629,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             />
           </MobileField>
           <MobileField label="Aussi présent dans"
-                       hint="Sélectionne les autres usages où cet équipement physique est aussi présent. Options groupées par zone, icône colorée par catégorie.">
+                       hint="Les autres usages que ce même équipement dessert aussi, par exemple une chaudière qui produit aussi l’eau chaude.">
             <MobileSelectSheet
               v-if="shareSystemOptions.length"
               :model-value="extraSystemIds"
@@ -1565,7 +1647,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                l'équipement est partagé entre plusieurs zones / usages. -->
           <template v-if="(editingDevice.device.extra_system_ids || []).length">
             <MobileField label="Comptage séparable"
-                         hint="Le comptage de chaque zone desservie par cet équipement partagé peut-il être séparé ? Un comptage non séparable regroupe les zones en une seule zone fonctionnelle de suivi.">
+                         hint="Peut-on relever séparément la consommation de chaque zone desservie par cet équipement partagé ? Sinon, ces zones sont regroupées en une seule zone de suivi.">
               <div class="flex gap-2">
                 <button v-for="opt in MOBILE_METERING_OPTS" :key="opt.value" type="button"
                         @click="deviceForm.metering_separable = deviceForm.metering_separable === opt.value ? null : opt.value"
@@ -1581,6 +1663,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                          hint="Justification courte : circuit hydraulique unique, colonnes montantes communes, tableaux électriques distincts…">
               <input
                 v-model="deviceForm.metering_separable_note"
+                v-tooltip.overflow
                 type="text"
                 placeholder="ex : circuit hydraulique unique"
                 autocapitalize="sentences"
