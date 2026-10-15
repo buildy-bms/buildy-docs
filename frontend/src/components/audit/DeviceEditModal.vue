@@ -64,16 +64,17 @@ const YESNO = [
 ]
 // Mig 201 — exception par équipement du périmètre GTB. null = suit l'usage
 // (« usages traités par la GTB »), true = forcé dans, false = forcé hors.
+// Deux réponses seulement (Kévin, 2026-10-15 : « Selon l'usage » ne voulait rien dire) : « Oui »
+// = cas normal (null) ; « Non, pas à raccorder » = exclu (false). Le « forcé dans » (true) n'est
+// plus proposé : sur les 22 équipements qui l'avaient, l'usage était déjà traité par la GTB (aucun
+// effet) ; il s'affiche comme « Oui » et reste compris par le serveur.
 const SCOPE_OPTIONS = [
-  { value: null,  label: 'Selon l’usage', tip: GTB_SCOPE_OPTION_TIPS.default },
-  { value: true,  label: 'Oui', tip: GTB_SCOPE_OPTION_TIPS.yes },
-  { value: false, label: 'Non', tip: GTB_SCOPE_OPTION_TIPS.no },
+  { value: null,  label: 'Oui', tip: GTB_SCOPE_OPTION_TIPS.default },
+  { value: false, label: 'Non, pas à raccorder', tip: GTB_SCOPE_OPTION_TIPS.no },
 ]
 const gtbScopeSel = computed(() => {
   const v = props.device.gtb_scope_override
-  if (v === 1 || v === true) return true
-  if (v === 0 || v === false) return false
-  return null
+  return v === 0 || v === false ? false : null
 })
 // Régulation intégrée à l'équipement (true) vs portée par un module
 // déporté (false). Mig 183 — pilote l'affichage des champs régulateur.
@@ -859,9 +860,9 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">
-                Cet équipement est-il concerné par l'intégration à la GTB ?
+                Faut-il raccorder cet équipement à la GTB ?
               </div>
-              <div class="text-xs text-gray-500 mt-0.5">Par défaut, cela suit les « usages traités par la GTB » (étape GTB) ; un usage que la GTB ne traite pas reste à raccorder. Choisis « Non » seulement si cet équipement n'a pas à être raccordé (émetteur passif, unité extérieure pilotée par des unités intérieures raccordées…) : il n'est alors pas évalué.</div>
+              <div class="text-xs text-gray-500 mt-0.5">« Oui » dans le cas normal : le décret demande de raccorder les équipements des systèmes reliés, et le rapport évalue son raccordement. Réponds « Non » seulement s'il n'a pas à être raccordé lui-même (émetteur passif, unité extérieure pilotée par des unités intérieures raccordées…) : il n'est alors pas évalué.</div>
             </div>
             <div class="inline-flex rounded-md overflow-hidden border border-gray-200 shrink-0">
               <button v-for="opt in SCOPE_OPTIONS" :key="String(opt.value)" type="button"

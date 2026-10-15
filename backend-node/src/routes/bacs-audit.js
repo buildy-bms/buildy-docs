@@ -94,7 +94,7 @@ async function routes(fastify) {
     const af = assertBacsAuditExists(id, request, reply, { requiredRole: 'write' });
     if (!af) return;
     const schema = z.object({
-      action: z.enum(['clear_regulation_deport_refs', 'align_device_roles_to_template']),
+      action: z.enum(['clear_regulation_deport_refs', 'align_device_roles_to_template', 'reset_gtb_scope_override']),
       entity_id: z.number().int().positive(),
     });
     let body;
@@ -129,6 +129,24 @@ async function routes(fastify) {
       return { ok: true, new_roles: dev.default_device_role, precheck: buildPrecheck(id) };
     }
 
+    if (body.action === 'reset_gtb_scope_override') {
+      // DEV-007 — générateur déclaré « pas à raccorder » : remet la réponse par défaut
+      // (« Oui » à « Faut-il raccorder cet équipement à la GTB ? », gtb_scope_override NULL).
+      const dev = db.db.prepare(`
+        SELECT d.id, d.name, d.gtb_scope_override FROM bacs_audit_system_devices d
+        JOIN bacs_audit_systems s ON s.id = d.system_id
+        WHERE d.id = ? AND s.document_id = ?
+      `).get(body.entity_id, id);
+      if (!dev) return reply.code(404).send({ detail: `Équipement #${body.entity_id} introuvable dans cet audit.` });
+      db.db.prepare(`
+        UPDATE bacs_audit_system_devices SET gtb_scope_override = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(body.entity_id);
+      logBacsAudit(request, 'bacs.precheck.auto_fix', id, {
+        action: 'reset_gtb_scope_override', device_id: body.entity_id, previous: dev.gtb_scope_override,
+      });
+      const { buildPrecheck } = require('../lib/bacs-audit-precheck');
+      return { ok: true, precheck: buildPrecheck(id) };
+    }
     if (body.action === 'clear_regulation_deport_refs') {
       // Nullify les FK régulateur déporté qui pointent sur ce device, dans
       // les régulations thermiques de cet audit. Cf. finding DEV-003.

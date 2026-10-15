@@ -430,7 +430,7 @@ export function deviceMissingItems(device, systemCategory) {
   const isCommunicatingYes = (device.is_communicating === true || device.is_communicating === 1)
                           || (hasProtocol && device.communication_protocol !== 'non_communicant')
   if (isCommunicatingYes && !hasProtocol) add('protocol', 'communication', 'au moins un protocole de communication')
-  // Équipement sorti du périmètre de la GTB (« Non » à « concerné par l'intégration à la GTB ? ») :
+  // Équipement sorti du périmètre de la GTB (« Non » à « Faut-il raccorder cet équipement à la GTB ? ») :
   // la fiche l'indique « pas évalué », ses trois questions de raccordement ne sont pas exigées.
   if (!no(device.gtb_scope_override)) {
     if (device.wired == null) add('wired', 'communication', 'la liaison câblée vers la GTB (oui ou non)')

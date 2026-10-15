@@ -394,13 +394,15 @@ function buildPrecheck(documentId) {
       FROM bacs_audit_system_devices d JOIN bacs_audit_systems s ON s.id = d.system_id
       WHERE s.document_id = ? AND d.gtb_scope_override = 0 AND COALESCE(d.out_of_service, 0) = 0
         AND s.system_category IN ('heating', 'cooling', 'ventilation', 'dhw')
+        -- Système exempté de raccordement (règle des 5 %) : « pas à raccorder » est justifié.
+        AND COALESCE(s.marked_negligible_under_5pct, 0) = 0
     `).all(documentId).filter(d => parseRoles(d.device_role).includes('production'));
     for (const d of excludedProducers) {
       warnings.push(newFinding('DEV-007', 'warning', 'device', d.id, 'gtb_scope_override',
-        `« ${d.name || 'Équipement'} » (production) : déclaré non concerné par l'intégration à la GTB, son raccordement n'est pas évalué.`,
+        `« ${d.name || 'Équipement'} » (production) : déclaré « pas à raccorder » à la GTB, son raccordement n'est pas évalué.`,
         'Le décret demande que les générateurs des systèmes reliés communiquent avec la GTB, directement ou par le régulateur qui les pilote. L\'exclusion n\'est justifiée que si un équipement raccordé le pilote (ex. unités intérieures d\'un DRV).',
-        'Vérifie la fiche de l\'équipement (Systèmes) : laisse « Par défaut » si rien ne le pilote depuis la GTB.',
-        { systemCategory: d.system_category }));
+        'Vérifie la fiche de l\'équipement (Systèmes) : réponds « Oui » à « Faut-il raccorder cet équipement à la GTB ? » si rien de raccordé ne le pilote.',
+        { systemCategory: d.system_category, autoFixAction: 'reset_gtb_scope_override', autoFixLabel: 'Répondre « Oui » à « Faut-il raccorder cet équipement à la GTB ? »' }));
     }
   }
 
