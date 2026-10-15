@@ -719,7 +719,7 @@ export const GTB_SCOPE_OPTION_TIPS = {
     title: 'Pas à raccorder',
     tone: 'neutral',
     icon: 'link-slash',
-    text: 'Pour un émetteur passif (radiateur, bouche d’air…) ou une unité extérieure pilotée par des unités intérieures raccordées. Non évalué, le rapport l’indique.',
+    text: 'Pour un émetteur passif (radiateur, bouche d’air…) ou une unité extérieure pilotée par des unités intérieures raccordées. Non évalué ; le rapport l’indique avec le motif écrit.',
   },
 };
 

@@ -6,7 +6,10 @@
  *  - Production   = device avec role ∋ 'production' (le plus puissant si plusieurs)
  *  - Distribution = device avec role ∋ 'distribution'
  *  - Emission     = device avec role ∋ 'emission'
- *  - Regulation   = device avec role ∋ 'regulation' ou has_regulation = true
+ *  - Regulation   = régulateur déporté : équipement dédié à la régulation (fonction
+ *                   « Régulation » seule : sonde, régulateur, automate), jamais à
+ *                   régulation intégrée (le serveur le refuse : PATCH 400, vu sur
+ *                   Sénas le 2026-10-15) ni l'équipement qu'il régule
  *
  * Le helper ne fait que PROPOSER une valeur ; l'auditeur reste libre de
  * surcharger via le SearchableSelect de la ligne thermique.
@@ -32,8 +35,12 @@ export function bestDeviceForLevel(devices, level) {
   const live = devices.filter(d => !d.out_of_service)
   if (!live.length) return null
   if (level === 'regulation') {
-    // Régulateur : un device avec role ∋ regulation OU has_regulation = true.
-    const cands = live.filter(d => hasRole(d, 'regulation') || d.has_regulation === 1 || d.has_regulation === true)
+    // Régulateur déporté : un équipement dont la seule fonction est la régulation. Un équipement
+    // de production, distribution ou émission « avec régulation » se régule lui-même (intégrée)
+    // ou par un régulateur qui n'est pas cet équipement (déportée) : jamais proposé.
+    const cands = live.filter(d => hasRole(d, 'regulation')
+      && !['production', 'distribution', 'emission'].some(r => hasRole(d, r))
+      && !(d.regulation_integrated === 1 || d.regulation_integrated === true))
     return cands[0] || null
   }
   const cands = live.filter(d => hasRole(d, level))
@@ -77,13 +84,19 @@ export function buildPrefillPatch(t, devicesForZoneCategory) {
     patch.distribution_device_id = derived.distribution.id
   if (!t.emission_device_id && derived.emission)
     patch.emission_device_id = derived.emission.id
-  // Pour la régulation, on remplit le slot Production en priorité (cas le
-  // plus fréquent : un régulateur central pilote la production). Si l'auditeur
-  // a une régulation distincte par niveau, il l'ajustera manuellement.
+  // Régulateur déporté : proposé pour chaque niveau qui a un équipement (déjà choisi ou proposé
+  // ci-dessus), jamais pour un niveau vide ni sur l'équipement lui-même. L'auditeur ajuste s'il a
+  // une régulation distincte par niveau.
   if (derived.regulation) {
-    if (!t.production_regulation_device_id)   patch.production_regulation_device_id = derived.regulation.id
-    if (!t.distribution_regulation_device_id) patch.distribution_regulation_device_id = derived.regulation.id
-    if (!t.emission_regulation_device_id)     patch.emission_regulation_device_id = derived.regulation.id
+    const reg = derived.regulation.id
+    const levels = [
+      ['production_regulation_device_id', patch.generator_device_id ?? t.generator_device_id],
+      ['distribution_regulation_device_id', patch.distribution_device_id ?? t.distribution_device_id],
+      ['emission_regulation_device_id', patch.emission_device_id ?? t.emission_device_id],
+    ]
+    for (const [col, levelDevice] of levels) {
+      if (!t[col] && levelDevice && levelDevice !== reg) patch[col] = reg
+    }
   }
   return Object.keys(patch).length ? patch : null
 }

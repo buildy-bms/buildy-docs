@@ -576,6 +576,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
           excludedByAuditor: true,
           label: 'Non évalué — équipements déclarés non concernés par l\'intégration à la GTB',
           reasons: [`L'auditeur a déclaré ${excluded.length > 1 ? 'les équipements' : 'l\'équipement'} ${listDeviceNames(excluded)} non concerné${excluded.length > 1 ? 's' : ''} par l'intégration à la GTB (par exemple, équipement piloté par un autre équipement raccordé) : le raccordement de ce système n'est pas évalué.`,
+            ...excluded.filter(d => (d.gtb_exclusion_reason || '').trim()).map(d => `Motif pour « ${d.name || 'équipement'} » : ${d.gtb_exclusion_reason.trim().replace(/[.\s]+$/, '')}.`),
             ...(sharedNote ? [sharedNote] : [])],
         };
       }

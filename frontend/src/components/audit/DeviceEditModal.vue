@@ -76,6 +76,13 @@ const gtbScopeSel = computed(() => {
   const v = props.device.gtb_scope_override
   return v === 0 || v === false ? false : null
 })
+// Motif d'un équipement « pas à raccorder » (mig 217, imprimé dans le rapport) : exigé pour une
+// production de chauffage, froid, ventilation ou eau chaude ; motifs types en un clic.
+const GTB_EXCLUSION_REASONS = [
+  'Piloté par les unités intérieures, raccordées à la GTB par une passerelle',
+  'Émetteur passif, sans régulation propre',
+  'Système exempté de raccordement (règle des 5 %)',
+]
 // Régulation intégrée à l'équipement (true) vs portée par un module
 // déporté (false). Mig 183 — pilote l'affichage des champs régulateur.
 const REGULATION_PLACEMENT_OPTS = [
@@ -871,6 +878,23 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                gtbScopeSel === opt.value ? 'bg-indigo-600 text-white font-medium' : 'bg-white text-gray-600 hover:bg-gray-50']"
                       v-tooltip="opt.tip">
                 {{ opt.label }}
+              </button>
+            </div>
+          </div>
+          <div v-if="gtbScopeSel === false" class="space-y-1.5">
+            <label :for="`dev-${device.id}-gtb-reason`" class="text-sm font-medium text-gray-800">
+              Pourquoi n'a-t-il pas à être raccordé ?
+              <span v-if="!(hasProductionRole && ['heating', 'cooling', 'ventilation', 'dhw'].includes(originCategory))" class="text-xs font-normal text-gray-500">(facultatif)</span>
+            </label>
+            <input :id="`dev-${device.id}-gtb-reason`" type="text" maxlength="300" :value="device.gtb_exclusion_reason || ''"
+                   placeholder="Imprimé dans le rapport"
+                   @blur="e => patchInput('gtb_exclusion_reason', e.target.value.trim())" :class="inputCls" class="w-full" />
+            <div class="flex flex-wrap gap-1.5">
+              <button v-for="r in GTB_EXCLUSION_REASONS" :key="r" type="button"
+                      @click="patch({ gtb_exclusion_reason: r })"
+                      :class="['px-2 py-0.5 rounded-full border text-xs transition',
+                               device.gtb_exclusion_reason === r ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50']">
+                {{ r }}
               </button>
             </div>
           </div>

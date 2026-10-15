@@ -139,7 +139,7 @@ async function routes(fastify) {
       `).get(body.entity_id, id);
       if (!dev) return reply.code(404).send({ detail: `Équipement #${body.entity_id} introuvable dans cet audit.` });
       db.db.prepare(`
-        UPDATE bacs_audit_system_devices SET gtb_scope_override = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE bacs_audit_system_devices SET gtb_scope_override = NULL, gtb_exclusion_reason = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?
       `).run(body.entity_id);
       logBacsAudit(request, 'bacs.precheck.auto_fix', id, {
         action: 'reset_gtb_scope_override', device_id: body.entity_id, previous: dev.gtb_scope_override,
@@ -1620,6 +1620,8 @@ async function routes(fastify) {
       // défaut par usage). null = suit l'usage ; true = forcé DANS le
       // périmètre ; false = forcé HORS périmètre. Booléen → 1/0/null en DB.
       gtb_scope_override: z.boolean().nullable().optional(),
+      // Mig 217 — motif d'un équipement « pas à raccorder » à la GTB (imprimé dans le rapport).
+      gtb_exclusion_reason: z.string().max(300).nullable().optional(),
       out_of_service: z.boolean().nullable().optional(),
       bms_integration_out_of_service: z.boolean().nullable().optional(),
       // Mig 134 : nombre d'exemplaires identiques de ce device sur la zone.
@@ -1661,6 +1663,10 @@ async function routes(fastify) {
     sanitizeBodyHtmlFields(body);
     forceNotOperationalWhenOutOfService(body, dev);
     clearRegulationAnswersOnNo(body, dev);
+    // Motif « pas à raccorder » : sans objet dès que l'équipement est de nouveau à raccorder ;
+    // texte vide = pas de motif.
+    if ('gtb_scope_override' in body && body.gtb_scope_override !== false && !('gtb_exclusion_reason' in body)) body.gtb_exclusion_reason = null;
+    if (typeof body.gtb_exclusion_reason === 'string') body.gtb_exclusion_reason = body.gtb_exclusion_reason.trim() || null;
 
     // Coercion doctrine `energy_source` (mig 194). On calcule le rôle
     // effectif après patch (body si fourni, sinon valeur actuelle DB) ;

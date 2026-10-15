@@ -432,6 +432,12 @@ export function deviceMissingItems(device, systemCategory) {
   if (isCommunicatingYes && !hasProtocol) add('protocol', 'communication', 'au moins un protocole de communication')
   // Équipement sorti du périmètre de la GTB (« Non » à « Faut-il raccorder cet équipement à la GTB ? ») :
   // la fiche l'indique « pas évalué », ses trois questions de raccordement ne sont pas exigées.
+  // Production (chauffage, froid, ventilation, eau chaude) « pas à raccorder » : le motif est exigé
+  // (Kévin, 2026-10-15 ; imprimé dans le rapport). Facultatif pour les autres équipements.
+  if (no(device.gtb_scope_override) && roles.includes('production')
+      && ['heating', 'cooling', 'ventilation', 'dhw'].includes(systemCategory) && !String(device.gtb_exclusion_reason || '').trim()) {
+    add('gtb_exclusion_reason', 'communication', 'pourquoi il n’a pas à être raccordé à la GTB')
+  }
   if (!no(device.gtb_scope_override)) {
     if (device.wired == null) add('wired', 'communication', 'la liaison câblée vers la GTB (oui ou non)')
     if (device.meets_r175_3_p4 == null) add('manual_stop', 'communication', "l'arrêt à la main depuis la GTB (oui ou non)")
