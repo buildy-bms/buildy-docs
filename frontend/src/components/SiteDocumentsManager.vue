@@ -14,6 +14,9 @@ import { meterUsageLabel } from '@/lib/meter-options'
 import { exifTip, attachmentTip, DOC_ATTACHED_COLUMN_TIP, DOC_REPORT_COLUMN_TIP } from '@/lib/audit-tips-site'
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import Tooltip from '@/components/Tooltip.vue'
+import SearchableSelect from '@/components/SearchableSelect.vue'
+import { groupDocuments, kindShownInGroup } from '@/lib/documents-guide'
+import { DOCS_GROUPS, DOCS_REPORT_TIP, DOCS_SITE_WIDE, docsReportCount, docsSummaryLine } from '@/lib/audit-tips-guided'
 
 /**
  * Manager des fichiers DOE rattachés à un site (visibles depuis l'audit BACS).
@@ -34,6 +37,9 @@ const props = defineProps({
   // Zone de dépôt sur une seule ligne (étape Documents de l'audit à onglets) :
   // mêmes textes, hauteur divisée par ~4.
   compact: { type: Boolean, default: false },
+  // Mise en page « Nouvelle » de l'audit : documents groupés par rattachement (lib/documents-guide.js),
+  // catégorie en liste de choix de l'appli, pastille « Rattaché à » sans le type redit par le groupe.
+  guided: { type: Boolean, default: false },
 })
 
 const { success, error } = useNotification()
@@ -109,6 +115,7 @@ async function confirmUpload() {
     showModal.value = false
     pendingFile.value = null
     refresh()
+    notifyDocsChanged()
   } catch (e) {
     error(e.response?.data?.detail || 'Upload impossible')
   } finally {
@@ -116,10 +123,15 @@ async function confirmUpload() {
   }
 }
 
+// Prévient l'audit (décompte des documents : règles des étapes Documents et GTB).
+function notifyDocsChanged() {
+  window.dispatchEvent(new CustomEvent('site-documents:changed'))
+}
 async function patchDoc(d, patch) {
   try {
     const { data } = await updateSiteDocument(d.id, patch)
     Object.assign(d, data)
+    if ('category' in patch) notifyDocsChanged()
   } catch {
     error('Sauvegarde impossible')
   }
@@ -159,6 +171,7 @@ async function removeDoc(d) {
     await deleteSiteDocument(d.id)
     documents.value = documents.value.filter(x => x.id !== d.id)
     success('Document supprimé')
+    notifyDocsChanged()
   } catch {
     error('Suppression impossible')
   }
@@ -236,6 +249,13 @@ function attachmentLabel(d) {
   return { kind: 'Site', label: '' }
 }
 
+// Lignes du tableau : dans l'ordre d'origine, ou groupées par rattachement (mise en page « Nouvelle »).
+const grouped = computed(() => groupDocuments(documents.value, d => attachmentLabel(d).kind, d => attachmentLabel(d).label))
+const tableRows = computed(() => (props.guided
+  ? grouped.value.rows
+  : documents.value.map(doc => ({ doc, group: null, first: false }))))
+const CATEGORY_OPTIONS = [...CATEGORIES, { value: 'photo', label: 'Photo' }]
+
 const previewDoc = ref(null)
 // Aperçu d'un PDF dans une fenêtre de l'appli (plus de téléchargement forcé).
 const viewerDoc = ref(null)
@@ -295,6 +315,7 @@ async function deleteSelection() {
     for (const d of docs) await deleteSiteDocument(d.id)
     selectedIds.value = new Set()
     refresh()
+    notifyDocsChanged()
     success(`${docs.length} document${docs.length > 1 ? 's' : ''} supprimé${docs.length > 1 ? 's' : ''}`)
   } catch {
     error('Suppression partielle — recharge la page')
@@ -375,7 +396,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <p v-if="!loading && documents.length" class="mt-4 text-xs text-gray-500">
+    <p v-if="!loading && documents.length && guided" class="mt-4 text-xs text-gray-600">
+      <span v-tooltip="DOCS_REPORT_TIP">{{ docsSummaryLine(documents.length, includedCount) }}</span>
+    </p>
+    <p v-if="!loading && documents.length && !guided" class="mt-4 text-xs text-gray-500">
       <span class="font-semibold text-gray-700">{{ includedCount }}</span>
       document{{ includedCount > 1 ? 's' : '' }} sur {{ documents.length }}
       inclus dans le rapport PDF (annexe « Documents joints »). Coche « Inclure » pour ajouter un document ;
@@ -410,8 +434,17 @@ onBeforeUnmount(() => {
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
-        <tr v-for="d in documents" :key="d.id"
-            :class="['group hover:bg-gray-50/60 align-middle', selectedIds.has(d.id) ? 'bg-indigo-50/40' : '']">
+        <template v-for="{ doc: d, group: g, first } in tableRows" :key="d.id">
+        <!-- Mise en page « Nouvelle » : en-tête de groupe (rattachement). -->
+        <tr v-if="first" class="docs-group-head">
+          <td colspan="8" class="px-3 py-2 bg-slate-100 text-left">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[13px] font-semibold text-indigo-600 normal-case">{{ DOCS_GROUPS[g].label }}</span>
+              <span class="text-xs text-gray-500">{{ grouped.groups[g].count }}<template v-if="grouped.groups[g].inReport"> · {{ docsReportCount(grouped.groups[g].inReport) }}</template><template v-if="DOCS_GROUPS[g].note"> · {{ DOCS_GROUPS[g].note }}</template></span>
+            </div>
+          </td>
+        </tr>
+        <tr :class="['group hover:bg-gray-50/60 align-middle', selectedIds.has(d.id) ? 'bg-indigo-50/40' : '']">
           <td class="text-center py-2 px-2 align-middle">
             <input type="checkbox" :checked="selectedIds.has(d.id)" @change="toggleOne(d.id)" class="rounded"
                    v-tooltip="selectedIds.has(d.id) ? { label: 'Désélectionner ce document', icon: 'square-minus' } : 'Sélectionner ce document'" />
@@ -448,7 +481,10 @@ onBeforeUnmount(() => {
             </div>
           </td>
           <td class="px-3 py-2 align-middle">
-            <select :value="d.category"
+            <SearchableSelect v-if="guided" :model-value="d.category" :options="CATEGORY_OPTIONS"
+                              :clearable="false" size="sm"
+                              @update:model-value="v => v && v !== d.category && patchDoc(d, { category: v })" />
+            <select v-else :value="d.category"
                     @change="e => patchDoc(d, { category: e.target.value })"
                     class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
               <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
@@ -456,12 +492,15 @@ onBeforeUnmount(() => {
             </select>
           </td>
           <td class="px-3 py-2 align-middle">
-            <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border max-w-full whitespace-nowrap',
+            <!-- Mise en page « Nouvelle » : le groupe dit déjà le type de rattachement. -->
+            <span v-if="guided && attachmentLabel(d).kind === 'Site'" class="text-xs text-gray-400"
+                  v-tooltip="attachmentTip(attachmentLabel(d))">{{ DOCS_SITE_WIDE }}</span>
+            <span v-else :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border max-w-full whitespace-nowrap',
               attachmentLabel(d).kind === 'Site'
                 ? 'border-gray-200 text-gray-600 bg-gray-50'
                 : 'border-indigo-200 text-indigo-700 bg-indigo-50']"
                   v-tooltip="attachmentTip(attachmentLabel(d))">
-              <span class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
+              <span v-if="!guided || kindShownInGroup(g) || !attachmentLabel(d).label" class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
               <span v-if="attachmentLabel(d).label" class="truncate">{{ attachmentLabel(d).label }}</span>
             </span>
           </td>
@@ -489,6 +528,7 @@ onBeforeUnmount(() => {
             </button>
           </td>
         </tr>
+        </template>
       </tbody>
     </table>
     </div>

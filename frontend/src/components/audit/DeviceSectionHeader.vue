@@ -4,9 +4,10 @@
  *  - Mise en page actuelle : le titre d'origine, inchangé.
  *  - Fiche en rubriques (mise en page guidée) : un bouton qui ouvre ou ferme la rubrique. À gauche,
  *    l'icône qui identifie la rubrique ; au centre, son titre puis une ligne : ce qui manque
- *    (orange), ce qui est à vérifier (rose), sinon, rubrique fermée, le résumé des réponses (gris) ;
- *    à droite, son état (✓, nombre de réponses manquantes, !). Ouverte, son bandeau prend la
- *    teinte de son état.
+ *    (orange), ce qui est à vérifier (rose), les questions restées sans réponse (gris en pointillés,
+ *    `unanswered`, étapes GTB et Identification ; elles bloquent aussi l'étape), sinon, rubrique fermée, le résumé des
+ *    réponses (gris) ; à droite, son état (✓, nombre de réponses manquantes, !). Ouverte, son
+ *    bandeau prend la teinte de son état.
  */
 import { computed } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -27,15 +28,18 @@ const props = defineProps({
   icon: { type: String, default: 'id-card' },
   missing: { type: Array, default: () => [] },   // libellés courts de ce qui manque
   checks: { type: Array, default: () => [] },    // titres des points à vérifier
+  unanswered: { type: Array, default: () => [] }, // questions sans réponse (pointillés)
   summary: { type: String, default: '' },
   bodyId: { type: String, default: '' },
 })
 const emit = defineEmits(['toggle'])
 
-const state = computed(() => (props.checks.length ? 'check' : (props.missing.length ? 'todo' : 'done')))
+const state = computed(() => (props.checks.length ? 'check'
+  : props.missing.length ? 'todo' : props.unanswered.length ? 'open' : 'done'))
 const line = computed(() => {
   if (props.checks.length) return { tone: 'text-rose-700', text: `À vérifier : ${props.checks.join(', ')}` }
   if (props.missing.length) return { tone: 'text-amber-800', text: `À compléter : ${props.missing.join(', ')}` }
+  if (props.unanswered.length) return { tone: 'text-slate-600', text: `Sans réponse : ${props.unanswered.join(', ')}` }
   return props.open ? null : (props.summary ? { tone: 'text-slate-500', text: props.summary } : null)
 })
 const headTone = computed(() => {
@@ -63,9 +67,12 @@ const tip = computed(() => rubricHeaderTip(props.title, { open: props.open }))
       </span>
       <span :class="['shrink-0 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-[10px] font-semibold',
                      state === 'check' ? 'bg-rose-100 text-rose-700'
-                       : state === 'todo' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-600']">
+                       : state === 'todo' ? 'bg-amber-100 text-amber-800'
+                         : state === 'open' ? 'bg-white text-slate-600 border border-dashed border-slate-400'
+                           : 'bg-emerald-50 text-emerald-600']">
         <FontAwesomeIcon v-if="state === 'check'" :icon="['fas', 'exclamation']" class="w-2.5 h-2.5" />
         <span v-else-if="state === 'todo'">{{ missing.length }}</span>
+        <span v-else-if="state === 'open'">{{ unanswered.length }}</span>
         <FontAwesomeIcon v-else :icon="['fas', 'check']" class="w-2.5 h-2.5" />
       </span>
       <FontAwesomeIcon :icon="['fas', 'chevron-down']"

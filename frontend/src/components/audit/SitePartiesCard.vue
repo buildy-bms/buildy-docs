@@ -21,6 +21,8 @@ import HelpTip from '@/components/HelpTip.vue'
 // imbriquée dans une autre section — évite l'effet « card dans une card ».
 defineProps({
   flush: { type: Boolean, default: false },
+  // Mise en page « Nouvelle » de l'audit : le titre est porté par la rubrique qui contient la carte.
+  hideTitle: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open-notes'])
 
@@ -104,7 +106,7 @@ const structure = computed({
 
 <template>
   <div :class="flush ? '' : 'bg-white rounded-2xl border border-gray-200 overflow-hidden'">
-    <div :class="['flex items-center gap-2',
+    <div v-if="!hideTitle" :class="['flex items-center gap-2',
                   flush ? 'pb-2.5' : 'px-4 py-3 border-b border-gray-100']">
       <FontAwesomeIcon :icon="['fas', 'scale-balanced']" class="w-5 h-5 text-indigo-600 shrink-0" />
       <h3 class="text-base font-medium text-gray-900">Structure juridique et parties prenantes</h3>

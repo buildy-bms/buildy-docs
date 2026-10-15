@@ -18,15 +18,14 @@ const db = require('../../src/database');
 db.init();
 const { computeMeterPlanStatus } = require('../../src/lib/bacs-audit-action-generator');
 const { axisOfArticle, isReserveAction } = require('../../src/routes/bacs-audit/_compliance-summary');
-const { renderHtml, shutdown } = require('../../src/lib/pdf');
+const { renderHtml, preparePagedPage, shutdown } = require('../../src/lib/pdf');
+const { buildBacsAuditReportHtml } = require('../../src/lib/bacs-audit-report');
 const {
   buildBacsAuditExportData, renderBacsAuditReport, renderBacsAuditTables,
 } = require('../../src/routes/bacs-audit/exports');
 const puppeteer = require('puppeteer');
 
 const PX_PER_MM = 96 / 25.4;
-const PAGE_BODY_MM = 263; // hauteur utile d'une page A4 du rapport
-const A4_WIDTH_MM = 174;  // largeur utile A4
 const A3_WIDTH_MM = 392;  // largeur utile A3 paysage (420 − 28)
 // Aperçu HTML : neutralise la mise en page « feuille » (marges, ombre) pour
 // mesurer dans la largeur utile réelle du PDF.
@@ -89,49 +88,45 @@ function checkMeters(d, id) {
     diffs.length ? diffs.slice(0, 3).join(' ; ') : `${Object.keys(ps).length} statut(s)`);
 }
 
-// ── Mise en page A4 : pages de synthèse sur une page, aucun débordement
-// horizontal (un seul élément trop large fait réduire tout le PDF).
+// ── Mise en page A4 du rapport, paginé par Paged.js comme à l'export (lib/bacs-audit-report.js,
+// lib/pdf.js renderPagedHtmlPdf) : aucun contenu qui déborde d'une page, aucun élément plus large
+// que la page (pages sombres à fond perdu exclues), aucun titre seul en bas de page.
 async function checkLayoutA4(page, d) {
-  const html = renderHtml({ template: 'bacs-audit', styles: 'styles-bacs-audit', data: d, fresh: true });
-  await page.setContent(html, { waitUntil: 'load' });
-  await page.addStyleTag({ content: PRINT_BODY_CSS });
-  await page.evaluate(() => document.fonts.ready);
-  const m = await page.evaluate((PX) => {
+  await preparePagedPage(page, await buildBacsAuditReportHtml(d));
+  const m = await page.evaluate(async (PX) => {
+    await window.PagedPolyfill.preview();
     const mm = (px) => Math.round(px / PX * 10) / 10;
-    const height = (sel) => {
-      const el = document.querySelector(sel);
-      return el ? mm(el.getBoundingClientRect().height) : null;
-    };
-    const W = document.documentElement.clientWidth;
-    const pills = [...document.querySelectorAll('section.r175-dashboard .r175-row')].map(r => {
-      const st = r.querySelector('.r175-row-status');
-      const v = r.querySelector('.r175-row-verdict');
-      if (!st || !v) return null;
-      const a = st.getBoundingClientRect();
-      const b = v.getBoundingClientRect();
-      return (b.left < a.left - 0.5 || b.right > a.right + 0.5 || v.scrollWidth > v.clientWidth + 1)
-        ? `${r.querySelector('.r175-row-code')?.textContent.trim()} « ${v.textContent.trim()} »` : null;
-    }).filter(Boolean);
-    // Hors page de garde et page de clôture, imprimées bord à bord.
-    const overflow = [...document.querySelectorAll('body *')].filter(el => {
-      if (el.closest('section.cover, section.closing')) return false;
-      const r = el.getBoundingClientRect();
-      return r.width > 0 && r.right > W + 1;
-    }).slice(0, 5).map(el => `${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`
-      + ` « ${(el.textContent || '').trim().slice(0, 30)} » +${mm(el.getBoundingClientRect().right - W)} mm`);
-    return {
-      essential: height('section.essential'),
-      dashboard: height('section.r175-dashboard'),
-      pills,
-      overflow,
-    };
+    const pages = [...document.querySelectorAll('.pagedjs_page')];
+    const vertical = [];
+    const horizontal = [];
+    const orphans = [];
+    pages.forEach((pg, i) => {
+      const area = pg.querySelector('.pagedjs_page_content');
+      if (!area) return;
+      if (area.scrollHeight > area.clientHeight + 2) vertical.push(`p. ${i + 1}`);
+      if (pg.classList.contains('pagedjs_full_page')) return;
+      const box = area.getBoundingClientRect();
+      // Paged.js range le contenu dans une colonne de travail (premier enfant) : seuls ses
+      // descendants posés sur la page comptent
+      const flow = area.firstElementChild;
+      const wide = flow && [...flow.querySelectorAll('p, li, td, th, h1, h2, h3, h4, img, table, figure, dl')].find((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.left < box.right - 1 && r.right > box.right + 1; });
+      if (wide) horizontal.push(`p. ${i + 1} ${wide.tagName.toLowerCase()}.${String(wide.className).split(' ')[0]} « ${(wide.textContent || '').trim().slice(0, 30)} » +${mm(wide.getBoundingClientRect().right - box.right)} mm`);
+      // Dernier élément visible de la page (feuille du DOM : texte, image, filet) : s'il appartient à
+      // un titre (ou à la tête d'un système, titre et pastilles), ce titre est seul en bas de page.
+      const leaves = flow ? [...flow.querySelectorAll('*')].filter((el) => {
+        const r = el.getBoundingClientRect();
+        return r.height > 0 && r.left < box.right - 1 && !el.firstElementChild && (el.textContent.trim() || /^(IMG|svg|path)$/i.test(el.tagName));
+      }) : [];
+      if (!leaves.length) return;
+      const last = leaves.reduce((a, b) => (b.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom + 0.5 ? b : a));
+      const head = last.closest('h1, h2, h3, h4, .sys-head, .acts-sub');
+      if (head && !head.closest('.pagedjs_margin')) orphans.push(`p. ${i + 1} « ${head.textContent.trim().slice(0, 40)} »`);
+    });
+    return { pages: pages.length, vertical, horizontal: horizontal.slice(0, 5), orphans };
   }, PX_PER_MM);
-  report(m.essential != null && m.essential <= PAGE_BODY_MM, 'L\'essentiel tient sur une page',
-    m.essential == null ? 'section introuvable' : `${m.essential} mm / ${PAGE_BODY_MM}`);
-  report(m.dashboard != null && m.dashboard <= PAGE_BODY_MM, 'Tableau de bord R175 sur une page',
-    m.dashboard == null ? 'section introuvable' : `${m.dashboard} mm / ${PAGE_BODY_MM}`);
-  report(!m.pills.length, 'Pastilles du tableau de bord dans leur colonne', m.pills.join(' | '));
-  report(!m.overflow.length, 'Aucun débordement horizontal (rapport A4)', m.overflow.join(' | '));
+  report(!m.vertical.length, 'Aucun contenu qui déborde d’une page (rapport A4)', m.vertical.length ? m.vertical.join(', ') : `${m.pages} pages`);
+  report(!m.horizontal.length, 'Aucun débordement horizontal (rapport A4)', m.horizontal.join(' | '));
+  report(!m.orphans.length, 'Aucun titre seul en bas de page (rapport A4)', m.orphans.join(' | '));
 }
 
 async function checkLayoutA3(page, d) {
@@ -178,23 +173,23 @@ function checkChars(file, label) {
   report(!odd.length, `Caractères couverts par les polices (${label})`, odd.join(', '));
 }
 
-// Sommaire (page 2) : chaque entrée renvoie à la page réelle de son titre.
+// Sommaire (page 2) : chaque entrée renvoie à la page réelle de son titre (titre de chapitre en
+// tête de page, juste sous l'en-tête ; annexes précédées de leur lettre).
 function checkToc(file, pages) {
   const texts = [];
   for (let p = 1; p <= pages; p++) texts.push(pdftotext(file, ['-f', String(p), '-l', String(p), '-layout']));
   const toc = [];
   for (const line of (texts[1] || '').split('\n')) {
-    const m = /^\s*(\d+|[A-Z])\s{2,}(.+?)\s{2,}(\d+)\s*$/.exec(line);
-    if (m) toc.push({ num: m[1], title: m[2].trim(), page: parseInt(m[3], 10) });
+    const m = /^\s*(?:([A-D])\s+)?(\S.*?)\s{2,}(\d+)\s*$/.exec(line);
+    if (m && m[2] !== 'Sommaire') toc.push({ letter: m[1], title: m[2].trim(), page: parseInt(m[3], 10) });
   }
+  const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const bad = [];
   for (const e of toc) {
-    const matches = /^\d+$/.test(e.num)
-      ? (l) => l.trim().startsWith(`${e.num}. `) && l.includes(e.title.slice(0, 12))
-      : (l) => l.trim().startsWith(`Annexe ${e.num}`);
-    const idx = texts.findIndex((t, i) => i > 1 && t.split('\n').filter(x => x.trim()).slice(0, 5).some(matches));
+    const re = new RegExp(`^(?:${e.letter ? `${e.letter}\\s+` : ''})${reEsc(e.title)}(?:\\s+R175[^a-z]*)?$`);
+    const idx = texts.findIndex((t, i) => i > 1 && t.split('\n').filter(x => x.trim()).slice(1, 3).some(l => re.test(l.trim())));
     if (idx < 0 || idx + 1 !== e.page) {
-      bad.push(`${e.num} « ${e.title.slice(0, 28)} » : sommaire p. ${e.page}, réel ${idx < 0 ? '?' : `p. ${idx + 1}`}`);
+      bad.push(`${e.letter ? `${e.letter} ` : ''}« ${e.title.slice(0, 28)} » : sommaire p. ${e.page}, réel ${idx < 0 ? '?' : `p. ${idx + 1}`}`);
     }
   }
   report(toc.length > 0 && !bad.length, 'Sommaire : numéros de page justes',
@@ -203,9 +198,9 @@ function checkToc(file, pages) {
 
 (async () => {
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  // Rapport : même fenêtre que l'export (A4 à 96 ppp), pagination par Paged.js
   const pageA4 = await browser.newPage();
-  await pageA4.setViewport({ width: Math.round(A4_WIDTH_MM * PX_PER_MM), height: 1200 });
-  await pageA4.emulateMediaType('print');
+  await pageA4.setViewport({ width: 794, height: 1123 });
   const pageA3 = await browser.newPage();
   await pageA3.setViewport({ width: Math.round(A3_WIDTH_MM * PX_PER_MM), height: 1200 });
   await pageA3.emulateMediaType('print');

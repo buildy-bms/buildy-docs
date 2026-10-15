@@ -15,14 +15,25 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faBullseye, faCircleCheck, faListCheck, faRotateLeft, faCheck } from '@fortawesome/pro-solid-svg-icons'
 import Button from '@/components/Button.vue'
+import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { phaseForStep } from '@/lib/audit-steps-ui'
 import { phaseTip, NON_BLOCKING_STEP_TIP, REOPEN_STEP_TIP, stepNotValidableTip } from '@/lib/audit-tips'
+import { LAYOUT_OPTIONS, LAYOUT_TOGGLE_TIP } from '@/lib/audit-tips-systems-guide'
+import { STEP_NOTES_TITLE, STEP_NOTES_HINT, STEP_READY_WITH_NOTES } from '@/lib/audit-tips-guided'
+import { useAuditLayout } from '@/composables/useAuditLayout'
 
 library.add(faBullseye, faCircleCheck, faListCheck, faRotateLeft, faCheck)
+
+// Mise en page de l'audit (actuelle / nouvelle) : un seul choix pour toutes les étapes.
+const { layout, setLayout } = useAuditLayout()
+const LAYOUT_TOGGLE_OPTIONS = LAYOUT_OPTIONS.map(o => ({ ...o, tone: 'navy' }))
 
 const props = defineProps({
   step: { type: Object, required: true },
   total: { type: Number, required: true },
+  // Mise en page « Nouvelle » : questions encore sans réponse signalées par l'étape (ne bloquent
+  // pas la validation ; cf. AUDIT_STEP_NOTES_KEY). Vide dans la mise en page actuelle.
+  notes: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['validate', 'invalidate'])
 
@@ -33,7 +44,8 @@ const validatedWhen = computed(() => {
   if (!v) return ''
   const d = new Date(String(v).includes('T') ? v : String(v).replace(' ', 'T'))
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  // « 1er juillet » et non « 1 juillet ».
+  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/^1 /, '1er ')
 })
 
 function capitalize(s) {
@@ -91,7 +103,21 @@ function capitalize(s) {
       </div>
       <div v-else class="mt-3 flex items-center gap-2 text-xs text-emerald-800">
         <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-        Tout est renseigné : tu peux valider l'étape.
+        <template v-if="notes.length">{{ STEP_READY_WITH_NOTES }}</template>
+        <template v-else>Tout est renseigné : tu peux valider l'étape.</template>
+      </div>
+      <!-- Mise en page « Nouvelle » : ce qui reste sans réponse sans bloquer la validation. -->
+      <div v-if="notes.length && !step.validated" data-step-notes
+           class="mt-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2">
+        <p class="text-xs font-medium text-slate-700">
+          {{ STEP_NOTES_TITLE }} <span class="font-normal text-slate-500">— {{ STEP_NOTES_HINT }}</span>
+        </p>
+        <ul class="mt-1 space-y-0.5 text-xs text-slate-700">
+          <li v-for="(n, i) in notes" :key="i" class="flex items-start gap-2">
+            <span class="mt-1.5 w-1 h-1 rounded-full bg-slate-400 shrink-0"></span>
+            <span>{{ n }}</span>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -116,6 +142,12 @@ function capitalize(s) {
         <template #icon-left><FontAwesomeIcon :icon="['fas', 'rotate-left']" class="w-3.5 h-3.5" /></template>
         Rouvrir l'étape
       </Button>
+      <div class="flex items-center gap-1.5" data-audit-layout-toggle>
+        <span class="text-[11px] text-gray-500">Mise en page</span>
+        <SegmentedToggle :model-value="layout" :options="LAYOUT_TOGGLE_OPTIONS"
+                         :tooltip="LAYOUT_TOGGLE_TIP"
+                         @update:model-value="setLayout" />
+      </div>
     </div>
   </section>
 </template>

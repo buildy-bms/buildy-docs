@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
 import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon, QuestionMarkCircleIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
@@ -24,6 +24,14 @@ import { useConfirm } from '@/composables/useConfirm'
 import { updateZone, deleteZone, listZones, resyncBacsAudit, reorderBacsZones, duplicateZone } from '@/api'
 import { ZONE_OCCUPANCY_PROFILES } from '@/lib/audit-options'
 import { ZONE_COLUMN_TIPS, ZONE_KIND_TIPS, zoneLegendTip, comfortConstraintTip } from '@/lib/audit-tips-site'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { flashAuditTarget } from '@/lib/audit-reveal'
+import { zoneMissing, groupZones, zoneGroupTotals, zonesTodoLine, isTechnicalZone } from '@/lib/zones-guide'
+import {
+  ZONES_GROUPS, ZONES_DONE_TEXT, ZONES_GO_FIRST_TIP, ZONE_TECH_NA_TIP, METERS_GO_FIRST_LABEL,
+  zoneMissingTip,
+} from '@/lib/audit-tips-guided'
 
 // Section Zones — rendue deux fois selon `kind` :
 //   - 'functional' : zones fonctionnelles (R175-1 6°), assujetties BACS,
@@ -189,6 +197,35 @@ function sortZoneValue(z, key) {
   return ''
 }
 const sortedZones = computed(() => sortedRows(kindZones.value, sortZoneValue))
+
+// ─── Mise en page « Nouvelle » : zones fonctionnelles puis locaux techniques ─────────────
+// Deux groupes titrés (avec leurs totaux), une pastille « à compléter » par zone, le reste à faire
+// en tête (lib/zones-guide.js). Mêmes lignes, mêmes saisies ; la mise en page actuelle est inchangée.
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value && props.unified)
+const displayZones = computed(() => (guided.value ? groupZones(sortedZones.value) : sortedZones.value))
+const zoneGroups = computed(() => ({
+  functional: zoneGroupTotals(kindZones.value.filter(z => !isTechnicalZone(z))),
+  technical: zoneGroupTotals(kindZones.value.filter(isTechnicalZone)),
+}))
+const zonesTodo = computed(() => zoneGroups.value.functional.todo + zoneGroups.value.technical.todo)
+// En-tête de groupe avant la première zone de chaque type.
+function isGroupStart(z, i) {
+  if (!guided.value) return false
+  return i === 0 || isTechnicalZone(displayZones.value[i - 1]) !== isTechnicalZone(z)
+}
+const groupKey = (z) => (isTechnicalZone(z) ? 'technical' : 'functional')
+async function goToFirstTodoZone() {
+  const z = displayZones.value.find(x => zoneMissing(x).length)
+  if (!z) return
+  await nextTick()
+  const el = window.document.querySelector(`#section-zones [data-zone-id="${z.zone_id}"], [data-zone-id="${z.zone_id}"]`)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  flashAuditTarget(el)
+}
+// Zones à compléter : « Reste à faire » du bandeau (STEP_DEFINITIONS.zones de la vue).
 // Légende de la map satellite (initiale + couleur par zone) propagée dans
 // les DEUX tableaux (fonctionnel + technique) pour cohérence visuelle avec
 // ZonesOverviewMap. Construite sur la liste COMPLÈTE des zones du site
@@ -280,6 +317,18 @@ onBeforeUnmount(teardownZonesSortable)
          TOUTES les zones du site (fonctionnelles + techniques) pour donner
          une vision d'ensemble. La table de la section technique en
          dessous garde ses pastilles cohérentes via `legendByZone` partagé. -->
+    <!-- Mise en page « Nouvelle » : le reste à faire en tête. -->
+    <div v-if="guided && kindZones.length" data-zones-guide class="mx-3 mb-3">
+      <div v-if="zonesTodo"
+           class="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+        <p class="flex-1 min-w-0 leading-snug">{{ zonesTodoLine(zonesTodo) }}</p>
+        <button type="button" @click="goToFirstTodoZone" v-tooltip="ZONES_GO_FIRST_TIP"
+                class="shrink-0 text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950">
+          {{ METERS_GO_FIRST_LABEL }}
+        </button>
+      </div>
+      <p v-else class="text-[13px] text-emerald-700">✓ {{ ZONES_DONE_TEXT }}</p>
+    </div>
     <div v-if="!isTechnical" class="mb-3">
       <ZonesOverviewMap :zones="zones" />
     </div>
@@ -299,7 +348,19 @@ onBeforeUnmount(teardownZonesSortable)
           </tr>
         </thead>
         <tbody ref="zonesBodyRef">
-          <template v-for="z in sortedZones" :key="z.zone_id">
+          <template v-for="(z, i) in displayZones" :key="z.zone_id">
+          <!-- Mise en page « Nouvelle » : en-tête de groupe (zones fonctionnelles, locaux techniques). -->
+          <tr v-if="isGroupStart(z, i)" class="zones-group-head">
+            <td :colspan="isTechnical ? 6 : 8" class="px-3 py-2 bg-slate-100 border-t-4 border-white text-left">
+              <div class="flex items-center gap-2">
+                <span class="text-[13px] font-semibold text-indigo-600">{{ ZONES_GROUPS[groupKey(z)].label }}</span>
+                <span class="text-xs text-gray-500">
+                  {{ zoneGroups[groupKey(z)].count }}<template v-if="groupKey(z) === 'functional' && zoneGroups.functional.surface"> · {{ zoneGroups.functional.surface.toLocaleString('fr-FR') }} m²</template><template v-if="ZONES_GROUPS[groupKey(z)].note"> · {{ ZONES_GROUPS[groupKey(z)].note }}</template>
+                </span>
+                <span v-if="zoneGroups[groupKey(z)].todo" class="text-xs font-medium text-amber-800">· {{ zoneGroups[groupKey(z)].todo }} à compléter</span>
+              </div>
+            </td>
+          </tr>
           <PhotoDropTr :row-class="'zone-row'"
                        :data-id="z.zone_id"
                        :data-zone-id="z.zone_id"
@@ -316,6 +377,9 @@ onBeforeUnmount(teardownZonesSortable)
             </td>
             <td>
               <div class="flex items-center gap-2">
+                <!-- Mise en page « Nouvelle » : pastille « à compléter » (ce qui manque au survol). -->
+                <span v-if="guided && zoneMissing(z).length" class="inline-flex size-4 items-center justify-center shrink-0 -mx-1"
+                      v-tooltip="zoneMissingTip(zoneMissing(z))"><span class="w-2 h-2 rounded-full bg-amber-400"></span></span>
                 <!-- Pastille initiale + couleur, identique à la légende de la
                      map satellite (ZonesOverviewMap). Présente uniquement
                      pour les zones géolocalisées (les autres n'apparaissent
@@ -326,10 +390,12 @@ onBeforeUnmount(teardownZonesSortable)
                       v-tooltip="zoneLegendTip(legendByZone.get(z.zone_id).initial)">
                   {{ legendByZone.get(z.zone_id).initial }}
                 </span>
+                <!-- Nom lisible : sans largeur minimale, le tableau le réduisait à quelques lettres
+                     (16 px à 1 440 px), les autres colonnes prenant toute la place. -->
                 <input type="text" :value="z.name"
                        v-tooltip.overflow
                        @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                       class="w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white font-semibold text-gray-900" />
+                       class="min-w-40 w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white font-semibold text-gray-900" />
               </div>
             </td>
             <td class="min-w-44">
@@ -342,13 +408,18 @@ onBeforeUnmount(teardownZonesSortable)
               />
             </td>
             <td v-if="!isTechnical" class="min-w-44">
-              <SearchableSelect
-                :model-value="z.occupancy_profile"
-                @update:model-value="v => patchZone(z, { occupancy_profile: v || null })"
-                :options="ZONE_OCCUPANCY_PROFILES"
-                placeholder="Régime d'activité"
-                size="sm"
-              />
+              <!-- Largeur fixe : le régime choisi est coupé (texte entier au survol) au lieu d'élargir
+                   la colonne aux dépens du nom de la zone. -->
+              <div v-if="!guided || !isTechnicalZone(z)" class="w-60">
+                <SearchableSelect
+                  :model-value="z.occupancy_profile"
+                  @update:model-value="v => patchZone(z, { occupancy_profile: v || null })"
+                  :options="ZONE_OCCUPANCY_PROFILES"
+                  placeholder="Régime d'activité"
+                  size="sm"
+                />
+              </div>
+              <span v-else class="text-gray-300" v-tooltip="ZONE_TECH_NA_TIP">—</span>
             </td>
             <!-- Contrainte de confort (zones fonctionnelles, comme à la
                  création et sur la PWA) : texte libre, enregistré en sortie.

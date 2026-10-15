@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { WrenchScrewdriverIcon, PencilSquareIcon, DocumentArrowUpIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -35,6 +35,26 @@ import {
   BMS_LEVEL_LOCK_TIP, BMS_COLUMN_TIPS, BMS_INTEGRATED_TOGGLE_TIP, BMS_STATUS_TIPS, BMS_SYSTEM_LEVEL_CHECKS_TIP,
   bmsLevelTip, bmsOperationalTip, bmsMeterIntegratedTip, bmsUsageToggleLabel,
 } from '@/lib/audit-tips-systems'
+import RubricShell from '@/components/audit/guided/RubricShell.vue'
+import AuditGuideRail from '@/components/audit/guided/AuditGuideRail.vue'
+import RubricsFilter from '@/components/audit/guided/RubricsFilter.vue'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { useStepRubrics } from '@/composables/useStepRubrics'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { bmsStepRubrics, bmsGuideTotals, nextBmsRubric, bmsRubricStatus, BMS_RUBRIC_GROUPS } from '@/lib/bms-guide'
+import {
+  RUBRICS_RESUME_TIP, RUBRICS_DONE_TEXT, BMS_GUIDE_TITLE,
+  BMS_OUT_OF_SERVICE_NOTE, rubricsProgressLabel, rubricsResumeLabel,
+} from '@/lib/audit-tips-guided'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import {
+  faTowerBroadcast, faIdCard, faShareNodes, faPowerOff, faFileLines, faMicrochip, faLayerGroup, faPlug,
+  faChartLine, faShareFromSquare, faDatabase, faScrewdriverWrench,
+} from '@fortawesome/free-solid-svg-icons'
+
+// Icônes des rubriques de la mise en page « Nouvelle » (lib/bms-guide.js).
+library.add(faTowerBroadcast, faIdCard, faShareNodes, faPowerOff, faFileLines, faMicrochip, faLayerGroup, faPlug,
+  faChartLine, faShareFromSquare, faDatabase, faScrewdriverWrench)
 
 // Section "Solution GTB / GTC en place" (R175-3 / R175-4 / R175-5).
 // Lit l'etat depuis useAuditStore (bms, document, meters, devices) et
@@ -176,14 +196,18 @@ async function uploadAfFiles(files) {
 // dépôt, avec aperçu, téléchargement et suppression. Rechargés à chaque
 // ajout ou suppression de document (événement `site-documents:changed`).
 const afDocs = ref([])
+// Liste chargée une première fois : les rubriques ouvertes par défaut (mise en page « Nouvelle »)
+// attendent ce chargement, sinon « Analyse fonctionnelle » s'ouvrait le temps de la requête.
+const afDocsLoaded = ref(false)
 const afViewerDoc = ref(null)
 async function loadAfDocs() {
   const uuid = document.value?.site_uuid
-  if (!uuid) { afDocs.value = []; return }
+  if (!uuid) { afDocs.value = []; afDocsLoaded.value = true; return }
   try {
     const { data } = await listSiteDocuments(uuid, { category: 'analyse_fonctionnelle' })
     afDocs.value = data || []
   } catch { /* liste indisponible : la zone de dépôt reste utilisable */ }
+  afDocsLoaded.value = true
 }
 watch(() => document.value?.site_uuid, loadAfDocs, { immediate: true })
 onMounted(() => window.addEventListener('site-documents:changed', loadAfDocs))
@@ -305,6 +329,66 @@ const filteredDevices = computed(() =>
   props.devicesWithMeta.filter(gtbInScope))
 const filteredMeters = computed(() =>
   props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage)))
+
+// ─── Mise en page « Nouvelle » : rubriques repliables et guide de gauche ─────────
+// Mêmes blocs, mêmes réponses : chaque bloc devient une rubrique (RubricShell) avec son état
+// (lib/bms-guide.js), comme la fiche équipement de l'étape Systèmes. Le sommaire de gauche
+// devient le guide des rubriques. La mise en page actuelle est inchangée.
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
+const componentsCount = ref(null)
+// Même calcul que la règle de validation de l'étape (STEP_DEFINITIONS.bms de la vue).
+const rubrics = computed(() => bmsStepRubrics(bms.value, {
+  isBacs: audit.isBacs,
+  offerLabel: buildyOfferLabel,
+  afStatus: document.value?.audit_existing_af_status ?? null,
+  afDocsCount: afDocs.value.length,
+  protocolLabel: (v) => props.protocolOptions.find(o => o.value === v)?.label || v,
+  componentsCount: componentsCount.value,
+  devicesWithMeta: props.devicesWithMeta,
+  metersPresent: props.metersPresent,
+}))
+const rubricByKey = computed(() => Object.fromEntries(rubrics.value.map(r => [r.key, r])))
+const rubricTotals = computed(() => bmsGuideTotals(rubrics.value))
+// Ouverture : le reste à faire d'abord (rubriques incomplètes ouvertes), ou toute l'étape (choix
+// mémorisé, commun aux étapes à rubriques) — composables/useStepRubrics.js.
+const {
+  showAll: showAllRubrics, setShowAll: setShowAllRubrics, showTodo: showTodoRubrics,
+  isOpen: isRubricOpen, toggle: toggleRubric, goTo: goToRubric, active: activeRubric,
+} = useStepRubrics(rubrics, () => [guided.value, bms.value?.document_id, afDocsLoaded.value])
+// Propriétés d'une rubrique pour RubricShell.
+function rubric(key) {
+  const r = rubricByKey.value[key]
+  if (!r) return { title: '', open: true }
+  return { title: r.title, icon: r.icon, missing: r.missing, unanswered: r.unanswered, summary: r.summary,
+    muted: r.optional, open: isRubricOpen(key) }
+}
+// Guide de gauche : un clic ouvre la rubrique et l'amène à l'écran ; « Reprendre » enchaîne.
+function resumeRubrics() {
+  const n = nextBmsRubric(rubrics.value, activeRubric.value)
+  if (n) goToRubric(n.key)
+}
+const railGroups = computed(() => BMS_RUBRIC_GROUPS
+  .map(g => ({
+    key: g.key,
+    label: g.label,
+    items: rubrics.value.filter(r => r.group === g.key)
+      .map(r => { const status = bmsRubricStatus(r); return { key: r.key, title: r.title, icon: r.icon, status, mark: status.mark } }),
+  }))
+  .filter(g => g.items.length))
+const railProgress = computed(() => ({
+  done: rubricTotals.value.done,
+  total: rubricTotals.value.count,
+  label: rubricsProgressLabel(rubricTotals.value.done, rubricTotals.value.count),
+}))
+const resumeCount = computed(() => rubrics.value.filter(r => r.state !== 'done').length)
+// Les questions sans réponse bloquent la validation : elles sont dans « Reste à faire » du bandeau
+// (STEP_DEFINITIONS.bms de la vue), plus dans « Encore à renseigner ».
+// Titres de blocs : en majuscules dans la mise en page actuelle, en phrase dans les rubriques.
+const blockTitleCls = computed(() => (guided.value
+  ? 'text-[13px] font-semibold text-slate-800'
+  : 'text-xs font-semibold text-gray-700 uppercase tracking-wider'))
 
 // Ordre canonique des catégories/usages BACS pour tri intra-groupe.
 const CATEGORY_ORDER = ['heating', 'cooling', 'ventilation', 'dhw',
@@ -503,13 +587,18 @@ function hasNotes(html) {
       :attach-to="{ bms_document_id: bms.document_id }"
       :enabled="!!(document?.site_uuid && bms.document_id)"
       @changed="emit('refresh-audit-data')">
-      <div class="bg-slate-50/70 rounded-b-xl">
+      <!-- Mise en page « Nouvelle » (GTB présente) : une grille, le guide à gauche sur toute la
+           hauteur, la rubrique Présence puis les autres rubriques à droite. -->
+      <div :class="guided && bms.present === 1
+        ? 'bg-slate-50/70 rounded-b-xl px-5 py-5 grid grid-cols-1 lg:grid-cols-[256px_1fr] gap-x-4 gap-y-3 items-start'
+        : 'bg-slate-50/70 rounded-b-xl'">
       <!-- Présence de la GTB : mêmes cases que présent/non concerné des
            usages (card 4). « Pas de GTB » masque toute la saisie R175. -->
-      <div class="px-5 pt-5 pb-1">
-        <div id="bms-block-presence" class="audit-subcard">
+      <div :class="!guided ? 'px-5 pt-5 pb-1' : bms.present === 1 ? 'min-w-0 lg:col-start-2 lg:row-start-1' : 'px-5 py-5'">
+        <RubricShell :guided="guided" id="bms-block-presence" cls="audit-subcard" v-bind="rubric('presence')"
+                     @toggle="toggleRubric('presence')">
         <div class="flex flex-wrap items-center gap-3">
-          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+          <p :class="guided ? 'text-sm text-gray-800' : 'text-xs font-semibold text-gray-700 uppercase tracking-wider'">
             Une GTB est-elle présente sur le site ?
           </p>
           <SegmentedToggle :model-value="triState(bms.present)"
@@ -525,7 +614,7 @@ function hasNotes(html) {
         <!-- Question préalable (mig 206) : le niveau d'offre Buildy Cloud n'a
              de sens que si la GTB en place est une supervision Buildy. -->
         <div v-if="bms.present !== 0" class="mt-4 flex flex-wrap items-center gap-3">
-          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+          <p :class="guided ? 'text-sm text-gray-800' : 'text-xs font-semibold text-gray-700 uppercase tracking-wider'">
             La GTB en place est-elle une supervision Buildy ?
           </p>
           <SegmentedToggle :model-value="isBuildySupervision"
@@ -566,13 +655,24 @@ function hasNotes(html) {
             Le niveau {{ buildyOfferLabel(bms.buildy_offer_level) }} assure les fonctions exigées par le décret, sans réserve liée au niveau d'offre. La formation de l'exploitant reste à attester.
           </div>
         </div>
-        </div>
+        </RubricShell>
       </div>
 
-      <div v-if="bms.present === 1" class="px-5 pt-3 pb-5 grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-5">
-        <!-- Sommaire collant sous les en-têtes (page + carte) : un clic saute au bloc. -->
-        <aside class="sticky self-start" :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + 76px)' }">
-          <div class="bg-white rounded-xl border border-slate-200 p-3">
+      <div v-if="bms.present === 1"
+           :class="guided ? 'contents' : 'px-5 pt-3 pb-5 grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-5'">
+        <!-- Sommaire collant sous les en-têtes (page + carte) : un clic saute au bloc.
+             Mise en page « Nouvelle » : le guide des rubriques, avec leur état. -->
+        <aside class="sticky self-start" :class="guided ? 'lg:col-start-1 lg:row-start-1 lg:row-span-2' : ''"
+               :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + 76px)' }">
+          <div v-if="guided" data-bms-guide
+               class="bg-white rounded-xl ring-1 ring-slate-200 shadow-sm overflow-y-auto max-h-[calc(100vh-var(--audit-sticky-offset,0)-96px)]">
+            <AuditGuideRail :title="BMS_GUIDE_TITLE" :progress="railProgress" :groups="railGroups"
+                            :active-key="activeRubric" aria-label="Rubriques de la GTB"
+                            :resume-label="resumeCount ? rubricsResumeLabel(resumeCount) : ''"
+                            :resume-tip="RUBRICS_RESUME_TIP" :done-text="RUBRICS_DONE_TEXT"
+                            @select="goToRubric" @resume="resumeRubrics" />
+          </div>
+          <div v-else class="bg-white rounded-xl border border-slate-200 p-3">
             <h4 class="text-[11px] font-medium font-semibold text-gray-500 mb-3">Progression de la saisie</h4>
             <VerticalStepper :steps="bmsSteps" clickable @select="(i, s) => scrollToBmsBlock(s.anchor)" />
             <div class="mt-4 pt-3 border-t border-gray-100">
@@ -588,9 +688,15 @@ function hasNotes(html) {
             </div>
           </div>
         </aside>
-        <div class="space-y-4 min-w-0">
-          <div id="bms-block-identification" class="audit-subcard">
-          <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Identification de la GTB</h3>
+        <div :class="guided ? 'flex flex-col gap-3 min-w-0 lg:col-start-2 lg:row-start-2' : 'space-y-4 min-w-0'">
+          <!-- Mise en page « Nouvelle » : le reste à faire d'abord, ou toute l'étape (choix mémorisé). -->
+          <div v-if="guided" class="flex flex-wrap items-center justify-between gap-2">
+            <p v-if="bms.out_of_service" class="text-xs text-slate-600">{{ BMS_OUT_OF_SERVICE_NOTE }}</p>
+            <RubricsFilter class="ml-auto" :show-all="showAllRubrics" @todo="showTodoRubrics" @all="setShowAllRubrics(true)" />
+          </div>
+          <RubricShell :guided="guided" id="bms-block-identification" cls="audit-subcard" v-bind="rubric('identification')"
+                       @toggle="toggleRubric('identification')">
+          <h3 v-if="!guided" class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Identification de la GTB</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Solution en place</label>
@@ -618,8 +724,9 @@ function hasNotes(html) {
                      class="input-base" />
             </div>
           </div>
-          </div>
-          <div id="bms-block-protocols" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
+          </RubricShell>
+          <RubricShell :guided="guided" id="bms-block-protocols" :cls="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']"
+                       v-bind="rubric('protocols')" @toggle="toggleRubric('protocols')">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">
                 Protocoles de partage des données
@@ -632,23 +739,24 @@ function hasNotes(html) {
                 placeholder="Aucun protocole renseigné"
                 @update:modelValue="v => { bms.provided_protocols = v; saveBmsDebounced() }" />
             </div>
-          </div>
+          </RubricShell>
 
-          <div id="bms-block-out-of-service" class="audit-subcard">
+          <RubricShell :guided="guided" id="bms-block-out-of-service" cls="audit-subcard"
+                       v-bind="rubric('out-of-service')" @toggle="toggleRubric('out-of-service')">
             <div class="flex items-center gap-3">
               <span class="text-sm text-gray-700 font-medium">La GTB est-elle hors service ?</span>
               <SegmentedToggle :model-value="triState(bms.out_of_service)"
                                @update:model-value="v => setBmsFlag('out_of_service', v)" />
             </div>
             <p class="text-[11px] text-gray-400 mt-0.5">Le plan d'actions ignore alors les exigences sur la GTB. Les rubriques restent modifiables (notes comprises) pour garder une trace.</p>
-          </div>
+          </RubricShell>
 
-          <div id="bms-block-af" class="audit-subcard">
+          <RubricShell :guided="guided" id="bms-block-af" cls="audit-subcard" v-bind="rubric('af')" @toggle="toggleRubric('af')">
             <div class="flex items-center justify-between gap-2 mb-2">
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <h3 v-if="!guided" class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Analyse fonctionnelle de la GTB existante
               </h3>
-              <BmsTopicNoteButton topic-key="analyse_fonctionnelle"
+              <BmsTopicNoteButton class="ml-auto" topic-key="analyse_fonctionnelle"
                                   topic-label="Analyse fonctionnelle de la GTB existante"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
@@ -723,16 +831,18 @@ function hasNotes(html) {
               ⚠ Aucun document d'<strong>analyse fonctionnelle</strong> n'est disponible pour la GTB existante.
             </p>
             <DocumentViewerModal :doc="afViewerDoc" @close="afViewerDoc = null" />
-          </div>
+          </RubricShell>
 
-          <div v-if="audit.docId" id="bms-block-components" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
-            <BmsComponentsTable :document-id="audit.docId" />
-          </div>
+          <RubricShell v-if="audit.docId" :guided="guided" id="bms-block-components" :cls="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']"
+                       v-bind="rubric('components')" @toggle="toggleRubric('components')">
+            <BmsComponentsTable :document-id="audit.docId" :hide-title="guided" @count="n => (componentsCount = n)" />
+          </RubricShell>
 
-          <div id="bms-block-usages" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
+          <RubricShell :guided="guided" id="bms-block-usages" :cls="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']"
+                       v-bind="rubric('usages')" @toggle="toggleRubric('usages')">
             <div class="flex items-center justify-between gap-2 mb-2">
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Usages traités par la GTB</h3>
-              <BmsTopicNoteButton topic-key="usages" topic-label="Usages traités par la GTB"
+              <h3 v-if="!guided" class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Usages traités par la GTB</h3>
+              <BmsTopicNoteButton class="ml-auto" topic-key="usages" topic-label="Usages traités par la GTB"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
             <p class="text-xs text-gray-500 mb-2">Un usage non coché n'est pas relié à la GTB : le décret peut en exiger le raccordement (obligatoire, ou seulement s'il se rembourse en moins de 10 ans dans un bâtiment existant). Le plan d'actions le signale.</p>
@@ -756,12 +866,13 @@ function hasNotes(html) {
                 <span v-if="bms[u.key]" class="ml-auto text-[#00cd92] font-bold">✓</span>
               </button>
             </div>
-          </div>
+          </RubricShell>
 
-          <div id="bms-block-integrated" :class="['audit-subcard space-y-6', bms.out_of_service ? 'opacity-70' : '']">
+          <RubricShell :guided="guided" id="bms-block-integrated" :cls="['audit-subcard space-y-6', bms.out_of_service ? 'opacity-70' : '']"
+                       body-cls="space-y-6" v-bind="rubric('integrated')" @toggle="toggleRubric('integrated')">
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <h3 :class="blockTitleCls">
                   Équipements intégrés à la GTB
                   <span class="font-normal normal-case text-gray-500 text-[10px]">— « Opérationnel » = vérifié sur place par l'auditeur</span>
                 </h3>
@@ -819,7 +930,7 @@ function hasNotes(html) {
             </div>
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <h3 :class="blockTitleCls">
                   Compteurs intégrés à la GTB
                   <span class="font-normal normal-case text-gray-500 text-[10px]">— uniquement les compteurs présents</span>
                 </h3>
@@ -888,19 +999,20 @@ function hasNotes(html) {
                 <span v-if="meters.length" class="block mt-1">Coche « Présent » à l'étape 5 · Compteurs pour rendre les compteurs disponibles ici.</span>
               </p>
             </div>
-          </div>
+          </RubricShell>
 
-          <div v-if="audit.isBacs" id="bms-block-r175-3" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
+          <RubricShell v-if="audit.isBacs" :guided="guided" id="bms-block-r175-3" :cls="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']"
+                       v-bind="rubric('capabilities')" @toggle="toggleRubric('capabilities')">
             <div class="flex items-start justify-between gap-2 mb-2">
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1 flex-wrap">
-                Ce que sait faire la supervision
+                <template v-if="!guided">Ce que sait faire la supervision</template>
                 <R175Tooltip article="R175-3" />
-                <span class="inline-flex items-center gap-1 font-normal normal-case text-gray-500 text-[10px]">
-                  — dialogue avec les équipements et arrêt à la main : vérifiés à l’étape Systèmes
+                <span :class="['inline-flex items-center gap-1 font-normal normal-case text-gray-500', guided ? 'text-xs' : 'text-[10px]']">
+                  {{ guided ? 'Dialogue' : '— dialogue' }} avec les équipements et arrêt à la main : vérifiés à l’étape Systèmes
                   <HelpTip size="xs" :tip="BMS_SYSTEM_LEVEL_CHECKS_TIP" />
                 </span>
               </h3>
-              <BmsTopicNoteButton topic-key="r175_3_capacites"
+              <BmsTopicNoteButton class="ml-auto" topic-key="r175_3_capacites"
                                   topic-label="Ce que sait faire la supervision"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
@@ -940,15 +1052,16 @@ function hasNotes(html) {
                         rows="2"
                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded"></textarea>
             </div>
-          </div>
+          </RubricShell>
 
-          <div v-if="audit.isBacs" id="bms-block-data-provision" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
+          <RubricShell v-if="audit.isBacs" :guided="guided" id="bms-block-data-provision" :cls="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']"
+                       v-bind="rubric('data-provision')" @toggle="toggleRubric('data-provision')">
             <div class="flex items-center justify-between gap-2 mb-2">
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
-                Mise à disposition des données
+                <template v-if="!guided">Mise à disposition des données</template>
                 <R175Tooltip article="R175-3" />
               </h3>
-              <BmsTopicNoteButton topic-key="r175_3_mise_dispo"
+              <BmsTopicNoteButton class="ml-auto" topic-key="r175_3_mise_dispo"
                                   topic-label="Mise à disposition des données"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
@@ -982,14 +1095,15 @@ function hasNotes(html) {
                 </div>
               </div>
             </template>
-          </div>
+          </RubricShell>
 
           <!-- Item 15 — R175-3 : conservation 5 ans + accès aux données -->
-          <div v-if="audit.isBacs" id="bms-block-data-storage" :class="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']">
+          <RubricShell v-if="audit.isBacs" :guided="guided" id="bms-block-data-storage" :cls="['audit-subcard', bms.out_of_service ? 'opacity-70' : '']"
+                       v-bind="rubric('data-storage')" @toggle="toggleRubric('data-storage')">
             <div class="flex items-center justify-between gap-2 mb-2">
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
-                Conservation et accès aux données
-                <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(historique de 5 ans)</span>
+                <template v-if="!guided">Conservation et accès aux données</template>
+                <span :class="['font-normal normal-case text-gray-500', guided ? 'text-xs' : 'text-[10px] ml-1']">{{ guided ? 'Historique de 5 ans' : '(historique de 5 ans)' }}</span>
                 <R175Tooltip article="R175-3 1°" />
               </h3>
             </div>
@@ -1060,12 +1174,13 @@ function hasNotes(html) {
                         rows="2"
                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded"></textarea>
             </div>
-          </div>
+          </RubricShell>
 
-          <div v-if="audit.isBacs" id="bms-block-r175-4-5" :class="['audit-subcard space-y-4', bms.out_of_service ? 'opacity-70' : '']">
+          <RubricShell v-if="audit.isBacs" :guided="guided" id="bms-block-r175-4-5" :cls="['audit-subcard space-y-4', bms.out_of_service ? 'opacity-70' : '']"
+                       body-cls="space-y-4" v-bind="rubric('upkeep')" @toggle="toggleRubric('upkeep')">
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                <h3 :class="[blockTitleCls, 'inline-flex items-center gap-1']">
                   Vérifications périodiques de la GTB
                   <R175Tooltip article="R175-4" />
                 </h3>
@@ -1096,7 +1211,7 @@ function hasNotes(html) {
             </div>
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                <h3 :class="[blockTitleCls, 'inline-flex items-center gap-1']">
                   Formation de l’exploitant
                   <R175Tooltip article="R175-5" />
                 </h3>
@@ -1134,7 +1249,7 @@ function hasNotes(html) {
                 Supervision Buildy : l'assistance intégrée facilite la prise en main, mais ne remplace pas la formation de l'exploitant au fonctionnement et au paramétrage de la GTB, à attester (attestation ou feuille d'émargement).
               </p>
             </div>
-          </div>
+          </RubricShell>
         </div>
       </div>
       </div>

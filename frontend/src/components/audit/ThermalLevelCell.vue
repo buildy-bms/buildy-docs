@@ -45,6 +45,9 @@ const props = defineProps({
   // emission_notes_html) : éditée via la modale de notes partagée (la vue),
   // reprise dans le PDF et sur la PWA.
   noteHtml: { type: String, default: '' },
+  // Mise en page « Nouvelle » : un équipement absent n'est signalé (orange) que s'il est exigé
+  // (l'émetteur) ; production et distribution peuvent manquer (émetteurs reliés directement…).
+  deviceOptional: { type: Boolean, default: false },
 })
 const emit = defineEmits(['patch-thermal', 'patch-device', 'open-notes'])
 
@@ -174,11 +177,11 @@ const deportedTooltip = computed(() => {
   <div :class="['thermal-level-grid', level === 'emission' ? 'is-emission' : '']">
     <SearchableSelect
       class="tl-eq"
-      v-tooltip="deviceId ? null : THERMAL_DEVICE_MISSING_TIP"
+      v-tooltip="deviceId || deviceOptional ? null : THERMAL_DEVICE_MISSING_TIP"
       :model-value="selectedDevices"
       :options="allOptions"
       :multiple="true"
-      :invalid="!deviceId"
+      :invalid="!deviceId && !deviceOptional"
       invalid-tone="amber"
       :clearable="false"
       :chip-limit="1"

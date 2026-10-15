@@ -1,5 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, watchEffect, inject } from 'vue'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { AUDIT_STEP_MODE_KEY, AUDIT_STEP_NOTES_KEY } from '@/lib/audit-steps-ui'
+import { PLAN_FILTERS, planNoPrecoNote } from '@/lib/audit-tips-guided'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
 import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIcon, EyeSlashIcon, EyeIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
@@ -155,6 +158,42 @@ function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
+
+// ─── Mise en page « Nouvelle » : gravité en barre de couleur, filtre « sans préconisation » ─────
+// Mêmes actions, mêmes gestes ; numéros et articles dans la police de l'application (chiffres Sora).
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
+// Action retenue sans préconisation rédigée (le bouton « Préconiser » est alors rouge).
+const needsPreco = (it) => it.status === 'open' && !hasNotes(it.alternative_solutions_html)
+const noPrecoCount = computed(() => planItems.value.filter(needsPreco).length)
+const planFilter = ref('all')
+const planFilters = computed(() => PLAN_FILTERS.map(f => ({ ...f, count: f.value === 'nopreco' ? noPrecoCount.value : null })))
+watch(noPrecoCount, n => { if (!n && planFilter.value === 'nopreco') planFilter.value = 'all' })
+const PLAN_CHIP = {
+  navy: { on: 'bg-indigo-600 text-white ring-indigo-600', off: 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50' },
+  amber: { on: 'bg-amber-100 text-amber-900 ring-amber-400', off: 'bg-white text-amber-800 ring-amber-300 hover:bg-amber-50' },
+}
+function planChipClass(f) {
+  if (f.count === 0) return 'bg-white text-slate-400 ring-slate-200 cursor-default'
+  return planFilter.value === f.value ? PLAN_CHIP[f.tone].on : PLAN_CHIP[f.tone].off
+}
+function pickPlanFilter(f) {
+  if (f.count === 0) return
+  planFilter.value = planFilter.value === f.value && f.value !== 'all' ? 'all' : f.value
+}
+const itemShown = (it) => !guided.value || planFilter.value === 'all' || needsPreco(it)
+// Barre de gravité à gauche de l'action (mêmes teintes que les pastilles de niveau).
+function sevBarCls(it) {
+  if (it.is_reserve) return 'border-l-indigo-400'
+  return it.severity === 'blocking' ? 'border-l-red-500' : it.severity === 'major' ? 'border-l-orange-400' : 'border-l-amber-300'
+}
+// Bandeau de l'étape : actions sans préconisation (ne bloquent pas la validation).
+const stepNotes = inject(AUDIT_STEP_NOTES_KEY, null)
+watchEffect(() => {
+  if (!stepNotes) return
+  stepNotes.review = guided.value && noPrecoCount.value ? [planNoPrecoNote(noPrecoCount.value)] : []
+})
 </script>
 
 <template>
@@ -237,6 +276,17 @@ function hasNotes(html) {
           </button>
         </span>
       </div>
+      <!-- Mise en page « Nouvelle » : filtre des actions sans préconisation. -->
+      <div v-if="guided && planItems.length" role="group" aria-label="Filtrer les actions" class="flex flex-wrap items-center gap-1.5">
+        <button v-for="f in planFilters" :key="f.value" type="button"
+                :aria-pressed="planFilter === f.value ? 'true' : 'false'"
+                :aria-disabled="f.count === 0 ? 'true' : undefined"
+                @click="pickPlanFilter(f)"
+                v-tooltip="f.count === 0 ? 'Chaque action retenue a sa préconisation' : f.tip"
+                :class="['inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60', planChipClass(f)]">
+          {{ f.label }}<template v-if="f.count != null"> ({{ f.count }})</template>
+        </button>
+      </div>
       <!-- Sources (repliables) : même hiérarchie que l'encart du PDF. -->
       <div v-if="visibleActionItems.length && sourcesOpen" class="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200">
         <InformationCircleIcon class="w-4 h-4 shrink-0 text-indigo-500 mt-0.5" />
@@ -257,7 +307,7 @@ function hasNotes(html) {
       <!-- Actions regroupees par CARTE de l'audit (stepper). Carte GTB
            sous-divisee en sous-sections (Capacites, Integration
            equipements, Integration compteurs, Maintenance & formation). -->
-      <section v-for="(card, ci) in groupedCards" :key="card.key" class="space-y-3">
+      <section v-for="(card, ci) in groupedCards" :key="card.key" v-show="card.items.some(itemShown)" class="space-y-3">
         <!-- Bandeau de carte : full-width, fond emeraude prononce, numero
              d'ordre dans la pastille pour rythmer le scroll. -->
         <!-- Bandeau neutre (ardoise) : la couleur reste réservée aux niveaux ;
@@ -273,7 +323,7 @@ function hasNotes(html) {
           <!-- Sous-titre uniquement si la carte a plusieurs sous-sections
                (cas GTB) — bandeau ardoise indente, design parallele au
                bandeau de carte avec une pastille a/b/c/d pour le rythme. -->
-          <div v-if="card.subsections && card.subsections.length > 1"
+          <div v-if="card.subsections && card.subsections.length > 1" v-show="sub.items.some(itemShown)"
                class="flex items-center gap-2.5 ml-4 mt-3 px-3 py-2 rounded-md bg-slate-100 border-l-[3px] border-slate-400">
             <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-500 text-white text-[10px] font-bold shrink-0">{{ String.fromCharCode(97 + si) }}</span>
             <div class="flex-1 min-w-0">
@@ -286,7 +336,12 @@ function hasNotes(html) {
           <div
             v-for="it in sub.items"
             :key="it.id"
-            :class="['border rounded-lg overflow-hidden transition bg-white',
+            v-show="itemShown(it)"
+            :class="guided
+              ? ['rounded-lg overflow-hidden transition bg-white ring-1 ring-slate-200 border-l-4', sevBarCls(it),
+                 card.subsections && card.subsections.length > 1 ? 'ml-4' : '',
+                 it.status === 'declined' ? 'opacity-50' : '']
+              : ['border rounded-lg overflow-hidden transition bg-white',
               card.subsections && card.subsections.length > 1 ? 'ml-4' : '',
               it.status === 'declined' ? 'opacity-50' : '',
               it.is_reserve ? 'border-indigo-200' : (it.severity === 'blocking' ? 'border-red-200' : (it.severity === 'major' ? 'border-orange-200' : 'border-amber-200'))]">
@@ -300,14 +355,15 @@ function hasNotes(html) {
             <FontAwesomeIcon :icon="['fas', isOpen(it) ? 'chevron-down' : 'chevron-right']" class="w-3 h-3" />
           </button>
           <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
-            <span class="inline-flex items-center justify-center w-19 px-1.5 py-0.5 text-[10px] font-mono rounded bg-gray-800 text-white whitespace-nowrap"
+            <span :class="['inline-flex items-center justify-center w-19 px-1.5 py-0.5 text-[10px] rounded whitespace-nowrap',
+                           guided ? 'font-semibold bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200' : 'font-mono bg-gray-800 text-white']"
                   v-tooltip="actionNumberTip(it.display_number)">
               {{ it.display_number || '—' }}
             </span>
             <span :class="['pill justify-center w-25', levelOf(it).cls]" v-tooltip="levelTip(it)">
               {{ levelOf(it).label }}
             </span>
-            <span v-tooltip="articleTip(it.r175_article)" class="w-26 truncate text-[10px] text-gray-500 font-mono whitespace-nowrap">{{ it.r175_article || '—' }}</span>
+            <span v-tooltip="articleTip(it.r175_article)" :class="['w-26 truncate text-[10px] text-gray-500 whitespace-nowrap', guided ? '' : 'font-mono']">{{ it.r175_article || '—' }}</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm text-gray-800 font-medium leading-snug cursor-pointer" @click="toggleOpen(it)">
@@ -371,7 +427,7 @@ function hasNotes(html) {
       <!-- Informations hors plan (exemption 5 %, vigilance…) : sans numéro ni
            effet sur la conformité, comme le bloc « Exemptions et points de
            vigilance » du PDF. -->
-      <section v-if="infoItems.length" class="space-y-3">
+      <section v-if="infoItems.length" v-show="!guided || planFilter === 'all'" class="space-y-3">
         <header class="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 border-l-4 border-gray-300">
           <h3 class="text-sm font-semibold text-gray-800 leading-tight">Informations hors plan</h3>
           <p class="ml-auto text-xs text-gray-500">Exemptions et points de vigilance : sans numéro ni effet sur la conformité</p>

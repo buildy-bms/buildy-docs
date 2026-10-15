@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { DocumentArrowDownIcon } from '@heroicons/vue/24/outline'
 import { getBacsChecklist } from '@/api'
@@ -7,6 +7,8 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import { useAuditStore } from '@/stores/audit'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { useAuditLayout } from '@/composables/useAuditLayout'
 
 // Section 9 — Documents du site (DOE).
 const props = defineProps({
@@ -32,6 +34,11 @@ async function loadChecklist(docId) {
   }
 }
 watch(() => document.value?.id, loadChecklist, { immediate: true })
+
+// Mise en page « Nouvelle » : documents groupés par rattachement (SiteDocumentsManager).
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
 </script>
 
 <template>
@@ -55,6 +62,7 @@ watch(() => document.value?.id, loadChecklist, { immediate: true })
       <SiteDocumentsManager
         v-if="document?.site_uuid"
         compact
+        :guided="guided"
         :site-uuid="document.site_uuid"
         :systems="systems"
         :zones="zones"

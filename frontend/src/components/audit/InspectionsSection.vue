@@ -1,6 +1,6 @@
 <script setup>
 import { storeToRefs } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch, watchEffect } from 'vue'
 import { ClockIcon, PlusIcon, ChevronDownIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
@@ -10,6 +10,9 @@ import InspectionReportDrop from '@/components/audit/InspectionReportDrop.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { AUDIT_STEP_MODE_KEY, AUDIT_STEP_NOTES_KEY } from '@/lib/audit-steps-ui'
+import { inspectionsContradictionNote } from '@/lib/audit-tips-guided'
 import { addYearsIso, todayIso as todayIsoLocal } from '@/lib/date-helpers'
 import {
   inspectionStatusTip, nextInspectionLabel, NEXT_INSPECTION_TIP, REPORT_RETENTION_TIP,
@@ -118,6 +121,22 @@ async function removeInspection(ins) {
   catch { error('Suppression impossible') }
 }
 
+// Mise en page « Nouvelle » : une réponse « Non » qui garde des inspections enregistrées, et les
+// inspections sans date, sont signalées (sans rien effacer : à l'auditeur de trancher).
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
+const contradiction = computed(() => (notApplicable.value && inspections.value.length
+  ? inspectionsContradictionNote(inspections.value.length) : ''))
+// Les inspections sans date bloquent la validation : « Reste à faire » du bandeau
+// (STEP_DEFINITIONS.inspections de la vue). La contradiction n'est pas une question sans réponse :
+// elle reste dans « Encore à renseigner », sans bloquer.
+const stepNotes = inject(AUDIT_STEP_NOTES_KEY, null)
+watchEffect(() => {
+  if (!stepNotes) return
+  stepNotes.inspections = guided.value && contradiction.value ? [contradiction.value] : []
+})
+
 function fmtDate(iso) {
   if (!iso) return null
   const d = new Date(iso + 'T00:00:00')
@@ -182,6 +201,8 @@ function statusFor(ins) {
                          :options="[{ value: true, label: 'Oui', tone: 'green' }, { value: false, label: 'Non', tone: 'slate' }]"
                          @update:model-value="v => setNotApplicable(v === false)" />
       </div>
+      <p v-if="guided && contradiction" data-inspections-contradiction
+         class="rounded-lg bg-amber-50 ring-1 ring-amber-200 px-3 py-2 text-sm text-amber-900">{{ contradiction }}</p>
       <div v-if="notApplicable" class="px-1">
         <label class="block text-[11px] text-gray-600 mb-1">Précision (optionnelle, reprise dans la réserve du rapport)</label>
         <input :value="document?.inspection_not_applicable_reason || ''" type="text"
@@ -199,7 +220,7 @@ function statusFor(ins) {
                 v-tooltip="isOpen(ins.id) ? 'Replier cette inspection' : 'Déplier cette inspection'"
                 class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 transition">
           <ClockIcon class="w-4 h-4 text-amber-600 shrink-0" />
-          <span class="text-sm font-medium text-gray-900">
+          <span :class="['text-sm font-medium', guided && !ins.last_inspection_date ? 'text-amber-800' : 'text-gray-900']">
             {{ fmtDate(ins.last_inspection_date) || 'Date à renseigner' }}
           </span>
           <span class="text-xs text-gray-500 truncate" v-tooltip.overflow>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, defineAsyncComponent, provide, readonly } from 'vue'
+import { ref, computed, onMounted, watch, watchEffect, defineAsyncComponent, provide, readonly, reactive } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -39,7 +39,9 @@ import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
 import AuditStepTabs from '@/components/audit/AuditStepTabs.vue'
 import AuditStepGuide from '@/components/audit/AuditStepGuide.vue'
 import AuditStepFooter from '@/components/audit/AuditStepFooter.vue'
-import { AUDIT_STEP_MODE_KEY, phaseForStep, stepObjective } from '@/lib/audit-steps-ui'
+import { AUDIT_STEP_MODE_KEY, AUDIT_STEP_NOTES_KEY, phaseForStep, stepObjective } from '@/lib/audit-steps-ui'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { synthesisPendingStepsNote } from '@/lib/audit-tips-guided'
 import { requestAuditReveal, AUDIT_REVEAL_EVENT, waitForElement, nextFrame, flashAuditTarget } from '@/lib/audit-reveal'
 import { useAuditStepNav } from '@/composables/useAuditStepNav'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
@@ -207,8 +209,12 @@ const addDeviceSystem = ref(null) // { id, system_category, zone_name } — moda
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
 // SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
-import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES, OWNERSHIP_STRUCTURES } from '@/lib/audit-options'
 import { systemsStepTodo } from '@/lib/systems-guide'
+import {
+  identificationUnansweredReasons, zonesUnansweredReasons, thermalStepTodo, metersUnansweredReasons,
+  bmsUnansweredReasonsFor, inspectionsUnansweredReasons,
+} from '@/lib/step-unanswered'
 import { plural } from '@/lib/tooltip-content'
 
 const showNotConcernedSystems = ref(localStorage.getItem('bacs-show-not-concerned') === '1')
@@ -551,6 +557,12 @@ const bmsSteps = computed(() => {
 // bacs_audit_device_shared_systems (mig 143).
 // Fallback (zoneId, category) gardé pour les appelants qui ne passent
 // pas encore le system_id — comportement historique.
+// Équipements du système d'une ligne de l'étape Régulation (règle de validation de l'étape).
+function devicesOfThermalRow(t) {
+  return (t.system_id
+    ? generatorDevicesForZoneCategory(t.system_id)
+    : generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')) || []
+}
 function generatorDevicesForZoneCategory(zoneIdOrSystemId, categoryOrNull) {
   // Nouveau call : generatorDevicesForSystem(systemId)
   if (categoryOrNull == null) {
@@ -655,7 +667,9 @@ function toggleStepperCollapsed() {
   stepperCollapsed.value = !stepperCollapsed.value
   localStorage.setItem(STEPPER_KEY, stepperCollapsed.value ? '1' : '0')
 }
-const siteDocCounts = ref({ doe: 0, photo: 0 })
+// af : documents d'analyse fonctionnelle (règle de l'étape GTB) ; null tant que la liste n'est pas
+// chargée (la règle ne bloque pas sur une donnée inconnue).
+const siteDocCounts = ref({ doe: 0, photo: 0, af: null })
 const siteCredCount = ref(0)
 
 async function refreshSiteCounts() {
@@ -668,10 +682,24 @@ async function refreshSiteCounts() {
     siteDocCounts.value = {
       doe: (docs || []).filter(d => d.category !== 'photo').length,
       photo: (docs || []).filter(d => d.category === 'photo').length,
+      af: (docs || []).filter(d => d.category === 'analyse_fonctionnelle').length,
     }
     siteCredCount.value = (creds || []).length
   } catch { /* silencieux */ }
 }
+
+// Document ajouté, supprimé ou recatégorisé (étapes GTB, Documents, photos) : recompte, dont les
+// documents d'analyse fonctionnelle exigés par la règle de l'étape GTB. Requêtes regroupées.
+let siteCountsTimer = null
+function onSiteDocumentsChanged() {
+  clearTimeout(siteCountsTimer)
+  siteCountsTimer = setTimeout(refreshSiteCounts, 300)
+}
+onMounted(() => window.addEventListener('site-documents:changed', onSiteDocumentsChanged))
+onBeforeUnmount(() => {
+  window.removeEventListener('site-documents:changed', onSiteDocumentsChanged)
+  clearTimeout(siteCountsTimer)
+})
 
 // Modèle « Supervision Buildy Cloud » (carte GTB) : un accès a été créé en
 // carte 10 → recompte + remonte la liste des accès.
@@ -698,13 +726,24 @@ const STEP_DEFINITIONS = [
       if (!document.value?.bacs_applicability_status) {
         r.push('on ne sait pas encore si le bâtiment est concerné : renseigne la puissance de chauffage et de climatisation, et la date du permis de construire')
       }
+      // Questions sans réponse (lib/step-unanswered.js). Fiche du site pas encore chargée : rien à
+      // conclure sur sa structure de propriété.
+      if (auditStore.site) {
+        r.push(...identificationUnansweredReasons(document.value, {
+          isBacs: isBacs.value,
+          hasSite: !!document.value?.site_uuid,
+          structureLabel: OWNERSHIP_STRUCTURES.find(o => o.value === auditStore.site?.ownership_structure)?.label || '',
+        }))
+      }
       return r
     } },
   { key: 'zones',
     label: 'Zones',
     description: 'Au moins une zone saisie. Les locaux techniques, hors décret, sont listés au même endroit mais ne sont pas exigés pour valider.',
-    incomplete: () => (zones.value.some(z => (z.kind || 'functional') !== 'technical')
-      ? [] : ["aucune zone fonctionnelle n'a été saisie"]) },
+    incomplete: () => [
+      ...(zones.value.some(z => (z.kind || 'functional') !== 'technical') ? [] : ["aucune zone fonctionnelle n'a été saisie"]),
+      ...zonesUnansweredReasons(zones.value),
+    ] },
   { key: 'systems',
     label: 'Systèmes',
     description: 'Chaque usage a sa réponse (présent ou non concerné), chaque usage présent a ses équipements, et chaque équipement est complètement renseigné.',
@@ -736,19 +775,22 @@ const STEP_DEFINITIONS = [
         return ["aucune régulation de température n'a été décrite"]
       }
       // Chaque ligne doit avoir au moins un équipement d'émission saisi
-      // OU être déclarée exemptée (bois). Sinon le PDF générera des
+      // OU être exemptée (bois, cochée ou déduite du générateur). Sinon le PDF générera des
       // actions « Régulation manquante » que l'auditeur ne s'attend pas
-      // à voir, alors qu'il a validé l'étape.
-      const incomplete = thermalFiltered.value.filter(t =>
-        !t.emission_device_id && !t.generator_exempt_wood
-      )
-      if (incomplete.length === 0) return []
-      const labels = incomplete.map(t => {
-        const cat = t.category === 'cooling' ? 'refroidissement' : 'chauffage'
-        return `${t.zone_name || 'zone'} (${cat})`
-      })
-      const head = `${incomplete.length} régulation${incomplete.length > 1 ? 's' : ''} sans émetteur indiqué (radiateur, ventilo-convecteur…)`
-      return [`${head} : ${labels.join(', ')}`]
+      // à voir, alors qu'il a validé l'étape. Puis les questions sans réponse (équipement de
+      // production, type de régulation) : mêmes règles que l'étape (lib/step-unanswered.js).
+      const todo = thermalStepTodo(thermalFiltered.value, devicesOfThermalRow)
+      const r = []
+      if (todo.missingRows.length) {
+        const labels = todo.missingRows.map(t => {
+          const cat = t.category === 'cooling' ? 'refroidissement' : 'chauffage'
+          return `${t.zone_name || 'zone'} (${cat})`
+        })
+        const n = todo.missingRows.length
+        r.push(`${n} régulation${n > 1 ? 's' : ''} sans émetteur indiqué (radiateur, ventilo-convecteur…) : ${labels.join(', ')}`)
+      }
+      r.push(...todo.reasons)
+      return r
     } },
   { key: 'meters',
     label: 'Compteurs',
@@ -758,7 +800,7 @@ const STEP_DEFINITIONS = [
       if (!meters.value.some(m => m.present_actual !== null)) {
         return ["aucun compteur n'a été pointé présent ou absent"]
       }
-      return []
+      return metersUnansweredReasons(meters.value, auditStore.meterPlanStatus)
     } },
   // GTB : complète si « Pas de GTB » répondu, ou GTB présente + solution saisie.
   { key: 'bms',
@@ -766,10 +808,19 @@ const STEP_DEFINITIONS = [
     description: 'GTB en place, ce qu’elle sait faire, son entretien et la formation de l’exploitant.',
     incomplete: () => {
       if (bms.value?.present == null) return ["la présence d'une GTB sur le site n'est pas indiquée"]
+      const r = []
       if (bms.value?.present === 1 && !bms.value?.existing_solution) {
-        return ['la solution GTB en place n\'est pas renseignée']
+        r.push('la solution GTB en place n\'est pas renseignée')
       }
-      return []
+      // Puis les questions sans réponse des rubriques (mêmes règles que l'étape, lib/bms-guide.js) :
+      // tout ce qui reste, d'un coup.
+      return [...r, ...bmsUnansweredReasonsFor(bms.value, {
+        isBacs: isBacs.value,
+        afStatus: document.value?.audit_existing_af_status ?? null,
+        afDocsCount: siteDocCounts.value.af ?? 1,
+        devicesWithMeta: devicesWithMeta.value,
+        metersPresent: metersPresent.value,
+      })]
     } },
   { key: 'inspections',
     label: 'Inspections',
@@ -778,8 +829,11 @@ const STEP_DEFINITIONS = [
       // Mig 187 — case « Aucune inspection à déclarer » bypass la validation.
       const na = document.value?.inspection_not_applicable
       if (na === 1 || na === true) return []
-      return (inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
-        ? [] : ["la date de la dernière inspection n'est pas renseignée — ou réponds Non si aucune inspection n'est à tracer"]
+      return [
+        ...((inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
+          ? [] : ["la date de la dernière inspection n'est pas renseignée — ou réponds Non si aucune inspection n'est à tracer"]),
+        ...inspectionsUnansweredReasons(inspections.value, false),
+      ]
     } },
   { key: 'docs-checklist',
     label: 'Check-list',
@@ -952,6 +1006,17 @@ provide(AUDIT_STEP_MODE_KEY, {
   phaseFor: phaseForStep,
   goToStep,
   numberFor: (key) => tabSteps.value.find(s => s.key === key)?.number ?? null,
+})
+// Mise en page « Nouvelle » : questions encore sans réponse, signalées par chaque étape (ne
+// bloquent pas la validation), affichées par le bandeau de l'étape.
+const stepNotes = reactive({})
+provide(AUDIT_STEP_NOTES_KEY, stepNotes)
+// Étape Synthèse : Claude rédige à partir de l'audit tel qu'il est ; le bandeau rappelle les étapes
+// pas encore validées.
+const { isGuidedLayout } = useAuditLayout()
+watchEffect(() => {
+  const pending = stepperSteps.value.filter(s => s.key !== 'synthesis' && !s.validated).map(s => s.label)
+  stepNotes.synthesis = isGuidedLayout.value && pending.length ? [synthesisPendingStepsNote(pending)] : []
 })
 
 async function validateAndContinue() {
@@ -1317,10 +1382,11 @@ function downloadCsv() {
 }
 
 const exporting = ref(false)
-async function exportPdf() {
+// `layout: 'classic'` (menu Plus) : ancienne mise en page, pour comparer avec la nouvelle
+async function exportPdf({ layout } = {}) {
   exporting.value = true
   try {
-    const { data } = await exportBacsPdf(docId)
+    const { data } = await exportBacsPdf(docId, { layout })
     success(`PDF généré (${(data.file_size_bytes / 1024).toFixed(0)} Ko)`)
     window.location.href = data.download_url
   } catch (e) {
@@ -1756,6 +1822,13 @@ onBeforeUnmount(() => {
               {{ exportingDossier ? 'Préparation du dossier…' : 'Dossier complet (ZIP)' }}
             </button>
             </div>
+            <div data-tip-wrap v-tooltip="'Comparer avec l’ancienne mise en page'">
+            <button @click="showSettingsMenu = false; exportPdf({ layout: 'classic' })" :disabled="exporting"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              <DocumentArrowDownIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              Rapport (ancienne mise en page)
+            </button>
+            </div>
             <div class="border-t border-gray-100 my-1"></div>
             <button @click="showSettingsMenu = false; deleteAudit()"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
@@ -1789,6 +1862,7 @@ onBeforeUnmount(() => {
         v-if="activeTab"
         :step="activeTab"
         :total="tabSteps.length"
+        :notes="stepNotes[activeTab.key] || []"
         @validate="validateStep"
         @invalidate="invalidateStep"
       />

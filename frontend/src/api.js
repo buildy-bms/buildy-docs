@@ -512,7 +512,9 @@ export const regenerateBacsActionItems = (docId) =>
   api.post(`/bacs-audit/${docId}/action-items/regenerate`)
 export const getBacsActionItemsCsvUrl = (docId) =>
   `/api/bacs-audit/${docId}/action-items/export.csv`
-export const exportBacsPdf = (docId) => api.post(`/bacs-audit/${docId}/export-pdf`)
+// `layout: 'classic'` : ancienne mise en page du rapport, gardée pour comparer (refonte 2026-10)
+export const exportBacsPdf = (docId, { layout } = {}) =>
+  api.post(`/bacs-audit/${docId}/export-pdf`, null, layout ? { params: { layout } } : undefined)
 export const exportBacsTablesPdf = (docId) => api.post(`/bacs-audit/${docId}/exports/tables`)
 // Dossier complet (ZIP) : rapport + tableaux A3 + documents cochés
 // « Inclure dans le rapport ». Réponse binaire (blob).
