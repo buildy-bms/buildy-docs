@@ -58,14 +58,31 @@ const FONTS = [
   ['Manrope', 400, 'manrope-latin-400-normal.woff2'], ['Manrope', 500, 'manrope-latin-500-normal.woff2'],
   ['Manrope', 600, 'manrope-latin-600-normal.woff2'], ['Manrope', 700, 'manrope-latin-700-normal.woff2'],
 ];
+// Sous-ensembles complémentaires (paquets @fontsource du serveur, mêmes versions que la charte)
+const EXTRA_SUBSETS = [
+  ['latin-ext', 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF',
+    [['Poppins', 400], ['Poppins', 600], ['Manrope', 400], ['Manrope', 500], ['Manrope', 600], ['Manrope', 700]]],
+  ['greek', 'U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF',
+    [['Manrope', 400], ['Manrope', 500], ['Manrope', 600], ['Manrope', 700]]],
+];
 let _fontsCss = null;
 function fontsCss() {
   if (_fontsCss != null) return _fontsCss;
-  _fontsCss = FONTS.map(([family, weight, file]) => {
-    const b64 = fs.readFileSync(path.join(CHARTE_DIR, 'fonts', file)).toString('base64');
-    const range = family === 'Sora Digits' ? '\n  unicode-range: U+0030-0039;' : '';
-    return `@font-face {\n  font-family: '${family}';\n  src: url(data:font/woff2;base64,${b64}) format('woff2');\n  font-weight: ${weight};\n  font-style: normal;\n  font-display: block;${range}\n}`;
-  }).join('\n');
+  const face = (family, weight, b64, range) => `@font-face {\n  font-family: '${family}';\n  src: url(data:font/woff2;base64,${b64}) format('woff2');\n  font-weight: ${weight};\n  font-style: normal;\n  font-display: block;${range ? `\n  unicode-range: ${range};` : ''}\n}`;
+  const charter = FONTS.map(([family, weight, file]) => face(family, weight,
+    fs.readFileSync(path.join(CHARTE_DIR, 'fonts', file)).toString('base64'), family === 'Sora Digits' ? 'U+0030-0039' : null));
+  // Mêmes familles, alphabets au-delà du latin courant (noms « Łódź », « ΔT » dans une note) :
+  // sinon Chromium prend une police du système (Liberation Sans en production, vu le 2026-10-15).
+  const extra = [];
+  for (const [subset, range, weights] of EXTRA_SUBSETS) {
+    for (const [family, weight] of weights) {
+      try {
+        const file = require.resolve(`@fontsource/${family.toLowerCase()}/files/${family.toLowerCase()}-${subset}-${weight}-normal.woff2`);
+        extra.push(face(family, weight, fs.readFileSync(file).toString('base64'), range));
+      } catch { /* sous-ensemble absent : repli sur la police du système pour ces caractères */ }
+    }
+  }
+  _fontsCss = [...charter, ...extra].join('\n');
   return _fontsCss;
 }
 
@@ -90,6 +107,20 @@ async function decreePlainModule() {
   return _decreePlain;
 }
 
+// Chiffres en indice ou en exposant Unicode (« CO₂ », « m⁴ ») : absents de toutes les polices
+// embarquées ; écrits en <sub> / <sup> avec le chiffre ordinaire. Texte seulement (jamais dans
+// les balises, les styles ni les attributs).
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+function scriptDigits(html) {
+  return html
+    .split(/(<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>|<title[\s\S]*?<\/title>)/i)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/>([^<]+)</g, (_m, text) => `>${text
+      .replace(/[₀-₉]+/g, (m) => `<sub>${[...m].map((c) => SUB.indexOf(c)).join('')}</sub>`)
+      .replace(/[⁰⁴-⁹]+/g, (m) => `<sup>${[...m].map((c) => SUP.indexOf(c)).join('')}</sup>`)}<`)))
+    .join('');
+}
+
 /**
  * HTML du rapport d'audit BACS.
  * @param {object} data — buildBacsAuditExportData()
@@ -105,7 +136,7 @@ async function buildBacsAuditReportHtml(data, { mode = 'print' } = {}) {
   };
   // Copie : le gabarit complète des listes absentes
   const html = buildHtml(JSON.parse(JSON.stringify(data)), env);
-  return typographyForTemplate('bacs-audit-report', html);
+  return typographyForTemplate('bacs-audit-report', scriptDigits(html));
 }
 
 function buildHtml(d, env) {

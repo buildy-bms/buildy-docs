@@ -1,18 +1,18 @@
 // Mise en page de l'audit desktop : « Actuelle » (classic) ou « Nouvelle » (guided), pour toutes
 // les étapes. Un seul état partagé (module) : le choix fait dans le bandeau d'une étape vaut pour
-// les autres. Mémorisé dans le navigateur, tous audits confondus ; l'actuelle reste le défaut.
-// Reprend le choix déjà fait sur l'étape Systèmes (`bacs-systems-layout`, 13/10).
+// les autres. Mémorisé dans le navigateur, tous audits confondus.
+// La nouvelle est imposée à tous (demande de Kévin, 2026-10-15) : défaut « Nouvelle », et nouvelle
+// clé de mémoire (v2) pour que les choix « Actuelle » faits avant n'y restent pas. Le bouton du
+// bandeau permet encore de revenir à l'actuelle pour comparer.
 import { computed, ref } from 'vue'
 
-const KEY = 'bacs-audit-layout'
-const LEGACY_KEY = 'bacs-systems-layout'
+const KEY = 'bacs-audit-layout-v2'
 
 function read() {
   try {
-    const v = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY)
-    return v === 'guided' ? 'guided' : 'classic'
+    return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'guided'
   } catch {
-    return 'classic'
+    return 'guided'
   }
 }
 

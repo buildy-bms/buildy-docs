@@ -636,8 +636,9 @@ retours à la ligne, placement parfait (jamais sur l'élément survolé, toujour
 
 Bouton « Mise en page : Actuelle / Nouvelle » dans le bandeau de chaque étape (`AuditStepGuide`),
 un seul choix pour toutes les étapes (`composables/useAuditLayout.js`, `localStorage`
-`bacs-audit-layout` = `classic` | `guided`, reprend l'ancien `bacs-systems-layout` ; actuelle par
-défaut).
+`bacs-audit-layout-v2` = `classic` | `guided`). **Nouvelle imposée par défaut** (Kévin, 2026-10-15) :
+la clé v2 ignore les anciens choix « Actuelle » (`bacs-audit-layout`, `bacs-systems-layout`) ; le
+bouton permet encore de revenir à l'actuelle pour comparer.
 Même données, mêmes actions ; règle de Kévin : la nouvelle ne doit jamais être moins pratique
 (aucune fonction perdue, jamais plus de clics) et **aucune réponse en masse**.
 
