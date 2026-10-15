@@ -36,13 +36,16 @@ n'a pas pu tourner.
 | Contrôle | Règle |
 |---|---|
 | Décomptes cohérents | L'essentiel = cartes du plan = page de clôture = actions numérotées ; tableau de bord = actions rattachées à une exigence (réserves à part) |
-| Compteurs | statut de l'onglet Compteurs = statut imprimé au chapitre 4 |
-| L'essentiel sur une page | hauteur ≤ 263 mm |
-| Tableau de bord sur une page | hauteur ≤ 263 mm, pastilles dans leur colonne |
-| Débordement horizontal | aucun élément plus large que la page (A4 174 mm, A3 392 mm) |
-| Rapport produit | chemin d'export de production (plan régénéré, mêmes options de rendu) |
+| Compteurs | statut de l'onglet Compteurs = statut imprimé dans « Le comptage » |
+| Débordement d'une page | rapport paginé par Paged.js comme à l'export : aucun contenu qui dépasse le bas d'une page |
+| Débordement horizontal | aucun texte, tableau ou image plus large que la page (A4 174 mm, A3 392 mm) ; pages sombres à fond perdu exclues |
+| Titre seul en bas de page | le dernier élément visible d'une page n'est jamais un titre (ni la tête d'un système) |
+| Rapport produit | chemin d'export de production (plan régénéré, nouvelle mise en page) |
 | Caractères | tous couverts par les polices embarquées (poppler requis) |
 | Sommaire | chaque entrée renvoie à la page réelle de son titre (poppler requis) |
+
+Nouvelle mise en page du rapport (2026-10-15) : les anciens contrôles « L'essentiel sur une page » et
+« tableau de bord sur une page » ne s'appliquent plus (le verdict peut tenir sur deux pages).
 
 poppler (`pdftotext`, `pdfinfo`) : `brew install poppler`. Sans lui, les deux
 derniers contrôles sont ignorés avec un avertissement.

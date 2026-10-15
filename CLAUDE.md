@@ -135,6 +135,39 @@ Tous les PDF passent par `backend-node/src/lib/pdf.js::renderPdf()`. Options en 
   - Audit `pm2 logs buildy-docs` au boot : tout warn `Font X Y absente` = symptome a corriger immediatement.
 - **Pas de `box-shadow` floues** : Safari/macOS Preview rend les `box-shadow: 0 Xmm Ymm rgba(...)` comme un rectangle opaque cale a l'offset, sans blur. Visuellement catastrophique (CTA vert flanque d'un bloc vert, card avec halo plat qui deborde). Utiliser bordure pleine + radius + fond teinte pour la profondeur. Audit : `grep -rn "box-shadow" backend-node/templates/pdf/` ne doit pas retourner de blur > 0.5mm. Toujours ouvrir un PDF dans Safari avant validation.
 
+### Rapport d'audit BACS — nouvelle mise en page (charte graphique, 2026-10-15)
+
+Validée par Kévin sur maquettes (Virtuo, Sausheim), intégrée le 2026-10-15, **non commitée**. La charte
+graphique Buildy des PDF vit dans le dépôt `../charte-graphique/` (règles, couleurs, polices, logos).
+- **Gabarit** : `src/lib/bacs-audit-report.js` (`buildBacsAuditReportHtml(data, { mode })`, HTML depuis les
+  données de `buildBacsAuditExportData`, comme l'ancien gabarit) + `templates/pdf/styles-bacs-audit-report.css`.
+  Partie 1 « L'essentiel » (verdict en 3 questions, mot de l'auditeur, exigences du décret, plan par
+  domaine), partie 2 « Le constat détaillé » par domaine (chaque chapitre finit par ses actions,
+  justification et origine comprises : l'ancienne annexe C), annexes A décret, B méthodologie,
+  C mentions légales, D documents joints. Tableaux : une ligne de valeurs courtes, le détail sur une
+  ligne pleine largeur dessous (demande de Kévin : pas de retours à la ligne dans les colonnes).
+- **Rien perdu** par rapport à `bacs-audit.hbs` : vérifié en comparant les textes (phrases, nombres,
+  numéros d'actions) sur Virtuo, Sausheim, le jeu Atlas Sud et deux variantes qui forcent chaque cas
+  rare. Toute rubrique ajoutée à l'export doit être ajoutée aux deux gabarits tant que l'ancien existe.
+- **Pagination** : Paged.js 0.4.3 embarqué (`templates/pdf/vendor/pagedjs/`, voir son README),
+  `lib/pdf.js` `renderPagedHtmlPdf()` / `preparePagedPage()` (même navigateur partagé et même délai
+  que `renderPdf`). En-tête et pied de page en « margin boxes » `@page` générées par le gabarit
+  (mêmes textes que `buildHeaderFooter()`, présentation de la charte) : exception assumée à la règle
+  « seul buildHeaderFooter », Puppeteer ne peut ni retirer l'en-tête des intercalaires à fond perdu ni
+  numéroter les renvois. `requestAnimationFrame` remplacé avant Paged.js (sinon blocage en arrière-plan).
+- **Polices et logos** : `templates/pdf/charte/`, copie générée par
+  `../charte-graphique/scripts/sync-buildy-docs.mjs` (ne pas modifier à la main). Sora en graisses fixes
+  (« Sora Digits », chiffres seuls) ; « → » absent de Manrope → icône SVG.
+- **Textes du décret en clair** : `frontend/src/lib/decree-plain.js`, chargé par import dynamique
+  (source unique avec la fiche ⓘ de l'interface).
+- **Ancienne mise en page gardée pour comparer** (règle « refonte = en double ») : `?layout=classic` sur
+  `POST /bacs-audit/:id/export-pdf` et `GET /bacs-audit/:id/preview` ; menu « Plus » → « Rapport (ancienne
+  mise en page) ». À retirer quand Kévin le décide (avec `bacs-audit.hbs`, `_action-group.hbs`,
+  `styles-bacs-audit.css`, le `layout` d'`exports.js`).
+- **Aperçu de l'application** (cadre sans script) : `mode: 'screen'`, d'un bloc, sans numéros de page.
+- **Contrôles** : `npm run check:pdf` mesure le rapport paginé (débordement vertical et horizontal,
+  titre seul en bas de page, sommaire) ; test `test/bacs-audit-report.test.mjs`.
+
 ### Design system PDF (référence centrale)
 
 **Voir `docs/pdf-design-system.md`** — référence vivante des conventions visuelles de tous les PDF Buildy : tokens (palette, typographie Poppins+Inter, espacements, bords arrondis), vocabulaire de composants (panel, info-card, system-card, m-pill, usage-pill, headline, stat, recap-tile, gtb-summary, dashboard-row, action-card, callout, etc.), patterns de layout (cover, page L'essentiel, sommaire, dashboard R175, opener chapitre, annexes), formats de page par type de doc, helpers Handlebars, conventions de code.
@@ -601,8 +634,10 @@ retours à la ligne, placement parfait (jamais sur l'élément survolé, toujour
 
 ## Étape Systèmes : deux mises en page (2026-10-13)
 
-Bouton « Mise en page : Actuelle / Nouvelle » à droite de la barre des zones (choix mémorisé dans
-le navigateur, `localStorage` `bacs-systems-layout` = `classic` | `guided`, actuelle par défaut).
+Bouton « Mise en page : Actuelle / Nouvelle » dans le bandeau de chaque étape (`AuditStepGuide`),
+un seul choix pour toutes les étapes (`composables/useAuditLayout.js`, `localStorage`
+`bacs-audit-layout` = `classic` | `guided`, reprend l'ancien `bacs-systems-layout` ; actuelle par
+défaut).
 Même données, mêmes actions ; règle de Kévin : la nouvelle ne doit jamais être moins pratique
 (aucune fonction perdue, jamais plus de clics) et **aucune réponse en masse**.
 
@@ -631,7 +666,12 @@ catégorie de l'usage d'ORIGINE)` de `lib/audit-options.js` → `{ key, section,
 `DEVICE_SECTIONS` ; `deviceMissingFields` / `isDeviceComplete` en dérivent (deux mises en page,
 mobile, bandeau de l'étape, guide).
 - Régulation Oui/Non ; si Oui : intégrée ou déportée, et le type de régulation de chaque fonction
-  (production, distribution, émission). « Régulation : Non » efface les réponses devenues cachées.
+  (production, distribution, émission). « Régulation : Non » efface les réponses devenues cachées :
+  fiche bureau et mobile, et serveur au passage à Non (`clearRegulationAnswersOnNo`, PATCH devices,
+  pour les appels MCP) ; mig 215 = rattrapage de l'existant. Exception voulue (Kévin, 2026-10-13) :
+  un type choisi depuis l'étape Régulation sur un équipement déjà à Non est gardé
+  (« Équilibrage hydraulique » d'un circuit sans régulation, Rexel) ; la mig 215 laisse aussi
+  les équipements désignés dans l'étape Régulation et les audits livrés.
 - « Dessert plusieurs bâtiments ? » (vide comptait « non » dans la répartition des responsabilités).
 - Puissance (ou « puissance inconnue ») d'une production de chauffage ou de froid comptée dans le
   seuil des 70 kW (hors secours, hors service, « hors cumul »).
@@ -667,6 +707,78 @@ l'état quand elle est ouverte). La mise en page actuelle n'en est pas affectée
 (par défaut) ; un clic sur un usage n'affiche plus que ce système (rappel « Seulement l'usage … »
 au-dessus de la liste), le résumé, les compteurs et précédent / suivant de la fiche suivent ; le
 parcours « Reprendre » déplace le filtre ; remis à « Tous » à chaque changement de zone.
+
+## Autres étapes : mise en page « Nouvelle » (2026-10-13)
+
+Même choix « Mise en page » que l'étape Systèmes ; même langage : le reste à faire en tête (encadré
+orange + « Aller au premier »), filtres en pastilles (« À compléter », « Non conformes »…), chaque
+groupe dans sa carte, une couleur = un sens (usage / énergie / état, jamais décoratif), une ligne
+par élément. **Mise en page actuelle inchangée au pixel près** : tout passe par `guided` (computed
+`stepMode.enabled && isGuidedLayout`), classes et blocs conditionnels ; vérifié étape par étape
+contre une copie de l'interface du dernier commit (`git archive HEAD frontend`, Vite sur un autre
+port avec `server.fs.allow` vers les `node_modules`, fenêtre de 5 200 px de haut pour éviter les
+recouvrements de l'en-tête collant, bouton « Mise en page » masqué). Bruit connu : carte Google de
+l'étape Zones, lissage de 1 à 2 niveaux, sommaire collant de la GTB à 1 024 px (calque composité).
+
+- **Pièces communes** (`components/audit/guided/`) : `RubricShell` (actuelle = la div d'origine,
+  mêmes id et classes ; nouvelle = rubrique repliable, en-tête `DeviceSectionHeader`, qui accepte
+  aussi `unanswered` = « sans réponse » en pointillés), `RubricsFilter` (« Le reste à faire / Toute
+  l'étape »), `AuditGuideRail` (guide de gauche, une ligne par rubrique), `composables/useStepRubrics.js`
+  (ouverture des rubriques, `localStorage` `bacs-step-rubrics`). Textes : `lib/audit-tips-guided.js`.
+- **Bandeau** : chaque étape publie ses questions encore sans réponse (`AUDIT_STEP_NOTES_KEY`,
+  `provide` de la vue) ; le bandeau les liste dans « Encore à renseigner — ne bloque pas la
+  validation » et ne dit plus « Tout est renseigné ». Deux niveaux partout : « à compléter » = ce
+  que l'étape exige (mêmes règles que `STEP_DEFINITIONS`), « sans réponse » = question affichée vide.
+- **Identification** : verdict en tête (libellé, puissance retenue, permis), 4 rubriques
+  (`lib/identification-guide.js`). **Zones** : groupes « Zones fonctionnelles » / « Locaux
+  techniques » (`lib/zones-guide.js`), pastille par zone, champs sans objet des locaux techniques
+  en « — ». **Régulation** : trait de couleur du circuit, verdict par système
+  (`lib/thermal-guide.js`, mêmes règles que le plan : émission par pièce / par zone, froid non
+  évalué, émetteur sans régulation renseignée = « à préciser ») ; émetteur et production manquants
+  en orange, la distribution reste facultative (`ThermalLevelCell` `device-optional`) ; point orange
+  dans le verdict d'un système « à préciser » ; filtre « À compléter » = tout ce qui bloque. **Compteurs** : carte par énergie teintée, une ligne
+  par compteur (usage, puis ce qu'il mesure sans « Électricité consommée par : »), filtres « À
+  compléter » / « Requis manquants » qui ouvrent l'énergie concernée. **GTB** : guide des 12 rubriques
+  (`lib/bms-guide.js`), « Reprendre les N rubriques ». **Check-list** : « Photos du site » avec
+  progression, « Pièces du dossier » avec l'état de chaque pièce. **Plan d'actions** : gravité en
+  barre de couleur, numéros en chiffres Sora, filtre « Sans préconisation ».
+- **Documents** (2026-10-14) : `SiteDocumentsManager` prop `guided` (utilisé par l'audit seul) —
+  groupes par rattachement (`lib/documents-guide.js` : documents du site, pièces de la check-list
+  triées par point, GTB, éléments, actions et inspection), catégorie en `SearchableSelect`, pastille
+  « Rattaché à » sans le type redit par le groupe, ligne « N documents · N joints au rapport ».
+  **Inspections** : une réponse « Non » qui garde des inspections enregistrées est signalée (encadré +
+  bandeau), sans rien effacer ; les inspections sans date autres que la plus récente (déjà dans
+  « Reste à faire ») sont rappelées. **Synthèse** : le bandeau rappelle les étapes pas encore
+  validées (la note reprend l'audit tel qu'il est ; la note périmée était déjà signalée).
+- **Inchangée** : Accès (une à trois lignes par site, déjà compact).
+- **Questions sans réponse = bloquantes** (décision de Kévin, 2026-10-14, comme à l'étape Systèmes) :
+  `lib/step-unanswered.js` ajoute aux `STEP_DEFINITIONS` de la vue, dans les **deux** mises en page :
+  Identification (structure de propriété, audit BACS rattaché à un site, fiche du site chargée),
+  Zones (nature ; régime et surface des zones fonctionnelles), Régulation (émetteur — dispense bois
+  déduite du générateur comprise —, équipement de production, type de régulation de chaque
+  équipement désigné), Compteurs (présence des compteurs requis), GTB (questions des rubriques,
+  sauf facultatives GTB hors service ; liste complète d'un coup, plus d'arrêt au premier manque ;
+  documents d'analyse fonctionnelle comptés par la vue via `siteDocCounts.af`, recompte sur
+  l'événement `site-documents:changed`, émis aussi par `SiteDocumentsManager`), Inspections
+  (inspections sans date autres que la plus récente). Les étapes calculent leurs états avec les
+  mêmes fonctions (`bmsStepRubrics`, `thermalGuideForRow`). Restent dans « Encore à renseigner —
+  ne bloque pas » : préconisations du plan, étapes pas encore validées (Synthèse), inspection gardée
+  malgré « Non ». Verrou serveur (`bacs-audit-step-completion.js`) inchangé, plus large.
+- **Puissance enregistrée** (`bacs_total_power_kw`, simple cache en calcul automatique) : le champ de
+  l'étape Identification affiche la puissance retenue (`power_summary.retainedKw`) ; la note de
+  synthèse (Claude) reçoit la puissance retenue (`resolveTotalPower`) ; changer la date du permis
+  (`PATCH /afs/:id`) juge sur le cumul et rafraîchit le cache. Mig 216 (accord de Kévin 15/10) :
+  rattrapage des caches des audits BACS non livrés (base de dev : #43 122,8 → 155,8 kW, #56 949 →
+  1 002 kW, aucun verdict changé ; test `power-cache-migration`).
+- Zones, mise en page actuelle aussi : nom `min-w-40`, régime `w-60` (le nom tombait à 16 px).
+- Pièges vus en relisant sur d'autres audits que STEF (2026-10-14) : une rubrique ouverte « par
+  défaut » avant la fin d'un chargement propre au composant reste ouverte une fois complète → mettre
+  ce chargement dans la clé de `useStepRubrics` (GTB : `afDocsLoaded`) ; le résumé de la puissance
+  doit lire la puissance **retenue** (`power_summary.retainedKw`, celle du verdict), pas
+  `bacs_total_power_kw` (en calcul automatique, cache parfois ancien : audit #56, 949 kW enregistrés,
+  1 002 kW retenus) ; « 1er » du mois (`toLocaleDateString` écrit « 1 janvier »).
+- Tests : `bms-guide`, `thermal-guide`, `identification-guide`, `zones-guide`, `documents-guide`,
+  `step-unanswered` (`backend-node/test`).
 
 ## Listes "intégré à la GTB" filtrées par usages traités
 

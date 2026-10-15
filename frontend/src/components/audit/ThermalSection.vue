@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount, reactive } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, reactive, inject } from 'vue'
 import Sortable from 'sortablejs'
 import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 import {
@@ -25,7 +25,15 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal, reorderBacsThermal, updateBacsDevice } from '@/api'
 import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
-import { requestAuditReveal } from '@/lib/audit-reveal'
+import { requestAuditReveal, flashAuditTarget } from '@/lib/audit-reveal'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { thermalGuideForRow, thermalTotals } from '@/lib/thermal-guide'
+import { fluidStyle } from '@/lib/system-fluids'
+import {
+  THERMAL_FILTERS, THERMAL_DONE_TEXT, THERMAL_GO_FIRST_TIP, METERS_GO_FIRST_LABEL,
+  thermalTodoLine, thermalKoLine, thermalFilterEmptyTip,
+} from '@/lib/audit-tips-guided'
 
 // Niveaux R175-6 (Production / Distribution / Émission). Chaque niveau
 // porte 4 saisies dans la table : équipement, équipement de régulation,
@@ -414,6 +422,90 @@ const woodExemptCount = computed(() =>
   (props.thermalFiltered || []).filter(t => exemptAutoFromWood(t)).length,
 )
 
+// ─── Mise en page « Nouvelle » : verdict de chaque système, filtre, reste à faire ─────────
+// Mêmes lignes, mêmes saisies : sous chaque système, son verdict (lib/thermal-guide.js, mêmes
+// règles que le plan d'actions) ; la ligne prend la couleur de son circuit (lib/system-fluids.js).
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
+// Même calcul que la règle de validation de l'étape (STEP_DEFINITIONS.thermal de la vue).
+const devicesOfRow = (t) => (t.system_id
+  ? props.generatorDevicesForZoneCategory(t.system_id)
+  : props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')) || []
+const rowGuides = computed(() => {
+  const map = new Map()
+  if (!guided.value) return map
+  for (const t of (props.thermalFiltered || [])) map.set(t.id, thermalGuideForRow(t, devicesOfRow(t)))
+  return map
+})
+const guideOf = (t) => rowGuides.value.get(t.id) || null
+const guideTotals = computed(() => thermalTotals([...rowGuides.value.values()]))
+// À compléter = ce qui bloque la validation : sans émetteur (todo), ou équipement de production /
+// type de régulation sans réponse (open), quel que soit le verdict.
+const needsAnswer = (g) => !!g && (g.missing.length > 0 || g.unanswered.length > 0)
+const answerCounts = computed(() => {
+  const list = [...rowGuides.value.values()]
+  return {
+    todo: list.filter(g => g.missing.length).length,
+    open: list.filter(g => !g.missing.length && g.unanswered.length).length,
+  }
+})
+const zoneTotals = (g) => thermalTotals(g.rows.map(guideOf).filter(Boolean))
+// Carte du verdict : ce qui manque ou reste à préciser (sinon le verdict seul, en étiquette).
+function verdictTip(t) {
+  const g = guideOf(t)
+  if (!g) return null
+  const todo = [...g.missing, ...g.unanswered]
+  if (!todo.length) return g.verdict.text
+  return { title: g.verdict.text, icon: 'list-check', tone: 'warning', text: `À préciser : ${todo.join(', ')}.` }
+}
+const VERDICT_TONE = {
+  green: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  red: 'bg-red-50 text-red-700 ring-red-200',
+  amber: 'bg-amber-50 text-amber-800 ring-amber-200',
+  slate: 'bg-slate-50 text-slate-600 ring-slate-200',
+}
+// Filtre : tous, à compléter (sans émetteur), non conformes.
+const thermalFilter = ref('all')
+const thermalFilters = computed(() => THERMAL_FILTERS.map(f => ({
+  ...f,
+  count: f.value === 'todo' ? answerCounts.value.todo + answerCounts.value.open : f.value === 'ko' ? guideTotals.value.ko : null,
+})))
+const FILTER_CHIP = {
+  navy: { on: 'bg-indigo-600 text-white ring-indigo-600', off: 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50' },
+  amber: { on: 'bg-amber-100 text-amber-900 ring-amber-400', off: 'bg-white text-amber-800 ring-amber-300 hover:bg-amber-50' },
+  red: { on: 'bg-red-100 text-red-900 ring-red-400', off: 'bg-white text-red-700 ring-red-200 hover:bg-red-50' },
+}
+function filterChipClass(f) {
+  if (f.count === 0) return 'bg-white text-slate-400 ring-slate-200 cursor-default'
+  return thermalFilter.value === f.value ? FILTER_CHIP[f.tone].on : FILTER_CHIP[f.tone].off
+}
+function pickFilter(f) {
+  if (f.count === 0) return
+  thermalFilter.value = thermalFilter.value === f.value && f.value !== 'all' ? 'all' : f.value
+}
+watch(() => [answerCounts.value.todo + answerCounts.value.open, guideTotals.value.ko], ([todo, ko]) => {
+  if ((thermalFilter.value === 'todo' && !todo) || (thermalFilter.value === 'ko' && !ko)) thermalFilter.value = 'all'
+})
+function rowVisible(t) {
+  if (!guided.value || thermalFilter.value === 'all') return true
+  return thermalFilter.value === 'todo' ? needsAnswer(guideOf(t)) : guideOf(t)?.state === thermalFilter.value
+}
+const zoneVisible = (g) => !guided.value || thermalFilter.value === 'all' || g.rows.some(rowVisible)
+// « Aller au premier » : premier système à compléter (zone dépliée, ligne à l'écran).
+async function goToFirstTodo() {
+  const t = sortedThermal.value.find(x => guideOf(x)?.state === 'todo') || sortedThermal.value.find(x => needsAnswer(guideOf(x)))
+  if (!t) return
+  collapsedZones[t.zone_name || 'Sans zone'] = false
+  await nextTick()
+  const el = window.document.querySelector(`[data-thermal-id="${t.id}"]`)
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  flashAuditTarget(el)
+}
+// Les régulations à préciser bloquent la validation : elles sont dans « Reste à faire » du bandeau
+// (STEP_DEFINITIONS.thermal de la vue).
+
 // Mig 187 — drag & drop des systèmes thermiques. Maintenant 1 Sortable
 // par zone (chaque zone est sa propre sous-card avec sa liste d'articles)
 // pour empêcher de glisser un système hors de sa zone (= contrainte métier
@@ -507,6 +599,31 @@ onBeforeUnmount(teardownSortable)
         </button>
       </Tooltip>
     </div>
+    <!-- Mise en page « Nouvelle » : le reste à faire en tête, puis le filtre des systèmes. -->
+    <div v-if="guided && thermalFiltered.length" data-thermal-guide class="mx-3 mt-2 flex flex-col gap-2">
+      <div v-if="answerCounts.todo || answerCounts.open"
+           class="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+        <p class="flex-1 min-w-0 leading-snug">{{ thermalTodoLine(answerCounts.todo, answerCounts.open) }}</p>
+        <button type="button" @click="goToFirstTodo" v-tooltip="THERMAL_GO_FIRST_TIP"
+                class="shrink-0 text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950">
+          {{ METERS_GO_FIRST_LABEL }}
+        </button>
+      </div>
+      <p v-else class="text-[13px] text-emerald-700">✓ {{ THERMAL_DONE_TEXT }}</p>
+      <div v-if="guideTotals.ko" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-900">
+        {{ thermalKoLine(guideTotals.ko) }}
+      </div>
+      <div role="group" aria-label="Filtrer les systèmes" class="flex flex-wrap items-center gap-1.5">
+        <button v-for="f in thermalFilters" :key="f.value" type="button"
+                :aria-pressed="thermalFilter === f.value ? 'true' : 'false'"
+                :aria-disabled="f.count === 0 ? 'true' : undefined"
+                @click="pickFilter(f)"
+                v-tooltip="f.count === 0 ? thermalFilterEmptyTip(f.value) : f.tip"
+                :class="['inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60', filterChipClass(f)]">
+          {{ f.label }}<template v-if="f.count != null"> ({{ f.count }})</template>
+        </button>
+      </div>
+    </div>
     <!-- Rappel réglementaire R175-6 : replié par défaut (mémorisé) pour
          alléger l'écran ; le texte reste dans la page (v-show). -->
     <div class="px-3 pt-2 pb-2 flex items-center justify-between gap-2">
@@ -598,31 +715,42 @@ onBeforeUnmount(teardownSortable)
         </thead>
         <template v-for="g in thermalGroups" :key="g.zoneName">
           <!-- tbody zone-header — bande cliquable pour replier la zone. -->
-          <tbody class="thermal-zone-header">
+          <tbody v-show="zoneVisible(g)" class="thermal-zone-header">
             <tr @click="toggleZone(g.zoneName)" class="group/zone cursor-pointer select-none"
                 v-tooltip="collapsedZones[g.zoneName] ? 'Déplier cette zone' : 'Replier cette zone'">
-              <td colspan="5" class="px-3 py-1.5 bg-slate-100/70 border-t border-slate-200 group-hover/zone:bg-slate-100 transition">
+              <td colspan="5" :class="guided
+                ? 'px-3 py-2 bg-slate-100 border-t-4 border-white group-hover/zone:bg-slate-200/70 transition'
+                : 'px-3 py-1.5 bg-slate-100/70 border-t border-slate-200 group-hover/zone:bg-slate-100 transition'">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-1.5">
                     <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-3.5 h-3.5 text-gray-500" />
                     <ChevronDownIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-                    <h3 class="text-[13px] font-medium text-gray-800">{{ g.zoneName }}</h3>
+                    <h3 :class="guided ? 'text-sm font-semibold text-indigo-600' : 'text-[13px] font-medium text-gray-800'">{{ g.zoneName }}</h3>
                   </div>
-                  <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
+                  <span class="text-[11px] text-gray-500">
+                    {{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}
+                    <template v-if="guided && zoneTotals(g).todo">
+                      · <span class="font-medium text-amber-800">{{ zoneTotals(g).todo }} à compléter</span>
+                    </template>
+                    <template v-if="guided && zoneTotals(g).ko">
+                      · <span class="font-medium text-red-700">{{ zoneTotals(g).ko }} non conforme{{ zoneTotals(g).ko > 1 ? 's' : '' }}</span>
+                    </template>
+                  </span>
                 </div>
               </td>
             </tr>
           </tbody>
           <!-- tbody par système (data-id + poignée pour Sortable). -->
           <tbody v-for="t in g.rows" :key="t.id"
-                 v-show="!collapsedZones[g.zoneName]"
+                 v-show="!collapsedZones[g.zoneName] && rowVisible(t)"
                  :data-id="t.id"
                  :data-thermal-id="t.id"
                  class="thermal-row">
             <tr class="hover:bg-slate-50/70 transition-colors">
               <!-- Système : poignée, usage (icône + libellé), nom (lien vers
                    l'étape Systèmes), exemption bois -->
-              <td class="px-2 py-1.5 border-t border-slate-100 align-middle">
+              <td :class="['px-2 py-1.5 border-t border-slate-100 align-middle', guided ? 'thermal-sys' : '']"
+                  :style="guided ? fluidStyle(t.category || 'heating') : undefined">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <button type="button"
                           class="drag-handle inline-flex p-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
@@ -646,6 +774,16 @@ onBeforeUnmount(teardownSortable)
                         </span>
                       </Tooltip>
                     </div>
+                    <!-- Mise en page « Nouvelle » : verdict du système (mêmes règles que le plan d'actions). -->
+                    <span v-if="guided && guideOf(t) && !exemptAutoFromWood(t)"
+                          :class="['mt-1 inline-flex max-w-full items-center rounded-full px-2 py-px text-[11px] font-medium ring-1 ring-inset',
+                                   VERDICT_TONE[guideOf(t).verdict.tone]]"
+                          v-tooltip="verdictTip(t)">
+                      <!-- À préciser (équipement de production, type de régulation) : bloque l'étape. -->
+                      <span v-if="!guideOf(t).missing.length && guideOf(t).unanswered.length"
+                            class="mr-1 size-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true"></span>
+                      <span class="truncate">{{ guideOf(t).verdict.text }}</span>
+                    </span>
                   </div>
                 </div>
               </td>
@@ -660,6 +798,7 @@ onBeforeUnmount(teardownSortable)
                   :regulation-type-options="regulationTypeOptionsFor(t, level.key)"
                   :integrated="regulationIsIntegrated(deviceForLevel(t, level.key))"
                   :note-html="t[LEVEL_NOTES_FIELD[level.key]] || ''"
+                  :device-optional="guided && level.key === 'distribution'"
                   @patch-thermal="(p) => patchThermal(t, p)"
                   @patch-device="patchDeviceField"
                   @open-notes="emit('open-notes', {
@@ -725,3 +864,9 @@ onBeforeUnmount(teardownSortable)
     </p>
   </CollapsibleSection>
 </template>
+
+<style scoped>
+/* Mise en page « Nouvelle » : chaque système porte la couleur de son circuit (lib/system-fluids.js),
+   comme les usages de l'étape Systèmes. */
+.thermal-sys { box-shadow: inset 3px 0 0 var(--fluid); }
+</style>

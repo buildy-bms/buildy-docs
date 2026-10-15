@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { BuildingOffice2Icon, ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -14,6 +14,19 @@ import {
   POWER_LABEL_HELP, POWER_AUTO_TIP, POWER_SOURCE_LABELS, POWER_SOURCE_TIPS, RETAINED_POWER_TIP,
   PERMIT_DATE_TIP, SUBSTATION_TIP, powerDeviceTip, powerCategoryLabel, applicabilityTip, thermalTriggerTip,
 } from '@/lib/audit-tips-site'
+import RubricShell from '@/components/audit/guided/RubricShell.vue'
+import RubricsFilter from '@/components/audit/guided/RubricsFilter.vue'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import { useStepRubrics } from '@/composables/useStepRubrics'
+import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
+import { identificationRubrics, VERDICT_TONES, frenchDate, formatKw } from '@/lib/identification-guide'
+import { IDENT_VERDICT_QUESTION, IDENT_VERDICT_PENDING, IDENT_RETAINED_POWER, IDENT_PERMIT } from '@/lib/audit-tips-guided'
+import { OWNERSHIP_STRUCTURES } from '@/lib/audit-options'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { faGauge, faScrewdriverWrench, faScaleBalanced, faChartColumn } from '@fortawesome/free-solid-svg-icons'
+
+// Icônes des rubriques de la mise en page « Nouvelle » (lib/identification-guide.js).
+library.add(faGauge, faScrewdriverWrench, faScaleBalanced, faChartColumn)
 
 // Section 1 — Identification du site & applicabilité R175-2.
 const props = defineProps({
@@ -89,6 +102,48 @@ const inputCls = 'h-9 px-2.5 border border-gray-200 rounded-lg text-sm bg-white 
 
 // Détail du calcul de puissance — replié par défaut (gain de hauteur).
 const showPowerDetail = ref(false)
+
+// ─── Mise en page « Nouvelle » : le verdict en tête, puis les rubriques ─────────────────
+// Le verdict (la réponse même de l'étape) passe en tête avec la puissance retenue et le permis ;
+// les quatre blocs deviennent des rubriques repliables (lib/identification-guide.js), comme l'étape
+// GTB. Mêmes champs, mêmes gestes ; la mise en page actuelle est inchangée.
+const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value && !!audit.isBacs)
+const { site, siteParties } = storeToRefs(audit)
+const historyCount = ref(null)
+const retainedKw = computed(() => powerSummary.value?.power_summary?.retainedKw ?? document.value?.bacs_total_power_kw)
+const rubrics = computed(() => identificationRubrics(document.value, {
+  hasSite: !!document.value?.site_uuid,
+  structureLabel: OWNERSHIP_STRUCTURES.find(o => o.value === site.value?.ownership_structure)?.label || '',
+  partiesCount: (siteParties.value || []).length,
+  historyCount: historyCount.value,
+  retainedKw: retainedKw.value,
+}))
+const rubricByKey = computed(() => Object.fromEntries(rubrics.value.map(r => [r.key, r])))
+const {
+  showAll: showAllRubrics, setShowAll: setShowAllRubrics, showTodo: showTodoRubrics,
+  isOpen: isRubricOpen, toggle: toggleRubric,
+} = useStepRubrics(rubrics, () => [guided.value, document.value?.id])
+function rubric(key) {
+  const r = rubricByKey.value[key]
+  if (!r) return { title: '', open: true }
+  return { title: r.title, icon: r.icon, missing: r.missing, unanswered: r.unanswered, summary: r.summary, open: isRubricOpen(key) }
+}
+// Verdict en tête : libellé, teinte de sévérité, puissance retenue et date du permis.
+const verdict = computed(() => {
+  const st = document.value?.bacs_applicability_status
+  return st ? { status: st, label: props.applicabilityLabels[st]?.label || st, tone: VERDICT_TONES[st] || 'amber' } : null
+})
+const VERDICT_HERO = {
+  red: 'bg-red-50 ring-red-200 text-red-900',
+  orange: 'bg-orange-50 ring-orange-200 text-orange-900',
+  amber: 'bg-amber-50 ring-amber-200 text-amber-900',
+  green: 'bg-emerald-50 ring-emerald-200 text-emerald-900',
+  none: 'bg-white ring-slate-300 text-slate-700',
+}
+// La structure de propriété sans réponse bloque la validation : « Reste à faire » du bandeau
+// (STEP_DEFINITIONS.identification de la vue).
 </script>
 
 <template>
@@ -114,10 +169,45 @@ const showPowerDetail = ref(false)
     </template>
     <!-- Mode BACS : 4 cartes sur fond gris léger. Le verdict d'applicabilité
          est affiché à côté de la puissance et du permis qui le déterminent. -->
-    <div v-if="audit.isBacs" class="p-4 space-y-4 bg-slate-50/70">
-      <div id="ident-applicability" class="audit-subcard">
-        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Le bâtiment est-il concerné ?</h3>
-        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-4 items-start">
+    <div v-if="audit.isBacs" :class="guided ? 'p-4 flex flex-col gap-3 bg-slate-50/70' : 'p-4 space-y-4 bg-slate-50/70'">
+      <!-- Mise en page « Nouvelle » : le verdict en tête (la réponse même de l'étape), avec la
+           puissance retenue et la date du permis qui le déterminent. -->
+      <template v-if="guided">
+        <section data-ident-verdict v-tooltip="verdict ? verdictTip : null"
+                 :class="['rounded-xl ring-1 px-5 py-4 flex flex-wrap items-center gap-x-10 gap-y-3', VERDICT_HERO[verdict?.tone || 'none']]">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <span class="w-11 h-11 shrink-0 rounded-xl bg-white/80 ring-1 ring-inset ring-black/5 inline-flex items-center justify-center">
+              <CheckCircleIcon v-if="verdict?.tone === 'green'" class="w-6 h-6" />
+              <ExclamationTriangleIcon v-else class="w-6 h-6" />
+            </span>
+            <div class="min-w-0">
+              <p class="text-xs opacity-80">{{ IDENT_VERDICT_QUESTION }}</p>
+              <p class="text-lg font-semibold leading-snug">{{ verdict ? verdict.label : IDENT_VERDICT_PENDING }}</p>
+            </div>
+          </div>
+          <dl class="flex items-end gap-10">
+            <div>
+              <dt class="text-xs opacity-80">{{ IDENT_RETAINED_POWER }}</dt>
+              <dd class="text-2xl font-semibold leading-tight tabular-nums">{{ formatKw(retainedKw) || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs opacity-80">{{ IDENT_PERMIT }}</dt>
+              <dd class="text-base font-semibold leading-tight">{{ frenchDate(document?.bacs_building_permit_date) || '—' }}</dd>
+            </div>
+          </dl>
+        </section>
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <p v-if="verdict && verdict.status !== 'not_subject'" class="flex-1 min-w-60 px-1 text-[11px] text-gray-500 leading-relaxed">
+            <em>À titre informatif :</em> le propriétaire peut être dispensé si la mise en conformité ne se rembourse
+            pas en moins de 10 ans. Ce calcul ne fait pas partie de l’audit (voir l’annexe D du rapport, point 4).
+          </p>
+          <RubricsFilter class="ml-auto" :show-all="showAllRubrics" @todo="showTodoRubrics" @all="setShowAllRubrics(true)" />
+        </div>
+      </template>
+      <RubricShell :guided="guided" id="ident-applicability" cls="audit-subcard" v-bind="rubric('applicability')"
+                   @toggle="toggleRubric('applicability')">
+        <h3 v-if="!guided" class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Le bâtiment est-il concerné ?</h3>
+        <div :class="guided ? 'grid grid-cols-1 gap-4 items-start' : 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-4 items-start'">
       <!-- Applicabilité R175-2 : puissance + permis sur une ligne -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2">
         <div class="md:col-span-2">
@@ -126,8 +216,11 @@ const showPowerDetail = ref(false)
             <HelpTip size="xs" class="ml-0.5" :tip="POWER_LABEL_HELP" />
           </label>
           <div class="flex gap-2">
+            <!-- Calcul automatique : la puissance retenue (celle du verdict et du rapport), pas la
+                 valeur enregistrée, qui peut dater d'un ancien calcul (audit #56 : 949 kW
+                 enregistrés, 1 002 kW retenus). Saisie à la main : la valeur saisie. -->
             <input type="number" min="0" step="0.1"
-                   :value="document?.bacs_total_power_kw"
+                   :value="powerSource === 'auto' ? retainedKw : document?.bacs_total_power_kw"
                    @input="e => emit('save-doc', { bacs_total_power_kw: e.target.value === '' ? null : parseFloat(e.target.value), bacs_total_power_source: 'manual_override' })"
                    :class="inputCls" class="flex-1 min-w-0" />
             <button @click="emit('recompute-power')"
@@ -173,8 +266,9 @@ const showPowerDetail = ref(false)
                  v-tooltip="PERMIT_DATE_TIP" />
         </div>
       </div>
-          <!-- Verdict d'applicabilité (auparavant en bas de la carte) -->
-          <div>
+          <!-- Verdict d'applicabilité (auparavant en bas de la carte) ; en tête de l'étape dans la
+               mise en page « Nouvelle ». -->
+          <div v-if="!guided">
             <template v-if="document?.bacs_applicability_status">
               <div :class="['rounded-lg border p-3 flex items-start gap-3', applicabilityLabels[document.bacs_applicability_status].cls]"
                    v-tooltip="verdictTip">
@@ -194,11 +288,12 @@ const showPowerDetail = ref(false)
             </div>
           </div>
         </div>
-      </div>
+      </RubricShell>
 
       <!-- Déclencheurs réglementaires : Oui / Non, conditionnels en dessous -->
-      <div id="ident-triggers" class="audit-subcard">
-        <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Travaux récents et réseau urbain</h3>
+      <RubricShell :guided="guided" id="ident-triggers" cls="audit-subcard" v-bind="rubric('triggers')"
+                   @toggle="toggleRubric('triggers')">
+        <h3 v-if="!guided" class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Travaux récents et réseau urbain</h3>
         <div class="qa-grid text-sm">
           <div class="qa-question">
             Des travaux d'installation ou de remplacement d'un générateur de chaleur ont-ils été réalisés ?
@@ -237,16 +332,18 @@ const showPowerDetail = ref(false)
                  @input="e => emit('save-doc', { bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
                  :class="inputCls" class="w-40" />
         </div>
-      </div>
+      </RubricShell>
 
       <!-- Item 4 — Structure juridique & parties prenantes -->
-      <div v-if="audit.document?.site_uuid" id="ident-parties" class="audit-subcard">
-        <SitePartiesCard flush @open-notes="emit('open-notes', $event)" />
-      </div>
+      <RubricShell v-if="audit.document?.site_uuid" :guided="guided" id="ident-parties" cls="audit-subcard"
+                   v-bind="rubric('parties')" @toggle="toggleRubric('parties')">
+        <SitePartiesCard flush :hide-title="guided" @open-notes="emit('open-notes', $event)" />
+      </RubricShell>
       <!-- Item 13 — Base de consommations mensuelles de référence -->
-      <div v-if="audit.document?.site_uuid" id="ident-energy-history" class="audit-subcard">
-        <EnergyHistoryCard flush />
-      </div>
+      <RubricShell v-if="audit.document?.site_uuid" :guided="guided" id="ident-energy-history" cls="audit-subcard"
+                   v-bind="rubric('history')" @toggle="toggleRubric('history')">
+        <EnergyHistoryCard flush :hide-title="guided" @count="n => (historyCount = n)" />
+      </RubricShell>
     </div>
     <div v-if="!audit.isBacs" class="px-5 py-4 text-sm text-gray-500">
       <p>

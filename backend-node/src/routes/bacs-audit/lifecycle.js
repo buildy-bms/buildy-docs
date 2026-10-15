@@ -25,6 +25,7 @@ const { effectiveBuildyBms } = require('../../lib/buildy-cloud-preset');
 const tri = v => (v == null ? 'unanswered' : isTrue(v));
 const { isStepComplete, NON_BLOCKING_STEPS } = require('../../lib/bacs-audit-step-completion');
 const { buildPrecheck } = require('../../lib/bacs-audit-precheck');
+const { computeAutoPower, resolveTotalPower, loadPowerDevices } = require('../../lib/bacs-audit-power');
 
 async function routes(fastify) {
   // ─── Livraison de l'audit ──────────────────────────────────────────
@@ -350,7 +351,10 @@ async function routes(fastify) {
         project_name: af.project_name,
         applicability_status: af.bacs_applicability_status,
         applicable_deadline: af.bacs_applicable_deadline,
-        total_power_kw: af.bacs_total_power_kw,
+        // Puissance retenue, celle du verdict et du rapport : en calcul automatique, la valeur
+        // enregistrée n'est qu'un cache, parfois ancien (audit #56 : 949 kW enregistrés, 1 002 kW
+        // retenus) — la note aurait contredit le rapport.
+        total_power_kw: resolveTotalPower(af, computeAutoPower(loadPowerDevices(db.db, documentId))).effectiveKw,
         total_power_source: af.bacs_total_power_source,
         building_permit_date: af.bacs_building_permit_date,
         // R175-2 : pour batiments raccordes a un reseau urbain, la

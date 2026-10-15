@@ -22,12 +22,12 @@ export const LAYOUT_OPTIONS = [
   { value: 'guided', label: 'Nouvelle' },
 ];
 export const LAYOUT_TOGGLE_TIP = {
-  title: 'Mise en page de l’étape',
+  title: 'Mise en page de l’audit',
   icon: 'table-columns',
-  text: 'Tes réponses restent les mêmes dans les deux : seul l’affichage change.',
+  text: 'Tes réponses restent les mêmes dans les deux : seul l’affichage change. Le choix vaut pour toutes les étapes.',
   rows: [
-    { icon: 'table-list', label: 'Actuelle', value: 'les usages en cartes, la fiche à droite' },
-    { icon: 'list-check', label: 'Nouvelle', value: 'le reste à faire en tête, puis un parcours point par point' },
+    { icon: 'table-list', label: 'Actuelle', value: 'l’affichage habituel' },
+    { icon: 'list-check', label: 'Nouvelle', value: 'le reste à faire en tête, chaque groupe dans sa carte' },
   ],
 };
 

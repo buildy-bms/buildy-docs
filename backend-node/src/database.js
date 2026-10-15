@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 214;
+const TARGET_VERSION = 216;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7882,6 +7882,80 @@ function runMigrations() {
         )`).run();
     log.info(`Migration 214 appliquee : ${r.changes} equipement(s) d'audit renomme(s) « Groupe d'eau glacee »`);
     db.pragma('user_version = 214');
+  }
+
+  if (current < 215) {
+    // Migration 215 — Réponses de régulation restées derrière un « Non » (demande Kévin
+    // 2026-10-13). Avant la 0.1.272, répondre Non à « L'équipement dispose-t-il d'une
+    // régulation ? » sur la fiche (bureau) n'effaçait que la marque, la référence et la zone
+    // du régulateur : intégrée / déportée, types, granularité et emplacements restaient en
+    // base, invisibles sur la fiche mais repris par le rapport (« Régulation : intégrée à
+    // l'équipement » sur la carte de l'équipement). Règle désormais appliquée à l'écriture
+    // (clearRegulationAnswersOnNo, PATCH devices) ; rattrapage de l'existant. Laissés tels quels :
+    //  - les équipements désignés dans l'étape Régulation : leur type s'y affiche et a pu y être
+    //    choisi après le Non (« Équilibrage hydraulique » d'un circuit sans régulation, gardé
+    //    sur décision de Kévin) ;
+    //  - les audits livrés : leur contenu reste celui du rapport remis (cf. 214).
+    // updated_at n'est pas modifié (rattrapage, pas une saisie). Rejouable.
+    const REG_COLS = [
+      'regulation_integrated', 'regulation_granularity',
+      'regulation_type_production', 'regulation_type_distribution', 'regulation_type_emission',
+      'regulator_brand', 'regulator_model_reference', 'regulator_location_zone_id',
+      'regulator_location_production', 'regulator_location_distribution', 'regulator_location_emission',
+    ];
+    const usedInRegulationStep = [
+      ...['generator_device_id', 'distribution_device_id', 'emission_device_id',
+        'production_regulation_device_id', 'distribution_regulation_device_id', 'emission_regulation_device_id']
+        .map(c => `SELECT ${c} FROM bacs_audit_thermal_regulation WHERE ${c} IS NOT NULL`),
+      ...['production_extra_device_ids', 'distribution_extra_device_ids', 'emission_extra_device_ids']
+        .map(c => `SELECT CAST(j.value AS INTEGER) FROM bacs_audit_thermal_regulation t,
+          json_each(CASE WHEN json_valid(t.${c}) THEN t.${c} ELSE '[]' END) j WHERE j.value IS NOT NULL`),
+    ].join(' UNION ');
+    const leftovers = `has_regulation = 0 AND COALESCE(${REG_COLS.join(', ')}) IS NOT NULL`;
+    const n = db.prepare(`
+      UPDATE bacs_audit_system_devices SET ${REG_COLS.map(c => `${c} = NULL`).join(', ')}
+      WHERE ${leftovers}
+        AND id NOT IN (${usedInRegulationStep})
+        AND system_id IN (
+          SELECT s.id FROM bacs_audit_systems s JOIN afs a ON a.id = s.document_id
+          WHERE COALESCE(a.status, '') NOT IN ('delivered', 'livree')
+        )`).run().changes;
+    const kept = db.prepare(`SELECT COUNT(*) AS c FROM bacs_audit_system_devices WHERE ${leftovers}`).get().c;
+    log.info(`Migration 215 appliquee : réponses de régulation effacées sur ${n} équipement(s) répondu(s) « Non », ${kept} laissé(s) tel(s) quel(s) (étape Régulation ou audit livré)`);
+    db.pragma('user_version = 215');
+  }
+
+  if (current < 216) {
+    // Migration 216 — Puissance enregistrée périmée (accord de Kévin 2026-10-15). En calcul
+    // automatique, bacs_total_power_kw n'est qu'un cache du cumul des équipements, recalculé à
+    // chaque modification de l'audit (regenerateActionItems → recomputeAndPersistAuditPower).
+    // Quand la règle de cumul change dans le code, le cache garde l'ancienne valeur jusqu'à la
+    // prochaine modification : audit #56 (Rexel) 949 kW enregistrés, 1 002 kW retenus par le
+    // verdict et le rapport ; #43 (Realtherm) 122,8 → 155,8 kW. Rattrapage : le même recalcul
+    // qu'après une modification, sur les audits BACS non livrés (puissance saisie à la main jamais
+    // touchée ; statut d'assujettissement et échéance recalculés comme à chaque modification ;
+    // updated_at inchangé). Rejouable.
+    const { recomputeAndPersistAuditPower } = require('./lib/bacs-audit-power');
+    const audits = db.prepare(`
+      SELECT id, bacs_total_power_kw AS kw, bacs_applicability_status AS st FROM afs
+      WHERE kind = 'bacs_audit' AND deleted_at IS NULL
+        AND COALESCE(status, '') NOT IN ('delivered', 'livree')`).all();
+    const after = db.prepare('SELECT bacs_total_power_kw AS kw, bacs_applicability_status AS st FROM afs WHERE id = ?');
+    let power = 0;
+    let verdict = 0;
+    for (const a of audits) {
+      try {
+        recomputeAndPersistAuditPower(db, a.id);
+      } catch (e) {
+        log.warn(`Migration 216 : puissance non recalculée pour l'audit #${a.id} (${e.message})`);
+        continue;
+      }
+      const b = after.get(a.id);
+      if (b.kw !== a.kw) power++;
+      if (b.st !== a.st) verdict++;
+    }
+    log.info(`Migration 216 appliquee : puissance recalculée sur ${audits.length} audit(s) non livré(s), ${power} puissance(s) et ${verdict} statut(s) d'assujettissement mis à jour`);
+    db.pragma('user_version = 216');
   }
 
   if (current > TARGET_VERSION) {

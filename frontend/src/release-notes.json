@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.273",
+      "date": "2026-10-15",
+      "title": "Nouveau rapport d’audit BACS, toutes les étapes en mise en page « Nouvelle »",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Nouveau rapport d’audit BACS, plus lisible, sur la charte graphique Buildy",
+          "what": "Le rapport PDF est réorganisé en deux parties. « L’essentiel » répond à trois questions (le bâtiment est-il concerné, où en est-il, que faut-il faire), puis donne le mot de l’auditeur, les exigences du décret en clair et le plan d’actions par domaine. « Le constat détaillé » reprend chaque domaine (site et zones, systèmes, comptage, régulation, GTB, inspection) et se termine par ses actions, avec leur justification et l’origine du constat : l’ancienne annexe C n’est plus nécessaire. Les tableaux tiennent sur une ligne par élément, le détail passe sur une ligne pleine largeur dessous. Polices, couleurs et logo suivent la charte graphique Buildy (Poppins, Manrope, chiffres en Sora). Aucune information de l’ancien rapport n’est perdue, et il est plus court (Sausheim JDW : 38 pages au lieu de 50).",
+          "where": "Audit BACS : boutons « Aperçu » et « Rapport », dossier complet (ZIP). L’ancienne mise en page reste disponible pour comparer : menu « Plus » → « Rapport (ancienne mise en page) ».",
+          "how_to_test": "Ouvrir un audit, cliquer « Rapport » : sommaire avec numéros de page, verdict en trois questions, pages bleu marine pour les intercalaires, actions à la fin de chaque chapitre. Comparer avec « Plus » → « Rapport (ancienne mise en page) »."
+        },
+        {
+          "kind": "ux",
+          "title": "Mise en page « Nouvelle » pour toutes les étapes de l’audit",
+          "what": "Le choix « Mise en page : Actuelle / Nouvelle » de l’étape Systèmes s’applique désormais aux autres étapes : Identification, Zones, Compteurs, Régulation, GTB, Documents, Inspections, Synthèse, Check-list et Plan d’actions. En « Nouvelle », chaque étape montre ce qui reste à compléter en tête, des filtres en pastilles et un groupe par carte. La mise en page « Actuelle » ne change pas.",
+          "where": "Audit BACS, bandeau de chaque étape : « Mise en page ».",
+          "how_to_test": "Choisir « Nouvelle » dans le bandeau d’une étape, puis passer d’une étape à l’autre : le reste à faire apparaît en tête de chacune."
+        },
+        {
+          "kind": "improvement",
+          "title": "Une question affichée sans réponse empêche de valider l’étape",
+          "what": "Comme à l’étape Systèmes, les questions restées sans réponse bloquent désormais la validation des étapes Identification (structure de propriété), Zones (nature, régime, surface), Régulation, Compteurs (présence des compteurs requis), GTB et Inspections. Le bandeau de l’étape les liste et se met à jour dès qu’on répond.",
+          "where": "Audit BACS, bandeau de chaque étape.",
+          "how_to_test": "Laisser une question vide puis valider l’étape : la validation est refusée et la question est citée. Y répondre : elle disparaît du bandeau."
+        },
+        {
+          "kind": "fix",
+          "title": "Puissance retenue partout, réponses de régulation cohérentes",
+          "what": "Le champ de puissance de l’étape Identification, la note de synthèse et le changement de date du permis utilisent la puissance retenue (le cumul des équipements), et non plus une valeur enregistrée parfois ancienne ; les audits non livrés sont remis à jour (aucun verdict changé sur les audits vérifiés). Un équipement passé à « Régulation : Non » ne garde plus les réponses de régulation devenues cachées.",
+          "where": "Audit BACS : étapes Identification et Systèmes, note de synthèse.",
+          "how_to_test": "Sur un audit en calcul automatique, la puissance de l’étape Identification est celle du verdict. Passer un équipement à « Régulation : Non » : ses types de régulation sont vidés."
+        }
+      ]
+    },
+    {
       "version": "0.1.272",
       "date": "2026-10-13",
       "title": "Infobulles refaites, étape Systèmes guidée, fiches équipement vraiment complètes",

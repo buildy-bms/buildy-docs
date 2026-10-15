@@ -26,13 +26,18 @@ import { TENANT_COLUMN_TIP, ATTACH_INVOICE_TIP, ENERGY_IMPORT_TIP, CSV_TEMPLATE_
 // `flush` : rendu en sous-section (sans chrome de card) quand imbriquée.
 defineProps({
   flush: { type: Boolean, default: false },
+  // Mise en page « Nouvelle » de l'audit : le titre est porté par la rubrique qui contient la carte.
+  hideTitle: { type: Boolean, default: false },
 })
+// Nombre de mois saisis (résumé de la rubrique « Consommations de référence »).
+const emit = defineEmits(['count'])
 
 const audit = useAuditStore()
 const { site } = storeToRefs(audit)
 const { error, success } = useNotification()
 
 const rows = ref([])
+watch(() => rows.value.length, n => emit('count', n), { immediate: true })
 // Preneurs : dérivés de la liste partagée des parties prenantes du site
 // (store) — filtrés sur le genre « locataire ». Toujours à jour.
 const tenants = computed(() => (audit.siteParties || []).filter(p => p.kind === 'tenant'))
@@ -292,7 +297,7 @@ function downloadCsvTemplate() {
 
 <template>
   <div :class="flush ? '' : 'bg-white rounded-2xl border border-gray-200 overflow-hidden'">
-    <div :class="['flex items-center gap-2',
+    <div v-if="!hideTitle" :class="['flex items-center gap-2',
                   flush ? 'pb-2.5' : 'px-4 py-3 border-b border-gray-100']">
       <FontAwesomeIcon :icon="['fas', 'chart-column']" class="w-5 h-5 text-indigo-600 shrink-0" />
       <h3 class="text-base font-medium text-gray-900">Consommations de référence</h3>

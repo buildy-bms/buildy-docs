@@ -427,7 +427,7 @@ async function routes(fastify) {
     }
     const touchesApplicability = ['bacs_total_power_kw', 'bacs_building_permit_date'].some(k => k in body);
     if (touchesApplicability) {
-      const powerKw = body.bacs_total_power_kw !== undefined ? body.bacs_total_power_kw : af.bacs_total_power_kw;
+      const manualKw = body.bacs_total_power_kw !== undefined ? body.bacs_total_power_kw : af.bacs_total_power_kw;
       const pcDate = body.bacs_building_permit_date !== undefined ? body.bacs_building_permit_date : af.bacs_building_permit_date;
       // Compte les équipements thermiques sans puissance saisie pour la
       // règle protective d'assujettissement (incident audit Communay :
@@ -442,6 +442,13 @@ async function routes(fastify) {
         WHERE s.document_id = ?
       `).all(id);
       const auto = computeAutoPower(devices);
+      // Même puissance que recomputeAndPersistAuditPower (lib/bacs-audit-power.js) : saisie à la
+      // main = la valeur saisie (à défaut le cumul) ; calcul automatique = le cumul des équipements,
+      // pas la valeur enregistrée, qui n'en est qu'un cache parfois ancien (audit #56 : 949 kW
+      // enregistrés, 1 002 kW retenus) — changer la date du permis aurait jugé sur 949 kW.
+      const source = (body.bacs_total_power_source ?? af.bacs_total_power_source) === 'manual_override' ? 'manual' : 'auto';
+      const powerKw = source === 'manual' ? (manualKw ?? auto.retainedKw) : auto.retainedKw;
+      if (source === 'auto') fields.bacs_total_power_kw = auto.retainedKw;
       const applic = computeBacsApplicability(powerKw, pcDate, auto.incompletePowerCount);
       if (applic) {
         fields.bacs_applicability_status = applic.status;

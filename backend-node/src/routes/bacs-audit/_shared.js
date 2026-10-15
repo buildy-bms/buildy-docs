@@ -120,6 +120,28 @@ function forceNotOperationalWhenOutOfService(body, row) {
   if (hs && managed) body.bms_integration_out_of_service = true;
 }
 
+// Réponses de régulation de la fiche équipement, cachées dès que « L'équipement
+// dispose-t-il d'une régulation ? » vaut Non. Même liste que la fiche (bureau :
+// DeviceEditModal setHasRegulation ; mobile : MobileSystemsTab) et que la mig 215.
+const REGULATION_ANSWER_FIELDS = [
+  'regulation_integrated', 'regulation_granularity',
+  'regulation_type_production', 'regulation_type_distribution', 'regulation_type_emission',
+  'regulator_brand', 'regulator_model_reference', 'regulator_location_zone_id',
+  'regulator_location_production', 'regulator_location_distribution', 'regulator_location_emission',
+];
+
+// Passage à Non : les réponses de régulation sont effacées, comme le fait la
+// fiche — sinon le rapport les reprend (« Régulation : intégrée à
+// l'équipement »). Protège surtout les appels MCP. Seulement au passage : un
+// équipement déjà à Non garde un type choisi depuis l'étape Régulation
+// (« Équilibrage hydraulique » d'un circuit sans régulation, décision Kévin
+// 2026-10-13). Une valeur envoyée dans la même requête est respectée. Appelé
+// par le PATCH devices ; mig 215 = rattrapage de l'existant. Mute `body`.
+function clearRegulationAnswersOnNo(body, row) {
+  if (body.has_regulation !== false || row.has_regulation === 0 || row.has_regulation === false) return;
+  for (const k of REGULATION_ANSWER_FIELDS) if (!(k in body)) body[k] = null;
+}
+
 // Nom court d'un audit pour les noms de fichiers et l'objet des e-mails :
 // « Audit BACS — Sénas » → « Sénas » (le type est déjà dans le libellé).
 function auditShortName(af) {
@@ -135,5 +157,7 @@ module.exports = {
   assertBacsAuditExists,
   logBacsAudit,
   forceNotOperationalWhenOutOfService,
+  REGULATION_ANSWER_FIELDS,
+  clearRegulationAnswersOnNo,
   auditShortName,
 };

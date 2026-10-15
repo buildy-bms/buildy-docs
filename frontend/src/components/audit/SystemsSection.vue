@@ -48,8 +48,9 @@ import {
   indexChecks, zoneGuide, guideTotals, guideStops, nextStop, checkCells, deviceMissing,
   missingShort, MISSING_POWER_CODE,
 } from '@/lib/systems-guide'
+import { useAuditLayout } from '@/composables/useAuditLayout'
 import {
-  LAYOUT_OPTIONS, LAYOUT_TOGGLE_TIP, guideBadges, zoneGuideTabTip, synthesisGuideTabTip, stopReasonLabel,
+  guideBadges, zoneGuideTabTip, synthesisGuideTabTip, stopReasonLabel,
   hiddenByFilterText, SHOW_ALL_LABEL, missingPowersLabel, missingPowersTip,
   usageFilterText, SHOW_ALL_USAGES_LABEL,
 } from '@/lib/audit-tips-systems-guide'
@@ -574,19 +575,13 @@ async function removePanelDevice() {
 }
 
 // ─── Mise en page : actuelle ou guidée ─────────────────────────────────
-// Choix mémorisé dans le navigateur (tous audits). L'actuelle reste la mise en
-// page par défaut ; la guidée (lib/systems-guide.js) met le reste à faire en
-// tête : à compléter, à vérifier (règles du pré-contrôle de livraison), sans
-// réponse, avec un parcours point par point. Mêmes données, mêmes actions.
-const LAYOUT_KEY = 'bacs-systems-layout'
-const layout = ref((() => {
-  try { return localStorage.getItem(LAYOUT_KEY) === 'guided' ? 'guided' : 'classic' } catch { return 'classic' }
-})())
-function setLayout(v) {
-  layout.value = v === 'guided' ? 'guided' : 'classic'
-  try { localStorage.setItem(LAYOUT_KEY, layout.value) } catch { /* navigation privée */ }
-}
-const isGuided = computed(() => isStepMode.value && layout.value === 'guided')
+// Choix commun à toutes les étapes (composables/useAuditLayout.js, bouton dans
+// le bandeau de l'étape). L'actuelle reste la mise en page par défaut ; la
+// guidée (lib/systems-guide.js) met le reste à faire en tête : à compléter, à
+// vérifier (règles du pré-contrôle de livraison), sans réponse, avec un
+// parcours point par point. Mêmes données, mêmes actions.
+const { layout, isGuidedLayout } = useAuditLayout()
+const isGuided = computed(() => isStepMode.value && isGuidedLayout.value)
 
 // Pré-contrôle de livraison (points « à vérifier ») : relu à l'ouverture de
 // l'étape puis, après chaque modification, une fois la saisie posée.
@@ -1184,7 +1179,7 @@ onBeforeUnmount(teardownSortables)
       <div v-if="isStepMode && systemsByZone.length" ref="zoneTabsBarRef"
            class="sticky z-[5] -mx-3 px-3 pt-1 pb-2 mb-2 bg-gray-50/95 backdrop-blur"
            :style="{ top: 'calc(var(--audit-sticky-offset, 0px) + var(--systems-header-h, 64px))' }">
-        <!-- Barre des zones, puis le choix de la mise en page (actuelle / nouvelle). -->
+        <!-- Barre des zones (le choix de la mise en page est dans le bandeau de l'étape). -->
         <div class="@container flex items-center gap-2">
           <AuditSubTabs
             class="flex-1 min-w-0"
@@ -1196,12 +1191,6 @@ onBeforeUnmount(teardownSortables)
             :model-value="activeZoneId"
             @update:model-value="selectZone"
           />
-          <div class="shrink-0 flex items-center gap-1.5" data-systems-layout-toggle>
-            <span class="text-[11px] text-gray-500 @max-[900px]:hidden">Mise en page</span>
-            <SegmentedToggle :model-value="layout" :options="LAYOUT_OPTIONS.map(o => ({ ...o, tone: 'navy' }))"
-                             :tooltip="LAYOUT_TOGGLE_TIP"
-                             @update:model-value="setLayout" />
-          </div>
         </div>
       </div>
       <!-- Onglet « Synthèse des systèmes » : tableau de présence zones × usages

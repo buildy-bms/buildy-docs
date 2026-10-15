@@ -9,7 +9,13 @@ const fs = require('fs');
 const config = require('../../config');
 const db = require('../../database');
 const log = require('../../lib/logger').system;
-const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl } = require('../../lib/pdf');
+const { renderPdf, renderHtml, renderPagedHtmlPdf, buildHeaderFooter, loadAssetDataUrl } = require('../../lib/pdf');
+const { buildBacsAuditReportHtml } = require('../../lib/bacs-audit-report');
+
+// Mise en page du rapport : la nouvelle (charte 2026-10, lib/bacs-audit-report.js) par défaut ;
+// l'ancienne (bacs-audit.hbs) reste disponible pour comparer (`?layout=classic`), le temps que
+// Kévin la retire.
+const reportLayoutOf = (request) => (request.query?.layout === 'classic' ? 'classic' : 'new');
 const { buildChecklistData } = require('../../lib/bacs-checklist-builder');
 const { assertBacsAuditExists, auditShortName } = require('./_shared');
 const { numberActionItems } = require('./_action-numbering');
@@ -43,7 +49,8 @@ const WATERMARK_PATH = path.resolve(__dirname, '../../../templates/pdf/assets/wa
 const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 0.85, heightRatio: 0.85, opacity: 0.03 };
 
 // Rapport d'audit A4. Lève une erreur si le rendu échoue.
-async function renderBacsAuditReport(af, data, userId) {
+// `layout` : 'new' (charte 2026-10, Paged.js) ou 'classic' (bacs-audit.hbs).
+async function renderBacsAuditReport(af, data, userId, { layout = 'new' } = {}) {
   const documentId = af.id;
   const { actionItemsRaw, actionStats, version, isBacs } = data;
   const exportsDir = path.resolve(config.exportsDir);
@@ -57,7 +64,9 @@ async function renderBacsAuditReport(af, data, userId) {
   // n'apparaissait pas sur exports reels alors que la fixture preview
   // affichait bien la version a jour grace au flag fresh:true).
   const devFresh = process.env.DEV_BYPASS_AUTH === '1';
-  const result = await renderPdf({
+  const result = layout !== 'classic'
+    ? await renderPagedHtmlPdf({ html: await buildBacsAuditReportHtml(data), outputPath, label: `bacs-audit #${documentId}` })
+    : await renderPdf({
     template: 'bacs-audit',
     styles: 'styles-bacs-audit',
     data,
@@ -95,13 +104,13 @@ async function renderBacsAuditReport(af, data, userId) {
       meters_count: data.meters.length,
       actions_blocking: actionStats.blocking, actions_major: actionStats.major,
     }),
-    JSON.stringify({ version }),
+    JSON.stringify({ version, layout }),
     'Export audit BACS',
     userId || null, result.sizeBytes,
   );
   db.auditLog.add({
     afId: documentId, userId, action: 'export.bacs-audit',
-    payload: { version, file_size_bytes: result.sizeBytes, actions_total: actionItemsRaw.length },
+    payload: { version, layout, file_size_bytes: result.sizeBytes, actions_total: actionItemsRaw.length },
   });
   log.info(`PDF audit BACS exported: doc #${documentId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
   pruneOldExports(documentId, insertedRow.lastInsertRowid);
@@ -312,9 +321,9 @@ async function routes(fastify) {
     // En dev, recharge templates + partials a chaque appel — cohérent
     // avec la route POST /export-pdf et avec la fixture preview.
     const devFresh = process.env.DEV_BYPASS_AUTH === '1';
-    const html = renderHtml({
-      template: 'bacs-audit', styles: 'styles-bacs-audit', data, fresh: devFresh,
-    });
+    const html = reportLayoutOf(request) === 'classic'
+      ? renderHtml({ template: 'bacs-audit', styles: 'styles-bacs-audit', data, fresh: devFresh })
+      : await buildBacsAuditReportHtml(data, { mode: 'screen' });
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
   });
 
@@ -459,7 +468,7 @@ async function routes(fastify) {
     const data = await buildBacsAuditExportData(af, { user, previewMode: false });
     let out;
     try {
-      out = await renderBacsAuditReport(af, data, userId);
+      out = await renderBacsAuditReport(af, data, userId, { layout: reportLayoutOf(request) });
     } catch (err) {
       log.error(`PDF audit BACS render failed: ${err.message}`);
       return reply.code(500).send({ detail: `Echec generation PDF : ${err.message}` });

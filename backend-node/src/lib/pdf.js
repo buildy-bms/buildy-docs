@@ -1298,6 +1298,68 @@ async function _renderRawHtmlPdfImpl({ htmlPath, outputPath }) {
   }
 }
 
+// ── Rendu PDF d'un HTML paginé par Paged.js (rapport d'audit BACS, charte 2026-10) ──
+// Le HTML porte toute la mise en page imprimée en CSS : @page (marges, en-tête et pied de page
+// en « margin boxes », pages nommées à fond perdu), numéros de page des renvois et du sommaire
+// (target-counter). Paged.js (vendor/pagedjs, MIT, 0.4.3) pagine dans Chromium, puis page.pdf
+// imprime les pages telles quelles (marges 0, pas d'en-tête Puppeteer). Même navigateur partagé
+// et même délai maximal que renderPdf.
+const PAGED_POLYFILL_PATH = path.resolve(__dirname, '../../templates/pdf/vendor/pagedjs/paged.polyfill.min.js');
+
+async function renderPagedHtmlPdf(opts) {
+  return _withTimeout(_renderPagedHtmlPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPagedHtmlPdf(${opts.label || 'html'})`);
+}
+
+// Charge `html` dans `page` et y installe Paged.js, prêt à paginer (window.PagedPolyfill.preview()).
+// Paged.js avance par requestAnimationFrame / requestIdleCallback, que Chromium suspend dans un
+// onglet en arrière-plan : deux rendus simultanés dans le navigateur partagé (ou le contrôle
+// check:pdf, qui ouvre deux onglets) bloquaient jusqu'au délai maximal. Les deux sont remplacés,
+// pour cette page et avant le chargement de Paged.js, par une file de messages (MessageChannel),
+// jamais suspendue (vérifié le 2026-10-15 : 37 pages en 2 s en arrière-plan, au lieu d'un blocage).
+async function preparePagedPage(page, html) {
+  await page.setViewport({ width: 794, height: 1123 });
+  await page.setContent(html, { waitUntil: 'load', timeout: 90_000 });
+  await page.evaluate(() => (document.fonts && document.fonts.ready) || true);
+  await page.evaluate(() => {
+    window.PagedConfig = { auto: false };
+    const channel = new MessageChannel();
+    const queue = [];
+    channel.port1.onmessage = () => { const cb = queue.shift(); if (cb) cb(performance.now()); };
+    const schedule = (cb) => { queue.push(cb); channel.port2.postMessage(null); return queue.length; };
+    window.requestAnimationFrame = schedule;
+    window.requestIdleCallback = (cb) => schedule(() => cb({ didTimeout: false, timeRemaining: () => 50 }));
+  });
+  await page.addScriptTag({ path: PAGED_POLYFILL_PATH });
+}
+
+async function _renderPagedHtmlPdfImpl({ html, outputPath }) {
+  const { page, release } = await _openRenderPage();
+  try {
+    await preparePagedPage(page, html);
+    const layout = await page.evaluate(async () => {
+      const flow = await window.PagedPolyfill.preview();
+      const overflow = [...document.querySelectorAll('.pagedjs_page')]
+        .map((pg, i) => { const c = pg.querySelector('.pagedjs_page_content'); return c && c.scrollHeight > c.clientHeight + 2 ? i + 1 : null; })
+        .filter(Boolean);
+      return { pages: flow.total, overflow };
+    });
+    if (layout.overflow.length) log.warn(`renderPagedHtmlPdf : contenu qui déborde, pages ${layout.overflow.join(', ')}`);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    await page.pdf({
+      path: outputPath,
+      printBackground: true,
+      preferCSSPageSize: true,
+      displayHeaderFooter: false,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+    const stat = fs.statSync(outputPath);
+    return { path: outputPath, sizeBytes: stat.size, pages: layout.pages };
+  } finally {
+    await page.close().catch(() => { /* ignore */ });
+    release();
+  }
+}
+
 // Helper expose pour les modules qui injectent des pilules FA en HTML
 // (cf. _export-data.js stripActionTags). Retourne une chaine SVG inline.
 function renderFaIconSvg(name, color, size) {
@@ -1314,6 +1376,10 @@ module.exports = {
   renderPdf,
   renderHtml,
   renderRawHtmlPdf,
+  renderPagedHtmlPdf,
+  preparePagedPage,
+  lookupFaIcon,
+  typographyForTemplate,
   buildHeaderFooter,
   loadAssetDataUrl,
   loadFileAsDataUrl,

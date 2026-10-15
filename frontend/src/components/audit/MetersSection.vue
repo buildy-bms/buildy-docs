@@ -24,6 +24,11 @@ import AuditSubTabs from '@/components/audit/AuditSubTabs.vue'
 import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
 import { flashAuditTarget } from '@/lib/audit-reveal'
 import { isMeterMissing, isMeterUnanswered, presentToggleValue, requiredCellLabel, meterPlanNote } from '@/lib/meter-plan-state'
+import { useAuditLayout } from '@/composables/useAuditLayout'
+import {
+  METER_FILTERS, METERS_DONE_TEXT, METERS_GO_FIRST_LABEL, METERS_GO_FIRST_TIP,
+  metersTodoLine, metersMissingLine, meterFilterEmptyTip,
+} from '@/lib/audit-tips-guided'
 
 // Section 4 — Compteurs et mesurage (R175-3 1°).
 const props = defineProps({
@@ -96,9 +101,53 @@ const energyTabs = computed(() => energySections.value.map(({ energy, meters: li
     iconColor: energy.color,
     badge: missing || null,
     badgeTone: 'red',
+    // Mise en page « Nouvelle » : présences sans réponse en pastille ambre, comme les zones de l'étape Systèmes.
+    ...(guided.value && unanswered ? { badges: [{ text: String(unanswered), tone: 'amber', label: `${unanswered} à compléter` }] } : {}),
     tooltip: energyTabTip({ value: energy.value, label: energy.label, total: list.length, present, missing, unanswered }),
   }
 }))
+
+// ─── Mise en page « Nouvelle » : le reste à faire en tête, un filtre des compteurs ─────────
+// Mêmes compteurs, mêmes gestes ; chaque énergie en carte teintée de sa couleur (MeterEnergyGroup).
+const { isGuidedLayout } = useAuditLayout()
+const guided = computed(() => isStepMode.value && isGuidedLayout.value)
+const meterFilter = ref('all')
+const meterFilters = computed(() => METER_FILTERS.map(f => ({
+  ...f,
+  count: f.value === 'todo' ? globalStats.value.unanswered : f.value === 'missing' ? globalStats.value.missing : null,
+})))
+const FILTER_CHIP = {
+  navy: { on: 'bg-indigo-600 text-white ring-indigo-600', off: 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50' },
+  amber: { on: 'bg-amber-100 text-amber-900 ring-amber-400', off: 'bg-white text-amber-800 ring-amber-300 hover:bg-amber-50' },
+  red: { on: 'bg-red-100 text-red-900 ring-red-400', off: 'bg-white text-red-700 ring-red-200 hover:bg-red-50' },
+}
+function filterChipClass(f) {
+  if (f.count === 0) return 'bg-white text-slate-400 ring-slate-200 cursor-default'
+  return meterFilter.value === f.value ? FILTER_CHIP[f.tone].on : FILTER_CHIP[f.tone].off
+}
+function pickFilter(f) {
+  if (f.count === 0) return
+  meterFilter.value = meterFilter.value === f.value && f.value !== 'all' ? 'all' : f.value
+  // L'énergie affichée n'a aucun compteur concerné : on ouvre la première qui en a.
+  if (meterFilter.value === 'all') return
+  const match = meterFilter.value === 'missing' ? isMissing : isUnanswered
+  if (!metersOfEnergy(activeEnergy.value).some(match)) {
+    const first = energySections.value.find(({ meters: list }) => list.some(match))
+    if (first) selectEnergy(first.energy.value)
+  }
+}
+// Un filtre vidé par la saisie (dernière réponse donnée) revient à « Tous ».
+watch(() => [globalStats.value.unanswered, globalStats.value.missing], ([u, m]) => {
+  if ((meterFilter.value === 'todo' && !u) || (meterFilter.value === 'missing' && !m)) meterFilter.value = 'all'
+})
+// Présences sans réponse : « Reste à faire » du bandeau (STEP_DEFINITIONS.meters de la vue).
+// « Aller au premier » : premier compteur sans réponse, dans l'ordre des énergies.
+function goToFirstTodo() {
+  for (const { meters: list } of energySections.value) {
+    const m = list.find(isUnanswered)
+    if (m) { focusMeter(m.id); return }
+  }
+}
 
 // Mise en évidence d'une ligne (nouveau compteur, lien croisé) : on bascule
 // sur l'énergie du compteur (mode étape), on scrolle vers la ligne et on met
@@ -253,7 +302,7 @@ function hasNotes(html) {
     <div class="hidden md:block space-y-4 p-3">
       <!-- Étage 3 — Stats globales : pastilles compactes sur une ligne (les
            grandes tuiles occupaient toute la largeur pour 4 chiffres). -->
-      <div data-meters-kpis class="flex flex-wrap items-center gap-2">
+      <div v-if="!guided" data-meters-kpis class="flex flex-wrap items-center gap-2">
         <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-xs text-gray-600">
           <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ globalStats.total }}</span>
           compteur{{ globalStats.total > 1 ? 's' : '' }}
@@ -281,6 +330,39 @@ function hasNotes(html) {
           présence{{ globalStats.unanswered > 1 ? 's' : '' }} à vérifier
         </span>
       </div>
+      <!-- Mise en page « Nouvelle » : le reste à faire en tête, puis le filtre des compteurs. -->
+      <div v-else data-meters-guide class="flex flex-col gap-2">
+        <div v-if="globalStats.unanswered"
+             class="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
+          <p class="flex-1 min-w-0 leading-snug">{{ metersTodoLine(globalStats.unanswered) }}</p>
+          <button type="button" @click="goToFirstTodo" v-tooltip="METERS_GO_FIRST_TIP"
+                  class="shrink-0 text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950">
+            {{ METERS_GO_FIRST_LABEL }}
+          </button>
+        </div>
+        <div v-if="globalStats.missing" v-tooltip="metersMissingTip(globalStats.missing)"
+             class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-900">
+          {{ metersMissingLine(globalStats.missing) }}
+        </div>
+        <p v-if="globalStats.total && !globalStats.unanswered" class="text-[13px] text-emerald-700">✓ {{ METERS_DONE_TEXT }}</p>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <div role="group" aria-label="Filtrer les compteurs" class="flex flex-wrap items-center gap-1.5">
+            <button v-for="f in meterFilters" :key="f.value" type="button"
+                    :aria-pressed="meterFilter === f.value ? 'true' : 'false'"
+                    :aria-disabled="f.count === 0 ? 'true' : undefined"
+                    @click="pickFilter(f)"
+                    v-tooltip="f.count === 0 ? meterFilterEmptyTip(f.value) : f.tip"
+                    :class="['inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60', filterChipClass(f)]">
+              {{ f.label }}<template v-if="f.count != null"> ({{ f.count }})</template>
+            </button>
+          </div>
+          <p class="text-xs text-slate-500">
+            {{ globalStats.total }} compteur{{ globalStats.total > 1 ? 's' : '' }}
+            · <span class="text-emerald-700" v-tooltip="metersPresentTip(globalStats.present)">{{ globalStats.present }} présent{{ globalStats.present > 1 ? 's' : '' }}</span>
+            · <span v-tooltip="metersCommunicatingTip(globalStats.communicating)">{{ globalStats.communicating }} communicant{{ globalStats.communicating > 1 ? 's' : '' }}</span>
+          </p>
+        </div>
+      </div>
 
       <!-- Matrice « Plan de comptage » retirée (2026-09-23, demande Kévin) :
            elle répétait les tableaux par énergie. Le nom du système desservi,
@@ -303,6 +385,8 @@ function hasNotes(html) {
           v-show="!isStepMode || activeEnergy === section.energy.value"
           :key="section.energy.value"
           :tab-mode="isStepMode"
+          :guided="guided"
+          :filter="meterFilter"
           :energy="section.energy"
           :meters="section.meters"
           :zones="zones"

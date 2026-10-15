@@ -21,12 +21,17 @@ import { BMS_COMPONENT_ADD_TIPS, BMS_COMPONENT_COLUMN_TIPS } from '@/lib/audit-t
 
 const props = defineProps({
   documentId: { type: Number, required: true },
+  // Mise en page « Nouvelle » : le titre est porté par la rubrique qui contient le tableau.
+  hideTitle: { type: Boolean, default: false },
 })
+// Nombre de composants (résumé de la rubrique « Composants matériels »).
+const emit = defineEmits(['count'])
 
 const { error, success } = useNotification()
 const { confirm } = useConfirm()
 
 const components = ref([])
+watch(() => components.value.length, n => emit('count', n), { immediate: true })
 
 const TYPE_OPTIONS = [
   { value: 'gateway',    label: 'Passerelle',         icon: ArrowsRightLeftIcon, color: 'text-violet-600' },
@@ -115,13 +120,13 @@ const inputCls = 'w-full px-2 py-1 text-xs border border-gray-200 rounded hover:
 <template>
   <div>
     <div class="flex items-center justify-between mb-2">
-      <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+      <h3 v-if="!hideTitle" class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
         Composants matériels GTB
         <span class="font-normal normal-case text-gray-500 text-[10px]">
           — passerelles, automates, contrôleurs, modules d’entrées/sorties…
         </span>
       </h3>
-      <div class="flex items-center gap-1">
+      <div class="ml-auto flex items-center gap-1">
         <Tooltip :text="BMS_COMPONENT_ADD_TIPS.gateway">
           <button @click="addComponent('gateway')"
                   class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded">

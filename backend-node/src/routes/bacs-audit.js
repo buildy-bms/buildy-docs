@@ -21,6 +21,7 @@ const {
   METER_USAGES, METER_TYPES, RECOMMENDATIONS,
   REGULATION_TYPES, GENERATOR_TYPES, ENERGY_SOURCES,
   assertBacsAuditExists, logBacsAudit, forceNotOperationalWhenOutOfService,
+  clearRegulationAnswersOnNo,
 } = require('./bacs-audit/_shared');
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
 const { parseRoles, serializeRoles, rolesAllowEnergySource } = require('../lib/device-roles');
@@ -1641,6 +1642,7 @@ async function routes(fastify) {
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
     forceNotOperationalWhenOutOfService(body, dev);
+    clearRegulationAnswersOnNo(body, dev);
 
     // Coercion doctrine `energy_source` (mig 194). On calcule le rôle
     // effectif après patch (body si fourni, sinon valeur actuelle DB) ;

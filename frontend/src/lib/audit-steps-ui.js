@@ -9,6 +9,11 @@
 // chaud (HMR Vite) et inject() renverrait null dans les composants montés.
 export const AUDIT_STEP_MODE_KEY = 'audit:step-mode'
 
+// Mise en page « Nouvelle » : chaque étape signale ici ses questions encore sans réponse qui ne
+// bloquent pas la validation ({ [clé d'étape]: string[] }), affichées par le bandeau de l'étape
+// (AuditStepGuide) : il ne dit alors plus « Tout est renseigné ».
+export const AUDIT_STEP_NOTES_KEY = 'audit:step-notes'
+
 export const AUDIT_PHASES = [
   {
     key: 'site',

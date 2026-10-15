@@ -1,5 +1,11 @@
 # Design system — PDF Buildy
 
+> **Charte graphique Buildy des PDF (validée le 2026-10-15) : `../../charte-graphique/README.md`.**
+> Elle prime sur ce document (couleurs, polices Poppins / Manrope / chiffres en Sora, logo, grilles).
+> Le rapport d'audit BACS l'applique déjà (`backend-node/src/lib/bacs-audit-report.js`, voir
+> `CLAUDE.md` § « Rapport d'audit BACS — nouvelle mise en page ») ; les autres PDF ci-dessous
+> suivent encore ce document, à migrer gabarit par gabarit.
+
 Référence centrale pour tous les exports PDF de buildy-docs : AF (analyse fonctionnelle), audit BACS, audit GTB classique, brochure commerciale, catalogue d'offres, fiches techniques (synthesis, points-list, checklist BACS), tableaux de synthèse paysage. Consolidée mai 2026 lors de l'itération sur l'audit BACS — applicable à tous les PDF Buildy nouveaux ou existants.
 
 L'objectif : un rendu **premium, sobre, professionnel, illustré et actionnable** qui se distingue radicalement des rapports techniques bricolés que produisent nos concurrents. Carte de visite Buildy auprès des intégrateurs GTB, BET, exploitants et propriétaires.
