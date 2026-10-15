@@ -14,7 +14,7 @@
  * entité auto-couverte = 1 point ; chaque item de check-list available OR
  * not_available = 1 point).
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   CheckIcon, XMarkIcon, PencilSquareIcon, CameraIcon,
@@ -36,8 +36,6 @@ import {
 import DocumentViewerModal from '@/components/DocumentViewerModal.vue'
 import { useAuditStore } from '@/stores/audit'
 import { coverageTileTip, CHECKLIST_STATUS_TIPS, PHOTOS_NEED_SITE_TIP } from '@/lib/audit-tips-site'
-import { useAuditLayout } from '@/composables/useAuditLayout'
-import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
 import {
   CHECKLIST_PHOTOS_TITLE, CHECKLIST_PHOTOS_HINT, CHECKLIST_ITEMS_TITLE, CHECKLIST_ITEM_STATUS, checklistItemsSummary,
 } from '@/lib/audit-tips-guided'
@@ -124,18 +122,14 @@ const completionPct = computed(() =>
 )
 
 // ─── Popover « entités sans photo » ─────────────────────────────────
-// ─── Mise en page « Nouvelle » : deux groupes titrés, progression, état de chaque pièce ─────
-// Mêmes tuiles, mêmes pièces, mêmes gestes ; la mise en page actuelle est inchangée.
-const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
-const { isGuidedLayout } = useAuditLayout()
-const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
+// ─── Deux groupes titrés, progression, état de chaque pièce ─────
 const coveragePct = (c) => (c?.total ? Math.round((c.covered / c.total) * 100) : 0)
 const itemsSummary = computed(() => checklistItemsSummary({
   available: items.value.filter(i => i.status === 'available').length,
   pending: items.value.filter(i => i.status === 'pending').length,
   notAvailable: items.value.filter(i => i.status === 'not_available').length,
 }))
-// Tuile de couverture : blanche avec sa barre de progression (orange plein = mise en page actuelle).
+// Tuile de couverture : blanche avec sa barre de progression.
 function tileGuidedCls(c) {
   if (!c.total) return 'bg-gray-50 border-gray-200 text-gray-400'
   return c.covered === c.total
@@ -362,7 +356,7 @@ defineExpose({ refresh: load })
     <div v-else class="px-5 py-4 space-y-3">
       <!-- ── BLOC 1 : Couverture photo (KPI pleines) ───────────────────── -->
       <section ref="popoverRef">
-        <div v-if="guided" class="mb-1.5 flex items-baseline justify-between gap-2">
+        <div class="mb-1.5 flex items-baseline justify-between gap-2">
           <h3 class="text-[13px] font-semibold text-indigo-600">
             {{ CHECKLIST_PHOTOS_TITLE }} <span class="font-normal text-xs text-slate-500">— {{ CHECKLIST_PHOTOS_HINT }}</span>
           </h3>
@@ -373,14 +367,7 @@ defineExpose({ refresh: load })
                   type="button"
                   v-tooltip="popoverOpen === kind ? null : coverageTileTip(kind, coverage[kind])"
                   @click="kind !== 'bms' ? togglePopover(kind) : emit('goto-bms')"
-                  :class="guided
-                    ? ['relative rounded-lg px-2.5 pt-1.5 pb-3 text-left transition-colors duration-200 flex items-center gap-2 border', tileGuidedCls(coverage[kind])]
-                    : ['relative rounded-md px-2.5 py-1.5 text-left transition-colors duration-200 flex items-center gap-2 border',
-                           coverage[kind].total === 0
-                             ? 'bg-gray-50 border-gray-200 text-gray-400'
-                             : coverage[kind].covered === coverage[kind].total
-                               ? 'bg-emerald-100 border-emerald-300 text-emerald-900 hover:bg-emerald-200'
-                               : 'bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200']">
+                  :class="['relative rounded-lg px-2.5 pt-1.5 pb-3 text-left transition-colors duration-200 flex items-center gap-2 border', tileGuidedCls(coverage[kind])]">
             <MapPinIcon v-if="kind === 'zones'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
             <WrenchScrewdriverIcon v-if="kind === 'systems'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
             <BoltIcon v-if="kind === 'meters'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
@@ -393,8 +380,8 @@ defineExpose({ refresh: load })
                 {{ coverage[kind].covered }}<span class="opacity-50 font-normal">/{{ coverage[kind].total }}</span>
               </p>
             </div>
-            <!-- Mise en page « Nouvelle » : progression (photos prises / attendues). -->
-            <span v-if="guided && coverage[kind].total" aria-hidden="true"
+            <!-- Progression (photos prises / attendues). -->
+            <span v-if="coverage[kind].total" aria-hidden="true"
                   class="absolute left-2.5 right-2.5 bottom-1.5 h-1 rounded-full bg-slate-200 overflow-hidden">
               <span class="block h-full rounded-full bg-[#00cd92]" :style="{ width: `${coveragePct(coverage[kind])}%` }"></span>
             </span>
@@ -415,7 +402,7 @@ defineExpose({ refresh: load })
 
       <!-- ── BLOC 2 : Pièces jointes du dossier (1 ligne par item) ──────── -->
       <section>
-        <div v-if="guided && items.length" class="mt-2 mb-1.5 flex items-baseline justify-between gap-2">
+        <div v-if="items.length" class="mt-2 mb-1.5 flex items-baseline justify-between gap-2">
           <h3 class="text-[13px] font-semibold text-indigo-600">{{ CHECKLIST_ITEMS_TITLE }}</h3>
           <span class="text-xs text-slate-500">{{ itemsSummary }}</span>
         </div>
@@ -449,8 +436,8 @@ defineExpose({ refresh: load })
               </p>
             </div>
 
-            <!-- Mise en page « Nouvelle » : état de la pièce, à gauche des actions. -->
-            <span v-if="guided" :class="['shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CHECKLIST_ITEM_STATUS[item.status]?.cls]"
+            <!-- État de la pièce, à gauche des actions. -->
+            <span :class="['shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', CHECKLIST_ITEM_STATUS[item.status]?.cls]"
                   v-tooltip="CHECKLIST_STATUS_TIPS[item.status]">
               {{ CHECKLIST_ITEM_STATUS[item.status]?.label }}
             </span>

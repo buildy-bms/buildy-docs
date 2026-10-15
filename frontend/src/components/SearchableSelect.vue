@@ -40,7 +40,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   clearable: { type: Boolean, default: true },
   // 'md' (defaut) = px-3 py-2 ~38px ; 'sm' = px-2 py-1 ~28px pour les
-  // formulaires denses (SystemDevicesTable, inline editing).
+  // formulaires denses (inline editing).
   size: { type: String, default: 'md' },
   // Si true : permet d'ajouter une valeur libre non listée. Quand la
   // recherche ne match rien (ou même si match), un item "+ Ajouter «X»"

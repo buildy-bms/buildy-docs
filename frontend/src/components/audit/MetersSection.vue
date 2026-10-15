@@ -14,7 +14,7 @@ import MeterEnergyGroup from '@/components/audit/MeterEnergyGroup.vue'
 import { METER_TYPES as ENERGY_METAS, thermalMeterName } from '@/lib/meter-options'
 import {
   METER_MISSING_TIP, REQUIRED_LOCKED_CARD, METER_TOGGLE_TIPS, energyTabTip, thermalMeterTip,
-  metersMissingTip, metersUnansweredTip, metersPresentTip, metersCommunicatingTip,
+  metersMissingTip, metersPresentTip, metersCommunicatingTip,
 } from '@/lib/audit-tips'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -24,7 +24,6 @@ import AuditSubTabs from '@/components/audit/AuditSubTabs.vue'
 import { AUDIT_STEP_MODE_KEY } from '@/lib/audit-steps-ui'
 import { flashAuditTarget } from '@/lib/audit-reveal'
 import { isMeterMissing, isMeterUnanswered, presentToggleValue, requiredCellLabel, meterPlanNote } from '@/lib/meter-plan-state'
-import { useAuditLayout } from '@/composables/useAuditLayout'
 import {
   METER_FILTERS, METERS_DONE_TEXT, METERS_GO_FIRST_LABEL, METERS_GO_FIRST_TIP,
   metersTodoLine, metersMissingLine, meterFilterEmptyTip,
@@ -101,16 +100,14 @@ const energyTabs = computed(() => energySections.value.map(({ energy, meters: li
     iconColor: energy.color,
     badge: missing || null,
     badgeTone: 'red',
-    // Mise en page « Nouvelle » : présences sans réponse en pastille ambre, comme les zones de l'étape Systèmes.
-    ...(guided.value && unanswered ? { badges: [{ text: String(unanswered), tone: 'amber', label: `${unanswered} à compléter` }] } : {}),
+    // Présences sans réponse en pastille ambre, comme les zones de l'étape Systèmes.
+    ...(unanswered ? { badges: [{ text: String(unanswered), tone: 'amber', label: `${unanswered} à compléter` }] } : {}),
     tooltip: energyTabTip({ value: energy.value, label: energy.label, total: list.length, present, missing, unanswered }),
   }
 }))
 
-// ─── Mise en page « Nouvelle » : le reste à faire en tête, un filtre des compteurs ─────────
-// Mêmes compteurs, mêmes gestes ; chaque énergie en carte teintée de sa couleur (MeterEnergyGroup).
-const { isGuidedLayout } = useAuditLayout()
-const guided = computed(() => isStepMode.value && isGuidedLayout.value)
+// ─── Le reste à faire en tête, un filtre des compteurs ─────────
+// Chaque énergie en carte teintée de sa couleur (MeterEnergyGroup).
 const meterFilter = ref('all')
 const meterFilters = computed(() => METER_FILTERS.map(f => ({
   ...f,
@@ -300,38 +297,8 @@ function hasNotes(html) {
     </template>
     <!-- Desktop : « Plan de comptage » en 3 étages (≥768px) -->
     <div class="hidden md:block space-y-4 p-3">
-      <!-- Étage 3 — Stats globales : pastilles compactes sur une ligne (les
-           grandes tuiles occupaient toute la largeur pour 4 chiffres). -->
-      <div v-if="!guided" data-meters-kpis class="flex flex-wrap items-center gap-2">
-        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-xs text-gray-600">
-          <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ globalStats.total }}</span>
-          compteur{{ globalStats.total > 1 ? 's' : '' }}
-        </span>
-        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-700"
-              v-tooltip="metersPresentTip(globalStats.present)">
-          <span class="text-sm font-semibold tabular-nums">{{ globalStats.present }}</span>
-          présent{{ globalStats.present > 1 ? 's' : '' }}
-        </span>
-        <span class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-xs text-indigo-700"
-              v-tooltip="metersCommunicatingTip(globalStats.communicating)">
-          <span class="text-sm font-semibold tabular-nums">{{ globalStats.communicating }}</span>
-          communicant{{ globalStats.communicating > 1 ? 's' : '' }}
-        </span>
-        <span :class="['inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border text-xs',
-                       globalStats.missing > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-gray-200 bg-gray-50 text-gray-500']"
-              v-tooltip="globalStats.missing > 0 ? metersMissingTip(globalStats.missing) : 'Aucun compteur requis ne manque'">
-          <span class="text-sm font-semibold tabular-nums">{{ globalStats.missing }}</span>
-          requis manquant{{ globalStats.missing > 1 ? 's' : '' }}
-        </span>
-        <span v-if="globalStats.unanswered > 0"
-              class="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-800"
-              v-tooltip="metersUnansweredTip(globalStats.unanswered)">
-          <span class="text-sm font-semibold tabular-nums">{{ globalStats.unanswered }}</span>
-          présence{{ globalStats.unanswered > 1 ? 's' : '' }} à vérifier
-        </span>
-      </div>
-      <!-- Mise en page « Nouvelle » : le reste à faire en tête, puis le filtre des compteurs. -->
-      <div v-else data-meters-guide class="flex flex-col gap-2">
+      <!-- Le reste à faire en tête, puis le filtre des compteurs. -->
+      <div data-meters-guide class="flex flex-col gap-2">
         <div v-if="globalStats.unanswered"
              class="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] text-amber-950">
           <p class="flex-1 min-w-0 leading-snug">{{ metersTodoLine(globalStats.unanswered) }}</p>
@@ -385,7 +352,6 @@ function hasNotes(html) {
           v-show="!isStepMode || activeEnergy === section.energy.value"
           :key="section.energy.value"
           :tab-mode="isStepMode"
-          :guided="guided"
           :filter="meterFilter"
           :energy="section.energy"
           :meters="section.meters"

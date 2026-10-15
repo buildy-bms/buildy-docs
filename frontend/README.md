@@ -64,6 +64,5 @@ Le build (`dist/`) est servi par le backend Fastify en prod via `@fastify/static
 | Tooltip article R175 | [`R175Tooltip.vue`](src/components/R175Tooltip.vue) (Teleport vers body, pas de clipping) |
 | Multi-select (protocoles) | [`ProtocolMultiPicker.vue`](src/components/ProtocolMultiPicker.vue) (Teleport, position calculée) |
 | Validation d'étape | [`StepValidateBadge.vue`](src/components/StepValidateBadge.vue) |
-| Stepper vertical (sidebar) | [`VerticalStepper.vue`](src/components/VerticalStepper.vue) |
 | Notification toast | `useNotification` composable |
 | Confirmation modale | `useConfirm` composable |

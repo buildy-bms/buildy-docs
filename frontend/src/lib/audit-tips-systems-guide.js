@@ -16,21 +16,6 @@ export const GUIDE_TEXTS = {
   createSystemIntro: 'Choisis l’usage. Deux systèmes du même usage peuvent coexister, par exemple deux chaudières indépendantes.',
 };
 
-// ─── Choix de la mise en page ─────────────────────────────────────────────────
-export const LAYOUT_OPTIONS = [
-  { value: 'classic', label: 'Actuelle' },
-  { value: 'guided', label: 'Nouvelle' },
-];
-export const LAYOUT_TOGGLE_TIP = {
-  title: 'Mise en page de l’audit',
-  icon: 'table-columns',
-  text: 'Tes réponses restent les mêmes dans les deux : seul l’affichage change. Le choix vaut pour toutes les étapes.',
-  rows: [
-    { icon: 'table-list', label: 'Actuelle', value: 'l’affichage habituel' },
-    { icon: 'list-check', label: 'Nouvelle', value: 'le reste à faire en tête, chaque groupe dans sa carte' },
-  ],
-};
-
 // ─── Pastilles des onglets (zones et synthèse) ────────────────────────────────
 /** Pastilles d'un onglet : à compléter (nombre), à vérifier (« ! N »), sans réponse (« ? N »). */
 export function guideBadges({ toComplete = 0, toCheck = 0, unanswered = 0 } = {}) {
@@ -409,7 +394,7 @@ export const RUBRICS_ALL_TIPS = {
     title: 'Toute la fiche',
     icon: 'eye',
     tone: 'info',
-    text: 'Toutes les rubriques restent dépliées, comme dans la mise en page actuelle.',
+    text: 'Toutes les rubriques restent dépliées.',
   },
   todo: {
     title: 'Le reste à faire d’abord',

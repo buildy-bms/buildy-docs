@@ -310,7 +310,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   // Tri intra-système par chaîne énergétique : Production → Distribution →
   // Émission → Régulation seule → autre, puis alphabétique. Aligne le PDF
-  // sur la card 04 desktop (cf. SystemDevicesTable.vue rolePriority).
+  // sur la card 04 desktop (cf. SystemDeviceList.vue rolePriority).
   const ROLE_PRIORITY_PDF = { production: 1, distribution: 2, emission: 3, regulation: 4 };
   function rolePriorityPdf(d) {
     const roles = Array.isArray(d.device_role) ? d.device_role : [];

@@ -31,7 +31,7 @@ const roleApplies = computed(() => isThermalCategory(props.systemCategory))
 
 // Item 3c — la puissance nominale n'a de sens que pour les usages
 // thermiques / aérauliques (masquée pour éclairage, production élec.).
-// Élargi en 0.1.144 — cf. SystemDevicesTable / DeviceEditModal.
+// Élargi en 0.1.144 — cf. DeviceEditModal.
 const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 const showPower = computed(() => POWER_RELEVANT.has(props.systemCategory))
 

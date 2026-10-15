@@ -19,13 +19,13 @@ import HelpTip from '@/components/HelpTip.vue'
 import { isDeviceComplete } from '@/lib/audit-options'
 import {
   PRESENCE_TOGGLE_TIP, PRESENCE_ZONE_LABEL, PRESENCE_OTHER_COLUMN_TIP, PRESENCE_LEGEND_TIP, TECHNICAL_ZONE_TIP,
-  presenceCellTip, presenceAddTip, presenceUnansweredTip, presenceToFixTip,
+  presenceCellTip, presenceAddTip,
 } from '@/lib/audit-tips-systems'
 import {
   synthesisTotals, zoneTodoParts, RESUME_ALL_LABEL, RESUME_ALL_TIP, TODO_COLUMN_TIP, CHECK_CELL_TIP,
 } from '@/lib/audit-tips-systems-guide'
 
-// Mise en page guidée : couleurs des totaux et de la colonne « Reste à faire ».
+// Couleurs des totaux et de la colonne « Reste à faire ».
 const TOTAL_TONE = {
   amber: 'bg-amber-50 ring-amber-300 text-amber-900',
   rose: 'bg-rose-50 ring-rose-200 text-rose-800',
@@ -41,10 +41,10 @@ const props = defineProps({
   // Faux dans l'onglet « Synthèse des systèmes » : le tableau en est le contenu,
   // toujours affiché (pas de « Masquer le tableau »), plus haut avant de défiler.
   collapsible: { type: Boolean, default: true },
-  // Mise en page guidée : { byZone: { [zoneId]: zoneGuide() }, totals: guideTotals(),
-  // checkCells: Set('zoneId:catégorie'), stops: nombre de points à reprendre }. Ajoute les
-  // totaux, « Reprendre le parcours », la colonne « Reste à faire » et le repère « ! ».
-  guide: { type: Object, default: null },
+  // { byZone: { [zoneId]: zoneGuide() }, totals: guideTotals(), checkCells: Set('zoneId:catégorie'),
+  // stops: nombre de points à reprendre } : totaux, « Reprendre le parcours », colonne « Reste à
+  // faire » et repère « ! ».
+  guide: { type: Object, required: true },
 })
 const emit = defineEmits(['select', 'set-presence', 'add-system', 'resume'])
 
@@ -104,19 +104,6 @@ const rows = computed(() => props.groups.map(g => ({
   cells: COLUMNS.map(col => ({ col, cell: cellFor(g, col) })),
 })))
 
-const summary = computed(() => {
-  let unanswered = 0
-  let toFix = 0
-  for (const r of rows.value) {
-    for (const { cell } of r.cells) {
-      if (cell.kind === 'none') continue
-      unanswered += cell.unanswered
-      if (cell.warn) toFix++
-    }
-  }
-  return { zones: rows.value.length, unanswered, toFix }
-})
-
 // Carte d'une case (lib/audit-tips-systems.js) : réponse, équipements, ce qui reste à reprendre.
 function cellTip(g, col, cell) {
   return presenceCellTip({
@@ -138,18 +125,18 @@ function setPresence(cell, v) {
   emit('set-presence', { system: cell.system, value: v ? 'present' : 'not_concerned' })
 }
 
-const totals = computed(() => (props.guide ? synthesisTotals(props.guide.totals || {}) : []))
-function hasCheck(g, col) { return !!props.guide?.checkCells?.has(`${g.zone_id}:${col.cat}`) }
+const totals = computed(() => synthesisTotals(props.guide.totals || {}))
+function hasCheck(g, col) { return !!props.guide.checkCells?.has(`${g.zone_id}:${col.cat}`) }
 function todoParts(g) {
-  const z = props.guide?.byZone?.[g.zone_id]
+  const z = props.guide.byZone?.[g.zone_id]
   return z ? zoneTodoParts(z) : []
 }
 </script>
 
 <template>
   <div class="rounded-xl border border-slate-200 bg-white overflow-hidden" data-systems-presence-matrix>
-    <!-- Mise en page guidée : totaux de l'étape et reprise du parcours. -->
-    <div v-if="guide" class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 flex-wrap" data-guide-totals>
+    <!-- Totaux de l'étape et reprise du parcours. -->
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100 flex-wrap" data-guide-totals>
       <h3 class="flex-1 min-w-[14rem] text-[15px] font-semibold text-indigo-600">Présence des usages par zone</h3>
       <div class="flex flex-wrap items-center gap-2">
         <span v-for="t in totals" :key="t.tone"
@@ -165,18 +152,12 @@ function todoParts(g) {
       </button>
     </div>
     <div class="flex items-center gap-3 px-3 py-2 border-b border-slate-100 flex-wrap">
-      <h3 v-if="!guide" class="text-xs font-semibold uppercase tracking-wider text-gray-700">Présence des usages par zone</h3>
-      <span v-if="!guide" class="text-[11px] text-gray-500">
-        {{ summary.zones }} zone{{ summary.zones > 1 ? 's' : '' }}
-        <template v-if="summary.unanswered"> · <span class="text-amber-700" v-tooltip="presenceUnansweredTip(summary.unanswered)">{{ summary.unanswered }} sans réponse</span></template>
-        <template v-if="summary.toFix"> · <span class="text-amber-700" v-tooltip="presenceToFixTip(summary.toFix)">{{ summary.toFix }} à reprendre</span></template>
-      </span>
       <div class="ml-auto flex items-center gap-3 text-[11px] text-gray-500">
         <span class="hidden xl:inline"><span class="font-bold text-emerald-700">✓</span> présent</span>
         <span class="hidden xl:inline"><span class="font-bold text-slate-600">✗</span> non concerné</span>
-        <span class="hidden xl:inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> {{ guide ? 'à compléter' : 'à reprendre' }}</span>
-        <span v-if="guide" class="hidden xl:inline"><span class="font-bold text-rose-700">!</span> à vérifier</span>
-        <span v-if="guide" class="hidden xl:inline"><span class="inline-block rounded border border-dashed border-slate-500 px-1">✓ ✗</span> sans réponse</span>
+        <span class="hidden xl:inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> à compléter</span>
+        <span class="hidden xl:inline"><span class="font-bold text-rose-700">!</span> à vérifier</span>
+        <span class="hidden xl:inline"><span class="inline-block rounded border border-dashed border-slate-500 px-1">✓ ✗</span> sans réponse</span>
         <span class="hidden xl:inline"><span class="font-bold text-gray-400">+</span> absent de la zone (clic : ajouter)</span>
         <!-- Légende masquée sous 1280 px : un ⓘ l'ouvre en carte. -->
         <HelpTip class="xl:hidden" :tip="PRESENCE_LEGEND_TIP" />
@@ -201,7 +182,7 @@ function todoParts(g) {
                 {{ col.label }}
               </span>
             </th>
-            <th v-if="guide" class="sticky top-0 z-10 bg-slate-50 text-left font-medium text-gray-600 px-3 py-2 border-b border-slate-200 whitespace-nowrap"
+            <th class="sticky top-0 z-10 bg-slate-50 text-left font-medium text-gray-600 px-3 py-2 border-b border-slate-200 whitespace-nowrap"
                 v-tooltip="TODO_COLUMN_TIP">Reste à faire</th>
           </tr>
         </thead>
@@ -231,9 +212,9 @@ function todoParts(g) {
                 +
               </button>
               <span v-else class="inline-flex items-center gap-1">
-                <!-- Mise en page guidée : sans réponse = toggle en pointillés. -->
+                <!-- Sans réponse = toggle en pointillés. -->
                 <span v-if="cell.kind === 'single'"
-                      :class="guide && cell.state == null ? 'rounded-lg outline-1 outline-dashed outline-slate-500 outline-offset-1' : 'contents'">
+                      :class="cell.state == null ? 'rounded-lg outline-1 outline-dashed outline-slate-500 outline-offset-1' : 'contents'">
                   <CompactToggle compact neutral-no size="xs"
                                  :model-value="cell.state"
                                  :tooltip="PRESENCE_TOGGLE_TIP"
@@ -250,11 +231,11 @@ function todoParts(g) {
                   <span v-if="cell.warn || (cell.kind === 'multi' && cell.unanswered)"
                         class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white"></span>
                 </button>
-                <span v-if="guide && hasCheck(r.g, col)" class="text-[12px] font-bold leading-none text-rose-700"
+                <span v-if="hasCheck(r.g, col)" class="text-[12px] font-bold leading-none text-rose-700"
                       v-tooltip="CHECK_CELL_TIP">!</span>
               </span>
             </td>
-            <td v-if="guide" class="px-3 py-1 border-b border-slate-100 whitespace-nowrap">
+            <td class="px-3 py-1 border-b border-slate-100 whitespace-nowrap">
               <button type="button" @click="emit('select', { zoneId: r.g.zone_id })"
                       class="text-left text-xs hover:underline" v-tooltip="PRESENCE_ZONE_LABEL">
                 <template v-for="(p, i) in todoParts(r.g)" :key="p.text">

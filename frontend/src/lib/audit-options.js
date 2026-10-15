@@ -2,7 +2,7 @@
  * Catalogues d'options des dropdowns BACS audit (énergies, nature, protocoles).
  * Chaque option : { value, label, icon?, color? } — consommée par
  * SearchableSelect.vue. Une seule source de vérité partagée entre
- * BacsAuditDetailView.vue, SystemDevicesTable.vue et AddDeviceModal.vue.
+ * BacsAuditDetailView.vue, AddDeviceModal.vue et la fiche équipement (DeviceEditModal).
  *
  * Pas d'entrée { value: null } : le SearchableSelect gère le placeholder
  * (prop `placeholder`) et le reset (bouton X "clearable"). Inclure null

@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.277",
+      "date": "2026-10-15",
+      "title": "Une seule mise en page de l’audit",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le bouton « Mise en page : Actuelle / Nouvelle » disparaît",
+          "what": "La nouvelle mise en page de l’audit (le reste à faire en tête, chaque groupe dans sa carte, la fiche de l’équipement à droite) est désormais la seule. Le bouton qui permettait de revenir à l’ancienne est retiré du bandeau des étapes, et un choix « Actuelle » mémorisé dans le navigateur n’est plus pris en compte. Rien d’autre ne change à l’écran.",
+          "where": "Audit BACS, bandeau en haut de chaque étape.",
+          "how_to_test": "Ouvrir un audit : sous « Valider l’étape » (ou « Rouvrir l’étape »), plus de « Mise en page » ; chaque étape s’affiche dans la nouvelle mise en page."
+        }
+      ]
+    },
+    {
       "version": "0.1.276",
       "date": "2026-10-15",
       "title": "Motif d’un équipement « pas à raccorder », pré-remplissage de la régulation",

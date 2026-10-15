@@ -1,4 +1,4 @@
-// Textes de la mise en page « Nouvelle » des étapes de l'audit autres que Systèmes (Systèmes :
+// Textes de la mise en page des étapes de l'audit autres que Systèmes (Systèmes :
 // lib/audit-tips-systems-guide.js). Règles de rédaction : CLAUDE.md BD § « Infobulles » —
 // tutoiement, en clair, sans article du décret dans le texte. Imports relatifs (testable sous Node).
 import { plural } from './tooltip-content.js';
@@ -21,7 +21,7 @@ export const STEP_RUBRICS_TIPS = {
     title: 'Toute l’étape',
     icon: 'eye',
     tone: 'info',
-    text: 'Toutes les rubriques restent dépliées, comme dans la mise en page actuelle.',
+    text: 'Toutes les rubriques restent dépliées.',
   },
 };
 

@@ -18,7 +18,6 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import BaseModal from '@/components/BaseModal.vue'
-import SearchableSelect from '@/components/SearchableSelect.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import { createBacsSystem } from '@/api'
@@ -38,9 +37,7 @@ const props = defineProps({
   // Pré-remplissage optionnel pour le raccourci « + Système similaire » :
   // { category: 'heating' | '__custom__' | 'lib:<key>', label: 'Chaudière gaz (2)' }.
   initial: { type: Object, default: null },
-  // Mise en page guidée de l'étape Systèmes : usages en tuiles (un clic), avec ce qui existe
-  // déjà dans la zone (`zoneSystems`). Sans elle : liste déroulante, fenêtre inchangée.
-  variant: { type: String, default: 'select' },  // 'select' | 'tiles'
+  // Usages en tuiles (un clic), avec ce qui existe déjà dans la zone (`zoneSystems`).
   zoneSystems: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['close', 'created'])
@@ -71,14 +68,9 @@ const libraryOpts = computed(() =>
   }))
 )
 
-// Option « personnalisé » : laisse l'auditeur saisir n'importe quel nom
-// d'usage qui ne rentre dans aucune catégorie connue (ex: « Borne de
-// recharge », « Occultation »…). Stocké en is_bacs=0 / category=custom:uuid.
-const allOptions = computed(() => [
-  ...BACS_STANDARD,
-  ...libraryOpts.value,
-  { value: '__custom__', label: 'Autre usage (saisie libre)' },
-])
+// Tuile « Autre usage » (`__custom__`) : laisse l'auditeur saisir n'importe quel nom d'usage qui
+// ne rentre dans aucune catégorie connue (ex: « Borne de recharge », « Occultation »…). Stocké en
+// is_bacs=0 / category=custom:uuid.
 
 const categoryValue = ref(null)
 const labelValue = ref('')
@@ -163,11 +155,11 @@ async function save() {
 </script>
 
 <template>
-  <BaseModal :title="`Ajouter un système — ${zone.name}`" :size="variant === 'tiles' ? 'lg' : 'md'"
+  <BaseModal :title="`Ajouter un système — ${zone.name}`" size="lg"
              :dismiss-on-backdrop="false"
              @close="emit('close')">
-    <!-- Mise en page guidée : usages en tuiles, avec ce qui existe déjà dans la zone. -->
-    <div v-if="variant === 'tiles'" class="space-y-4 pb-2" data-create-system-tiles>
+    <!-- Usages en tuiles, avec ce qui existe déjà dans la zone. -->
+    <div class="space-y-4 pb-2" data-create-system-tiles>
       <p class="text-sm text-gray-600">{{ GUIDE_TEXTS.createSystemIntro }}</p>
       <div role="radiogroup" aria-label="Usage du système" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <button v-for="c in tiles" :key="c.value" type="button" role="radio"
@@ -210,28 +202,6 @@ async function save() {
                class="h-9 px-2.5 w-full border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
                @keydown.enter="save" />
         <p class="text-[11px] text-gray-500 mt-1">{{ CREATE_SYSTEM_NAME_HINT }}</p>
-      </div>
-    </div>
-    <div v-else class="space-y-4 pb-2">
-      <p class="text-xs text-gray-500 leading-relaxed">
-        Plusieurs systèmes peuvent coexister dans la même zone : par exemple deux chaudières indépendantes,
-        ou une pompe à chaleur réversible (refroidissement) avec un chauffage gaz d'appoint. Chaque système
-        est évalué séparément, notamment pour la régulation de la température pièce par pièce.
-      </p>
-      <div>
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Catégorie</label>
-        <SearchableSelect v-model="categoryValue" :options="allOptions"
-                          :clearable="false" size="sm" placeholder="Choisir une catégorie…" />
-      </div>
-      <div>
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Nom du système</label>
-        <input ref="labelInput" type="text" v-model="labelValue"
-               placeholder="ex : Chaudière gaz centrale, pompe à chaleur bureaux RDC…"
-               class="h-9 px-2.5 w-full border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
-               @keydown.enter="save" />
-        <p class="text-[11px] text-gray-500 mt-1">
-          Ce nom sera affiché à l'étape 4 · Régulation et dans le PDF (chapitre 5).
-        </p>
       </div>
     </div>
     <template #footer>
