@@ -704,10 +704,10 @@ export const GRANULARITY_TIP = {
 /** Options du périmètre GTB d'un équipement (gtb_scope_override : null / true / false). */
 export const GTB_SCOPE_OPTION_TIPS = {
   default: {
-    title: 'Selon l’usage',
+    title: 'À raccorder',
     tone: 'info',
-    icon: 'display',
-    text: 'Suit les usages cochés dans « Usages traités par la GTB » (étape GTB). Un usage que la GTB ne traite pas reste à raccorder.',
+    icon: 'link',
+    text: 'Cas normal : le décret demande de raccorder les équipements des systèmes reliés. Le rapport évalue son raccordement.',
   },
   yes: {
     title: 'Concerné par la GTB',

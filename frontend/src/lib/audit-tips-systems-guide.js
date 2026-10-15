@@ -257,7 +257,8 @@ const CHECKS = {
     line: 'Son raccordement à la GTB n’est pas évalué.',
     title: 'Générateur exclu de la GTB',
     text: 'Le décret demande que les générateurs communiquent avec la GTB. L’exclure n’est justifié que si un équipement raccordé le pilote.',
-    todo: ['Sinon, remets « Selon l’usage » dans la fiche.'],
+    todo: ['Sinon, réponds « Oui » à « Faut-il raccorder cet équipement à la GTB ? ».'],
+    fix: 'Répondre « Oui »',
   },
   'DEV-008': {
     short: 'intégré à la GTB, sans communication',

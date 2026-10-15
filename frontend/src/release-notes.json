@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.275",
+      "date": "2026-10-15",
+      "title": "Raccordement à la GTB : une question claire",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "« Faut-il raccorder cet équipement à la GTB ? » remplace « Selon l’usage »",
+          "what": "Dans la fiche d’un équipement, rubrique « Communication et GTB », la question devient « Faut-il raccorder cet équipement à la GTB ? », avec deux réponses : « Oui » (le cas normal, son raccordement est évalué dans le rapport) ou « Non, pas à raccorder » (émetteur passif, unité extérieure pilotée par des unités intérieures raccordées…). Les réponses déjà saisies ne changent pas.",
+          "where": "Audit BACS, étape Systèmes, fiche d’un équipement.",
+          "how_to_test": "Ouvrir la fiche d’un équipement, rubrique « Communication et GTB » : deux réponses, « Oui » sélectionné par défaut."
+        },
+        {
+          "kind": "improvement",
+          "title": "« Générateur exclu de la GTB » : correction en un clic",
+          "what": "Le point « À vérifier » d’un générateur déclaré « pas à raccorder » propose le bouton « Répondre « Oui » », qui corrige la fiche directement. Il n’est plus signalé pour un système exempté de raccordement par la règle des 5 %.",
+          "where": "Audit BACS, étape Systèmes, mise en page « Nouvelle » : fiche ouverte d’un équipement « À vérifier ».",
+          "how_to_test": "Sur un générateur déclaré « Non, pas à raccorder », cliquer « Répondre « Oui » » : le point disparaît."
+        }
+      ]
+    },
+    {
       "version": "0.1.274",
       "date": "2026-10-15",
       "title": "Nouvelle mise en page de l’audit pour tout le monde, caractères spéciaux du rapport",
