@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 216;
+const TARGET_VERSION = 217;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7956,6 +7956,19 @@ function runMigrations() {
     }
     log.info(`Migration 216 appliquee : puissance recalculée sur ${audits.length} audit(s) non livré(s), ${power} puissance(s) et ${verdict} statut(s) d'assujettissement mis à jour`);
     db.pragma('user_version = 216');
+  }
+
+  if (current < 217) {
+    // Migration 217 — Motif d'un équipement « pas à raccorder » à la GTB (gtb_scope_override = 0),
+    // demande de Kévin 2026-10-15 : unité extérieure de DRV pilotée par ses unités intérieures,
+    // raccordées par une passerelle (CoolMaster). Exigé pour un équipement de production, imprimé
+    // dans le rapport ; lève le point « Générateur exclu de la GTB » (DEV-007). Ajout de colonne seul.
+    const cols = db.prepare('PRAGMA table_info(bacs_audit_system_devices)').all().map(c => c.name);
+    if (!cols.includes('gtb_exclusion_reason')) {
+      db.exec('ALTER TABLE bacs_audit_system_devices ADD COLUMN gtb_exclusion_reason TEXT');
+    }
+    log.info('Migration 217 appliquee : bacs_audit_system_devices.gtb_exclusion_reason');
+    db.pragma('user_version = 217');
   }
 
   if (current > TARGET_VERSION) {

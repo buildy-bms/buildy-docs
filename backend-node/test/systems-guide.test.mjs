@@ -206,8 +206,10 @@ describe('complétude d’un équipement : chaque question affichée a sa répon
     expect(keys(full({ device_role: ['production'], energy_source: null }), 'electricity_production')).toEqual([]);
   });
   it('équipement hors du périmètre de la GTB : ses questions de raccordement ne sont pas exigées', () => {
-    const d = full({ gtb_scope_override: false, wired: null, meets_r175_3_p4: null, meets_r175_3_p4_autonomous: null });
+    const d = full({ gtb_scope_override: false, gtb_exclusion_reason: 'Émetteur passif', wired: null, meets_r175_3_p4: null, meets_r175_3_p4_autonomous: null });
     expect(keys(d)).toEqual([]);
+    // Une production « pas à raccorder » doit dire pourquoi (Kévin, 2026-10-15).
+    expect(keys({ ...d, gtb_exclusion_reason: null })).toEqual(['gtb_exclusion_reason']);
     expect(keys({ ...d, gtb_scope_override: null })).toEqual(['wired', 'manual_stop', 'autonomous']);
   });
   it('chaque manque est rangé dans une rubrique de la fiche, dans l’ordre de la fiche', () => {

@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.276",
+      "date": "2026-10-15",
+      "title": "Motif d’un équipement « pas à raccorder », pré-remplissage de la régulation",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Pourquoi un équipement n’a pas à être raccordé à la GTB",
+          "what": "Quand on répond « Non, pas à raccorder » à « Faut-il raccorder cet équipement à la GTB ? », la fiche demande pourquoi. Trois motifs sont proposés en un clic (piloté par les unités intérieures, raccordées à la GTB par une passerelle ; émetteur passif ; système exempté par la règle des 5 %), ou on l’écrit. Le motif est exigé pour une production de chauffage, de froid, de ventilation ou d’eau chaude, et il lève le point « Générateur exclu de la GTB ». Il est imprimé dans le rapport : sous l’équipement, dans le tableau de la GTB et dans le verdict du système.",
+          "where": "Audit BACS, étape Systèmes, fiche d’un équipement, rubrique « Communication et GTB ».",
+          "how_to_test": "Sur l’unité extérieure d’un DRV, répondre « Non, pas à raccorder », choisir le premier motif : la fiche redevient complète, puis l’Aperçu affiche « Pas à raccorder : Piloté par les unités intérieures… »."
+        },
+        {
+          "kind": "fix",
+          "title": "« Pré-remplir » de l’étape Régulation n’échoue plus",
+          "what": "Le pré-remplissage proposait parfois comme régulateur déporté un équipement à régulation intégrée, ou l’équipement lui-même : l’enregistrement était refusé (« Erreur de sauvegarde »). Seul un équipement de régulation, non intégré, est désormais proposé.",
+          "where": "Audit BACS, étape Régulation, bouton « Pré-remplir ».",
+          "how_to_test": "Sur l’audit de Sénas, cliquer « Pré-remplir » : plus d’erreur de sauvegarde."
+        }
+      ]
+    },
+    {
       "version": "0.1.275",
       "date": "2026-10-15",
       "title": "Raccordement à la GTB : une question claire",

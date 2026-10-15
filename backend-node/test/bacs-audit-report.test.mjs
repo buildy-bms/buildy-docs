@@ -76,6 +76,15 @@ describe('Rapport d’audit BACS — nouvelle mise en page', () => {
     expect(html).toMatch(/font-family: 'Manrope';[^}]*unicode-range: U\+0100/);
   });
 
+  it('équipement « pas à raccorder » : le motif est imprimé', async () => {
+    const d = JSON.parse(JSON.stringify(fixture));
+    const v = d.systemsByZone.flatMap((z) => z.items).flatMap((i) => i.devices || [])[0];
+    v.gtb_scope_override = 0;
+    v.gtb_exclusion_reason = 'Piloté par les unités intérieures, raccordées à la GTB par une passerelle';
+    const t = text(await buildBacsAuditReportHtml(d));
+    expect(t).toContain('Raccordement à la GTB pas à raccorder — Piloté par les unités intérieures, raccordées à la GTB par une passerelle');
+  });
+
   it('action groupée : le titre de chaque action est imprimé', async () => {
     const d = JSON.parse(JSON.stringify(fixture));
     const card = d.actionItemsByCard.find((c) => (c.subsections || []).some((s) => (s.grouped || []).some((g) => g.kind === 'single')));

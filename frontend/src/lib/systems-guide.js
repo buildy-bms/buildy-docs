@@ -302,6 +302,7 @@ export const MISSING_SHORT = {
   'le type de régulation de la distribution': 'type de régulation de la distribution',
   "le type de régulation de l'émission": "type de régulation de l'émission",
   'si l’équipement dessert plusieurs bâtiments (oui ou non)': 'plusieurs bâtiments',
+  'pourquoi il n’a pas à être raccordé à la GTB': 'motif « pas à raccorder »',
 }
 export function missingShort(label) {
   return MISSING_SHORT[label] || label

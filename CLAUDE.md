@@ -680,6 +680,15 @@ mobile, bandeau de l'étape, guide).
   comptage séparable : la fiche les masque).
 - Équipement hors du périmètre GTB (« Non ») : liaison câblée, arrêt à la main, fonctionnement
   seul non exigés.
+- « Faut-il raccorder cet équipement à la GTB ? » (`gtb_scope_override` : null = Oui, false = « Non,
+  pas à raccorder » ; true n'est plus proposé) : le **motif** `gtb_exclusion_reason` (mig 217, 300
+  caractères) est exigé pour une production de chauffage, froid, ventilation ou eau chaude, facultatif
+  ailleurs (cas d'origine, Kévin 2026-10-15 : unité extérieure de DRV pilotée par ses unités
+  intérieures, raccordées par une passerelle CoolMaster). Un motif lève DEV-007 du pré-contrôle (un
+  système exempté par la règle des 5 % aussi) ; repasser à « Oui » efface le motif (PATCH devices et
+  correction en un clic `reset_gtb_scope_override`). Imprimé dans les deux rapports (ligne de détail
+  de l'équipement, tableau de la GTB, verdict « non évalué » du système). Fiche bureau seulement : le
+  mobile n'a pas la question.
 - Usage d'eau chaude présent : bouclage (Bouclée / Non bouclée / Inconnu) exigé.
 Un nouveau manque → son libellé court dans `MISSING_SHORT` (`lib/systems-guide.js`, test).
 

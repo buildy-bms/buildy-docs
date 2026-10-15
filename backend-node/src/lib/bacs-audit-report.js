@@ -676,6 +676,7 @@ function buildHtml(d, env) {
       calc ? ['Puissance', calc] : null,
       v.is_communicating && (v.wired === 0 || v.wired === 1) ? ['Liaison', v.wired === 1 ? 'filaire' : 'sans fil'] : null,
       v.sharedWithLabel ? ['Dessert aussi', esc(v.sharedWithLabel)] : null,
+      v.gtb_scope_override === 0 || v.gtb_scope_override === false ? ['Raccordement à la GTB', `pas à raccorder${String(v.gtb_exclusion_reason || '').trim() ? ` — ${esc(v.gtb_exclusion_reason.trim())}` : ''}`] : null,
       ['Localisation', esc(v.location || '—')],
       v.has_regulation || v.regulation_integrated != null || v.regulator_brand || v.regulator_model_reference ? ['Régulation', v.regulation_integrated === 1 ? 'intégrée' : v.regulation_integrated === 0 ? 'déportée' : '—'] : null,
       regulator ? ['Régulateur déporté', regulator] : null,
@@ -851,7 +852,9 @@ function buildHtml(d, env) {
     present: '<span class="mk ok">' + ic('check') + 'Remise par le propriétaire ou son exploitant</span>',
   };
   const devIntegration = (v) => {
-    if (v.excludedByAuditor) return '<span class="muted">Non concerné (décision de l’auditeur)</span>';
+    if (v.excludedByAuditor) return String(v.gtb_exclusion_reason || '').trim()
+      ? `<span class="muted">Pas à raccorder : ${esc(v.gtb_exclusion_reason.trim())}</span>`
+      : '<span class="muted">Non concerné (décision de l’auditeur)</span>';
     if (v.interopNotTargeted) return '<span class="muted">Non visé</span>';
     if (v.outOfGtbScope) return `${mark(0)} <span class="muted small">usage non traité par la GTB</span>`;
     if (v.bms_integration_out_of_service) return '<span class="mk bad">Liaison interrompue</span>';
