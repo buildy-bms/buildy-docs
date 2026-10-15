@@ -28,7 +28,6 @@ import {
   duplicateZone, duplicateBacsMeter,
   generateActionAlternatives,
 } from '@/api'
-import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
 import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
@@ -40,7 +39,6 @@ import AuditStepTabs from '@/components/audit/AuditStepTabs.vue'
 import AuditStepGuide from '@/components/audit/AuditStepGuide.vue'
 import AuditStepFooter from '@/components/audit/AuditStepFooter.vue'
 import { AUDIT_STEP_MODE_KEY, AUDIT_STEP_NOTES_KEY, phaseForStep, stepObjective } from '@/lib/audit-steps-ui'
-import { useAuditLayout } from '@/composables/useAuditLayout'
 import { synthesisPendingStepsNote } from '@/lib/audit-tips-guided'
 import { requestAuditReveal, AUDIT_REVEAL_EVENT, waitForElement, nextFrame, flashAuditTarget } from '@/lib/audit-reveal'
 import { useAuditStepNav } from '@/composables/useAuditStepNav'
@@ -145,10 +143,8 @@ async function deleteAudit() {
     error(e.response?.data?.detail || 'Suppression impossible')
   }
 }
-import DeviceAddModal from '@/components/DeviceAddModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
-import VerticalStepper from '@/components/VerticalStepper.vue'
 import ActivityPanel from '@/components/ActivityPanel.vue'
 import BmsComponentsTable from '@/components/BmsComponentsTable.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
@@ -204,9 +200,6 @@ function openMeterAddModal(prefill) {
   meterAddPrefill.value = prefill && typeof prefill === 'object' ? prefill : null
   showAddMeterModal.value = true
 }
-const addDeviceSystem = ref(null) // { id, system_category, zone_name } — modale d'ajout d'équipement à 2 onglets
-
-// Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
 // SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES, OWNERSHIP_STRUCTURES } from '@/lib/audit-options'
@@ -350,23 +343,14 @@ const systemsByZone = computed(() => {
   return groups
 })
 
-// Replier/déplier manuellement les zones et catégories de la card 3.
+// Replier/déplier manuellement les usages de l'étape Systèmes.
 // Persistance via localStorage scopée au document.
-const collapsedZones = ref(new Set())
 const collapsedSystems = ref(new Set())
 function loadCollapseState() {
   try {
-    const z = localStorage.getItem(`bacs-zone-collapse:${docId}`)
-    collapsedZones.value = new Set(z ? JSON.parse(z) : [])
     const s = localStorage.getItem(`bacs-system-collapse:${docId}`)
     collapsedSystems.value = new Set(s ? JSON.parse(s) : [])
   } catch { /* silent */ }
-}
-function toggleZoneCollapsed(zoneId) {
-  const s = new Set(collapsedZones.value)
-  if (s.has(zoneId)) s.delete(zoneId); else s.add(zoneId)
-  collapsedZones.value = s
-  localStorage.setItem(`bacs-zone-collapse:${docId}`, JSON.stringify([...s]))
 }
 function toggleSystemCollapsed(systemId) {
   const s = new Set(collapsedSystems.value)
@@ -447,7 +431,7 @@ async function refreshAuditData() {
   await auditStore.refreshAuditCore()
 }
 
-// Devices regroupés par system_id (pour passer au composant SystemDevicesTable)
+// Devices regroupés par system_id (étape Systèmes)
 const devicesBySystem = computed(() => {
   const out = {}
   for (const d of devices.value) {
@@ -496,56 +480,6 @@ const thermalFiltered = computed(() => {
     !technicalZoneIds.has(t.zone_id) &&
     presentCats.get(t.zone_id)?.has(t.category || 'heating')
   )
-})
-
-// Stepper de progression de la card GTB. En mode BACS : 8 etapes
-// dont 3 reglementaires (R175-3 capacites, R175-3 mise a disposition,
-// R175-4/5 maintenance + formation). En mode site_audit : 5 etapes,
-// les 3 reglementaires sont retirees.
-const bmsSteps = computed(() => {
-  // Libellés visibles en clair (sommaire de la carte GTB) : pas d'article du décret.
-  if (bms.value?.out_of_service) {
-    return [{ label: isBacs.value ? 'GTB déclarée hors service' : 'Supervision déclarée hors service',
-              done: true,
-              anchor: 'bms-block-out-of-service',
-              // Plan : action bloquante « Remettre en service la GTB » (bacs-audit-action-generator).
-              hint: isBacs.value ? 'Le plan d\'actions propose de la remettre en service' : 'Rubriques de la supervision masquées' }]
-  }
-  const common = [
-    { label: isBacs.value ? 'Identification de la GTB' : 'Identification de la supervision',
-      done: !!bms.value?.existing_solution,
-      anchor: 'bms-block-identification',
-      hint: 'Solution, marque et emplacement' },
-    { label: 'Protocoles de mise à disposition',
-      anchor: 'bms-block-protocols',
-      done: !!(bms.value?.provided_protocols && JSON.parse(bms.value.provided_protocols || '[]').length) },
-    { label: isBacs.value ? 'Analyse fonctionnelle GTB' : 'Documents existants (AF, plans…)',
-      anchor: 'bms-block-af',
-      done: !!(document.value?.audit_existing_af_status === 'absent'
-              || (siteDocCounts.value?.doe || 0) > 0) },
-    { label: isBacs.value ? 'Usages traités cochés' : 'Usages supervisés cochés',
-      anchor: 'bms-block-usages',
-      done: !!(bms.value?.manages_heating || bms.value?.manages_cooling
-              || bms.value?.manages_ventilation || bms.value?.manages_dhw
-              || bms.value?.manages_lighting) },
-    { label: 'Équipements et compteurs intégrés',
-      anchor: 'bms-block-integrated',
-      done: !!(devices.value.some(d => d.managed_by_bms) || meters.value.some(m => m.managed_by_bms)),
-      hint: 'Au moins un système ou compteur lié à la supervision' },
-  ]
-  if (!isBacs.value) return common
-  return [
-    ...common,
-    { label: 'Suivi des consommations et des dérives',
-      anchor: 'bms-block-r175-3',
-      done: !!(bms.value?.meets_r175_3_p1 && bms.value?.meets_r175_3_p2) },
-    { label: 'Mise à disposition des données',
-      anchor: 'bms-block-data-provision',
-      done: !!(bms.value?.data_provision_to_manager && bms.value?.data_provision_to_operators) },
-    { label: 'Vérifications et formation de l\'exploitant',
-      anchor: 'bms-block-r175-4-5',
-      done: !!(bms.value?.has_maintenance_procedures && bms.value?.operator_trained) },
-  ]
 })
 
 // Devices disponibles pour une régulation thermique. On filtre sur le
@@ -1007,16 +941,15 @@ provide(AUDIT_STEP_MODE_KEY, {
   goToStep,
   numberFor: (key) => tabSteps.value.find(s => s.key === key)?.number ?? null,
 })
-// Mise en page « Nouvelle » : questions encore sans réponse, signalées par chaque étape (ne
-// bloquent pas la validation), affichées par le bandeau de l'étape.
+// Questions encore sans réponse, signalées par chaque étape (ne bloquent pas la validation),
+// affichées par le bandeau de l'étape.
 const stepNotes = reactive({})
 provide(AUDIT_STEP_NOTES_KEY, stepNotes)
 // Étape Synthèse : Claude rédige à partir de l'audit tel qu'il est ; le bandeau rappelle les étapes
 // pas encore validées.
-const { isGuidedLayout } = useAuditLayout()
 watchEffect(() => {
   const pending = stepperSteps.value.filter(s => s.key !== 'synthesis' && !s.validated).map(s => s.label)
-  stepNotes.synthesis = isGuidedLayout.value && pending.length ? [synthesisPendingStepsNote(pending)] : []
+  stepNotes.synthesis = pending.length ? [synthesisPendingStepsNote(pending)] : []
 })
 
 async function validateAndContinue() {
@@ -1912,7 +1845,6 @@ onBeforeUnmount(() => {
         :systems-by-zone="systemsByZone"
         :devices-by-system="devicesBySystem"
         :hidden-not-concerned-count="hiddenNotConcernedCount"
-        :collapsed-zones="collapsedZones"
         :collapsed-systems="collapsedSystems"
         :system-labels="SYSTEM_LABEL"
         :system-negative-labels="SYSTEM_NEGATIVE_LABEL"
@@ -1922,9 +1854,7 @@ onBeforeUnmount(() => {
         @open-notes="openNotesModal"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
-        @toggle-zone-collapsed="toggleZoneCollapsed"
         @toggle-system-collapsed="toggleSystemCollapsed"
-        @add-device="sys => addDeviceSystem = sys"
       />
       </div>
 
@@ -1969,7 +1899,6 @@ onBeforeUnmount(() => {
       <BmsSection
         v-if="visitedSteps.has('bms')"
         :active="activeStepKey === 'bms'"
-        :bms-steps="bmsSteps"
         :devices-with-meta="devicesWithMeta"
         :meters-present="metersPresent"
         :system-labels="SYSTEM_LABEL"
@@ -2147,14 +2076,6 @@ onBeforeUnmount(() => {
       :required-locked="isBacs"
       @close="showAddMeterModal = false; meterAddPrefill = null"
       @submit="addMeter"
-    />
-    <DeviceAddModal
-      v-if="addDeviceSystem"
-      :system="addDeviceSystem"
-      :system-label="addDeviceSystem.is_bacs === 0 ? (addDeviceSystem.custom_label || 'Usage') : (SYSTEM_LABEL[addDeviceSystem.system_category] || addDeviceSystem.system_category)"
-      :zone-name="addDeviceSystem.zone_name || ''"
-      @close="addDeviceSystem = null"
-      @changed="refreshAuditData"
     />
 
     <BulkPhotoUploadModal

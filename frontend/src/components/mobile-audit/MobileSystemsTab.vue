@@ -258,7 +258,7 @@ function usageKpi(s) {
 
 // Priorité de rôle pour le tri par chaîne énergétique
 // (Production → Distribution → Émission → Régulation seule → autre).
-// Aligné sur la card 04 desktop (SystemDevicesTable.rolePriority).
+// Aligné sur la card 04 desktop (SystemDeviceList.rolePriority).
 const ROLE_PRIORITY_MOB = { production: 1, distribution: 2, emission: 3, regulation: 4 }
 function rolePriorityMob(d) {
   const roles = Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])
@@ -598,7 +598,7 @@ async function saveDevice() {
       communication_protocols: deviceForm.value.communication_protocols ?? null,
       // Le legacy `communication_protocol` (single) est nullé : la source
       // de vérité côté écriture est désormais `communication_protocols`
-      // (cohérent avec patchDevice de SystemDevicesTable).
+      // (cohérent avec la fiche équipement du bureau).
       communication_protocol: null,
       wired: triBool(deviceForm.value.wired),
       // Régulation — mêmes champs que DeviceEditModal desktop.

@@ -45,9 +45,8 @@ const props = defineProps({
   // Page audit à onglets : une énergie affichée à la fois (sous-onglets de
   // MetersSection) → groupe toujours déplié, en-tête non repliable.
   tabMode: { type: Boolean, default: false },
-  // Mise en page « Nouvelle » : carte à bandeau teinté de la couleur de l'énergie, une ligne par
-  // compteur (usage et ce qu'il mesure côte à côte, texte entier au survol), filtre des compteurs.
-  guided: { type: Boolean, default: false },
+  // Carte à bandeau teinté de la couleur de l'énergie, une ligne par compteur (usage et ce qu'il
+  // mesure côte à côte, texte entier au survol), filtre des compteurs.
   filter: { type: String, default: 'all' }, // 'all' | 'todo' (présence sans réponse) | 'missing' (requis absent)
 })
 
@@ -144,9 +143,9 @@ function setGroupBy(v) {
 // avec des subheaders inline (un objet { kind: 'header', label, count }
 // suivi des compteurs du groupe). Le drag-drop n'est actif qu'en mode
 // 'none' (sinon il faudrait reranger en respectant les groupes).
-// Mise en page « Nouvelle » : filtre « à compléter » (présence sans réponse) / « requis manquants ».
+// Filtre « à compléter » (présence sans réponse) / « requis manquants ».
 const shownMeters = computed(() => {
-  if (!props.guided || props.filter === 'all') return props.meters
+  if (props.filter === 'all') return props.meters
   return props.meters.filter(props.filter === 'missing' ? isMissing : isUnanswered)
 })
 const displayRows = computed(() => {
@@ -202,7 +201,7 @@ const displayRows = computed(() => {
 // subheaders se mélangent et l'expérience devient confuse), ou une partie des compteurs masquée.
 const dragEnabled = computed(() => groupBy.value === 'none' && shownMeters.value.length === props.meters.length)
 
-// Mise en page « Nouvelle » : ce que mesure le compteur, sous l'usage. Le début de la phrase du
+// Ce que mesure le compteur, sous l'usage. Le début de la phrase du
 // serveur (« Électricité consommée par : », lib/bacs-meter-purpose.js) répète l'onglet d'énergie :
 // on garde la suite ; la phrase entière reste au survol.
 const CONSUMED_BY_PREFIX = /^(Électricité consommée|Gaz consommé|Énergie consommée) par\s*:\s*/
@@ -271,16 +270,13 @@ onBeforeUnmount(teardownSortable)
 </script>
 
 <template>
-  <div :class="guided
-         ? ['meter-energy bg-white rounded-xl ring-1 ring-slate-200 overflow-hidden', meters.length === 0 ? 'opacity-80' : '']
-         : ['bg-white rounded-2xl border overflow-hidden transition',
-            meters.length === 0 ? 'border-gray-200 opacity-80' : 'border-gray-200']"
-       :style="guided ? { '--energy': energy.color } : undefined">
+  <div :class="['meter-energy bg-white rounded-xl ring-1 ring-slate-200 overflow-hidden', meters.length === 0 ? 'opacity-80' : '']"
+       :style="{ '--energy': energy.color }">
     <!-- Header énergie : couleur + KPI + toggle. En mode onglets, le groupe reste ouvert : l'en-tête
          est un simple titre (plus un bouton grisé sans raison, ni un faux élément cliquable). -->
     <component :is="tabMode ? 'div' : 'button'" :type="tabMode ? undefined : 'button'" @click="!tabMode && toggle()"
                :class="['w-full flex items-center gap-3 px-4 py-3 text-left transition', tabMode ? '' : 'hover:bg-gray-50',
-                        guided ? 'meter-energy-head' : '']">
+                        'meter-energy-head']">
       <span class="w-10 h-10 rounded-xl inline-flex items-center justify-center shrink-0"
             :style="{ background: energy.color + '1a', color: energy.color }">
         <FontAwesomeIcon :icon="['fas', energy.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
@@ -337,7 +333,7 @@ onBeforeUnmount(teardownSortable)
           </button>
         </div>
       </div>
-      <div v-if="meters.length && (!guided || shownMeters.length)" class="overflow-x-auto">
+      <div v-if="shownMeters.length" class="overflow-x-auto">
         <table class="data-table w-full text-sm">
           <thead>
             <tr>
@@ -365,11 +361,11 @@ onBeforeUnmount(teardownSortable)
                           :style="{ background: row.color + '1a', color: row.color }">
                       <FontAwesomeIcon :icon="['fas', row.icon.replace(/^fa-/, '')]" class="w-3 h-3" />
                     </span>
-                    <span :class="guided ? 'text-[13px] font-semibold text-indigo-600' : 'text-xs font-semibold text-gray-700 uppercase tracking-wider'">
+                    <span class="text-[13px] font-semibold text-indigo-600">
                       {{ row.label }}
                     </span>
-                    <span class="text-xs text-gray-400">{{ guided ? '' : '— ' }}{{ row.count }} compteur{{ row.count > 1 ? 's' : '' }}</span>
-                    <span v-if="guided && row.todo" class="text-xs font-medium text-amber-800">· {{ row.todo }} à compléter</span>
+                    <span class="text-xs text-gray-400">{{ row.count }} compteur{{ row.count > 1 ? 's' : '' }}</span>
+                    <span v-if="row.todo" class="text-xs font-medium text-amber-800">· {{ row.todo }} à compléter</span>
                   </div>
                 </td>
               </tr>
@@ -383,7 +379,7 @@ onBeforeUnmount(teardownSortable)
                 :row-class="['meter-row',
                   row.meter.out_of_service ? 'opacity-50' : '',
                   isMissing(row.meter) ? 'bg-red-50/40' : '',
-                  guided && isUnanswered(row.meter) ? 'bg-amber-50/50' : '',
+                  isUnanswered(row.meter) ? 'bg-amber-50/50' : '',
                   highlightId === row.meter.id ? 'ring-2 ring-amber-300 bg-amber-50/40' : '']"
                 @changed="$emit('photos-changed')">
               <td class="align-middle">
@@ -395,10 +391,10 @@ onBeforeUnmount(teardownSortable)
               </td>
               <!-- Colonne Usage — masquée quand on groupe déjà par usage
                    (le sous-en-tête EST l'usage → doublon). -->
-              <!-- Mise en page « Nouvelle » : l'usage, puis ce que mesure le compteur sur une ligne
-                   (coupée, texte entier au survol). La colonne prend la place restante : toutes les
-                   autres colonnes restent visibles. -->
-              <td v-if="groupBy !== 'usage' && guided" class="w-full max-w-0 min-w-40">
+              <!-- L'usage, puis ce que mesure le compteur sur une ligne (coupée, texte entier au
+                   survol). La colonne prend la place restante : toutes les autres colonnes restent
+                   visibles. -->
+              <td v-if="groupBy !== 'usage'" class="w-full max-w-0 min-w-40">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <span v-if="isMissing(row.meter)" class="inline-flex size-4 items-center justify-center shrink-0 -mx-0.5"
                         v-tooltip="METER_MISSING_TIP"><span class="w-2 h-2 rounded-full bg-red-500"></span></span>
@@ -411,36 +407,6 @@ onBeforeUnmount(teardownSortable)
                 </div>
                 <p v-if="meterDetail(row.meter)" :class="['truncate text-[11px] text-slate-600 text-left', row.meter.zone_id ? 'mt-0.5' : '']"
                    v-tooltip="meterDetailTip(row.meter)">{{ meterDetail(row.meter) }}</p>
-              </td>
-              <td v-else-if="groupBy !== 'usage'">
-                <div class="flex items-center gap-1">
-                  <span v-if="isMissing(row.meter)"
-                        class="text-red-600 shrink-0" v-tooltip="METER_MISSING_TIP">⚠</span>
-                  <span v-else-if="isUnanswered(row.meter)"
-                        class="text-amber-600 font-semibold shrink-0" v-tooltip="METER_UNANSWERED_TIP">?</span>
-                  <span v-if="row.meter.zone_id && thermalMeterName(row.meter)"
-                        class="text-xs font-medium text-gray-700 shrink-0"
-                        v-tooltip="thermalMeterTip(thermalMeterName(row.meter), row.meter.usage)">{{ thermalMeterName(row.meter) }}</span>
-                  <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
-                  <span v-else class="text-xs text-gray-400 italic">—</span>
-                </div>
-                <!-- Ce que mesure le compteur obligatoire (équipements, zones —
-                     serveur, lib/bacs-meter-purpose.js), sinon statut au regard
-                     du plan (usage exempté…) : même lecture que le chapitre 4 du PDF. -->
-                <p v-if="row.meter.purpose" v-tooltip="planNote(row.meter)?.tooltip"
-                   class="mt-0.5 text-[11px] text-slate-600 text-left whitespace-normal max-w-md">
-                  {{ row.meter.purpose }}
-                </p>
-                <p v-else-if="planNote(row.meter)" v-tooltip="planNote(row.meter).tooltip"
-                   class="mt-0.5 text-[11px] text-slate-500 italic text-left">
-                  {{ planNote(row.meter).label }}
-                </p>
-                <!-- Nom du système desservi (ex. « Chaudière principale »),
-                     auparavant visible seulement dans la matrice « Plan de comptage ». -->
-                <p v-if="systemNameForMeter(row.meter)" v-tooltip.overflow
-                   class="mt-0.5 text-[11px] text-gray-500 truncate max-w-56 text-left">
-                  {{ systemNameForMeter(row.meter) }}
-                </p>
               </td>
               <!-- Colonne Zone — masquée quand on groupe déjà par zone (le
                    sous-en-tête EST la zone → doublon). Le ⚠ n'est repris ici que
@@ -563,7 +529,7 @@ onBeforeUnmount(teardownSortable)
           </tbody>
         </table>
       </div>
-      <p v-else-if="guided && meters.length" class="px-4 py-3 text-xs text-slate-500">{{ METERS_FILTER_EMPTY }}</p>
+      <p v-else-if="meters.length" class="px-4 py-3 text-xs text-slate-500">{{ METERS_FILTER_EMPTY }}</p>
 
       <!-- Footer : bouton ajouter dans cette énergie -->
       <div class="px-3 py-3 border-t border-gray-100 bg-gray-50/40">
@@ -578,7 +544,7 @@ onBeforeUnmount(teardownSortable)
 </template>
 
 <style scoped>
-/* Mise en page « Nouvelle » : bandeau de l'énergie teinté de sa couleur (comme les usages de l'étape
+/* Bandeau de l'énergie teinté de sa couleur (comme les usages de l'étape
    Systèmes, lib/system-fluids.js). */
 .meter-energy-head { background: color-mix(in srgb, var(--energy) 8%, white); }
 </style>

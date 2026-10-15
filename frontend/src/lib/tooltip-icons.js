@@ -30,11 +30,11 @@ import {
   faQuoteLeft, faRightFromBracket, faRightLeft, faRotate, faRotateLeft, faRotateRight,
   faRoute, faScaleBalanced, faScrewdriverWrench, faShareFromSquare, faShareNodes, faShieldHalved,
   faSliders, faSnowflake, faSolarPanel, faSquareCheck, faSquareMinus, faStar,
-  faStop, faStrikethrough, faTable, faTableCellsLarge, faTableColumns, faTableList,
-  faTag, faTemperatureHalf, faTerminal, faThumbtack, faToggleOff, faToggleOn,
-  faTowerBroadcast, faTowerCell, faTrash, faTree, faTriangleExclamation, faTruck,
-  faUnderline, faUpload, faUser, faUserGroup, faUserTie, faUsers,
-  faWallet, faWandMagicSparkles, faWifi, faXmark,
+  faStop, faStrikethrough, faTable, faTableCellsLarge, faTableList, faTag,
+  faTemperatureHalf, faTerminal, faThumbtack, faToggleOff, faToggleOn, faTowerBroadcast,
+  faTowerCell, faTrash, faTree, faTriangleExclamation, faTruck, faUnderline,
+  faUpload, faUser, faUserGroup, faUserTie, faUsers, faWallet,
+  faWandMagicSparkles, faWifi, faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 
 export const TOOLTIP_ICONS = [
@@ -62,11 +62,11 @@ export const TOOLTIP_ICONS = [
   faQuoteLeft, faRightFromBracket, faRightLeft, faRotate, faRotateLeft, faRotateRight,
   faRoute, faScaleBalanced, faScrewdriverWrench, faShareFromSquare, faShareNodes, faShieldHalved,
   faSliders, faSnowflake, faSolarPanel, faSquareCheck, faSquareMinus, faStar,
-  faStop, faStrikethrough, faTable, faTableCellsLarge, faTableColumns, faTableList,
-  faTag, faTemperatureHalf, faTerminal, faThumbtack, faToggleOff, faToggleOn,
-  faTowerBroadcast, faTowerCell, faTrash, faTree, faTriangleExclamation, faTruck,
-  faUnderline, faUpload, faUser, faUserGroup, faUserTie, faUsers,
-  faWallet, faWandMagicSparkles, faWifi, faXmark,
+  faStop, faStrikethrough, faTable, faTableCellsLarge, faTableList, faTag,
+  faTemperatureHalf, faTerminal, faThumbtack, faToggleOff, faToggleOn, faTowerBroadcast,
+  faTowerCell, faTrash, faTree, faTriangleExclamation, faTruck, faUnderline,
+  faUpload, faUser, faUserGroup, faUserTie, faUsers, faWallet,
+  faWandMagicSparkles, faWifi, faXmark,
 ]
 
 library.add(...TOOLTIP_ICONS)

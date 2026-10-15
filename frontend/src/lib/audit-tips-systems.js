@@ -3,7 +3,7 @@
 // GTB et de ses composants matériels. Français simple pour un lecteur qui ne connaît pas le
 // décret BACS, tutoiement, article du décret en pied discret (`article`).
 // Une seule source pour le bureau (SystemsSection, SystemDeviceList, DeviceEditModal,
-// SystemDevicesTable, SystemsPresenceMatrix, BmsSection, BmsComponentsTable…) et le mobile
+// SystemsPresenceMatrix, BmsSection, BmsComponentsTable…) et le mobile
 // (MobileSystemsTab, MobileBmsTab). Fonctions PURES, imports relatifs uniquement (testées par
 // backend-node/test/audit-tips-systems.test.mjs). Règles : CLAUDE.md § « Infobulles (UI) ».
 // Règles métier relues dans backend-node/src/lib/ (bacs-audit-power.js, bacs-gtb-scope.js,

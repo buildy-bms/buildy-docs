@@ -632,17 +632,20 @@ retours à la ligne, placement parfait (jamais sur l'élément survolé, toujour
   par `cd backend-node && npx vitest run`.
 - Galerie : route cachée `/style-guide` (étiquettes, cartes, tons, accents, cas limites).
 
-## Étape Systèmes : deux mises en page (2026-10-13)
+## Étape Systèmes : mise en page guidée (2026-10-13)
 
-Bouton « Mise en page : Actuelle / Nouvelle » dans le bandeau de chaque étape (`AuditStepGuide`),
-un seul choix pour toutes les étapes (`composables/useAuditLayout.js`, `localStorage`
-`bacs-audit-layout-v2` = `classic` | `guided`). **Nouvelle imposée par défaut** (Kévin, 2026-10-15) :
-la clé v2 ignore les anciens choix « Actuelle » (`bacs-audit-layout`, `bacs-systems-layout`) ; le
-bouton permet encore de revenir à l'actuelle pour comparer.
-Même données, mêmes actions ; règle de Kévin : la nouvelle ne doit jamais être moins pratique
-(aucune fonction perdue, jamais plus de clics) et **aucune réponse en masse**.
+**Une seule mise en page** (Kévin, 2026-10-15, v0.1.277) : le bouton « Mise en page : Actuelle /
+Nouvelle » et tout le code de l'ancienne (« Actuelle », `classic`, `!guided`) sont retirés —
+`composables/useAuditLayout.js`, `SystemDevicesTable.vue`, `DeviceAddModal.vue`,
+`VerticalStepper.vue` supprimés ; `SystemDeviceList`, `SystemsPresenceMatrix`, `CreateSystemModal`,
+`DeviceMoveShare`, `RubricShell`, `MeterEnergyGroup`, `SiteDocumentsManager` n'ont plus que leur
+forme guidée. Retrait vérifié pixel par pixel (12 étapes × 6 audits, onglets, fiches). Les clés
+`bacs-audit-layout*`, `bacs-systems-layout` et `bacs-zone-collapse:*` du navigateur ne sont plus lues.
+Le mode « sans étapes » (`isStepMode` faux, page unique) reste dans le code, jamais atteint.
+Règle de Kévin : jamais moins pratique (aucune fonction perdue, jamais plus de clics) et **aucune
+réponse en masse**. `DeviceEditModal` garde ses deux formes : rubriques (fiche à droite) et fiche
+entière (fenêtre « Agrandir »).
 
-- **Actuelle** : inchangée au pixel près (vérifié par captures avant / après, bouton masqué).
 - **Guidée** (« piste D ») : trois états partout — « à compléter » (information manquante),
   « à vérifier » (règles du pré-contrôle de livraison `GET /bacs-audit/:id/precheck` + production
   sans puissance `power_summary.incompletePowerDeviceIds`), « sans réponse » (ni présent ni non
@@ -712,27 +715,26 @@ comme un schéma technique où chaque circuit a sa couleur (`lib/system-fluids.j
 de sa couleur (`--fluid-tint`) ; un équipement = une ligne, production en tête (point plein, nom en
 gras), équipements desservis décalés et reliés par le trait du circuit (`--fluid`) ; une rubrique de
 la fiche = une carte (icône, titre, résumé sur une 2e ligne, état à droite, bandeau teinté selon
-l'état quand elle est ouverte). La mise en page actuelle n'en est pas affectée.
+l'état quand elle est ouverte).
 **Filtre par usage** (demande de Kévin, 13/10) : en tête du guide de gauche, « Tous les usages »
 (par défaut) ; un clic sur un usage n'affiche plus que ce système (rappel « Seulement l'usage … »
 au-dessus de la liste), le résumé, les compteurs et précédent / suivant de la fiche suivent ; le
 parcours « Reprendre » déplace le filtre ; remis à « Tous » à chaque changement de zone.
 
-## Autres étapes : mise en page « Nouvelle » (2026-10-13)
+## Autres étapes : même mise en page (2026-10-13)
 
-Même choix « Mise en page » que l'étape Systèmes ; même langage : le reste à faire en tête (encadré
-orange + « Aller au premier »), filtres en pastilles (« À compléter », « Non conformes »…), chaque
-groupe dans sa carte, une couleur = un sens (usage / énergie / état, jamais décoratif), une ligne
-par élément. **Mise en page actuelle inchangée au pixel près** : tout passe par `guided` (computed
-`stepMode.enabled && isGuidedLayout`), classes et blocs conditionnels ; vérifié étape par étape
-contre une copie de l'interface du dernier commit (`git archive HEAD frontend`, Vite sur un autre
-port avec `server.fs.allow` vers les `node_modules`, fenêtre de 5 200 px de haut pour éviter les
-recouvrements de l'en-tête collant, bouton « Mise en page » masqué). Bruit connu : carte Google de
-l'étape Zones, lissage de 1 à 2 niveaux, sommaire collant de la GTB à 1 024 px (calque composité).
+Même langage que l'étape Systèmes : le reste à faire en tête (encadré orange + « Aller au
+premier »), filtres en pastilles (« À compléter », « Non conformes »…), chaque groupe dans sa carte,
+une couleur = un sens (usage / énergie / état, jamais décoratif), une ligne par élément.
+**Vérifier un changement d'affichage au pixel près** : copie de l'interface de référence (`rsync` de
+`frontend/` sans `node_modules`, lien symbolique vers ceux du dépôt, `server.fs.allow` dans la copie
+de `vite.config.js`), Vite sur un autre port, captures pleine page des 12 étapes, puis comparaison
+pixel par pixel ; attendre la fin du chargement de l'audit (bandeau de l'étape affiché, plus de
+« Chargement… »), un seul navigateur à la fois. Bruit connu : carte Google de l'étape Zones,
+lissage de 1 à 2 niveaux, sommaire collant de la GTB à 1 024 px (calque composité).
 
-- **Pièces communes** (`components/audit/guided/`) : `RubricShell` (actuelle = la div d'origine,
-  mêmes id et classes ; nouvelle = rubrique repliable, en-tête `DeviceSectionHeader`, qui accepte
-  aussi `unanswered` = « sans réponse » en pointillés), `RubricsFilter` (« Le reste à faire / Toute
+- **Pièces communes** (`components/audit/guided/`) : `RubricShell` (rubrique repliable, en-tête
+  `DeviceSectionHeader`, qui accepte aussi `unanswered` = « sans réponse » en pointillés), `RubricsFilter` (« Le reste à faire / Toute
   l'étape »), `AuditGuideRail` (guide de gauche, une ligne par rubrique), `composables/useStepRubrics.js`
   (ouverture des rubriques, `localStorage` `bacs-step-rubrics`). Textes : `lib/audit-tips-guided.js`.
 - **Bandeau** : chaque étape publie ses questions encore sans réponse (`AUDIT_STEP_NOTES_KEY`,
@@ -780,7 +782,7 @@ l'étape Zones, lissage de 1 à 2 niveaux, sommaire collant de la GTB à 1 024 p
   (`PATCH /afs/:id`) juge sur le cumul et rafraîchit le cache. Mig 216 (accord de Kévin 15/10) :
   rattrapage des caches des audits BACS non livrés (base de dev : #43 122,8 → 155,8 kW, #56 949 →
   1 002 kW, aucun verdict changé ; test `power-cache-migration`).
-- Zones, mise en page actuelle aussi : nom `min-w-40`, régime `w-60` (le nom tombait à 16 px).
+- Zones : nom `min-w-40`, régime `w-60` (le nom tombait à 16 px).
 - Pièges vus en relisant sur d'autres audits que STEF (2026-10-14) : une rubrique ouverte « par
   défaut » avant la fin d'un chargement propre au composant reste ouverte une fois complète → mettre
   ce chargement dans la clé de `useStepRubrics` (GTB : `afDocsLoaded`) ; le résumé de la puissance

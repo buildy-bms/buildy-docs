@@ -147,7 +147,7 @@ async function autoFix(f) {
                          :attach-to="{ device_id: device.id, system_id: system.id }" :label="deviceName" />
         <VoiceNoteButton v-if="siteUuid" :key="`voice-${device.id}`" :site-uuid="siteUuid"
                          :attach-to="{ device_id: device.id }" :label="deviceName" />
-        <DeviceMoveShare :key="`move-${device.id}`" searchable dialog :device="device" :systems="systems"
+        <DeviceMoveShare :key="`move-${device.id}`" :device="device" :systems="systems"
                          @updated="emit('changed')" />
         <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
         <button type="button" class="btn-icon" @click="emit('duplicate')" v-tooltip="'Dupliquer cet équipement'">

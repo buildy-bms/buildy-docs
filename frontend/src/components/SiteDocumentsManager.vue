@@ -37,10 +37,9 @@ const props = defineProps({
   // Zone de dépôt sur une seule ligne (étape Documents de l'audit à onglets) :
   // mêmes textes, hauteur divisée par ~4.
   compact: { type: Boolean, default: false },
-  // Mise en page « Nouvelle » de l'audit : documents groupés par rattachement (lib/documents-guide.js),
-  // catégorie en liste de choix de l'appli, pastille « Rattaché à » sans le type redit par le groupe.
-  guided: { type: Boolean, default: false },
 })
+// Documents groupés par rattachement (lib/documents-guide.js), catégorie en liste de choix de
+// l'appli, pastille « Rattaché à » sans le type redit par le groupe.
 
 const { success, error } = useNotification()
 const { confirm } = useConfirm()
@@ -249,11 +248,9 @@ function attachmentLabel(d) {
   return { kind: 'Site', label: '' }
 }
 
-// Lignes du tableau : dans l'ordre d'origine, ou groupées par rattachement (mise en page « Nouvelle »).
+// Lignes du tableau, groupées par rattachement.
 const grouped = computed(() => groupDocuments(documents.value, d => attachmentLabel(d).kind, d => attachmentLabel(d).label))
-const tableRows = computed(() => (props.guided
-  ? grouped.value.rows
-  : documents.value.map(doc => ({ doc, group: null, first: false }))))
+const tableRows = computed(() => grouped.value.rows)
 const CATEGORY_OPTIONS = [...CATEGORIES, { value: 'photo', label: 'Photo' }]
 
 const previewDoc = ref(null)
@@ -396,14 +393,8 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <p v-if="!loading && documents.length && guided" class="mt-4 text-xs text-gray-600">
+    <p v-if="!loading && documents.length" class="mt-4 text-xs text-gray-600">
       <span v-tooltip="DOCS_REPORT_TIP">{{ docsSummaryLine(documents.length, includedCount) }}</span>
-    </p>
-    <p v-if="!loading && documents.length && !guided" class="mt-4 text-xs text-gray-500">
-      <span class="font-semibold text-gray-700">{{ includedCount }}</span>
-      document{{ includedCount > 1 ? 's' : '' }} sur {{ documents.length }}
-      inclus dans le rapport PDF (annexe « Documents joints »). Coche « Inclure » pour ajouter un document ;
-      les photos rattachées à une zone, un système, un équipement, un compteur ou la GTB figurent déjà dans leur chapitre.
     </p>
 
     <div v-if="!loading && documents.length" class="mt-2 overflow-x-auto">
@@ -435,7 +426,7 @@ onBeforeUnmount(() => {
       </thead>
       <tbody class="divide-y divide-gray-100">
         <template v-for="{ doc: d, group: g, first } in tableRows" :key="d.id">
-        <!-- Mise en page « Nouvelle » : en-tête de groupe (rattachement). -->
+        <!-- En-tête de groupe (rattachement). -->
         <tr v-if="first" class="docs-group-head">
           <td colspan="8" class="px-3 py-2 bg-slate-100 text-left">
             <div class="flex items-center gap-2 flex-wrap">
@@ -481,26 +472,20 @@ onBeforeUnmount(() => {
             </div>
           </td>
           <td class="px-3 py-2 align-middle">
-            <SearchableSelect v-if="guided" :model-value="d.category" :options="CATEGORY_OPTIONS"
+            <SearchableSelect :model-value="d.category" :options="CATEGORY_OPTIONS"
                               :clearable="false" size="sm"
                               @update:model-value="v => v && v !== d.category && patchDoc(d, { category: v })" />
-            <select v-else :value="d.category"
-                    @change="e => patchDoc(d, { category: e.target.value })"
-                    class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
-              <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-              <option value="photo">Photo</option>
-            </select>
           </td>
           <td class="px-3 py-2 align-middle">
-            <!-- Mise en page « Nouvelle » : le groupe dit déjà le type de rattachement. -->
-            <span v-if="guided && attachmentLabel(d).kind === 'Site'" class="text-xs text-gray-400"
+            <!-- Le groupe dit déjà le type de rattachement. -->
+            <span v-if="attachmentLabel(d).kind === 'Site'" class="text-xs text-gray-400"
                   v-tooltip="attachmentTip(attachmentLabel(d))">{{ DOCS_SITE_WIDE }}</span>
             <span v-else :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border max-w-full whitespace-nowrap',
               attachmentLabel(d).kind === 'Site'
                 ? 'border-gray-200 text-gray-600 bg-gray-50'
                 : 'border-indigo-200 text-indigo-700 bg-indigo-50']"
                   v-tooltip="attachmentTip(attachmentLabel(d))">
-              <span v-if="!guided || kindShownInGroup(g) || !attachmentLabel(d).label" class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
+              <span v-if="kindShownInGroup(g) || !attachmentLabel(d).label" class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
               <span v-if="attachmentLabel(d).label" class="truncate">{{ attachmentLabel(d).label }}</span>
             </span>
           </td>

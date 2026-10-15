@@ -48,19 +48,16 @@ function decorOf(s) {
 const props = defineProps({
   device: { type: Object, required: true },
   systems: { type: Array, required: true },
-  // Mise en page guidée de l'étape Systèmes : champ de recherche (zone ou usage) et case
-  // « même usage seulement » en tête du menu. Sans elle : menu inchangé.
-  searchable: { type: Boolean, default: false },
-  // Une seule fenêtre « Déplacer ou partager » à deux onglets (maquette piste D), ouverte par
-  // l'une ou l'autre icône sur l'onglet correspondant ; pied : zones desservies. Avec `searchable`.
-  dialog: { type: Boolean, default: false },
 })
+// Une seule fenêtre « Déplacer ou partager » à deux onglets (maquette piste D), ouverte par l'une ou
+// l'autre icône sur l'onglet correspondant : champ de recherche (zone ou usage), case « même usage
+// seulement », pied : zones desservies.
 const emit = defineEmits(['updated'])
 const { error: notifyError, success } = useNotification()
 
 library.add(faMagnifyingGlass)
 
-// ─── Recherche (option `searchable`) ─────────────────────────────────────────
+// ─── Recherche ─────────────────────────────────────────
 const query = ref('')
 const sameUsageOnly = ref(false)
 const searchInput = ref(null)
@@ -79,13 +76,12 @@ function matches(g, s) {
   return norm(g.zone_name).includes(q) || norm(labelOf(s)).includes(q)
 }
 function filterZones(zones) {
-  if (!props.searchable) return zones
   return zones
     .map(g => ({ ...g, items: g.items.filter(s => matches(g, s)) }))
     .filter(g => g.items.length)
 }
 
-// Fenêtre (option `dialog`) : zone et usage d'origine, zones desservies en tout.
+// Fenêtre : zone et usage d'origine, zones desservies en tout.
 const ownSystem = computed(() => (props.systems || []).find(s => s.id === props.device.system_id) || null)
 const ownZoneName = computed(() => ownSystem.value?.zone_name || '')
 const zonesServed = computed(() => {
@@ -175,63 +171,23 @@ function close() { openKind.value = null }
 
 // Popover téléporté au <body> pour échapper aux overflow:hidden des cartes.
 const popupRef = ref(null)
-const pos = ref({ top: 0, left: 0, maxHeight: 480 })
-const DROPDOWN_W = 288
-const MIN_PANEL_H = 220 // sous cette hauteur en bas, on flip vers le haut
-
-function updatePos() {
-  const r = rootRef.value?.getBoundingClientRect()
-  if (!r) return
-  const vh = window.innerHeight || document.documentElement.clientHeight
-  const margin = 8
-  const gap = 4
-  const spaceBelow = vh - r.bottom - margin
-  const spaceAbove = r.top - margin
-  // Flip vers le haut quand l'espace en bas est insuffisant ET qu'il y a plus
-  // de place en haut. Évite de tronquer la liste sous le viewport en bas de
-  // page (incident 2026-06-08 sur l'audit Communay : « Bureaux 2 » coupé).
-  const flipUp = spaceBelow < MIN_PANEL_H && spaceAbove > spaceBelow
-  const maxAvail = flipUp ? spaceAbove - gap : spaceBelow - gap
-  const maxHeight = Math.max(180, Math.min(480, maxAvail))
-  pos.value = flipUp
-    ? { top: Math.max(margin, r.top - gap - maxHeight), left: Math.max(8, r.right - DROPDOWN_W), maxHeight }
-    : { top: r.bottom + gap, left: Math.max(8, r.right - DROPDOWN_W), maxHeight }
-}
 function onDocClick(e) {
   if (rootRef.value && rootRef.value.contains(e.target)) return
   if (popupRef.value && popupRef.value.contains(e.target)) return
   close()
 }
 watch(openKind, async (v, old) => {
-  if (props.dialog) {
-    if (v && !old) {
-      await nextTick()
-      query.value = ''
-      searchInput.value?.focus?.()
-      document.addEventListener('keydown', onDialogKey, true)
-    } else if (!v) document.removeEventListener('keydown', onDialogKey, true)
-    return
-  }
-  if (v) {
+  if (v && !old) {
     await nextTick()
-    updatePos()
-    if (props.searchable) {
-      query.value = ''
-      searchInput.value?.focus?.()
-    }
-    window.addEventListener('scroll', updatePos, true)
-    window.addEventListener('resize', updatePos)
-  } else {
-    window.removeEventListener('scroll', updatePos, true)
-    window.removeEventListener('resize', updatePos)
-  }
+    query.value = ''
+    searchInput.value?.focus?.()
+    document.addEventListener('keydown', onDialogKey, true)
+  } else if (!v) document.removeEventListener('keydown', onDialogKey, true)
 })
 onMounted(() => document.addEventListener('mousedown', onDocClick))
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onDialogKey, true)
   document.removeEventListener('mousedown', onDocClick)
-  window.removeEventListener('scroll', updatePos, true)
-  window.removeEventListener('resize', updatePos)
 })
 </script>
 
@@ -263,54 +219,41 @@ onBeforeUnmount(() => {
   </div>
 
   <Teleport to="body">
-    <!-- Fenêtre (option `dialog`) : fond, fenêtre centrée ; sinon, menu sous les icônes. -->
-    <div v-if="openKind" :class="dialog ? 'fixed inset-0 z-[115] flex items-center justify-center bg-slate-900/45 p-4' : 'contents'">
+    <!-- Fond, fenêtre centrée. -->
+    <div v-if="openKind" class="fixed inset-0 z-[115] flex items-center justify-center bg-slate-900/45 p-4">
     <div
       ref="popupRef"
-      :role="dialog ? 'dialog' : undefined"
-      :aria-modal="dialog ? 'true' : undefined"
-      :aria-labelledby="dialog ? `move-share-title-${device.id}` : undefined"
-      :style="dialog ? null : { position: 'fixed', top: pos.top + 'px', left: pos.left + 'px', width: DROPDOWN_W + 'px', maxHeight: pos.maxHeight + 'px' }"
-      :class="dialog
-        ? 'w-full max-w-[640px] max-h-[min(700px,calc(100vh-32px))] bg-white rounded-2xl shadow-2xl text-sm flex flex-col overflow-hidden'
-        : 'z-60 bg-white border border-gray-200 rounded-lg shadow-lg text-sm flex flex-col'"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="`move-share-title-${device.id}`"
+      class="w-full max-w-[640px] max-h-[min(700px,calc(100vh-32px))] bg-white rounded-2xl shadow-2xl text-sm flex flex-col overflow-hidden"
     >
-      <template v-if="dialog">
-        <div class="px-5 pt-4 pb-3 flex items-start gap-3 shrink-0">
-          <div class="min-w-0 flex-1">
-            <h2 :id="`move-share-title-${device.id}`" class="text-[17px] font-semibold text-primary truncate" v-tooltip.overflow>
-              {{ device.name || 'Équipement sans nom' }}
-            </h2>
-            <p v-if="ownSystem" class="mt-0.5 text-xs text-slate-600 truncate" v-tooltip.overflow>
-              Saisi dans {{ ownZoneName }}, {{ ownUsageLabel.toLowerCase() }}
-            </p>
-          </div>
-          <button type="button" class="btn-icon" @click="close" v-tooltip="'Fermer la fenêtre'">
-            <XMarkIcon class="w-4 h-4" />
+      <div class="px-5 pt-4 pb-3 flex items-start gap-3 shrink-0">
+        <div class="min-w-0 flex-1">
+          <h2 :id="`move-share-title-${device.id}`" class="text-[17px] font-semibold text-primary truncate" v-tooltip.overflow>
+            {{ device.name || 'Équipement sans nom' }}
+          </h2>
+          <p v-if="ownSystem" class="mt-0.5 text-xs text-slate-600 truncate" v-tooltip.overflow>
+            Saisi dans {{ ownZoneName }}, {{ ownUsageLabel.toLowerCase() }}
+          </p>
+        </div>
+        <button type="button" class="btn-icon" @click="close" v-tooltip="'Fermer la fenêtre'">
+          <XMarkIcon class="w-4 h-4" />
+        </button>
+      </div>
+      <div class="px-5 pb-2 flex flex-col gap-2 shrink-0">
+        <div role="tablist" aria-label="Déplacer ou partager" class="inline-flex self-start rounded-lg border border-slate-300 overflow-hidden">
+          <button v-for="t in MOVE_SHARE_TABS" :key="t.key" type="button" role="tab" :aria-selected="openKind === t.key ? 'true' : 'false'"
+                  @click="openKind = t.key"
+                  :class="['px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition',
+                           openKind === t.key ? 'bg-primary text-white' : 'bg-white text-slate-700 hover:bg-slate-50']">
+            {{ t.label }}
           </button>
         </div>
-        <div class="px-5 pb-2 flex flex-col gap-2 shrink-0">
-          <div role="tablist" aria-label="Déplacer ou partager" class="inline-flex self-start rounded-lg border border-slate-300 overflow-hidden">
-            <button v-for="t in MOVE_SHARE_TABS" :key="t.key" type="button" role="tab" :aria-selected="openKind === t.key ? 'true' : 'false'"
-                    @click="openKind = t.key"
-                    :class="['px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition',
-                             openKind === t.key ? 'bg-primary text-white' : 'bg-white text-slate-700 hover:bg-slate-50']">
-              {{ t.label }}
-            </button>
-          </div>
-          <p class="text-[13px] text-slate-700">{{ moveShareIntro(openKind, { zone: ownZoneName, usage: ownUsageLabel }) }}</p>
-        </div>
-      </template>
-      <div v-else class="px-3 py-2 border-b border-gray-100 shrink-0">
-        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
-          {{ openKind === 'move' ? 'Déplacer vers' : 'Partager dans d\'autres usages' }}
-        </p>
-        <p class="text-[11px] text-gray-400 mt-0.5 truncate" v-tooltip.overflow>
-          {{ device.name || 'Équipement sans nom' }}
-        </p>
+        <p class="text-[13px] text-slate-700">{{ moveShareIntro(openKind, { zone: ownZoneName, usage: ownUsageLabel }) }}</p>
       </div>
-      <!-- Recherche (mise en page guidée) : zone ou usage, et « même usage seulement ». -->
-      <div v-if="searchable || dialog" :class="['py-2 border-b border-gray-100 shrink-0 flex flex-col gap-1.5', dialog ? 'px-5' : 'px-3']">
+      <!-- Recherche : zone ou usage, et « même usage seulement ». -->
+      <div class="py-2 border-b border-gray-100 shrink-0 flex flex-col gap-1.5 px-5">
         <label class="flex items-center gap-2 rounded-lg border border-gray-300 px-2.5 py-1.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/30">
           <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-3 h-3 text-gray-500 shrink-0" />
           <span class="sr-only">{{ MOVE_SEARCH_PLACEHOLDER }}</span>
@@ -324,16 +267,16 @@ onBeforeUnmount(() => {
         </label>
       </div>
 
-      <div :class="['overflow-y-auto flex-1 py-2', dialog ? 'px-5' : 'px-3']">
-        <p v-if="searchable && !(openKind === 'move' ? moveZonesShown : shareZonesShown).length && (openKind === 'move' || shareZones.length)"
+      <div class="overflow-y-auto flex-1 py-2 px-5">
+        <p v-if="!(openKind === 'move' ? moveZonesShown : shareZonesShown).length && (openKind === 'move' || shareZones.length)"
            class="text-[11px] text-gray-500 italic px-1 py-2">{{ MOVE_NO_MATCH }}</p>
         <!-- Déplacer vers : liste cliquable d'usages, 1 clic = déplacement -->
         <template v-if="openKind === 'move'">
           <div v-for="g in moveZonesShown" :key="g.zone_id" class="mb-2 last:mb-0">
             <!-- Sticky en haut du scroller : le nom de la zone reste visible
                  tant qu'on scroll dans ses items, puis est remplacé par le
-                 suivant. -mx-3 px-3 étend le bandeau bleuté jusqu'aux bords. -->
-            <p :class="['sticky top-0 z-10 py-1 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 border-y border-slate-200', dialog ? '-mx-5 px-5' : '-mx-3 px-3']">
+                 suivant. -mx-5 px-5 étend le bandeau bleuté jusqu'aux bords. -->
+            <p class="sticky top-0 z-10 py-1 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 border-y border-slate-200 -mx-5 px-5">
               {{ g.zone_name }}
             </p>
             <button
@@ -364,7 +307,7 @@ onBeforeUnmount(() => {
              « non concernés » sont masqués. -->
         <template v-else>
           <div v-for="g in shareZonesShown" :key="g.zone_id" class="mb-2 last:mb-0">
-            <p :class="['sticky top-0 z-10 py-1 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 border-y border-slate-200', dialog ? '-mx-5 px-5' : '-mx-3 px-3']">
+            <p class="sticky top-0 z-10 py-1 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 border-y border-slate-200 -mx-5 px-5">
               {{ g.zone_name }}
             </p>
             <label
@@ -392,7 +335,7 @@ onBeforeUnmount(() => {
           </p>
         </template>
       </div>
-      <div v-if="dialog" class="px-5 py-3 border-t border-slate-200 flex items-center gap-3 shrink-0">
+      <div class="px-5 py-3 border-t border-slate-200 flex items-center gap-3 shrink-0">
         <span class="min-w-0 flex-1 text-xs text-slate-600">{{ moveShareFooter(openKind, zonesServed) }}</span>
         <button type="button" @click="close"
                 class="h-9 px-4 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition">Fermer</button>

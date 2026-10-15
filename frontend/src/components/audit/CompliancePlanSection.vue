@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref, watch, watchEffect, inject } from 'vue'
-import { useAuditLayout } from '@/composables/useAuditLayout'
-import { AUDIT_STEP_MODE_KEY, AUDIT_STEP_NOTES_KEY } from '@/lib/audit-steps-ui'
+import { AUDIT_STEP_NOTES_KEY } from '@/lib/audit-steps-ui'
 import { PLAN_FILTERS, planNoPrecoNote } from '@/lib/audit-tips-guided'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
@@ -159,11 +158,8 @@ function hasNotes(html) {
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
 
-// ─── Mise en page « Nouvelle » : gravité en barre de couleur, filtre « sans préconisation » ─────
-// Mêmes actions, mêmes gestes ; numéros et articles dans la police de l'application (chiffres Sora).
-const stepMode = inject(AUDIT_STEP_MODE_KEY, null)
-const { isGuidedLayout } = useAuditLayout()
-const guided = computed(() => !!stepMode?.enabled && isGuidedLayout.value)
+// ─── Gravité en barre de couleur, filtre « sans préconisation » ─────
+// Numéros et articles dans la police de l'application (chiffres Sora).
 // Action retenue sans préconisation rédigée (le bouton « Préconiser » est alors rouge).
 const needsPreco = (it) => it.status === 'open' && !hasNotes(it.alternative_solutions_html)
 const noPrecoCount = computed(() => planItems.value.filter(needsPreco).length)
@@ -182,7 +178,7 @@ function pickPlanFilter(f) {
   if (f.count === 0) return
   planFilter.value = planFilter.value === f.value && f.value !== 'all' ? 'all' : f.value
 }
-const itemShown = (it) => !guided.value || planFilter.value === 'all' || needsPreco(it)
+const itemShown = (it) => planFilter.value === 'all' || needsPreco(it)
 // Barre de gravité à gauche de l'action (mêmes teintes que les pastilles de niveau).
 function sevBarCls(it) {
   if (it.is_reserve) return 'border-l-indigo-400'
@@ -192,7 +188,7 @@ function sevBarCls(it) {
 const stepNotes = inject(AUDIT_STEP_NOTES_KEY, null)
 watchEffect(() => {
   if (!stepNotes) return
-  stepNotes.review = guided.value && noPrecoCount.value ? [planNoPrecoNote(noPrecoCount.value)] : []
+  stepNotes.review = noPrecoCount.value ? [planNoPrecoNote(noPrecoCount.value)] : []
 })
 </script>
 
@@ -276,8 +272,8 @@ watchEffect(() => {
           </button>
         </span>
       </div>
-      <!-- Mise en page « Nouvelle » : filtre des actions sans préconisation. -->
-      <div v-if="guided && planItems.length" role="group" aria-label="Filtrer les actions" class="flex flex-wrap items-center gap-1.5">
+      <!-- Filtre des actions sans préconisation. -->
+      <div v-if="planItems.length" role="group" aria-label="Filtrer les actions" class="flex flex-wrap items-center gap-1.5">
         <button v-for="f in planFilters" :key="f.value" type="button"
                 :aria-pressed="planFilter === f.value ? 'true' : 'false'"
                 :aria-disabled="f.count === 0 ? 'true' : undefined"
@@ -337,14 +333,9 @@ watchEffect(() => {
             v-for="it in sub.items"
             :key="it.id"
             v-show="itemShown(it)"
-            :class="guided
-              ? ['rounded-lg overflow-hidden transition bg-white ring-1 ring-slate-200 border-l-4', sevBarCls(it),
-                 card.subsections && card.subsections.length > 1 ? 'ml-4' : '',
-                 it.status === 'declined' ? 'opacity-50' : '']
-              : ['border rounded-lg overflow-hidden transition bg-white',
-              card.subsections && card.subsections.length > 1 ? 'ml-4' : '',
-              it.status === 'declined' ? 'opacity-50' : '',
-              it.is_reserve ? 'border-indigo-200' : (it.severity === 'blocking' ? 'border-red-200' : (it.severity === 'major' ? 'border-orange-200' : 'border-amber-200'))]">
+            :class="['rounded-lg overflow-hidden transition bg-white ring-1 ring-slate-200 border-l-4', sevBarCls(it),
+                     card.subsections && card.subsections.length > 1 ? 'ml-4' : '',
+                     it.status === 'declined' ? 'opacity-50' : '']">
         <!-- Ligne condensée : titre seul ; le détail se déplie au clic
              (chevron ou titre). Numéro, niveau et article en largeur fixe :
              alignés d'une ligne à l'autre. -->
@@ -355,15 +346,14 @@ watchEffect(() => {
             <FontAwesomeIcon :icon="['fas', isOpen(it) ? 'chevron-down' : 'chevron-right']" class="w-3 h-3" />
           </button>
           <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
-            <span :class="['inline-flex items-center justify-center w-19 px-1.5 py-0.5 text-[10px] rounded whitespace-nowrap',
-                           guided ? 'font-semibold bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200' : 'font-mono bg-gray-800 text-white']"
+            <span class="inline-flex items-center justify-center w-19 px-1.5 py-0.5 text-[10px] rounded whitespace-nowrap font-semibold bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200"
                   v-tooltip="actionNumberTip(it.display_number)">
               {{ it.display_number || '—' }}
             </span>
             <span :class="['pill justify-center w-25', levelOf(it).cls]" v-tooltip="levelTip(it)">
               {{ levelOf(it).label }}
             </span>
-            <span v-tooltip="articleTip(it.r175_article)" :class="['w-26 truncate text-[10px] text-gray-500 whitespace-nowrap', guided ? '' : 'font-mono']">{{ it.r175_article || '—' }}</span>
+            <span v-tooltip="articleTip(it.r175_article)" class="w-26 truncate text-[10px] text-gray-500 whitespace-nowrap">{{ it.r175_article || '—' }}</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm text-gray-800 font-medium leading-snug cursor-pointer" @click="toggleOpen(it)">
@@ -427,7 +417,7 @@ watchEffect(() => {
       <!-- Informations hors plan (exemption 5 %, vigilance…) : sans numéro ni
            effet sur la conformité, comme le bloc « Exemptions et points de
            vigilance » du PDF. -->
-      <section v-if="infoItems.length" v-show="!guided || planFilter === 'all'" class="space-y-3">
+      <section v-if="infoItems.length" v-show="planFilter === 'all'" class="space-y-3">
         <header class="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 border-l-4 border-gray-300">
           <h3 class="text-sm font-semibold text-gray-800 leading-tight">Informations hors plan</h3>
           <p class="ml-auto text-xs text-gray-500">Exemptions et points de vigilance : sans numéro ni effet sur la conformité</p>

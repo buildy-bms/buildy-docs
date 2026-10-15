@@ -40,8 +40,7 @@ function expectCleanText(name, text) {
 }
 
 describe('mise en page guidée : bulles', () => {
-  it('choix de la mise en page, filtres, parcours', () => {
-    expectClean('LAYOUT_TOGGLE_TIP', tips.LAYOUT_TOGGLE_TIP);
+  it('filtres, parcours', () => {
     for (const [k, v] of Object.entries(tips.GUIDE_FILTER_TIPS)) expectClean(`GUIDE_FILTER_TIPS.${k}`, v);
     for (const k of ['RESUME_TIP', 'NEXT_STOP_TIP', 'RESUME_ALL_TIP', 'TODO_COLUMN_TIP', 'CHECK_FIX_TIP']) expectClean(k, tips[k]);
     for (const k of ['MISSING_DETAIL_TIP', 'MISSING_HIDE_TIP', 'GO_TO_SYSTEM_TIP', 'OPEN_DEVICE_TIP', 'CHECK_CELL_TIP',
