@@ -65,6 +65,17 @@ describe('Rapport d’audit BACS — nouvelle mise en page', () => {
     expect(t).toContain('Origine de contrôle · action ajoutée par l’auditeur');
   });
 
+  it('caractères hors du latin courant : indices écrits en <sub>, grec et latin étendu embarqués', async () => {
+    const d = JSON.parse(JSON.stringify(fixture));
+    d.ownershipNotes = 'Taux de CO₂ et ΔT relevés à Łódź';
+    d.ownershipStructureLabel = 'Propriétaire occupant';
+    const html = await buildBacsAuditReportHtml(d);
+    expect(html).toContain('CO<sub>2</sub>');
+    expect(html).not.toContain('₂');
+    expect(html).toMatch(/font-family: 'Manrope';[^}]*unicode-range: U\+0370/);
+    expect(html).toMatch(/font-family: 'Manrope';[^}]*unicode-range: U\+0100/);
+  });
+
   it('action groupée : le titre de chaque action est imprimé', async () => {
     const d = JSON.parse(JSON.stringify(fixture));
     const card = d.actionItemsByCard.find((c) => (c.subsections || []).some((s) => (s.grouped || []).some((g) => g.kind === 'single')));

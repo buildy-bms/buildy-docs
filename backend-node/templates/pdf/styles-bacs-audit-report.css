@@ -3,7 +3,8 @@
  * Le bloc @page (en-tête, pied de page) est généré par le gabarit : il porte le client et la version.
  * Couleurs et tailles : charte-graphique/README.md ; polices embarquées depuis templates/pdf/charte/. */
 
-:root { --buildy-font-display: 'Sora Digits', 'Poppins', sans-serif; --buildy-font-body: 'Sora Digits', 'Manrope', sans-serif; }
+:root { --buildy-font-display: 'Sora Digits', 'Poppins', 'Manrope', sans-serif; --buildy-font-body: 'Sora Digits', 'Manrope', sans-serif; }
+sub, sup { font-size: 0.72em; line-height: 0; }
 @page full { margin: 0; @top-left { content: none } @top-right { content: none } @bottom-left { content: none; background: none; border: 0 } @bottom-right { content: none; border: 0 } }
 html { font-family: var(--buildy-font-body); font-size: 9pt; line-height: 1.5; color: #1B2842; font-variant-numeric: tabular-nums; }
 body { margin: 0; }

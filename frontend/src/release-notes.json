@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.274",
+      "date": "2026-10-15",
+      "title": "Nouvelle mise en page de l’audit pour tout le monde, caractères spéciaux du rapport",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Mise en page « Nouvelle » de l’audit pour tout le monde",
+          "what": "Toutes les étapes de l’audit s’ouvrent désormais en mise en page « Nouvelle », pour chaque utilisateur, y compris ceux qui avaient choisi « Actuelle ». Le bouton « Mise en page » du bandeau permet encore de revenir à l’ancienne pour comparer ; ce choix reste mémorisé dans le navigateur.",
+          "where": "Audit BACS, toutes les étapes, bouton « Mise en page » du bandeau.",
+          "how_to_test": "Ouvrir un audit : la mise en page « Nouvelle » est sélectionnée. Choisir « Actuelle », recharger : le choix est gardé."
+        },
+        {
+          "kind": "fix",
+          "title": "Rapport d’audit : « CO₂ », « ΔT » et lettres accentuées étrangères dans les polices Buildy",
+          "what": "Les chiffres en indice (« CO₂ ») sont écrits en vrai indice, et les lettres grecques (« ΔT ») ou accentuées étrangères (« Łódź ») utilisent les polices de la charte au lieu d’une police de remplacement du serveur.",
+          "where": "Rapport d’audit BACS (PDF et aperçu).",
+          "how_to_test": "Écrire « CO₂ » et « ΔT » dans une note d’un audit, puis générer le rapport : mêmes polices que le reste du texte."
+        }
+      ]
+    },
+    {
       "version": "0.1.273",
       "date": "2026-10-15",
       "title": "Nouveau rapport d’audit BACS, toutes les étapes en mise en page « Nouvelle »",
