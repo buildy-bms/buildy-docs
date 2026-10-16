@@ -22,7 +22,7 @@ export const BMS_RUBRICS = [
   { key: 'presence', group: 'gtb', anchor: 'bms-block-presence', icon: 'tower-broadcast', title: 'Présence et offre Buildy Cloud' },
   { key: 'identification', group: 'gtb', anchor: 'bms-block-identification', icon: 'id-card', title: 'Identification' },
   { key: 'protocols', group: 'gtb', anchor: 'bms-block-protocols', icon: 'share-nodes', title: 'Partage des données' },
-  { key: 'out-of-service', group: 'gtb', anchor: 'bms-block-out-of-service', icon: 'power-off', title: 'En service ou hors service' },
+  { key: 'out-of-service', group: 'gtb', anchor: 'bms-block-out-of-service', icon: 'power-off', title: 'Fonctionnement de la GTB' },
   { key: 'af', group: 'gtb', anchor: 'bms-block-af', icon: 'file-lines', title: 'Analyse fonctionnelle' },
   { key: 'components', group: 'gtb', anchor: 'bms-block-components', icon: 'microchip', title: 'Composants matériels' },
   { key: 'usages', group: 'scope', anchor: 'bms-block-usages', icon: 'layer-group', title: 'Usages traités' },
@@ -46,6 +46,21 @@ export const BMS_USAGES = [
 ];
 
 const isYes = (v) => v === 1 || v === true;
+
+// « La GTB et la supervision sont-elles fonctionnelles ? » (mig 218) : 'functional' | 'partial' |
+// 'not_functional' | null. Repli sur `out_of_service` (« hors service » = « Non ») pour une ligne qui
+// n'a que lui.
+export const BMS_FUNCTIONAL_OPTIONS = [
+  { value: 'functional', label: 'Oui', tone: 'green' },
+  { value: 'partial', label: 'Partiellement', tone: 'amber' },
+  { value: 'not_functional', label: 'Non', tone: 'slate' },
+];
+export function bmsFunctionalState(bms) {
+  const b = bms || {};
+  if (['functional', 'partial', 'not_functional'].includes(b.functional_state)) return b.functional_state;
+  if (b.out_of_service == null) return null;
+  return isYes(b.out_of_service) ? 'not_functional' : 'functional';
+}
 const isNo = (v) => v === 0 || v === false;
 const yesNo = (v) => (v == null ? '?' : (isYes(v) ? 'oui' : 'non'));
 const TRI = { yes: 'oui', no: 'non', partial: 'partiel', unknown: 'inconnu' };
@@ -70,7 +85,7 @@ export function bmsRubrics(bms, ctx = {}) {
   const b = bms || {};
   const out = [];
   const present = b.present;
-  const outOfService = isYes(b.out_of_service);
+  const outOfService = bmsFunctionalState(b) === 'not_functional';
   for (const r of BMS_RUBRICS) {
     if (r.bacs && !ctx.isBacs) continue;
     if (r.key !== 'presence' && present !== 1) continue;
@@ -102,10 +117,19 @@ export function bmsRubrics(bms, ctx = {}) {
         summary = list.map(p => (ctx.protocolLabel ? ctx.protocolLabel(p) : p)).join(', ');
         break;
       }
-      case 'out-of-service':
-        if (b.out_of_service == null) unanswered.push('hors service ?');
-        else summary = outOfService ? 'Hors service : le plan d’actions ignore les exigences sur la GTB' : 'En service';
+      case 'out-of-service': {
+        const st = bmsFunctionalState(b);
+        const notes = String(b.functional_notes || '').trim();
+        if (st == null) unanswered.push('fonctionnelle ?');
+        // « Partiellement » : les notes disent ce qui ne fonctionne pas (imprimées dans le rapport et
+        // reprises par l'action du plan) — décision de Kévin, 2026-10-16.
+        if (st === 'partial' && !notes) missing.push('ce qui ne fonctionne pas');
+        summary = st === 'functional' ? 'Fonctionnelle'
+          : st === 'partial' ? `Partiellement fonctionnelle${notes ? ` : ${notes}` : ''}`
+            : st === 'not_functional' ? 'Non fonctionnelle : le plan d’actions ignore les exigences sur la GTB' : '';
+        if (notes && st !== 'partial') summary += ` · ${notes}`;
         break;
+      }
       case 'af': {
         const st = ctx.afStatus ?? null;
         const n = ctx.afDocsCount || 0;

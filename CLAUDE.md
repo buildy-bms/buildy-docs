@@ -151,7 +151,15 @@ graphique Buildy des PDF vit dans le dépôt `../charte-graphique/` (règles, co
   rare. Toute rubrique ajoutée à l'export doit être ajoutée aux deux gabarits tant que l'ancien existe.
 - **Pagination** : Paged.js 0.4.3 embarqué (`templates/pdf/vendor/pagedjs/`, voir son README),
   `lib/pdf.js` `renderPagedHtmlPdf()` / `preparePagedPage()` (même navigateur partagé et même délai
-  que `renderPdf`). En-tête et pied de page en « margin boxes » `@page` générées par le gabarit
+  que `renderPdf`). **Pagination en deux passes au moins** (`paginatePagedPage`, 2026-10-16) : Paged.js
+  n'écrit les renvois de page (`target-counter` : sommaire, « · p. 32 ») qu'après la mise en forme de
+  la page, avec « 0 » à la place ; un numéro plus large allongeait la ligne après coup et chassait la
+  ligne du bas dans une colonne cachée, hors de la page (ligne de tableau absente du PDF, audit 56). La
+  1re passe relève le numéro de chaque cible, la 2e pagine avec `data-pg` + `html.pg-known` (chaque règle
+  `target-counter` de la feuille du rapport a sa jumelle `attr(data-pg)` : à garder en ajoutant un
+  renvoi), une 3e si un numéro a encore bougé. Contenu resté hors de la page : avertissement dans les
+  logs et contrôle « Aucun contenu posé hors de la page » de `check:pdf`.
+  En-tête et pied de page en « margin boxes » `@page` générées par le gabarit
   (mêmes textes que `buildHeaderFooter()`, présentation de la charte) : exception assumée à la règle
   « seul buildHeaderFooter », Puppeteer ne peut ni retirer l'en-tête des intercalaires à fond perdu ni
   numéroter les renvois. `requestAnimationFrame` remplacé avant Paged.js (sinon blocage en arrière-plan).
@@ -490,7 +498,7 @@ touche aux calculs d'agrégation (`recapStats`, `devices_summary`,
 | `bacs_audit_systems` | `present`, `not_concerned`, `meets_r175_3_p3`, `meets_r175_3_p4`, `meets_r175_3_p4_autonomous`, `managed_by_bms`, `marked_negligible_under_5pct`, `is_district_heating_substation`, `serves_multiple_buildings` |
 | `bacs_audit_system_devices` | `wired`, `meets_r175_3_p4`, `meets_r175_3_p4_autonomous`, `managed_by_bms`, `is_backup`, `out_of_service`, `bms_integration_out_of_service` |
 | `bacs_audit_meters` | `present_actual`, `required`, `communicating`, `managed_by_bms`, `out_of_service` |
-| `bacs_audit_bms` | `present` (singleton GTB), `meets_r175_3_p1`, `meets_r175_3_p2`, `has_maintenance_procedures`, `operator_trained` |
+| `bacs_audit_bms` | `present` (singleton GTB), `meets_r175_3_p1`, `meets_r175_3_p2`, `has_maintenance_procedures`, `operator_trained`, `out_of_service` (tenu d'accord avec `functional_state`, voir ci-dessous) |
 | `documents` | `audit_existing_af_status` (text ternaire : 'present' / 'absent' / null) |
 
 ## Toggles Oui/Non pour saisies binaires (cf. memoire feedback_segmented_control_for_binary_state)
@@ -793,6 +801,26 @@ lissage de 1 à 2 niveaux, sommaire collant de la GTB à 1 024 px (calque compos
   1 002 kW retenus) ; « 1er » du mois (`toLocaleDateString` écrit « 1 janvier »).
 - Tests : `bms-guide`, `thermal-guide`, `identification-guide`, `zones-guide`, `documents-guide`,
   `step-unanswered` (`backend-node/test`).
+
+## GTB fonctionnelle, partiellement ou non (mig 218, 2026-10-16)
+
+« La GTB et la supervision sont-elles fonctionnelles ? » Oui / Partiellement / Non
+(`bacs_audit_bms.functional_state` ∈ `functional` | `partial` | `not_functional`, null = sans réponse)
++ `functional_notes` (ce qui est constaté ou relaté par le client), rubrique « Fonctionnement de la
+GTB » (bureau et mobile). Décisions de Kévin :
+- **Non** = l'ancien « hors service » : `out_of_service = 1`, action bloquante « Remettre en service la
+  GTB », exigences sur la GTB ignorées, rubriques de ce qu'elle sait faire facultatives.
+- **Partiellement** : la GTB reste évaluée ; action **majeure** « Remettre en état les fonctions
+  défaillantes de la GTB » (`bms_partially_functional`, R175-4) qui reprend les notes ; notes
+  **exigées** (rubrique « à compléter » sinon).
+- Notes imprimées dans les deux rapports (encadré « partiellement fonctionnelles », « Constat » sous
+  « hors service », ligne « Fonctionnement »).
+- `out_of_service` reste la colonne lue par le plan, la conformité, les rapports et les outils Claude :
+  `lib/bms-functional-state.js` (`syncBmsFunctionalState`, PUT `/bacs-audit/:id/bms`) les tient
+  d'accord ; `out_of_service` seul (outils Claude, ancienne version) garde un « Partiellement » en
+  service ; les deux en désaccord → `out_of_service` l'emporte. Côté interface : `bmsFunctionalState()`
+  (`lib/bms-guide.js`, repli sur `out_of_service`). Mig 218 : reprise 0 → `functional`, 1 → `not_functional`.
+- Tests : `bms-functional-state`, `bacs-audit-action-generator`.
 
 ## Listes "intégré à la GTB" filtrées par usages traités
 

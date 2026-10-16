@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 217;
+const TARGET_VERSION = 218;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7969,6 +7969,27 @@ function runMigrations() {
     }
     log.info('Migration 217 appliquee : bacs_audit_system_devices.gtb_exclusion_reason');
     db.pragma('user_version = 217');
+  }
+
+  if (current < 218) {
+    // Migration 218 — État de fonctionnement de la GTB (demande de Kévin 2026-10-16) : « La GTB et
+    // la supervision sont-elles fonctionnelles ? » Oui / Partiellement / Non, avec des notes (ce qui
+    // est constaté ou relaté par le client), imprimées dans le rapport et exigées pour
+    // « Partiellement ». `out_of_service` reste tenu à jour (= « Non ») pour ses lecteurs
+    // (plan d'actions, conformité, rapports, mobile, outils Claude). Reprise de l'existant :
+    // hors service 0 → fonctionnelle, 1 → non fonctionnelle, vide → sans réponse.
+    const cols = db.prepare('PRAGMA table_info(bacs_audit_bms)').all().map(c => c.name);
+    if (!cols.includes('functional_state')) {
+      db.exec("ALTER TABLE bacs_audit_bms ADD COLUMN functional_state TEXT CHECK (functional_state IN ('functional', 'partial', 'not_functional'))");
+    }
+    if (!cols.includes('functional_notes')) {
+      db.exec('ALTER TABLE bacs_audit_bms ADD COLUMN functional_notes TEXT');
+    }
+    const r = db.prepare(`UPDATE bacs_audit_bms SET functional_state = CASE out_of_service
+        WHEN 1 THEN 'not_functional' WHEN 0 THEN 'functional' END
+      WHERE functional_state IS NULL AND out_of_service IS NOT NULL`).run();
+    log.info(`Migration 218 appliquee : bacs_audit_bms.functional_state (+ notes), ${r.changes} GTB reprise(s)`);
+    db.pragma('user_version = 218');
   }
 
   if (current > TARGET_VERSION) {

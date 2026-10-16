@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.279",
+      "date": "2026-10-16",
+      "title": "GTB partiellement fonctionnelle, plus aucune ligne perdue dans le rapport",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "« La GTB et la supervision sont-elles fonctionnelles ? » Oui / Partiellement / Non",
+          "what": "La question « La GTB est-elle hors service ? » devient « La GTB et la supervision sont-elles fonctionnelles ? », avec une réponse « Partiellement », et un champ pour noter ce qui est constaté ou relaté par le client. « Partiellement » : la GTB reste évaluée, le plan d’actions ajoute « Remettre en état les fonctions défaillantes de la GTB » (majeure), qui reprend les notes ; les notes sont alors exigées. « Non » garde l’effet de l’ancien « hors service ». Les notes sont imprimées dans le rapport. Les réponses déjà données sont reprises.",
+          "where": "Audit BACS, étape GTB, rubrique « Fonctionnement de la GTB » (bureau et mobile) ; rapport, chapitre « La GTB ».",
+          "how_to_test": "Répondre « Partiellement », écrire une note : la rubrique se complète, l’action apparaît au plan d’actions et l’encadré dans l’aperçu du rapport."
+        },
+        {
+          "kind": "fix",
+          "title": "Rapport : une ligne en bas de page ne disparaît plus",
+          "what": "Une ligne de tableau placée tout en bas d’une page pouvait manquer dans le PDF : le numéro de page d’un renvoi (« · p. 32 »), écrit après la mise en page, allongeait la ligne et la faisait sortir de la page. Le rapport est désormais mis en page avec les numéros connus d’avance.",
+          "where": "Rapport d’audit BACS (PDF).",
+          "how_to_test": "Exporter le rapport de l’audit CLR Saint Herblain : la ligne « Vérifications périodiques de la GTB » figure au chapitre « La GTB »."
+        }
+      ]
+    },
+    {
       "version": "0.1.278",
       "date": "2026-10-16",
       "title": "Les rubriques ne se referment plus toutes seules",

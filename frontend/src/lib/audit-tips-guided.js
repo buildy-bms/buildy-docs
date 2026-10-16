@@ -144,6 +144,16 @@ export function bmsUnansweredReasons(rubrics) {
   return [`${plural(n, 'question sans réponse', 'questions sans réponse')} dans ${list.length} rubriques : ${list.map(r => r.title).join(', ')}`];
 }
 export const BMS_OUT_OF_SERVICE_NOTE = 'GTB hors service : le plan d’actions ignore ce qu’elle sait faire.';
+// « La GTB et la supervision sont-elles fonctionnelles ? » (mig 218) : ce que change chaque réponse.
+export const BMS_FUNCTIONAL_QUESTION = 'La GTB et la supervision sont-elles fonctionnelles ?';
+export const BMS_FUNCTIONAL_HINTS = {
+  none: 'Réponds « Partiellement » si une partie seulement marche (alarmes, accès à distance, historiques…).',
+  functional: 'Ce qu’elle sait faire est évalué rubrique par rubrique.',
+  partial: 'Elle reste évaluée ; le plan d’actions ajoute la remise en état de ce qui ne fonctionne pas, décrit ci-dessous.',
+  not_functional: 'Le plan d’actions ignore alors les exigences sur la GTB. Les rubriques restent modifiables (notes comprises) pour garder une trace.',
+};
+export const BMS_FUNCTIONAL_NOTES_LABEL = 'Ce qui est constaté ou relaté par le client';
+export const BMS_FUNCTIONAL_NOTES_PLACEHOLDER = 'Par exemple : alarmes plus remontées, supervision inaccessible à distance…';
 
 // ─── Étape Compteurs ───────────────────────────────────────────────────────────
 /** « 11 compteurs attendus sans réponse à « Présent ? » : réponds Oui ou Non pour chacun. » */

@@ -45,6 +45,10 @@ import {
   BMS_INTEGRATED_TOGGLE_TIP, BMS_STATUS_TIPS, bmsMeterIntegratedTip, bmsOperationalTip, bmsUsageToggleLabel,
 } from '@/lib/audit-tips-systems'
 import { longDate } from '@/lib/audit-tips-site'
+import { BMS_FUNCTIONAL_OPTIONS, bmsFunctionalState } from '@/lib/bms-guide'
+import {
+  BMS_FUNCTIONAL_QUESTION, BMS_FUNCTIONAL_HINTS, BMS_FUNCTIONAL_NOTES_LABEL, BMS_FUNCTIONAL_NOTES_PLACEHOLDER,
+} from '@/lib/audit-tips-guided'
 
 const audit = useAuditStore()
 const { document, bms, devices, meters, systems, inspections, todayIso } = storeToRefs(audit)
@@ -274,13 +278,28 @@ const USAGES = [
     </div>
 
     <template v-if="bms.present === 1">
-    <!-- Hors-service toggle -->
-    <MobileYesNo
-      label="La GTB est-elle hors service ?"
-      description="Complètement hors service, débranchée ou inutilisable : le plan d’actions ignore alors les exigences du décret sur la GTB. Les rubriques restent modifiables pour garder une trace."
-      :model-value="bms.out_of_service"
-      @update:model-value="v => { bms.out_of_service = v ? 1 : 0; saveDebounced() }"
-    />
+    <!-- « La GTB et la supervision sont-elles fonctionnelles ? » (mig 218), comme au bureau :
+         « hors service » suit (= « Non »). Notes : ce qui est constaté ou relaté par le client. -->
+    <div class="flex flex-col gap-2">
+      <MobileSegmented
+        :label="BMS_FUNCTIONAL_QUESTION"
+        :description="BMS_FUNCTIONAL_HINTS[bmsFunctionalState(bms) || 'none']"
+        :model-value="bmsFunctionalState(bms)"
+        :options="BMS_FUNCTIONAL_OPTIONS"
+        @update:model-value="v => { bms.functional_state = v; bms.out_of_service = v === 'not_functional' ? 1 : 0; saveDebounced() }"
+      />
+      <label class="block bg-white rounded-xl border border-gray-200 px-4 py-3">
+        <span class="text-sm font-medium text-gray-700">{{ BMS_FUNCTIONAL_NOTES_LABEL }}</span>
+        <span v-if="bmsFunctionalState(bms) !== 'partial'" class="text-sm text-gray-400"> (facultatif)</span>
+        <textarea
+          v-model="bms.functional_notes"
+          @input="saveDebounced"
+          :placeholder="BMS_FUNCTIONAL_NOTES_PLACEHOLDER"
+          rows="2"
+          class="pwa-input w-full mt-2"
+        ></textarea>
+      </label>
+    </div>
 
     <!-- Mig 109 : on n'efface plus les sous-blocs quand la GTB est HS,
          on les garde affichés (legerement opaques) pour que l'auditeur

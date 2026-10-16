@@ -30,8 +30,16 @@ h4 { font-weight: 600; font-size: 9pt; margin: 0 0 1mm; }
 .xref { font-weight: 600; color: #3B4A6B; }
 .xref::after { content: ", p. " target-counter(attr(href), page); font-weight: 500; color: #5D7189; }
 .pg::after { content: target-counter(attr(href), page); font-weight: 600; color: #3B4A6B; }
+/* Renvois de page connus d'avance (2e passe de pagination, lib/pdf.js paginatePagedPage) : Paged.js
+   n'écrit le numéro (target-counter) qu'après avoir mis la page en forme, avec « 0 » à la place ; un
+   numéro plus large allongeait la ligne après coup et pouvait chasser hors de la page la ligne du bas
+   (ligne de tableau perdue, audit 56, 2026-10-16). En 2e passe, le numéro est écrit dès la mise en
+   forme. Toute règle `target-counter` du rapport a sa jumelle `html.pg-known … attr(data-pg)`. */
+html.pg-known .xref::after { content: ", p. " attr(data-pg); }
+html.pg-known .pg::after { content: attr(data-pg); }
 .see { font-weight: 600; font-size: 7.5pt; color: #3B4A6B; white-space: nowrap; }
 .see::after { content: " · p. " target-counter(attr(href), page); color: #5D7189; font-weight: 500; }
+html.pg-known .see::after { content: " · p. " attr(data-pg); }
 .ext { font-size: 6.5pt; color: #5D7189; font-weight: 600; }
 .warn-t { color: #B45309; }
 
@@ -79,6 +87,7 @@ h4 { font-weight: 600; font-size: 9pt; margin: 0 0 1mm; }
 .divider-list li { border-top: 0.2mm solid #3B4A6B; padding-top: 3mm; margin: 0; }
 .divider-list a { display: flex; }
 .divider-list a::after { content: target-counter(attr(href), page); margin-left: auto; color: #8499AE; }
+html.pg-known .divider-list a::after { content: attr(data-pg); }
 .closing { justify-content: space-between; }
 .closing .logo { height: 14mm; align-self: flex-start; }
 .closing-title { font-weight: 400; font-size: 26pt; color: #FFFFFF; line-height: 1.15; margin-bottom: 6mm; }
@@ -95,6 +104,7 @@ h4 { font-weight: 600; font-size: 9pt; margin: 0 0 1mm; }
 .toc li { padding: 0.9mm 0; border-bottom: 0.2mm solid #E3E6EE; font-size: 9pt; margin: 0; }
 .toc li a { display: flex; align-items: center; }
 .toc li a::after { content: target-counter(attr(href), page); margin-left: auto; font-weight: 600; color: #3B4A6B; }
+html.pg-known .toc li a::after { content: attr(data-pg); }
 .toc .al { width: 4.5mm; height: 4.5mm; font-size: 7pt; margin-right: 2mm; vertical-align: 0; }
 .toc .toc-part { font-family: var(--buildy-font-display); font-weight: 600; font-size: 9.5pt; border-bottom: 0; padding-top: 3mm; }
 .howto { background: #F4F5F9; border-radius: 2mm; padding: 3.5mm 4.5mm; margin-bottom: 4mm; }

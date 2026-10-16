@@ -1420,9 +1420,19 @@
 {{#if bms.out_of_service}}
 <div class="callout callout-r175">
   <span class="callout-icon">{{{faIcon "circle-exclamation" "#1b2842" "14"}}}</span>
-  <div class="callout-body"><strong>GTB hors service au moment de l'audit.</strong> Ses fonctions ne sont pas assurées : sa remise en service figure au plan de mise en conformité (chapitre {{planChapterNumber}}). Les réponses ci-dessous décrivent les capacités déclarées de la solution ; elles n'ont pas pu être constatées en fonctionnement.</div>
+  <div class="callout-body"><strong>GTB hors service au moment de l'audit.</strong> Ses fonctions ne sont pas assurées : sa remise en service figure au plan de mise en conformité (chapitre {{planChapterNumber}}). Les réponses ci-dessous décrivent les capacités déclarées de la solution ; elles n'ont pas pu être constatées en fonctionnement.{{#if bms.functional_notes}}<br>Constat : {{bms.functional_notes}}{{/if}}</div>
 </div>
 {{/if}}
+{{!-- Mig 218 : GTB et supervision partiellement fonctionnelles (évaluées, action de remise en état). --}}
+{{#if (eq bms.functional_state "partial")}}
+<div class="callout callout-r175">
+  <span class="callout-icon">{{{faIcon "circle-exclamation" "#1b2842" "14"}}}</span>
+  <div class="callout-body"><strong>GTB et supervision partiellement fonctionnelles au moment de l'audit.</strong>{{#if bms.functional_notes}} {{bms.functional_notes}}{{/if}}<br>La remise en état de ce qui ne fonctionne pas figure au plan de mise en conformité (chapitre {{planChapterNumber}}) ; ce que la GTB sait faire reste évalué.</div>
+</div>
+{{/if}}
+{{#if (eq bms.functional_state "functional")}}{{#if bms.functional_notes}}
+<p class="muted" style="font-size:9pt"><strong>Fonctionnement constaté :</strong> {{bms.functional_notes}}</p>
+{{/if}}{{/if}}
 {{!-- Supervision Buildy (doctrine 2026-09-23) : conforme quel que soit le
      niveau d'offre, sous réserve des obligations du niveau. --}}
 {{#if bms.buildyOffer}}{{#if isBacs}}
