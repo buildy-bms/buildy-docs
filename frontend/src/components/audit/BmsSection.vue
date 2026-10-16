@@ -37,10 +37,11 @@ import RubricShell from '@/components/audit/guided/RubricShell.vue'
 import AuditGuideRail from '@/components/audit/guided/AuditGuideRail.vue'
 import RubricsFilter from '@/components/audit/guided/RubricsFilter.vue'
 import { useStepRubrics } from '@/composables/useStepRubrics'
-import { bmsStepRubrics, bmsGuideTotals, nextBmsRubric, bmsRubricStatus, BMS_RUBRIC_GROUPS } from '@/lib/bms-guide'
+import { bmsStepRubrics, bmsGuideTotals, nextBmsRubric, bmsRubricStatus, BMS_RUBRIC_GROUPS, BMS_FUNCTIONAL_OPTIONS, bmsFunctionalState } from '@/lib/bms-guide'
 import {
   RUBRICS_RESUME_TIP, RUBRICS_DONE_TEXT, BMS_GUIDE_TITLE,
   BMS_OUT_OF_SERVICE_NOTE, rubricsProgressLabel, rubricsResumeLabel,
+  BMS_FUNCTIONAL_QUESTION, BMS_FUNCTIONAL_HINTS, BMS_FUNCTIONAL_NOTES_LABEL, BMS_FUNCTIONAL_NOTES_PLACEHOLDER,
 } from '@/lib/audit-tips-guided'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
@@ -438,6 +439,13 @@ function setBmsFlag(field, v) {
   bms.value[field] = v == null ? null : (v ? 1 : 0)
   saveBmsDebounced()
 }
+// « La GTB et la supervision sont-elles fonctionnelles ? » (mig 218) : « hors service » suit (= « Non »).
+const functionalState = computed(() => bmsFunctionalState(bms.value))
+function setFunctionalState(v) {
+  bms.value.functional_state = v ?? null
+  bms.value.out_of_service = v == null ? null : (v === 'not_functional' ? 1 : 0)
+  saveBmsDebounced()
+}
 
 // Le refresh du plan d'action + cumul puissance est debouncé : si l'utilisateur
 // enchaine plusieurs clics rapides (ce qui arrive sur les tables GTB où on coche
@@ -699,11 +707,21 @@ function hasNotes(html) {
           <RubricShell id="bms-block-out-of-service"
                        v-bind="rubric('out-of-service')" @toggle="toggleRubric('out-of-service')">
             <div class="flex items-center gap-3">
-              <span class="text-sm text-gray-700 font-medium">La GTB est-elle hors service ?</span>
-              <SegmentedToggle :model-value="triState(bms.out_of_service)"
-                               @update:model-value="v => setBmsFlag('out_of_service', v)" />
+              <span class="text-sm text-gray-700 font-medium">{{ BMS_FUNCTIONAL_QUESTION }}</span>
+              <SegmentedToggle :model-value="functionalState" :options="BMS_FUNCTIONAL_OPTIONS"
+                               @update:model-value="setFunctionalState" />
             </div>
-            <p class="text-[11px] text-gray-400 mt-0.5">Le plan d'actions ignore alors les exigences sur la GTB. Les rubriques restent modifiables (notes comprises) pour garder une trace.</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">{{ BMS_FUNCTIONAL_HINTS[functionalState || 'none'] }}</p>
+            <div class="mt-3">
+              <label for="bms-functional-notes" class="block text-xs font-medium text-gray-700 mb-1">
+                {{ BMS_FUNCTIONAL_NOTES_LABEL }}
+                <span v-if="functionalState !== 'partial'" class="font-normal text-gray-400">(facultatif)</span>
+              </label>
+              <textarea id="bms-functional-notes" rows="2" :value="bms.functional_notes || ''"
+                        :placeholder="BMS_FUNCTIONAL_NOTES_PLACEHOLDER"
+                        @input="e => { bms.functional_notes = e.target.value; saveBmsDebounced() }"
+                        :class="['input-base w-full text-sm', functionalState === 'partial' && !String(bms.functional_notes || '').trim() ? 'border-amber-400' : '']" />
+            </div>
           </RubricShell>
 
           <RubricShell id="bms-block-af" v-bind="rubric('af')" @toggle="toggleRubric('af')">

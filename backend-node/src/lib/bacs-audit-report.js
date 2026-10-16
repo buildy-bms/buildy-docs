@@ -860,12 +860,18 @@ function buildHtml(d, env) {
     if (v.bms_integration_out_of_service) return '<span class="mk bad">Liaison interrompue</span>';
     return mark(v.managed_by_bms, { none: 'À qualifier' });
   };
+  // « La GTB et la supervision sont-elles fonctionnelles ? » (mig 218) ; repli sur « hors service ».
+  const gtbState = !b ? null : (['functional', 'partial', 'not_functional'].includes(b.functional_state) ? b.functional_state
+    : b.out_of_service == null ? null : (b.out_of_service ? 'not_functional' : 'functional'));
+  const gtbNotes = String(b?.functional_notes || '').trim();
+  const GTB_STATE_LABEL = { functional: 'Fonctionnelle', partial: 'Partiellement fonctionnelle', not_functional: 'Non fonctionnelle' };
   const ch5 = `
   <section id="gtb" class="chapter-start">
     <h1 class="chapter">La GTB ${isBacs ? art('R175-3') : ''}</h1>
     ${isBacs ? '<p class="lead">La <b>GTB (gestion technique du bâtiment)</b> supervise et pilote les équipements techniques (chauffage, climatisation, ventilation, eau chaude sanitaire, éclairage) et en suit les consommations. Au sens du décret, elle suit et analyse les consommations, ajuste automatiquement le fonctionnement des systèmes, permet leur arrêt manuel et les laisse fonctionner seuls si elle est arrêtée.</p>' : ''}
     ${!b ? '<p>Évaluation de la GTB non renseignée.</p>' : b.present === 0 || b.present === false ? box('bad', 'xmark', `<p><b>Aucune GTB sur le site.</b> Le bâtiment ne dispose d’aucun système de gestion technique. L’installation d’une GTB conforme au décret BACS figure dans les actions ci-dessous. Les exigences R175-3, R175-4 et R175-5 ne sont donc pas évaluées en détail dans ce chapitre.</p>`) : `
-    ${b.out_of_service ? box('bad', 'warn', '<p><b>GTB hors service au moment de l’audit.</b> Ses fonctions ne sont pas assurées : sa remise en service figure dans les actions ci-dessous. Les réponses ci-dessous décrivent les capacités déclarées de la solution ; elles n’ont pas pu être constatées en fonctionnement.</p>') : ''}
+    ${gtbState === 'not_functional' ? box('bad', 'warn', `<p><b>GTB hors service au moment de l’audit.</b> Ses fonctions ne sont pas assurées : sa remise en service figure dans les actions ci-dessous. Les réponses ci-dessous décrivent les capacités déclarées de la solution ; elles n’ont pas pu être constatées en fonctionnement.</p>${gtbNotes ? `<p>Constat : ${esc(gtbNotes)}</p>` : ''}`) : ''}
+    ${gtbState === 'partial' ? box('warn', 'warn', `<p><b>GTB et supervision partiellement fonctionnelles au moment de l’audit.</b>${gtbNotes ? ` ${esc(gtbNotes)}` : ''}</p><p>La remise en état de ce qui ne fonctionne pas figure dans les actions ci-dessous ; ce que la GTB sait faire reste évalué.</p>`) : ''}
     ${b.buildyOffer && isBacs ? box('info', 'server', `<p><b>Supervision Buildy Cloud — niveau ${esc(b.buildyOffer.levelLabel)}.</b> La solution assure les fonctions exigées par le décret (suivi des consommations, détection des dérives, interopérabilité, arrêt manuel et gestion autonome, mise à disposition des données).${b.buildyOffer.hasReserves ? ' La conformité est acquise sous réserve des obligations suivantes, reprises dans les actions :' : ''}</p>${b.buildyOffer.hasReserves ? `<ul>${b.buildyOffer.reserves.map((r) => `<li>${esc(r.label)} ${art(r.article)}</li>`).join('')}</ul>` : ''}`) : ''}
     <dl class="facts">
       <div><dt>Solution en place</dt><dd>${esc(b.existing_solution || 'Non renseigné')}</dd></div>
@@ -874,6 +880,7 @@ function buildHtml(d, env) {
       ${b.model_reference ? `<div><dt>Référence</dt><dd>${esc(b.model_reference)}</dd></div>` : ''}
       ${b.location ? `<div><dt>Emplacement</dt><dd>${esc(b.location)}</dd></div>` : ''}
       ${(b.providedProtocolsLabels || []).length ? `<div><dt>Protocoles proposés</dt><dd>${esc(b.providedProtocolsLabels.join(', '))}</dd></div>` : ''}
+      ${gtbState ? `<div class="wide"><dt>Fonctionnement</dt><dd>${GTB_STATE_LABEL[gtbState]}${gtbNotes && gtbState === 'functional' ? ` — ${esc(gtbNotes)}` : ''}</dd></div>` : ''}
       <div class="wide"><dt>Analyse fonctionnelle de la GTB existante</dt><dd>${AF_STATUS[doc.audit_existing_af_status] || '<span class="muted">Non renseigné</span>'}</dd></div>
     </dl>
     ${topicNotes('analyse_fonctionnelle')}

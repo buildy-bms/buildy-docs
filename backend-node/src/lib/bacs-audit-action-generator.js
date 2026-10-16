@@ -883,6 +883,22 @@ function computeTargetActions(documentId, details = null) {
       ].join('\n\n'),
     });
   }
+  // GTB et supervision partiellement fonctionnelles (mig 218, décision de Kévin 2026-10-16) : la GTB
+  // reste évaluée normalement ; ce qui ne fonctionne pas, décrit dans les notes de l'auditeur, est à
+  // remettre en état.
+  if (!noGtb && bms && !notSubject && bms.functional_state === 'partial') {
+    const notes = String(bms.functional_notes || '').trim().replace(/[.\s]+$/, '');
+    addTarget({
+      source_bms_document_id: documentId, source_subtype: 'bms_partially_functional',
+      category: 'bms_upgrade', severity: 'major',
+      r175_article: 'R175-4',
+      title: 'Remettre en état les fonctions défaillantes de la GTB',
+      description: [
+        `Constat\nLa GTB et la supervision ne fonctionnent qu'en partie${notes ? ` : ${notes}.` : '.'}`,
+        'Exigence\nLa GTB fait l\'objet de vérifications périodiques en vue de garantir son maintien en bon état de fonctionnement ; les éléments défaillants sont réparés ou remplacés rapidement (R175-4).',
+      ].join('\n\n'),
+    });
+  }
   if (!noGtb && bms && !notSubject) {
     // Supervision Buildy (doctrine validée le 2026-09-23) : conforme quel que
     // soit le niveau d'offre, SOUS RÉSERVE des obligations du niveau

@@ -1332,18 +1332,83 @@ async function preparePagedPage(page, html) {
   await page.addScriptTag({ path: PAGED_POLYFILL_PATH });
 }
 
+// Pagine `html` dans `page` (Paged.js), en deux passes au moins. Paged.js n'écrit les renvois de
+// page (target-counter : sommaire, « · p. 32 »…) qu'après avoir mis chaque page en forme, avec « 0 »
+// à la place : un numéro plus large allongeait la ligne après coup et pouvait chasser la ligne du
+// bas dans une colonne cachée, hors de la page — ligne de tableau absente du PDF (audit 56,
+// 2026-10-16). La 1re passe donne le numéro de page de chaque cible ; la 2e pagine avec ces numéros
+// écrits dès la mise en forme (attribut `data-pg` + classe `pg-known` sur <html>, règles jumelles
+// dans la feuille du rapport) ; une 3e passe seulement si un numéro a encore changé.
+// Renvoie { pages, overflow (pages qui débordent), hidden (contenus posés hors de la page), passes }.
+async function paginatePagedPage(page, html, { maxPasses = 3 } = {}) {
+  let known = null;
+  let result = null;
+  for (let pass = 1; pass <= maxPasses; pass++) {
+    await preparePagedPage(page, html);
+    if (known) {
+      await page.evaluate((pg) => {
+        document.documentElement.classList.add('pg-known');
+        for (const a of document.querySelectorAll('[href^="#"]')) {
+          const n = pg[a.getAttribute('href')];
+          if (n != null) a.setAttribute('data-pg', String(n));
+        }
+      }, known);
+    }
+    result = await page.evaluate(async () => {
+      const flow = await window.PagedPolyfill.preview();
+      const pageEls = [...document.querySelectorAll('.pagedjs_page')];
+      // Numéro de chaque page, même calcul que Paged.js (generated-content/target-counters.js).
+      const numbers = [];
+      let pg = 0;
+      for (const el of pageEls) {
+        const st = window.getComputedStyle(el);
+        const reset = st.counterReset.replace('page', '').trim();
+        const inc = st.counterIncrement.replace('page', '').trim();
+        if (reset !== 'none') pg = parseInt(reset, 10);
+        if (inc !== 'none') pg += parseInt(inc, 10);
+        numbers.push(pg);
+      }
+      const area = document.querySelector('.pagedjs_pages');
+      const targets = {};
+      for (const a of area.querySelectorAll('[href^="#"]')) {
+        const href = a.getAttribute('href');
+        if (href in targets || href.length < 2) continue;
+        let el = null;
+        try { el = area.querySelector('#' + CSS.escape(href.slice(1))); } catch { el = null; }
+        const i = el ? pageEls.findIndex((p) => p.contains(el)) : -1;
+        if (i >= 0) targets[href] = numbers[i];
+      }
+      const overflow = [];
+      const hidden = [];
+      pageEls.forEach((el, i) => {
+        const c = el.querySelector('.pagedjs_page_content');
+        if (!c) return;
+        if (c.scrollHeight > c.clientHeight + 2) overflow.push(i + 1);
+        if (el.classList.contains('pagedjs_full_page')) return;
+        // Contenu laissé dans la colonne de travail de Paged.js, à droite de la page : invisible.
+        const box = c.getBoundingClientRect();
+        const lost = [...(c.firstElementChild ? c.firstElementChild.querySelectorAll('*') : [])].find((n) => {
+          if (n.firstElementChild || !n.textContent.trim()) return false;
+          const r = n.getBoundingClientRect();
+          return r.width > 0 && r.left >= box.right - 1;
+        });
+        if (lost) hidden.push(`p. ${i + 1} « ${lost.textContent.trim().slice(0, 40)} »`);
+      });
+      return { pages: flow.total, targets, overflow, hidden };
+    });
+    result.passes = pass;
+    if (known && Object.keys(result.targets).every((h) => known[h] === result.targets[h])) break;
+    known = result.targets;
+  }
+  return result;
+}
+
 async function _renderPagedHtmlPdfImpl({ html, outputPath }) {
   const { page, release } = await _openRenderPage();
   try {
-    await preparePagedPage(page, html);
-    const layout = await page.evaluate(async () => {
-      const flow = await window.PagedPolyfill.preview();
-      const overflow = [...document.querySelectorAll('.pagedjs_page')]
-        .map((pg, i) => { const c = pg.querySelector('.pagedjs_page_content'); return c && c.scrollHeight > c.clientHeight + 2 ? i + 1 : null; })
-        .filter(Boolean);
-      return { pages: flow.total, overflow };
-    });
+    const layout = await paginatePagedPage(page, html);
     if (layout.overflow.length) log.warn(`renderPagedHtmlPdf : contenu qui déborde, pages ${layout.overflow.join(', ')}`);
+    if (layout.hidden.length) log.warn(`renderPagedHtmlPdf : contenu hors de la page (absent du PDF) : ${layout.hidden.join(' | ')}`);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     await page.pdf({
       path: outputPath,
@@ -1378,6 +1443,7 @@ module.exports = {
   renderRawHtmlPdf,
   renderPagedHtmlPdf,
   preparePagedPage,
+  paginatePagedPage,
   lookupFaIcon,
   typographyForTemplate,
   buildHeaderFooter,

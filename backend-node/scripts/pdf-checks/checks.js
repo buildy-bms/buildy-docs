@@ -18,7 +18,7 @@ const db = require('../../src/database');
 db.init();
 const { computeMeterPlanStatus } = require('../../src/lib/bacs-audit-action-generator');
 const { axisOfArticle, isReserveAction } = require('../../src/routes/bacs-audit/_compliance-summary');
-const { renderHtml, preparePagedPage, shutdown } = require('../../src/lib/pdf');
+const { renderHtml, paginatePagedPage, shutdown } = require('../../src/lib/pdf');
 const { buildBacsAuditReportHtml } = require('../../src/lib/bacs-audit-report');
 const {
   buildBacsAuditExportData, renderBacsAuditReport, renderBacsAuditTables,
@@ -92,9 +92,9 @@ function checkMeters(d, id) {
 // lib/pdf.js renderPagedHtmlPdf) : aucun contenu qui déborde d'une page, aucun élément plus large
 // que la page (pages sombres à fond perdu exclues), aucun titre seul en bas de page.
 async function checkLayoutA4(page, d) {
-  await preparePagedPage(page, await buildBacsAuditReportHtml(d));
+  // Même pagination que l'export (deux passes, renvois de page écrits dès la mise en forme).
+  const paged = await paginatePagedPage(page, await buildBacsAuditReportHtml(d));
   const m = await page.evaluate(async (PX) => {
-    await window.PagedPolyfill.preview();
     const mm = (px) => Math.round(px / PX * 10) / 10;
     const pages = [...document.querySelectorAll('.pagedjs_page')];
     const vertical = [];
@@ -127,6 +127,8 @@ async function checkLayoutA4(page, d) {
   report(!m.vertical.length, 'Aucun contenu qui déborde d’une page (rapport A4)', m.vertical.length ? m.vertical.join(', ') : `${m.pages} pages`);
   report(!m.horizontal.length, 'Aucun débordement horizontal (rapport A4)', m.horizontal.join(' | '));
   report(!m.orphans.length, 'Aucun titre seul en bas de page (rapport A4)', m.orphans.join(' | '));
+  report(!paged.hidden.length, 'Aucun contenu posé hors de la page (rapport A4)',
+    paged.hidden.length ? paged.hidden.join(' | ') : `pagination en ${paged.passes} passe(s)`);
 }
 
 async function checkLayoutA3(page, d) {

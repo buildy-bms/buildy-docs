@@ -329,6 +329,23 @@ describe('bacs-audit-action-generator — revue 2026-09-24', () => {
     expect(a.r175_article).toBe('R175-4');
   });
 
+  it('GTB partiellement fonctionnelle (mig 218) : action majeure qui reprend les notes, GTB évaluée', () => {
+    const s = seedSite({ status: 'subject_immediate', bms: { present: 1, out_of_service: 0, functional_state: 'partial',
+      functional_notes: 'Alarmes plus remontées depuis la mise à jour.  ' } });
+    const t = s.targets();
+    const a = t.find(x => x.source_subtype === 'bms_partially_functional');
+    expect(a).toMatchObject({ severity: 'major', r175_article: 'R175-4', title: 'Remettre en état les fonctions défaillantes de la GTB' });
+    expect(a.description).toContain('ne fonctionnent qu\'en partie : Alarmes plus remontées depuis la mise à jour.');
+    expect(a.description).not.toContain('..');
+    expect(t.find(x => x.source_subtype === 'bms_out_of_service')).toBeFalsy();
+  });
+
+  it('GTB fonctionnelle : ni remise en service, ni remise en état', () => {
+    const s = seedSite({ status: 'subject_immediate', bms: { present: 1, out_of_service: 0, functional_state: 'functional' } });
+    const t = s.targets();
+    expect(t.find(x => x.source_subtype === 'bms_partially_functional' || x.source_subtype === 'bms_out_of_service')).toBeFalsy();
+  });
+
   // Relectures finales R1 / R2 (2026-09-24).
   it('générateur non raccordé : un circulateur raccordé ne suffit pas (R1 C1)', () => {
     const s = seedSite({ status: 'subject_immediate' });

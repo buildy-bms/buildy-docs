@@ -26,6 +26,7 @@ const {
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
 const { parseRoles, serializeRoles, rolesAllowEnergySource } = require('../lib/device-roles');
 const { BUILDY_OFFER_LEVELS, BUILDY_CLOUD_CREDENTIAL, applyBuildyCloudPreset } = require('../lib/buildy-cloud-preset');
+const { syncBmsFunctionalState } = require('../lib/bms-functional-state');
 
 // Mapping d'un row device vers l'API : parse `device_role` en array (mig 117).
 function mapDevice(d) {
@@ -720,6 +721,9 @@ async function routes(fastify) {
       operator_training_date: z.string().nullable().optional(),
       overall_compliance: z.enum(['compliant','partial','non_compliant']).nullable().optional(),
       out_of_service: boolish,
+      // Mig 218 — « La GTB et la supervision sont-elles fonctionnelles ? » + notes.
+      functional_state: z.enum(['functional', 'partial', 'not_functional']).nullable().optional(),
+      functional_notes: z.string().max(2000).nullable().optional(),
       notes_html: z.string().nullable().optional(),
       // R175-3 dernier alinea
       data_provision_to_manager: boolish,
@@ -753,6 +757,11 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+    // État de fonctionnement (mig 218) et « hors service » tenus d'accord (lib/bms-functional-state.js).
+    if (body.functional_state !== undefined || body.out_of_service !== undefined || body.functional_notes !== undefined) {
+      const cur = db.db.prepare('SELECT functional_state FROM bacs_audit_bms WHERE document_id = ?').get(documentId)?.functional_state;
+      syncBmsFunctionalState(body, cur ?? null);
+    }
     // Toggle bool -> 0/1
     const fields = {};
     for (const [k, v] of Object.entries(body)) {
