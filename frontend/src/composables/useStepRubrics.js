@@ -4,15 +4,24 @@
 //   rubrics : ref/computed d'une liste [{ key, anchor, state ('todo'|'open'|'done'), optional }]
 //   resetKey : getter ; les rubriques par défaut sont recalculées quand il change (audit, mise en page)
 import { ref, watch, nextTick } from 'vue'
-import { flashAuditTarget } from '@/lib/audit-reveal'
+import { flashAuditTarget } from '../lib/audit-reveal.js'
 
 const STORAGE_KEY = 'bacs-step-rubrics'
+const sameKey = (a, b) => (Array.isArray(a) && Array.isArray(b)
+  ? a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+  : Object.is(a, b))
 const showAll = ref((() => { try { return localStorage.getItem(STORAGE_KEY) === 'all' } catch { return false } })())
 
 export function useStepRubrics(rubrics, resetKey) {
   const openKeys = ref(new Set())
   const defaultOpen = () => new Set((rubrics.value || []).filter(r => r.state !== 'done' && !r.optional).map(r => r.key))
-  watch(resetKey, () => { openKeys.value = defaultOpen() }, { immediate: true })
+  // Comparaison des valeurs, pas du tableau : la synchro de l'audit (toutes les 5 s) remplace les
+  // objets du store, la clé est recalculée à l'identique et refermait les rubriques ouvertes
+  // (étape GTB, signalé par Kévin le 2026-10-16).
+  watch(resetKey, (key, prev) => {
+    if (prev !== undefined && sameKey(key, prev)) return
+    openKeys.value = defaultOpen()
+  }, { immediate: true })
 
   function setShowAll(v) {
     showAll.value = !!v

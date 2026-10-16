@@ -785,7 +785,9 @@ lissage de 1 à 2 niveaux, sommaire collant de la GTB à 1 024 px (calque compos
 - Zones : nom `min-w-40`, régime `w-60` (le nom tombait à 16 px).
 - Pièges vus en relisant sur d'autres audits que STEF (2026-10-14) : une rubrique ouverte « par
   défaut » avant la fin d'un chargement propre au composant reste ouverte une fois complète → mettre
-  ce chargement dans la clé de `useStepRubrics` (GTB : `afDocsLoaded`) ; le résumé de la puissance
+  ce chargement dans la clé de `useStepRubrics` (GTB : `afDocsLoaded`) ; la clé est comparée valeur par
+  valeur (v0.1.278) : la synchro de l'audit (`useAuditAutoSync`, 5 s) remplace l'objet GTB du store et un
+  nouveau tableau aux mêmes valeurs refermait les rubriques ouvertes (GTB de STEF, 16/10) ; le résumé de la puissance
   doit lire la puissance **retenue** (`power_summary.retainedKw`, celle du verdict), pas
   `bacs_total_power_kw` (en calcul automatique, cache parfois ancien : audit #56, 949 kW enregistrés,
   1 002 kW retenus) ; « 1er » du mois (`toLocaleDateString` écrit « 1 janvier »).

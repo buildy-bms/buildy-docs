@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.278",
+      "date": "2026-10-16",
+      "title": "Les rubriques ne se referment plus toutes seules",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Une rubrique ouverte reste ouverte",
+          "what": "À l’étape GTB, une rubrique ouverte se refermait au bout de quelques secondes, avant d’avoir pu la remplir : la mise à jour automatique de l’audit (toutes les 5 secondes) remettait l’affichage par défaut. Les rubriques ne reviennent plus à l’affichage par défaut qu’en changeant d’audit. Même protection à l’étape Identification.",
+          "where": "Audit BACS, étapes GTB et Identification.",
+          "how_to_test": "Ouvrir une rubrique déjà complète de l’étape GTB, attendre 15 secondes : elle reste ouverte, et le reste quand on modifie un champ."
+        }
+      ]
+    },
+    {
       "version": "0.1.277",
       "date": "2026-10-15",
       "title": "Une seule mise en page de l’audit",
